@@ -100,3 +100,27 @@ jobs:
           done
           if [ "$fail" = "0" ]; then echo "ALL ASSETS OK"; else echo "ASSET CHECK FAILED"; exit 1; fi
           REMOTE
+
+      # Nettoyage transitoire : l'app était servie sous /webshop/mrszoko. rsync
+      # tourne sans --delete et vise désormais /mrszoko, donc l'ancienne copie
+      # resterait en place et continuerait de répondre sur /webshop/mrszoko.
+      # On la supprime — mais SEULEMENT après que la vérif ci-dessus a confirmé
+      # que le nouveau /mrszoko est bien en ligne. Idempotent (rm -rf sur un
+      # chemin absent = no-op) et la forme du chemin est whitelistée, donc on ne
+      # peut jamais toucher la racine webshop ni /var/www/html. Une fois passé
+      # une fois en prod, cette étape peut être retirée.
+      - name: Remove the old /webshop/mrszoko location (post-verify)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          OLD="${{ vars.OLD_DEPLOY_DIR || '/var/www/html/webshop/mrszoko' }}"
+          NEW="${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}"
+          case "$OLD" in
+            */webshop/mrszoko) : ;;   # forme attendue — OK
+            *) echo "Nettoyage sauté : OLD='$OLD' n'a pas la forme .../webshop/mrszoko"; exit 0 ;;
+          esac
+          if [ "$OLD" = "$NEW" ]; then echo "Nettoyage sauté : OLD == NEW ($OLD)"; exit 0; fi
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "if [ -d '$OLD' ]; then rm -rf '$OLD' && echo \"supprimé : $OLD\"; else echo \"déjà absent : $OLD\"; fi"
