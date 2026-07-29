@@ -25,8 +25,8 @@ back_office_ws_franchisor (front)                webshop/php-api (backend, MÊME
      (X-Admin-Token), repli seed par table              …/email-templates · …/users · …/audit
 ```
 
-- **base** = same-origin `<origin>/webshop/api` (dérivée en retirant
-  `/backoffice_franchisor`). Sur `*.github.io` ou API injoignable → **mode seed**.
+- **base** = same-origin `<origin>/mrszoko/api` (dérivée = dossier de la page +
+  `/api`). Sur `*.github.io` ou API injoignable → **mode seed**.
 - **token** = `localStorage['adminToken']` (partagé par origine avec l'admin
   webshop). Override de test : `?api=<url>&token=<jeton>`.
 - **Repli** : toute table en erreur / 401 / absente garde son seed → le rendu ne
@@ -72,7 +72,7 @@ pas de `ADD COLUMN IF NOT EXISTS`). Appliquée une seule fois par `migrate.sh`.
 ## Pour activer côté serveur (config uniquement, pas de code)
 
 1. **Déployer le webshop** (push `main`) → `migrate.sh` crée les tables/colonnes,
-   les routes `/franchisor/*` deviennent disponibles sous `<origin>/webshop/api`.
+   les routes `/franchisor/*` deviennent disponibles sous `<origin>/mrszoko/api`.
 2. **`admin_token`** doit être configuré dans `php-api/config.php` (déjà requis
    par tout `/admin/*`). Le front l'envoie via `X-Admin-Token`.
 3. **Déployer le franchisor** (déjà fait) → il hydrate tout seul dès que l'API
@@ -84,8 +84,8 @@ nouvelle (la base URL est same-origin, les creds DB sont ceux du webshop).
 
 ## Cohérence cross-projets 🔗
 
-`base` = **la même** `<origin>/webshop/api` pour le webshop, le franchisee et le
-franchisor. Les données partagées (boutiques, catalogue, bons, commandes/CA)
+`base` = `<origin>/mrszoko/api` (l'app est autonome, servie sous `/mrszoko`).
+Les données partagées (boutiques, catalogue, bons, commandes/CA)
 sortent des **mêmes tables** (`ws_shops`, `ws_products`, `ws_vouchers`,
 `ws_orders`). Pas de source divergente.
 

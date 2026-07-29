@@ -1,26 +1,21 @@
 /* =====================================================================
-   api-config.js — résolution de l'API pour la Console marque (franchisor)
+   api-config.js — résolution de l'API pour la Console marque (mrszoko)
    =====================================================================
-   Même convention que le WebShop : l'API PHP est servie en same-origin.
-   Le franchisor vit à  <origin>/webshop/backoffice_franchisor/  → l'API
-   partagée est à  <origin>/webshop/api  (les MÊMES endpoints/base que le
-   webshop et le franchisee : donnée partagée = source unique).
+   L'app est autonome (hors webshop) : servie sous  <origine>/mrszoko/  et
+   l'API PHP est déployée en  ./api  (same-origin). On dérive donc la base
+   API = <dossier de la page>/api, quel que soit le chemin de montage.
 
    • Sur *.github.io ou si l'API ne répond pas → mode démo (seed en mémoire).
-   • Le jeton admin est partagé par origine (localStorage 'adminToken'),
-     donc si l'admin s'est connecté au back-office webshop, le franchisor
-     le réutilise automatiquement.
+   • Le jeton admin est mémorisé par origine (localStorage 'adminToken').
    • Overrides de test :  ?api=<baseUrl>  et  ?token=<adminToken>.
    ===================================================================== */
 (function () {
   var onGitHubPages = /\.github\.io$/i.test(location.hostname);
 
-  // Base du webshop : on retire le segment /backoffice_franchisor/... pour
-  // retomber sur .../webshop, puis on ajoute /api.
-  var path = location.pathname;
-  var m = path.match(/^(.*?)\/backoffice_franchisor(?:\/|$)/);
-  var webshopBase = m ? m[1] : path.replace(/[^/]*$/, '').replace(/\/$/, '');
-  var base = onGitHubPages ? null : (location.origin + webshopBase + '/api');
+  // Base de l'API = le dossier courant de la page + /api (same-origin).
+  // Ex. servi sous  /mrszoko/  → API sous  /mrszoko/api.
+  var dir = location.pathname.replace(/[^/]*$/, '').replace(/\/$/, '');
+  var base = onGitHubPages ? null : (location.origin + dir + '/api');
 
   var token = '';
   try { token = localStorage.getItem('adminToken') || ''; } catch (e) {}

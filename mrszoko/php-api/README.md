@@ -1,7 +1,7 @@
 # php-api — `webshop_mrszoko` backend
 
 The server the back-office is wired to. It exposes the `/franchisor/*` endpoints
-over same-origin `<origin>/webshop/api`, reading and writing the **`webshop_mrszoko`**
+over same-origin `<origin>/mrszoko/api`, reading and writing the **`webshop_mrszoko`**
 database whose tables are all prefixed **`wsm_`**. No business data is hardcoded
 in the front-end: every screen reads these tables through this API.
 

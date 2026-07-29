@@ -5,7 +5,7 @@ name: Deploy to server (SSH / rsync)
 # Claude Design "DC" export run natively: back_office_ws_franchisor.dc.html +
 # support.js (runtime) + bo_server.js / menu_api.js / menu_seed.js (data) +
 # the L'Atelier design system under _ds/ + vendored React under vendor/.
-# It is served at  http://<host>/webshop/backoffice_franchisor
+# It is served at  http://<host>/mrszoko
 #
 # ─── One-time setup (GitHub → Settings → Secrets and variables → Actions) ─────
 #   Secrets (same names as WebShop):
@@ -14,8 +14,8 @@ name: Deploy to server (SSH / rsync)
 #     SSH_PASSWORD   that user's password
 #   Optional variables:
 #     SSH_PORT       ssh port (default 22)
-#     DEPLOY_DIR     absolute server dir mapped to the URL /webshop/backoffice_franchisor
-#                    (default /var/www/html/webshop/mrszoko)
+#     DEPLOY_DIR     absolute server dir mapped to the URL /mrszoko
+#                    (default /var/www/html/mrszoko)
 #
 #   Notes:
 #   • rsync runs WITHOUT --delete, so nothing else on the server is wiped.
@@ -39,17 +39,17 @@ jobs:
       - name: Assemble static site
         run: |
           rm -rf site && mkdir -p site
-          cp back_office_ws_franchisor.dc.html api-config.js support.js bo_server.js menu_api.js menu_seed.js site/
-          cp back_office_ws_franchisor.dc.html site/index.html
-          cp -r _ds site/
-          cp -r vendor site/
+          cp mrszoko/back_office_ws_franchisor.dc.html mrszoko/api-config.js mrszoko/support.js mrszoko/bo_server.js mrszoko/menu_api.js mrszoko/menu_seed.js site/
+          cp mrszoko/back_office_ws_franchisor.dc.html site/index.html
+          cp -r mrszoko/_ds site/
+          cp -r mrszoko/vendor site/
           # Mister Szoko design system (tokens + brand tile) imported under mrszoko/
-          cp -r mrszoko site/
+          cp -r mrszoko/mrszoko site/
           # webshop_mrszoko API — deployed as ./api/ because the app (served at
-          # /webshop/mrszoko/) derives its API base as <same-origin>/webshop/mrszoko/api.
+          # /mrszoko/) derives its API base as <same-origin>/mrszoko/api.
           # The local SQLite database (data/) is regenerated on the server, never shipped.
-          rsync -a --exclude 'data' --exclude '*.sqlite' php-api/ site/api/
-          mkdir -p site/img && cp img/logo.png site/img/
+          rsync -a --exclude 'data' --exclude '*.sqlite' mrszoko/php-api/ site/api/
+          mkdir -p site/img && cp mrszoko/img/logo.png site/img/
           ls -R site
 
       - name: Install sshpass
@@ -62,15 +62,15 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "mkdir -p '${{ vars.DEPLOY_DIR || '/var/www/html/webshop/mrszoko' }}' && command -v rsync >/dev/null || (echo 'rsync manquant sur le serveur — apt-get install -y rsync'; exit 1)"
+            "mkdir -p '${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' && command -v rsync >/dev/null || (echo 'rsync manquant sur le serveur — apt-get install -y rsync'; exit 1)"
 
-      - name: Deploy → ${{ vars.DEPLOY_DIR || '/var/www/html/webshop/mrszoko' }}
+      - name: Deploy → ${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -e rsync -rltDz --omit-dir-times \
             -e "ssh -p ${{ vars.SSH_PORT || '22' }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-            site/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ vars.DEPLOY_DIR || '/var/www/html/webshop/mrszoko' }}/"
+            site/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/"
 
       - name: Verify the served page + assets (incl. fonts) on the server
         env:
@@ -79,7 +79,7 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s << 'REMOTE'
-          BASE="http://localhost/webshop/mrszoko"
+          BASE="http://localhost/mrszoko"
           DS="_ds/l-atelier-by-8504a4e3-7796-44da-b087-3fbd9dcb8dcd"
           echo "== served page references support.js =="
           curl -fsS "$BASE/" | grep -o './support.js' | head -1 || echo "WARN: support.js ref not found"
@@ -100,3 +100,27 @@ jobs:
           done
           if [ "$fail" = "0" ]; then echo "ALL ASSETS OK"; else echo "ASSET CHECK FAILED"; exit 1; fi
           REMOTE
+
+      # Nettoyage transitoire : l'app était servie sous /webshop/mrszoko. rsync
+      # tourne sans --delete et vise désormais /mrszoko, donc l'ancienne copie
+      # resterait en place et continuerait de répondre sur /webshop/mrszoko.
+      # On la supprime — mais SEULEMENT après que la vérif ci-dessus a confirmé
+      # que le nouveau /mrszoko est bien en ligne. Idempotent (rm -rf sur un
+      # chemin absent = no-op) et la forme du chemin est whitelistée, donc on ne
+      # peut jamais toucher la racine webshop ni /var/www/html. Une fois passé
+      # une fois en prod, cette étape peut être retirée.
+      - name: Remove the old /webshop/mrszoko location (post-verify)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          OLD="${{ vars.OLD_DEPLOY_DIR || '/var/www/html/webshop/mrszoko' }}"
+          NEW="${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}"
+          case "$OLD" in
+            */webshop/mrszoko) : ;;   # forme attendue — OK
+            *) echo "Nettoyage sauté : OLD='$OLD' n'a pas la forme .../webshop/mrszoko"; exit 0 ;;
+          esac
+          if [ "$OLD" = "$NEW" ]; then echo "Nettoyage sauté : OLD == NEW ($OLD)"; exit 0; fi
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "if [ -d '$OLD' ]; then rm -rf '$OLD' && echo \"supprimé : $OLD\"; else echo \"déjà absent : $OLD\"; fi"
