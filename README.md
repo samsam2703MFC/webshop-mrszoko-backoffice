@@ -1,12 +1,18 @@
 # webshop-mrszoko-backoffice
 
-Console marque · Siège (franchisor back-office) for **Mister Szoko**.
+**Mister Szoko** — mono-repo of the brand's web presence, deployed standalone
+under **`/mrszoko`** on the server (`http://185.180.206.46/mrszoko`).
 
-The application now lives entirely under [`mrszoko/`](mrszoko/) and is deployed
-**standalone** (no longer under `/webshop`) to **`/mrszoko`** on the server —
-`http://185.180.206.46/mrszoko` — with its PHP API served alongside at
-`/mrszoko/api`.
+| URL | Content | Source |
+| --- | --- | --- |
+| `/mrszoko/` | redirect → landing | generated at deploy |
+| `/mrszoko/landing` | Mister Szoko landing page | [`mrszoko/landing/`](mrszoko/landing/) |
+| `/mrszoko/backoffice` | Console marque · Siège (franchisor back-office) | [`mrszoko/backoffice/`](mrszoko/backoffice/) |
+| `/mrszoko/backoffice/api` | PHP API (`webshop_mrszoko` DB, `wsm_` tables) | [`mrszoko/backoffice/php-api/`](mrszoko/backoffice/php-api/) |
 
-- **App + docs** — [`mrszoko/`](mrszoko/) · start with [`mrszoko/README.md`](mrszoko/README.md)
-- **Backend** (`webshop_mrszoko` DB, `wsm_` tables) — [`mrszoko/php-api/`](mrszoko/php-api/)
-- **Deploy** (SSH/rsync on push to `main`) — [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
+- **Design system** (imported Claude Design handoff: tokens, components,
+  prototypes) — [`mrszoko/design-system/`](mrszoko/design-system/)
+- **Deploy** (SSH/rsync on push to `main`, with on-server verification) —
+  [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
+
+Start with [`mrszoko/README.md`](mrszoko/README.md).

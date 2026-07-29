@@ -1,14 +1,13 @@
 name: Deploy to server (SSH / rsync)
 
-# Pushes the static back-office (Console marque franchiseur) to the client's
-# server over SSH (rsync), exactly like the WebShop repo. This app is the
-# Claude Design "DC" export run natively: back_office_ws_franchisor.dc.html +
-# support.js (runtime) + bo_server.js / menu_api.js / menu_seed.js (data) +
-# the L'Atelier design system under _ds/ + vendored React under vendor/.
-# It is served at  http://<host>/mrszoko
+# Pushes the Mister Szoko site to the client's server over SSH (rsync):
+#   /mrszoko/backoffice  ← the Console marque (Claude Design "DC" export run
+#                          natively) + its PHP API at ./api
+#   /mrszoko/landing     ← the Mister Szoko landing page (design-system tokens)
+#   /mrszoko/            ← redirects to the landing
 #
 # ─── One-time setup (GitHub → Settings → Secrets and variables → Actions) ─────
-#   Secrets (same names as WebShop):
+#   Secrets (same names as before):
 #     SSH_HOST       server IP/host, e.g. 185.180.206.46
 #     SSH_USER       ssh user (dedicated deploy user recommended)
 #     SSH_PASSWORD   that user's password
@@ -19,8 +18,8 @@ name: Deploy to server (SSH / rsync)
 #
 #   Notes:
 #   • rsync runs WITHOUT --delete, so nothing else on the server is wiped.
-#   • An index.html (copy of back_office_ws_franchisor.dc.html) is generated so
-#     the directory URL serves the app directly.
+#     A dedicated post-verify step removes the OLD flat layout (the app used to
+#     live directly at /mrszoko/) — explicit whitelist, see below.
 #   • SECURITY: prefer a dedicated non-root deploy user + SSH key over the root
 #     password (replace the sshpass lines with an ssh-agent key, drop SSH_PASSWORD).
 # ─────────────────────────────────────────────────────────────────────────────
@@ -36,21 +35,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Assemble static site
+      - name: Assemble static site (backoffice + landing)
         run: |
-          rm -rf site && mkdir -p site
-          cp mrszoko/back_office_ws_franchisor.dc.html mrszoko/api-config.js mrszoko/support.js mrszoko/bo_server.js mrszoko/menu_api.js mrszoko/menu_seed.js site/
-          cp mrszoko/back_office_ws_franchisor.dc.html site/index.html
-          cp -r mrszoko/_ds site/
-          cp -r mrszoko/vendor site/
-          # Mister Szoko design system (tokens + brand tile) imported under mrszoko/
-          cp -r mrszoko/mrszoko site/
+          rm -rf site && mkdir -p site/backoffice site/landing
+
+          # -- Back-office → /mrszoko/backoffice --------------------------------
+          BO=mrszoko/backoffice
+          cp "$BO"/back_office_ws_franchisor.dc.html "$BO"/api-config.js "$BO"/support.js \
+             "$BO"/bo_server.js "$BO"/menu_api.js "$BO"/menu_seed.js site/backoffice/
+          cp "$BO"/back_office_ws_franchisor.dc.html site/backoffice/index.html
+          cp -r "$BO"/_ds site/backoffice/
+          cp -r "$BO"/vendor site/backoffice/
+          mkdir -p site/backoffice/img && cp "$BO"/img/logo.png site/backoffice/img/
           # webshop_mrszoko API — deployed as ./api/ because the app (served at
-          # /mrszoko/) derives its API base as <same-origin>/mrszoko/api.
+          # /mrszoko/backoffice/) derives its API base as <same-origin>/mrszoko/backoffice/api.
           # The local SQLite database (data/) is regenerated on the server, never shipped.
-          rsync -a --exclude 'data' --exclude '*.sqlite' mrszoko/php-api/ site/api/
-          mkdir -p site/img && cp mrszoko/img/logo.png site/img/
-          ls -R site
+          rsync -a --exclude 'data' --exclude '*.sqlite' "$BO"/php-api/ site/backoffice/api/
+
+          # -- Landing → /mrszoko/landing ---------------------------------------
+          cp -r mrszoko/landing/. site/landing/
+
+          # -- /mrszoko/ → redirect to the landing ------------------------------
+          cat > site/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="fr"><head><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=landing/">
+          <title>Mister Szoko</title>
+          <link rel="canonical" href="landing/">
+          </head><body><p><a href="landing/">Mister Szoko</a></p></body></html>
+          HTML
+
+          ls -R site | head -60
 
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
@@ -72,55 +87,62 @@ jobs:
             -e "ssh -p ${{ vars.SSH_PORT || '22' }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             site/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/"
 
-      - name: Verify the served page + assets (incl. fonts) on the server
+      - name: Verify backoffice + landing on the server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s << 'REMOTE'
-          BASE="http://localhost/mrszoko"
-          DS="_ds/l-atelier-by-8504a4e3-7796-44da-b087-3fbd9dcb8dcd"
-          echo "== served page references support.js =="
-          curl -fsS "$BASE/" | grep -o './support.js' | head -1 || echo "WARN: support.js ref not found"
-          echo "== asset status (code type bytes) =="
           fail=0
-          for f in api-config.js support.js bo_server.js menu_api.js menu_seed.js \
-                   vendor/react.js vendor/react-dom.js \
-                   "$DS/global.css" "$DS/_ds_bundle.js" \
-                   "$DS/fonts/Gotham_Book.otf" "$DS/fonts/Gotham_Medium.otf" \
-                   "$DS/fonts/Gotham_Light.otf" "$DS/fonts/GC_Vank.ttf"; do
-            out=$(curl -s -o /dev/null -w "%{http_code} %{content_type} %{size_download}" "$BASE/$f")
-            set -- $out; code=$1; type=$2; size=$3
-            echo "  $code  $type  ${size}b  $f"
-            case "$f" in
-              *fonts/*) if [ "$code" != "200" ] || [ "${size:-0}" -lt 1000 ]; then echo "  ^ FONT NOT OK"; fail=1; fi ;;
-              *) if [ "$code" != "200" ]; then echo "  ^ ASSET NOT OK"; fail=1; fi ;;
-            esac
+          run() { URL="$1"; MIN="${2:-1}"
+            out=$(curl -s -o /dev/null -w "%{http_code}|%{size_download}|%{content_type}" "$URL")
+            IFS='|' read -r code size type <<< "$out"
+            size="${size%.*}"
+            echo "  $code  $type  ${size}b  $URL"
+            if [ "$code" != "200" ] || [ "${size:-0}" -lt "$MIN" ]; then echo "  ^ NOT OK"; fail=1; fi
+          }
+          BO="http://localhost/mrszoko/backoffice"
+          LP="http://localhost/mrszoko/landing"
+          DS="_ds/l-atelier-by-8504a4e3-7796-44da-b087-3fbd9dcb8dcd"
+          echo "== backoffice =="
+          for f in "" /api-config.js /support.js /bo_server.js /menu_api.js /menu_seed.js \
+                   /vendor/react.js /vendor/react-dom.js \
+                   "/$DS/global.css" "/$DS/_ds_bundle.js" \
+                   "/$DS/fonts/Gotham_Book.otf" "/$DS/fonts/Gotham_Medium.otf" \
+                   "/$DS/fonts/Gotham_Light.otf" "/$DS/fonts/GC_Vank.ttf"; do
+            case "$f" in *fonts/*) run "$BO$f" 1000 ;; *) run "$BO$f" 1 ;; esac
           done
-          if [ "$fail" = "0" ]; then echo "ALL ASSETS OK"; else echo "ASSET CHECK FAILED"; exit 1; fi
+          echo "== landing =="
+          run "$LP/" 1000
+          run "$LP/tokens.css" 100
+          run "$LP/tokens/colors.css" 500
+          run "$LP/assets/logo.png" 1000
+          echo "== racine /mrszoko → redirection landing =="
+          run "http://localhost/mrszoko/" 50
+          if [ "$fail" = "0" ]; then echo "ALL CHECKS OK"; else echo "CHECK FAILED"; exit 1; fi
           REMOTE
 
-      # Nettoyage transitoire : l'app était servie sous /webshop/mrszoko. rsync
-      # tourne sans --delete et vise désormais /mrszoko, donc l'ancienne copie
-      # resterait en place et continuerait de répondre sur /webshop/mrszoko.
-      # On la supprime — mais SEULEMENT après que la vérif ci-dessus a confirmé
-      # que le nouveau /mrszoko est bien en ligne. Idempotent (rm -rf sur un
-      # chemin absent = no-op) et la forme du chemin est whitelistée, donc on ne
-      # peut jamais toucher la racine webshop ni /var/www/html. Une fois passé
-      # une fois en prod, cette étape peut être retirée.
-      - name: Remove the old /webshop/mrszoko location (post-verify)
+      # Nettoyage transitoire : avant cette version, le back-office était servi À
+      # PLAT sous /mrszoko/ (index.html, support.js, api/…). rsync tourne sans
+      # --delete, donc ces fichiers resteraient servis à côté du nouveau layout
+      # backoffice/ + landing/. On les retire — liste blanche explicite, jamais de
+      # rm générique — et SEULEMENT après que la vérif ci-dessus est passée.
+      # Idempotent ; l'étape pourra être retirée une fois passée en prod.
+      - name: Remove the old flat layout at /mrszoko root (post-verify)
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
-          OLD="${{ vars.OLD_DEPLOY_DIR || '/var/www/html/webshop/mrszoko' }}"
-          NEW="${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}"
-          case "$OLD" in
-            */webshop/mrszoko) : ;;   # forme attendue — OK
-            *) echo "Nettoyage sauté : OLD='$OLD' n'a pas la forme .../webshop/mrszoko"; exit 0 ;;
-          esac
-          if [ "$OLD" = "$NEW" ]; then echo "Nettoyage sauté : OLD == NEW ($OLD)"; exit 0; fi
+          DIR="${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}"
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "if [ -d '$OLD' ]; then rm -rf '$OLD' && echo \"supprimé : $OLD\"; else echo \"déjà absent : $OLD\"; fi"
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s << REMOTE
+          set -u
+          DIR='$DIR'
+          for f in back_office_ws_franchisor.dc.html api-config.js support.js \
+                   bo_server.js menu_api.js menu_seed.js .nojekyll \
+                   _ds vendor img api mrszoko; do
+            if [ -e "\$DIR/\$f" ]; then rm -rf "\${DIR:?}/\$f" && echo "supprimé : \$DIR/\$f"; fi
+          done
+          echo "reste à la racine :"; ls -1 "\$DIR"
+          REMOTE
