@@ -106,7 +106,7 @@ jobs:
           LP="http://localhost/mrszoko/landing"
           DS="_ds/l-atelier-by-8504a4e3-7796-44da-b087-3fbd9dcb8dcd"
           echo "== backoffice =="
-          for f in "" /api-config.js /support.js /bo_server.js /menu_api.js /menu_seed.js \
+          for f in / /api-config.js /support.js /bo_server.js /menu_api.js /menu_seed.js \
                    /vendor/react.js /vendor/react-dom.js \
                    "/$DS/global.css" "/$DS/_ds_bundle.js" \
                    "/$DS/fonts/Gotham_Book.otf" "/$DS/fonts/Gotham_Medium.otf" \
