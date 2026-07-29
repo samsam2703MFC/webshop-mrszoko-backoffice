@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mister Szoko — Chocolat de couverture pour professionnels</title>
+<meta name="description" content="Mister Szoko Pro : chocolat de couverture en callets pour les professionnels de la pâtisserie. Noire, lait, blanche, ruby — 2,5 / 10 / 20 kg, prix HT dégressifs.">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  /* ==========================================================
+     Mister Szoko — landing. Composée uniquement avec les tokens
+     du design system (tokens.css) : chocolat/crème/caramel,
+     Plus Jakarta Sans + Mulish + DM Mono, coins doux, ombres
+     chaudes, motion « melt ».
+     ========================================================== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+    color: var(--text-body);
+    background: var(--bg-page);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; text-decoration: none; }
+
+  .container { max-width: var(--container); margin: 0 auto; padding-left: var(--space-6); padding-right: var(--space-6); }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+  }
+
+  /* ---- Boutons (pilule, hover lift + darken, press settle) ---- */
+  .btn {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--weight-bold);
+    padding: 13px 26px; border-radius: var(--radius-pill); border: 1px solid transparent;
+    cursor: pointer;
+    transition: background var(--dur-base) var(--ease-out),
+                transform var(--dur-fast) var(--ease-soft),
+                box-shadow var(--dur-base) var(--ease-out);
+  }
+  .btn:hover { transform: var(--lift); box-shadow: var(--shadow-md); }
+  .btn:active { transform: translateY(0) scale(0.98); box-shadow: var(--shadow-sm); }
+  .btn:focus-visible { outline: none; box-shadow: var(--ring); }
+  .btn--accent { background: var(--accent); color: var(--text-on-accent); }
+  .btn--accent:hover { background: var(--accent-hover); }
+  .btn--brand { background: var(--brand); color: var(--cream-50); }
+  .btn--brand:hover { background: var(--brand-hover); }
+  .btn--ghost-dark { background: transparent; color: var(--cream-100); border-color: var(--choco-500); }
+  .btn--ghost-dark:hover { background: var(--choco-800); }
+
+  /* ---- Header ---- */
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--cream-50) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .header-in { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); padding-top: 14px; padding-bottom: 14px; }
+  .header-logo { height: 44px; width: auto; }
+  nav { display: flex; align-items: center; gap: var(--space-6); }
+  nav a.navlink {
+    font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-body);
+    padding-bottom: 2px; border-bottom: 2px solid transparent;
+    transition: color var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+  }
+  nav a.navlink:hover { color: var(--text-strong); border-bottom-color: var(--accent); }
+
+  /* ---- Hero (panneau chocolat, filigrane logo) ---- */
+  .hero { background: var(--choco-900); color: var(--cream-50); position: relative; overflow: hidden; }
+  .hero-watermark {
+    position: absolute; right: -140px; top: 50%; transform: translateY(-50%);
+    width: 560px; height: auto; opacity: 0.05; pointer-events: none; user-select: none;
+  }
+  .hero-in { position: relative; padding-top: var(--space-10); padding-bottom: var(--space-10); }
+  .hero .eyebrow { color: var(--caramel-400); margin-bottom: var(--space-5); }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, var(--text-4xl));
+    line-height: var(--leading-tight); letter-spacing: var(--tracking-tight);
+    font-weight: var(--weight-semibold); max-width: 640px; margin-bottom: var(--space-4);
+  }
+  .hero p.lead { color: var(--cream-200); max-width: 500px; margin-bottom: var(--space-6); }
+  .hero-ctas { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
+  .hero-strip { border-top: 1px solid var(--choco-700); }
+  .hero-strip-in {
+    display: flex; gap: var(--space-8); flex-wrap: wrap;
+    padding-top: var(--space-4); padding-bottom: var(--space-4);
+    font-family: var(--font-mono); font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide); color: var(--choco-300);
+  }
+
+  /* ---- Sections ---- */
+  section.block { padding-top: var(--space-9); padding-bottom: var(--space-9); }
+  .section-head { margin-bottom: var(--space-6); }
+  .section-head .eyebrow { color: var(--caramel-600); margin-bottom: var(--space-2); }
+  .section-head h2 {
+    font-family: var(--font-display); font-size: var(--text-2xl);
+    color: var(--text-strong); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight);
+  }
+  .section-head p.sub { color: var(--text-muted); margin-top: var(--space-2); max-width: 560px; }
+
+  /* ---- Cartes gamme ---- */
+  .grid-products { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4); }
+  .pcard {
+    background: var(--surface-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+  }
+  .pcard:hover { transform: var(--lift); box-shadow: var(--shadow-md); border-color: var(--choco-400); }
+  .pcard-photo { aspect-ratio: 5 / 3; display: grid; place-items: center; }
+  .pcard-photo span { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: rgba(251, 246, 239, 0.55); }
+  .pcard-body { padding: var(--space-4) var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
+  .pcard-meta { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-muted); }
+  .pcard h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--text-strong); font-weight: var(--weight-semibold); }
+  .pcard .specs { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+  .pcard .price {
+    margin-top: auto; padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font-mono); font-size: var(--text-sm); color: var(--price);
+  }
+  .pcard .price .ht { font-size: var(--text-2xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .pcard .price .perkg { font-size: var(--text-2xs); color: var(--caramel-600); }
+  .dots { display: inline-flex; gap: 4px; align-items: center; }
+  .dots i { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--cream-300); }
+  .dots i.on { background: var(--choco-600); }
+
+  /* ---- Formats dégressifs ---- */
+  .formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); }
+  .format {
+    background: var(--surface-raised); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); padding: var(--space-5);
+  }
+  .format .fk { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--caramel-600); }
+  .format .fs { font-family: var(--font-display); font-size: var(--text-xl); color: var(--text-strong); font-weight: var(--weight-semibold); margin: var(--space-2) 0 var(--space-1); }
+  .format p { font-size: var(--text-sm); color: var(--text-muted); }
+
+  /* ---- Panneau pro (chocolat plein) ---- */
+  .pro { background: var(--choco-800); color: var(--cream-50); border-radius: var(--radius-2xl); overflow: hidden; }
+  .pro-in { padding: var(--space-8); display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); flex-wrap: wrap; }
+  .pro h2 { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); margin-bottom: var(--space-2); }
+  .pro p { color: var(--cream-200); max-width: 520px; }
+
+  /* ---- Footer ---- */
+  footer { background: var(--choco-950); color: var(--choco-300); margin-top: var(--space-10); }
+  .footer-in { padding-top: var(--space-8); padding-bottom: var(--space-8); display: flex; justify-content: space-between; gap: var(--space-6); flex-wrap: wrap; align-items: flex-start; }
+  footer .flogo { height: 40px; width: auto; opacity: 0.9; margin-bottom: var(--space-3); }
+  footer .fmono { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); }
+  footer a { border-bottom: 1px solid var(--choco-700); padding-bottom: 1px; transition: color var(--dur-base) var(--ease-out); }
+  footer a:hover { color: var(--cream-100); }
+  .footer-base { border-top: 1px solid var(--choco-800); }
+  .footer-base-in { padding-top: var(--space-4); padding-bottom: var(--space-4); display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--tracking-wide); color: var(--choco-400); }
+
+  @media (max-width: 640px) {
+    nav a.navlink { display: none; }
+    .hero-watermark { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .btn, .pcard, nav a.navlink, footer a { transition: none; }
+    .btn:hover, .pcard:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container header-in">
+    <a href="#top" aria-label="Mister Szoko — accueil"><img class="header-logo" src="assets/logo.png" alt="Mister Szoko"></a>
+    <nav aria-label="Navigation principale">
+      <a class="navlink" href="#gamme">La gamme</a>
+      <a class="navlink" href="#formats">Formats &amp; prix</a>
+      <a class="navlink" href="#atelier">L'atelier</a>
+      <a class="btn btn--brand" href="#pro">Espace pro</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ===================== HERO ===================== -->
+  <section class="hero">
+    <img class="hero-watermark" src="assets/logo.png" alt="" aria-hidden="true">
+    <div class="container hero-in">
+      <div class="eyebrow">Couverture · Callets</div>
+      <h1>La couverture des professionnels, au meilleur prix du kilo.</h1>
+      <p class="lead">Noire, lait, blanche, ruby — en sachets de 2,5 kg et 10 kg ou cartons de 20 kg. Prix HT dégressifs : plus le format est grand, moins le kilo coûte cher.</p>
+      <div class="hero-ctas">
+        <a class="btn btn--accent" href="#gamme">Découvrir la gamme</a>
+        <a class="btn btn--ghost-dark" href="#pro">Compte pro dès 40 kg/mois</a>
+      </div>
+    </div>
+    <div class="hero-strip">
+      <div class="container hero-strip-in">
+        <span>Livraison en 48 h</span>
+        <span>Prix au kilo dégressif par format</span>
+        <span>Factures HT / TVA automatiques</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== GAMME ===================== -->
+  <section class="block" id="gamme">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">Catalogue</div>
+        <h2>Chocolat de couverture</h2>
+        <p class="sub">Des callets qui fondent vite, tempèrent proprement et tiennent le brillant. Chaque référence indique sa fluidité, son origine et son pourcentage de cacao.</p>
+      </div>
+      <div class="grid-products">
+        <article class="pcard">
+          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--choco-900), var(--choco-700));"><span>Photo produit</span></div>
+          <div class="pcard-body">
+            <div class="pcard-meta"><span>Noire · Madagascar</span><span class="dots" title="Fluidité 4/5"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+            <h3>Noire 70&nbsp;%</h3>
+            <div class="specs">callets · cacao 70&nbsp;%</div>
+            <div class="price"><span>dès 39,90&nbsp;€ <span class="ht">HT</span></span><span class="perkg">12,80&nbsp;€/kg</span></div>
+          </div>
+        </article>
+        <article class="pcard">
+          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--choco-600), var(--choco-400));"><span>Photo produit</span></div>
+          <div class="pcard-body">
+            <div class="pcard-meta"><span>Lait · Ghana</span><span class="dots" title="Fluidité 3/5"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+            <h3>Lait 38&nbsp;%</h3>
+            <div class="specs">callets · cacao 38&nbsp;%</div>
+            <div class="price"><span>dès 36,50&nbsp;€ <span class="ht">HT</span></span><span class="perkg">11,70&nbsp;€/kg</span></div>
+          </div>
+        </article>
+        <article class="pcard">
+          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--cream-200), var(--cream-400));"><span>Photo produit</span></div>
+          <div class="pcard-body">
+            <div class="pcard-meta"><span>Blanche</span><span class="dots" title="Fluidité 3/5"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+            <h3>Blanche 31&nbsp;%</h3>
+            <div class="specs">callets · beurre de cacao 31&nbsp;%</div>
+            <div class="price"><span>dès 34,90&nbsp;€ <span class="ht">HT</span></span><span class="perkg">11,20&nbsp;€/kg</span></div>
+          </div>
+        </article>
+        <article class="pcard">
+          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--berry-600), var(--berry-500));"><span>Photo produit</span></div>
+          <div class="pcard-body">
+            <div class="pcard-meta"><span>Spécialité</span><span class="dots" title="Fluidité 3/5"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+            <h3>Ruby</h3>
+            <div class="specs">callets · fève ruby</div>
+            <div class="price"><span>dès 48,90&nbsp;€ <span class="ht">HT</span></span><span class="perkg">15,60&nbsp;€/kg</span></div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FORMATS ===================== -->
+  <section class="block" id="formats" style="background: var(--surface-card); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">Formats &amp; prix</div>
+        <h2>Le kilo baisse avec le format</h2>
+        <p class="sub">Trois conditionnements, un principe simple : le prix au kilo est dégressif. Les tarifs s'affichent HT, la TVA se calcule à la commande.</p>
+      </div>
+      <div class="formats">
+        <div class="format">
+          <div class="fk">Sachet</div>
+          <div class="fs">2,5&nbsp;kg</div>
+          <p>Le format d'essai et des petites productions. Plein tarif.</p>
+        </div>
+        <div class="format">
+          <div class="fk">Sachet</div>
+          <div class="fs">10&nbsp;kg</div>
+          <p>Le format atelier. Environ −12&nbsp;% sur le prix du kilo.</p>
+        </div>
+        <div class="format">
+          <div class="fk">Carton</div>
+          <div class="fs">20&nbsp;kg</div>
+          <p>Le format production. Environ −20&nbsp;% sur le prix du kilo.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ATELIER ===================== -->
+  <section class="block" id="atelier">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">L'atelier</div>
+        <h2>Le chocolat, comme Mister Szoko l'entend</h2>
+        <p class="sub">Des fèves torréfiées lentement, un tempérage précis, une casse nette et une fonte longue en bouche. Nous ne vendons que ce que nous couvririons nous-mêmes.</p>
+      </div>
+      <div class="section-head" style="margin-bottom: 0;">
+        <p class="sub" style="font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); color: var(--ink-500);">Expédié au froid. Livré vite. Ne fond qu'en bouche.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PRO ===================== -->
+  <section class="block" id="pro" style="padding-top: 0;">
+    <div class="container">
+      <div class="pro">
+        <div class="pro-in">
+          <div>
+            <div class="eyebrow" style="color: var(--caramel-400); margin-bottom: var(--space-2);">Espace pro</div>
+            <h2>Vous travaillez plus de 40&nbsp;kg par mois&nbsp;?</h2>
+            <p>La boutique en ligne Mister Szoko Pro ouvre bientôt : catalogue complet, remises volume, factures HT/TVA et commande en quatre clics. Laissez-nous votre adresse, vous serez prévenu à l'ouverture.</p>
+          </div>
+          <a class="btn btn--accent" href="mailto:pro@misterszoko.com?subject=Ouverture%20de%20la%20boutique%20Mister%20Szoko%20Pro">Être prévenu de l'ouverture</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="container footer-in">
+    <div>
+      <img class="flogo" src="assets/logo.png" alt="Mister Szoko">
+      <p class="fmono">Chocolat de couverture pour professionnels</p>
+    </div>
+    <div class="fmono" style="display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-end;">
+      <a href="mailto:pro@misterszoko.com">pro@misterszoko.com</a>
+      <a href="../backoffice/">Console siège</a>
+    </div>
+  </div>
+  <div class="footer-base">
+    <div class="container footer-base-in">
+      <span>© 2026 Mister Szoko</span>
+      <span>Photos produit à venir — visuels provisoires</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,13 @@
+/* Mister Szoko — Corner radii
+   Soft, rounded — echoing the smooth pebble shape of the logo blob and a
+   praline's edges. Nothing sharp. */
+:root {
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
+  --radius-xl:   26px;
+  --radius-2xl:  36px;
+  --radius-pill: 999px;
+  --radius-blob: 42% 58% 56% 44% / 52% 44% 56% 48%; /* organic praline blob */
+}
