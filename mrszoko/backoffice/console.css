@@ -13,85 +13,111 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-.wrap {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 20px 16px 64px;
+/* ===========================================================================
+   Ossature : une colonne de navigation à gauche, le travail à droite.
+   Sur téléphone la colonne devient un tiroir — pilotée par une case à cocher,
+   donc sans JavaScript : la navigation marche même si un script casse.
+   =========================================================================== */
+.shell { display: block; min-height: 100vh; }
+.main  { min-width: 0; }
+.wrap  { max-width: 1180px; margin: 0 auto; padding: 18px 16px 64px; }
+
+/* --- Colonne de navigation ------------------------------------------------ */
+.side {
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
+  width: min(80vw, 285px);
+  display: flex; flex-direction: column;
+  background: var(--choco-800); color: var(--cream-50);
+  transform: translateX(-100%); transition: transform .22s ease;
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.menu-toggle:checked ~ .shell .side { transform: none; }
+
+.side .brand {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px; text-decoration: none; color: var(--cream-50);
+  border-bottom: 1px solid var(--choco-600); flex: none;
+}
+.side .brand img { height: 34px !important; width: auto; max-width: none; display: block; }
+.side .brand span { font-size: 11px; line-height: 1.35; color: var(--choco-200);
+                    text-transform: uppercase; letter-spacing: .09em; }
+.side .brand b { font-family: var(--font-display); font-size: 15px; letter-spacing: 0;
+                 text-transform: none; color: var(--cream-50); }
+
+.side-close {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 999px; cursor: pointer; font-size: 22px; line-height: 1;
+  color: var(--cream-100); background: var(--choco-600);
 }
 
-/* --- Barre ---------------------------------------------------------------- */
-header.bar { background: var(--choco-800); color: var(--cream-50); position: sticky; top: 0; z-index: 20; }
-.bar-in {
-  max-width: 1240px; margin: 0 auto; padding: 8px 16px;
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+.menu { display: flex; flex-direction: column; padding: 8px 10px 18px; flex: 1 1 auto; }
+.menu a {
+  display: block; color: var(--cream-100); text-decoration: none;
+  font-size: 14.5px; font-weight: 600; padding: 11px 12px; border-radius: 9px;
+  min-height: 44px; line-height: 1.5;
 }
-.bar-in .brand { display: flex; align-items: center; flex: 0 0 auto; }
-/* brand.css impose 96 px au galet (img[alt="Mister Szoko"], !important) — la
-   bonne taille sur une page vitrine, trois fois trop haute dans une barre de
-   console. On surcharge ici, et seulement ici. */
-.bar-in img { height: 28px !important; width: auto; max-width: none; flex: 0 0 auto; display: block; }
-.bar-in h1 {
+.menu a:hover { background: var(--choco-700, rgba(255,255,255,.06)); }
+.menu a.on { background: var(--choco-600); color: var(--cream-50); }
+.menu .sep {
+  font: 600 10px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--choco-200); padding: 16px 12px 6px;
+}
+
+.side-foot {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-top: 1px solid var(--choco-600);
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--choco-200);
+  position: sticky; bottom: 0; background: var(--choco-800);
+}
+.side-foot .who { flex: 1 1 auto; line-height: 1.5; }
+.side-foot b { color: var(--cream-50); font-family: var(--font-sans); font-size: 12.5px; }
+.side-foot button {
+  flex: none; min-height: 34px; padding: 0 12px; font-size: 12px; border-radius: 999px;
+  background: transparent; color: var(--cream-100); border: 1px solid var(--choco-600);
+}
+
+/* Le voile qui referme le tiroir : c'est un <label>, donc il fonctionne au
+   clavier et sans script. */
+.scrim {
+  position: fixed; inset: 0; z-index: 30; display: none;
+  background: rgba(20, 10, 5, .5);
+}
+.menu-toggle:checked ~ .scrim { display: block; }
+.menu-toggle { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+
+/* --- Bandeau de la page --------------------------------------------------- */
+header.bar {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--choco-800); color: var(--cream-50);
+  display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+}
+header.bar h1 {
   font-family: var(--font-display); font-size: 18px; margin: 0; font-weight: 600;
-  flex: 1 1 auto; min-width: 0;
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.bar-in h1 .badge {
-  font-family: var(--font-mono); font-size: 11px; vertical-align: middle;
+header.bar h1 .badge {
+  font-family: var(--font-mono); font-size: 11px; vertical-align: middle; white-space: nowrap;
   background: var(--choco-600); color: var(--cream-100); border-radius: 999px; padding: 2px 8px;
 }
-.bar-in .who {
-  font-family: var(--font-mono); font-size: 11.5px; color: var(--choco-200);
-  flex: 0 0 auto; order: 3;
-}
-
-/* Navigation : une case à cocher pilote l'ouverture — aucun JavaScript, donc
-   le menu fonctionne même si un script casse. <details> ne convenait pas :
-   les navigateurs masquent son contenu quand il est fermé, et aucune règle CSS
-   ne peut le rouvrir sur grand écran. */
-.menu-toggle { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .menu-btn {
-  order: 2; cursor: pointer; user-select: none;
-  min-height: 40px; display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; user-select: none; flex: none;
+  min-height: 38px; display: inline-flex; align-items: center; gap: 8px;
   padding: 0 14px; border-radius: 999px;
   background: var(--choco-600); color: var(--cream-50);
   font-size: 13.5px; font-weight: 600;
 }
-.menu-btn::after { content: "▾"; font-size: 11px; }
-.menu-toggle:checked ~ .menu-btn::after { content: "▴"; }
-.menu-toggle:focus-visible ~ .menu-btn { outline: 2px solid var(--cream-100); outline-offset: 2px; }
+.menu-btn::before { content: "☰"; font-size: 15px; }
+.menu-toggle:focus-visible ~ .shell .menu-btn { outline: 2px solid var(--cream-100); outline-offset: 2px; }
 
-.menu { order: 4; display: none; flex-direction: column; width: 100%; padding: 6px 0 2px; }
-.menu-toggle:checked ~ .menu { display: flex; }
-.menu a {
-  color: var(--cream-100); text-decoration: none; font-size: 15px; font-weight: 600;
-  padding: 11px 4px; border-bottom: 1px solid var(--choco-600);
-}
-.menu a.on { color: var(--caramel-300, var(--cream-50)); }
-.menu .sep {
-  font: 600 10px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
-  color: var(--choco-200); padding: 14px 4px 4px;
-}
-
+/* --- À partir d'un écran de portable : la colonne est là, tout le temps ---- */
 @media (min-width: 980px) {
-  /* Deux lignes, jamais trois : l'identité de la page en haut, la navigation
-     en dessous. Elle NE SE REPLIE PAS — elle défile horizontalement. Une barre
-     qui s'enroule sur trois lignes mange l'écran et noie l'en-tête ; on garde
-     donc tous les écrans accessibles sans que la barre grossisse. */
-  .bar-in { padding: 8px 24px 0; gap: 16px; flex-wrap: wrap; }
-  .bar-in h1 { flex: 0 0 auto; font-size: 20px; }
-  .bar-in .who { order: 3; margin-left: auto; }
-  .menu-btn { display: none; }
-  .menu {
-    order: 4; display: flex; flex-direction: row; flex-wrap: nowrap; gap: 18px;
-    align-items: center; width: 100%; padding: 6px 0 7px; margin-top: 4px;
-    border-top: 1px solid var(--choco-600);
-    overflow-x: auto; overscroll-behavior-x: contain;
-    scrollbar-width: none;                     /* la barre de défilement gênerait plus qu'elle n'aide */
-  }
-  .menu::-webkit-scrollbar { display: none; }
-  .menu a { border-bottom: 2px solid transparent; padding: 2px 0; font-size: 13px; white-space: nowrap; }
-  .menu a.on { border-bottom-color: var(--cream-100); }
-  .menu .sep { padding: 0; border-left: 1px solid var(--choco-600); padding-left: 14px; white-space: nowrap; }
-  .wrap { padding: 24px; }
+  .shell { display: grid; grid-template-columns: 268px 1fr; }
+  .side { position: sticky; top: 0; height: 100vh; transform: none; width: auto; }
+  .scrim, .menu-btn, .side-close { display: none !important; }
+  header.bar { padding: 12px 24px; }
+  header.bar h1 { font-size: 20px; }
+  .wrap { padding: 24px 24px 72px; }
 }
 
 /* --- Blocs ---------------------------------------------------------------- */

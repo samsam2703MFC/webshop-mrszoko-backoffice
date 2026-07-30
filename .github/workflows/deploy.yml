@@ -402,6 +402,12 @@ jobs:
           # Le châssis commun et le lanceur : sans eux, les écrans s'affichent nus
           # et la console n'offre aucun chemin vers eux.
           run "$BO/console.css" 4000
+          # La colonne de navigation est le seul chemin vers les écrans : si la
+          # feuille perdait la règle, on se retrouverait avec un tiroir ouvert
+          # en permanence par-dessus le contenu.
+          curl -skL "$BO/console.css" | grep -q 'grid-template-columns: 268px' \
+            && echo "  colonne de navigation à gauche : présente dans la feuille" \
+            || { echo "  ^ NOT OK : la mise en page à deux colonnes a disparu"; fail=1; }
           run "$BO/console-nav.js" 1000
           curl -skL "$BO/" | grep -q 'console-nav.js' \
             && echo "  la console porte la navigation des écrans : confirmé" \

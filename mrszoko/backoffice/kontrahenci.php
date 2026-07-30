@@ -123,8 +123,10 @@ console_flash($flash, $kind);
   </div>
   <?php endif; ?>
 
-  <table>
-    <tr><th>Kontrahent</th><th>NIP</th><th>VAT UE</th><th>Status</th><th>Sprawdzono</th><th></th></tr>
+  <div class="tablewrap">
+  <table class="rwd">
+    <thead><tr><th>Kontrahent</th><th>NIP</th><th>VAT UE</th><th>Status</th><th>Sprawdzono</th><th></th></tr></thead>
+    <tbody>
     <?php foreach ($rows as $r):
       $vat = (string) $r['vat_eu'];
       $st  = (string) $r['vat_status'];
@@ -132,20 +134,20 @@ console_flash($flash, $kind);
       $lbl = ['valid' => 'Potwierdzony', 'invalid' => 'Nieznany', 'unavailable' => 'Brak odpowiedzi',
               'skipped' => 'Pominięty'][$st] ?? '—'; ?>
     <tr>
-      <td><?= h((string) $r['raison']) ?><br><small class="muted mono"><?= h((string) $r['code']) ?> · <?= h((string) $r['client_type']) ?></small></td>
-      <td class="mono"><?= h((string) $r['nip']) ?: '—' ?></td>
-      <td class="mono"><?= $vat !== '' ? h($vat) : '<span class="muted">—</span>' ?>
+      <td data-l="Kontrahent"><?= h((string) $r['raison']) ?><br><small class="muted mono"><?= h((string) $r['code']) ?> · <?= h((string) $r['client_type']) ?></small></td>
+      <td data-l="NIP" class="mono"><?= h((string) $r['nip']) ?: '—' ?></td>
+      <td data-l="VAT UE" class="mono"><?= $vat !== '' ? h($vat) : '<span class="muted">—</span>' ?>
         <?php if ($vat !== '' && wsm_vies_reverse_charge(['status' => $st, 'country' => substr($vat, 0, 2)])): ?>
           <br><span class="tag rc">odwrotne obciążenie</span>
         <?php endif; ?>
       </td>
-      <td><?php if ($vat !== ''): ?><span class="tag <?= h($cls) ?>"><?= h($lbl) ?></span>
+      <td data-l="Status"><?php if ($vat !== ''): ?><span class="tag <?= h($cls) ?>"><?= h($lbl) ?></span>
             <?php if (($r['vat_name'] ?? '') !== ''): ?><br><small class="muted"><?= h((string) $r['vat_name']) ?></small><?php endif; ?>
           <?php else: ?><span class="muted">—</span><?php endif; ?></td>
-      <td class="mono"><?= h(substr((string) ($r['vat_checked_at'] ?? ''), 0, 16)) ?: '—' ?>
+      <td data-l="Sprawdzono" class="mono"><?= h(substr((string) ($r['vat_checked_at'] ?? ''), 0, 16)) ?: '—' ?>
         <?php if (($r['vat_consultation'] ?? '') !== ''): ?><br><small class="muted"><?= h((string) $r['vat_consultation']) ?></small><?php endif; ?>
       </td>
-      <td>
+      <td data-l="">
         <?php if ($isAdmin && $vat !== ''): ?>
         <form method="post" style="margin:0">
           <input type="hidden" name="_t" value="<?= h($csrf) ?>">
@@ -157,5 +159,7 @@ console_flash($flash, $kind);
       </td>
     </tr>
     <?php endforeach; ?>
+    </tbody>
   </table>
+  </div>
 <?php console_foot();
