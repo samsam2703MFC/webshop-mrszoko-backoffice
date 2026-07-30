@@ -73,6 +73,8 @@ function console_menu(): array {
         'kontrahenci.php' => 'Kontrahenci',
         'kraje.php'       => 'Kraje',
         'rabaty.php'      => 'Rabaty',
+        'uzytkownicy.php' => 'Użytkownicy',
+        'audyt.php'       => 'Audyt',
         'ustawienia.php'  => 'Ustawienia',
     ];
 }
@@ -89,10 +91,11 @@ function console_erp_menu(): array {
     // Analiza geograficzna. Ici on vend en ligne : ces écrans ne décrivent
     // rien de réel et n'ont pas à être proposés. Ne restent que ceux qui
     // servent à une boutique : les comptes et la piste d'audit.
-    return [
-        'users' => 'Użytkownicy i role',
-        'audit' => 'Dziennik audytu',
-    ];
+    // Vide, et c'est voulu : la console héritée n'a plus d'écran que la nôtre
+    // ne couvre. Ses Użytkownicy ne pouvaient rien écrire (aucune route
+    // d'écriture n'existait) et son Dziennik audytu ne montrait que le
+    // journal, sans les chiffres. Les deux sont désormais chez nous.
+    return [];
 }
 
 /**
@@ -160,10 +163,12 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
       <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
 
-      <span class="sep">Konto</span>
+      <?php if (console_erp_menu()): ?>
+      <span class="sep">Konsola ERP</span>
       <?php foreach (console_erp_menu() as $k => $label): ?>
       <a href="./#ekran=<?= h($k) ?>"><?= h($label) ?></a>
       <?php endforeach; ?>
+      <?php endif; ?>
 
       <span class="sep">Publiczne</span>
       <a href="../shop/" target="_blank" rel="noopener">Sklep ↗</a>

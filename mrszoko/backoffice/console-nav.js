@@ -33,6 +33,8 @@
     ['kontrahenci.php', 'Kontrahenci'],
     ['kraje.php',       'Kraje i VAT'],
     ['rabaty.php',      'Rabaty'],
+    ['uzytkownicy.php', 'Użytkownicy'],
+    ['audyt.php',       'Audyt i wykresy'],
     ['ustawienia.php',  'Ustawienia integracji'],
     ['../shop/',        'Sklep ↗']
   ];
@@ -49,7 +51,10 @@
      whitelist qui n'existent pas ici. On ne les efface pas — ce serait
      toucher à l'export — on cesse de les proposer. */
   var HIDDEN = ['Pulpit sieci', 'Sklepy', 'Promocje sieci', 'Strefy zasięgu',
-                'Analiza geograficzna', 'Menu i zestawy', 'Dostawy'];
+                'Analiza geograficzna', 'Menu i zestawy', 'Dostawy',
+                // Remplacés par nos écrans : celui-ci ne savait pas écrire,
+                // celui-là ne montrait que le journal sans les chiffres.
+                'Użytkownicy i role', 'Dziennik audytu'];
 
   var NAV_SELECTOR = 'nav.lz';
   var BLOCK_ID = 'wsm-screens';
