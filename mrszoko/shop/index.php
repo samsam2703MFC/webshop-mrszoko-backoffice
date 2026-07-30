@@ -145,6 +145,15 @@ if ($page === '') {
       <p class="lead"><?= e($S['home.lead'] ?? '') ?></p>
       <a class="btn btn--accent" href="#katalog"><?= e($S['home.cta'] ?? '') ?></a>
     </div>
+    <?php if (isset($S['story.strip.1'])): ?>
+    <div class="hero-strip">
+      <div class="wrap hero-strip-in mono">
+        <span><?= e($S['story.strip.1']) ?></span>
+        <span><?= e($S['story.strip.2'] ?? '') ?></span>
+        <span><?= e($S['story.strip.3'] ?? '') ?></span>
+      </div>
+    </div>
+    <?php endif; ?>
   </section>
 
   <section class="wrap promises">
@@ -193,6 +202,62 @@ if ($page === '') {
     </div>
     <?php endif; ?>
   </section>
+
+  <?php // ---- Formats et prix dégressifs ---------------------------------- ?>
+  <?php if (isset($S['story.formats.title'])): ?>
+  <section class="block band" id="formaty">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow accent"><?= e($S['story.formats.eyebrow'] ?? '') ?></p>
+        <h2><?= e($S['story.formats.title']) ?></h2>
+        <p class="sub"><?= e($S['story.formats.sub'] ?? '') ?></p>
+      </div>
+      <div class="formats">
+        <?php for ($i = 1; isset($S["story.format.$i.size"]); $i++): ?>
+        <div class="format">
+          <p class="mono fk"><?= e($S["story.format.$i.kind"] ?? '') ?></p>
+          <p class="fs"><?= e($S["story.format.$i.size"]) ?></p>
+          <p><?= e($S["story.format.$i.note"] ?? '') ?></p>
+        </div>
+        <?php endfor; ?>
+      </div>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <?php // ---- La pracownia (ce que la landing racontait) -------------------- ?>
+  <?php if (isset($S['story.atelier.title'])): ?>
+  <section class="block" id="pracownia">
+    <div class="wrap section-head">
+      <p class="eyebrow accent"><?= e($S['story.atelier.eyebrow'] ?? '') ?></p>
+      <h2><?= e($S['story.atelier.title']) ?></h2>
+      <p class="sub"><?= e($S['story.atelier.sub'] ?? '') ?></p>
+      <p class="mono muted tagline"><?= e($S['story.atelier.tagline'] ?? '') ?></p>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <?php // ---- Panneau pro : compte B2B ------------------------------------- ?>
+  <?php if (isset($S['story.pro.title'])):
+    $mail = (string) ($S['footer.email'] ?? ''); ?>
+  <section class="wrap block" id="pro" style="padding-top:0">
+    <div class="pro">
+      <div class="pro-in">
+        <div>
+          <p class="eyebrow"><?= e($S['story.pro.eyebrow'] ?? '') ?></p>
+          <h2><?= e($S['story.pro.title']) ?></h2>
+          <p><?= e($S['story.pro.text'] ?? '') ?></p>
+        </div>
+        <?php if ($mail !== ''): ?>
+        <a class="btn btn--accent btn--lg"
+           href="mailto:<?= e($mail) ?>?subject=<?= e(rawurlencode((string) ($S['story.pro.mail_subject'] ?? ''))) ?>">
+          <?= e($S['story.pro.cta'] ?? '') ?>
+        </a>
+        <?php endif; ?>
+      </div>
+    </div>
+  </section>
+  <?php endif; ?>
 </main>
 <?php
     layout_footer($S);

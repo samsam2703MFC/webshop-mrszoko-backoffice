@@ -105,8 +105,10 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .hero .lead { color: var(--cream-200); max-width: 48ch; margin-bottom: var(--space-6); }
 
 /* ---- Promesses ------------------------------------------------------------- */
+/* Le bandeau mono ferme désormais le hero : les promesses ne le chevauchent
+   plus, elles s'ouvrent en dessous. */
 .promises { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);
-            margin-top: calc(-1 * var(--space-6)); position: relative; z-index: 1; }
+            margin-top: var(--space-7); }
 .promise { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
            padding: var(--space-5); box-shadow: var(--shadow-sm); }
 .promise h2 { font-size: var(--text-lg); margin-bottom: var(--space-1); }
@@ -276,3 +278,36 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
   .btn, .card, .navlink, .freeship .bar i { transition: none; }
   .btn:hover, .card:hover { transform: none; }
 }
+
+/* ============================================================================
+   Sections éditoriales reprises de la landing — la boutique et la page de
+   marque ne font plus qu'une. Mêmes jetons, mêmes règles.
+   ============================================================================ */
+
+/* Bandeau mono sous le hero : les trois arguments qui décident un pro. */
+.hero-strip { border-top: 1px solid var(--choco-700); }
+.hero-strip-in { display: flex; gap: var(--space-8); flex-wrap: wrap;
+                 padding-top: var(--space-4); padding-bottom: var(--space-4);
+                 color: var(--choco-300); }
+
+.band { background: var(--surface-card); border-top: 1px solid var(--border-subtle);
+        border-bottom: 1px solid var(--border-subtle); }
+.eyebrow.accent { color: var(--caramel-600); margin-bottom: var(--space-2); }
+.tagline { margin-top: var(--space-4); }
+
+.formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); }
+.format { background: var(--surface-raised); border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-lg); padding: var(--space-5); }
+.format .fk { color: var(--caramel-600); text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+.format .fs { font-family: var(--font-display); font-size: var(--text-xl); color: var(--text-strong);
+              font-weight: var(--weight-semibold); margin: var(--space-2) 0 var(--space-1); }
+.format p:last-child { font-size: var(--text-sm); color: var(--text-muted); }
+
+.pro { background: var(--choco-800); color: var(--cream-50); border-radius: var(--radius-2xl); overflow: hidden; }
+.pro-in { padding: var(--space-8); display: flex; align-items: center; justify-content: space-between;
+          gap: var(--space-6); flex-wrap: wrap; }
+.pro .eyebrow { color: var(--caramel-400); margin-bottom: var(--space-2); }
+.pro h2 { color: var(--cream-50); margin-bottom: var(--space-2); }
+.pro p { color: var(--cream-200); max-width: 56ch; }
+
+.site-foot .foot-links a { color: var(--choco-300); }

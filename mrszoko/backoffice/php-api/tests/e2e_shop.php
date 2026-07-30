@@ -70,6 +70,28 @@ ok('trzy języki dają trzy różne teksty', count(array_unique($langsSeen)) ===
 ok('nieznany język wraca do polskiego', ($bad['lang'] ?? '') === 'pl', $bad['lang'] ?? null);
 ok('metody dostawy pochodzą z bazy', count($cat['shipping'] ?? []) >= 2, $cat['shipping'] ?? null);
 
+// La page de marque et la boutique n'en font plus qu'une : le contenu
+// éditorial doit vivre dans la même table, dans les trois langues.
+foreach (['pl', 'uk', 'en'] as $L) {
+    [, $r] = http('GET', "$BASE/shop/catalog?lang=$L");
+    $S = $r['strings'] ?? [];
+    $missing = [];
+    foreach (['story.formats.title', 'story.atelier.title', 'story.pro.title',
+              'story.pro.cta', 'story.strip.1', 'footer.email'] as $k) {
+        if (($S[$k] ?? '') === '') $missing[] = $k;
+    }
+    ok("treść strony marki dostępna w « $L »", !$missing, $missing);
+}
+[, $rPl] = http('GET', "$BASE/shop/catalog?lang=pl");
+[, $rEn] = http('GET', "$BASE/shop/catalog?lang=en");
+ok('treść strony marki jest przetłumaczona, nie skopiowana',
+    ($rPl['strings']['story.pro.title'] ?? 'x') !== ($rEn['strings']['story.pro.title'] ?? 'y'));
+// La boutique existe : plus question d'annoncer qu'elle « ouvre bientôt ».
+$proAll = strtolower(($rPl['strings']['story.pro.text'] ?? '') . ' ' . ($rEn['strings']['story.pro.text'] ?? ''));
+ok('panel pro nie zapowiada już sklepu jako „wkrótce”',
+    !str_contains($proAll, 'wkrótce') && !str_contains($proAll, 'opens soon') && !str_contains($proAll, 'rusza'),
+    $proAll);
+
 $prod = $products[0];
 [$c2, $one] = http('GET', "$BASE/shop/product/" . rawurlencode($prod['slug']));
 ok('produkt po slug', $c2 === 200 && ($one['product']['id'] ?? '') === $prod['id'], $c2);

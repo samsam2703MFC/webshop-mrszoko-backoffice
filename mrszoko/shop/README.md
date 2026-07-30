@@ -1,7 +1,14 @@
-# shop — la boutique Mister Szoko
+# shop — le site public Mister Szoko
 
-`https://<serveur>/mrszoko/shop/` — catalogue, fiche produit, panier, caisse,
-confirmation. Cinq pages, trois langues (pl / uk / en), aucun libellé en dur.
+`https://<serveur>/mrszoko/shop/` — **une seule page publique**. La page de
+marque et la boutique ont été fusionnées : l'accueil enchaîne le hero, les
+promesses, le catalogue achetable, les formats dégressifs, la pracownia et le
+panneau B2B. Viennent ensuite la fiche produit, le panier, la caisse et la
+confirmation. Trois langues (pl / uk / en), aucun libellé en dur.
+
+`/mrszoko/landing/` ne duplique plus rien : cette adresse a été partagée, elle
+reste donc vivante mais se contente de rediriger ici. La racine `/mrszoko/`
+pointe elle aussi sur la boutique.
 
 ## Pourquoi c'est du PHP et pas une application cliente
 
@@ -34,6 +41,17 @@ chaque affichage. Le serveur reste seul juge du montant — voir
 `../backoffice/php-api/shop.php` et la preuve dans `tests/e2e_shop.php`.
 
 Le formulaire de commande porte un jeton anti-CSRF comparé avec `hash_equals`.
+
+## Le contenu de la page de marque
+
+Formats, pracownia et strefa pro vivent dans `wsm_shop_i18n` sous le préfixe
+`story.*`, aux côtés du reste — une seule page, une seule table. Le panneau pro
+a été réécrit au passage : il annonçait une boutique « bientôt disponible », ce
+qui est devenu faux le jour où elle s'est retrouvée juste au-dessus. Il propose
+maintenant l'ouverture d'un compte B2B. Un test le vérifie.
+
+`wsm_landing_i18n` et l'API `/landing/content` restent en place (l'ancienne
+adresse et son contenu ne sont pas détruits), mais plus aucune page ne les lit.
 
 ## Le contenu
 
