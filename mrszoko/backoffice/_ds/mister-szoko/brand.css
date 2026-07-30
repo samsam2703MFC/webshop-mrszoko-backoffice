@@ -82,5 +82,5 @@ a:hover { color: var(--brand-hover); }
 img[alt="Mister Szoko"] {
   width: auto !important;
   max-width: 100% !important;
-  height: 56px;
+  height: 96px !important;
 }
