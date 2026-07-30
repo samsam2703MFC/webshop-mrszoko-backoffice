@@ -68,12 +68,12 @@
   function showBlocked(msg) {
     var wrap = el('div',
       'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;' +
-      'background:#F4EFE7;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px');
+      'background:var(--bg-page, #FBF6EF);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px');
     var card = el('div',
-      'max-width:420px;background:#fff;border-radius:14px;padding:26px 28px;border:1px solid #E8DFD2;' +
-      'box-shadow:0 18px 40px -12px rgba(46,22,12,.20)');
-    card.appendChild(el('div', 'font:600 16px/1.3 inherit;color:#221712;margin-bottom:8px', T.title));
-    card.appendChild(el('div', 'font:400 13.5px/1.55 inherit;color:#7C6A5D', msg));
+      'max-width:420px;background:#fff;border-radius:14px;padding:26px 28px;border:1px solid var(--border-subtle, #DEC9AC);' +
+      'box-shadow:0 18px 40px -12px rgba(46, 22, 12, .20)');
+    card.appendChild(el('div', 'font:600 16px/1.3 inherit;color:var(--text-strong, #211712);margin-bottom:8px', T.title));
+    card.appendChild(el('div', 'font:400 13.5px/1.55 inherit;color:var(--text-muted, #7C6A5D)', msg));
     wrap.appendChild(card);
     document.body.appendChild(wrap);
   }
@@ -82,26 +82,27 @@
   function showLogin(onDone) {
     var wrap = el('div',
       'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;' +
-      'background:#F4EFE7;font-family:system-ui,-apple-system,"Segoe UI",sans-serif');
+      'background:var(--bg-page, #FBF6EF);font-family:system-ui,-apple-system,"Segoe UI",sans-serif');
 
     var card = el('div',
       'width:min(400px,92vw);background:#fff;border-radius:14px;padding:32px 30px;' +
-      'box-shadow:0 18px 40px -12px rgba(46,22,12,.20);border:1px solid #E8DFD2');
+      'box-shadow:0 18px 40px -12px rgba(46, 22, 12, .20);border:1px solid var(--border-subtle, #DEC9AC)');
 
     var logo = document.createElement('img');
     logo.src = 'img/logo.png';
     logo.alt = 'Mister Szoko';
-    logo.style.cssText = 'height:34px;width:auto;display:block;margin-bottom:22px';
+    logo.style.cssText = 'width:auto;display:block;margin-bottom:20px';
+    logo.style.setProperty('height', '72px', 'important');  // prime sur la règle du DS
     logo.onerror = function () { logo.style.display = 'none'; };
     card.appendChild(logo);
 
-    card.appendChild(el('div', 'font:600 19px/1.2 inherit;color:#221712;margin-bottom:4px', T.title));
-    card.appendChild(el('div', 'font:400 13.5px/1.5 inherit;color:#7C6A5D;margin-bottom:22px', T.subtitle));
+    card.appendChild(el('div', 'font:600 19px/1.2 inherit;color:var(--text-strong, #211712);margin-bottom:4px', T.title));
+    card.appendChild(el('div', 'font:400 13.5px/1.5 inherit;color:var(--text-muted, #7C6A5D);margin-bottom:22px', T.subtitle));
 
     var form = document.createElement('form');
-    var lblCss = 'display:block;font:600 11px/1 inherit;letter-spacing:.08em;text-transform:uppercase;color:#7C6A5D;margin-bottom:6px';
-    var inpCss = 'width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #DEC9AC;border-radius:8px;' +
-                 'font:400 14px/1.2 inherit;color:#221712;background:#fff;margin-bottom:16px;outline:none';
+    var lblCss = 'display:block;font:600 11px/1 inherit;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted, #7C6A5D);margin-bottom:6px';
+    var inpCss = 'width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid var(--border-subtle, #DEC9AC);border-radius:8px;' +
+                 'font:400 14px/1.2 inherit;color:var(--text-strong, #211712);background:#fff;margin-bottom:16px;outline:none';
 
     form.appendChild(el('label', lblCss, T.email));
     var inEmail = document.createElement('input');
@@ -115,7 +116,7 @@
     inPass.style.cssText = inpCss;
     form.appendChild(inPass);
 
-    var err = el('div', 'display:none;font:400 12.5px/1.45 inherit;color:#B0402E;background:#FBE9EB;' +
+    var err = el('div', 'display:none;font:400 12.5px/1.45 inherit;color:var(--danger, #B0402E);background:var(--color-danger-bg, #FBEAE5);' +
                         'border-radius:8px;padding:9px 11px;margin-bottom:14px');
     form.appendChild(err);
 
@@ -123,14 +124,14 @@
     btn.type = 'submit';
     btn.textContent = T.submit;
     btn.style.cssText = 'width:100%;padding:12px 0;border:none;border-radius:999px;cursor:pointer;' +
-                        'font:700 14px/1 inherit;color:#fff;background:#8D1D2C;transition:background .2s';
-    btn.onmouseenter = function () { btn.style.background = '#6d1622'; };
-    btn.onmouseleave = function () { btn.style.background = '#8D1D2C'; };
+                        'font:700 14px/1 inherit;color:#fff;background:var(--brand, #41281A);transition:background .2s';
+    btn.onmouseenter = function () { btn.style.background = 'var(--brand-hover, #2E160C)'; };
+    btn.onmouseleave = function () { btn.style.background = 'var(--brand, #41281A)'; };
     form.appendChild(btn);
 
     [inEmail, inPass].forEach(function (i) {
-      i.onfocus = function () { i.style.borderColor = '#C68A3C'; i.style.boxShadow = '0 0 0 3px rgba(198,138,60,.25)'; };
-      i.onblur = function () { i.style.borderColor = '#DEC9AC'; i.style.boxShadow = 'none'; };
+      i.onfocus = function () { i.style.borderColor = 'var(--accent, #C68A3C)'; i.style.boxShadow = '0 0 0 3px rgba(198, 138, 60, .25)'; };
+      i.onblur = function () { i.style.borderColor = 'var(--border-subtle, #DEC9AC)'; i.style.boxShadow = 'none'; };
     });
 
     function fail(msg) {
@@ -169,8 +170,8 @@
     var b = document.createElement('button');
     b.textContent = T.logout;
     b.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:9998;padding:7px 14px;' +
-      'border:1px solid rgba(34,23,18,.15);border-radius:999px;cursor:pointer;background:rgba(255,255,255,.92);' +
-      'font:600 11.5px/1 system-ui,-apple-system,"Segoe UI",sans-serif;color:#4A3B31;backdrop-filter:blur(6px)';
+      'border:1px solid rgba(46, 22, 12, .15);border-radius:999px;cursor:pointer;background:rgba(255, 255, 255, .92);' +
+      'font:600 11.5px/1 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink-700, #4A3B31);backdrop-filter:blur(6px)';
     b.onclick = function () {
       call('/auth/logout', { method: 'POST' })
         .catch(function () {})
