@@ -812,3 +812,21 @@ CREATE TABLE IF NOT EXISTS `wsm_stock_docs` (
   UNIQUE KEY `uq_wsm_stock_docs_number` (`number`),
   KEY `idx_wsm_stock_docs_order` (`order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Marki ------------------------------------------------------------------
+--  Une marque est une entité à part entière, pas une chaîne recopiée sur
+--  chaque produit : le logo, l'adresse du site et l'orthographe du nom se
+--  corrigent une fois pour toutes. Le produit ne porte qu'une référence.
+CREATE TABLE IF NOT EXISTS `wsm_brands` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name`       VARCHAR(120) NOT NULL,
+  `slug`       VARCHAR(120) NOT NULL,
+  `logo_url`   VARCHAR(255) NOT NULL DEFAULT '',
+  `site_url`   VARCHAR(255) NOT NULL DEFAULT '',
+  `note`       VARCHAR(255) NOT NULL DEFAULT '',
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `active`     TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_brands_slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

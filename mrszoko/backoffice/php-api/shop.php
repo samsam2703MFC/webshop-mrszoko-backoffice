@@ -137,6 +137,16 @@ function wsm_shop_row_to_product(array $r, array $S): array {
         'price_vat' => $vatAmt,
         'vat_rate'  => $vat,
         'stock'     => (int) ($r['stock'] ?? 0),
+        // La marque telle que la vitrine l'affiche, apportée par la jointure du
+        // catalogue : nom, logo, adresse. null quand le produit n'en porte pas,
+        // ou quand elle est désactivée — la boutique n'affiche alors rien,
+        // plutôt qu'un cadre vide en attente d'image.
+        'brand'     => (($r['brand_name'] ?? '') !== '' && (int) ($r['brand_active'] ?? 0) === 1) ? [
+            'name' => (string) $r['brand_name'],
+            'slug' => (string) ($r['brand_slug'] ?? ''),
+            'logo' => (string) ($r['brand_logo'] ?? ''),
+            'site' => (string) ($r['brand_site'] ?? ''),
+        ] : null,
         'weight_g'  => (int) ($r['weight_g'] ?? 0),
         'sku'       => (string) ($r['sku'] ?? ''),
         'ean'       => (string) ($r['ean'] ?? ''),
@@ -149,9 +159,12 @@ function wsm_shop_row_to_product(array $r, array $S): array {
 function wsm_shop_products(PDO $pdo, string $lang): array {
     $S = wsm_shop_strings($pdo, $lang);
     $rows = $pdo->query(
-        "SELECT p.*, c.name AS category_name
+        "SELECT p.*, c.name AS category_name,
+                b.name AS brand_name, b.slug AS brand_slug, b.logo_url AS brand_logo,
+                b.site_url AS brand_site, b.active AS brand_active
            FROM wsm_products p
            LEFT JOIN wsm_categories c ON c.id = p.category_id
+           LEFT JOIN wsm_brands b ON b.id = p.brand_id
           WHERE p.shop_visible = 1 AND p.active = 1
           ORDER BY p.sort_order, p.nom"
     )->fetchAll();
@@ -162,9 +175,12 @@ function wsm_shop_products(PDO $pdo, string $lang): array {
 function wsm_shop_product(PDO $pdo, string $key, string $lang): ?array {
     $S = wsm_shop_strings($pdo, $lang);
     $st = $pdo->prepare(
-        "SELECT p.*, c.name AS category_name
+        "SELECT p.*, c.name AS category_name,
+                b.name AS brand_name, b.slug AS brand_slug, b.logo_url AS brand_logo,
+                b.site_url AS brand_site, b.active AS brand_active
            FROM wsm_products p
            LEFT JOIN wsm_categories c ON c.id = p.category_id
+           LEFT JOIN wsm_brands b ON b.id = p.brand_id
           WHERE p.shop_visible = 1 AND p.active = 1 AND (p.slug = ? OR p.id = ?)
           LIMIT 1"
     );

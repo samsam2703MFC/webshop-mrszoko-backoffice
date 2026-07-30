@@ -603,6 +603,19 @@ jobs:
               NTL=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_landing_i18n" 2>/dev/null || echo 0)
               NTG=$(mysql -N -e "SELECT COUNT(DISTINCT lang) FROM mrszoko.wsm_shop_i18n" 2>/dev/null || echo 0)
             fi
+            # Marques : la table et la colonne qui la relie aux produits. Sans
+            # elles l'écran Marki serait muet et les logos absents de la vitrine.
+            QB="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name='wsm_brands'"
+            QBC="SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='mrszoko' AND table_name='wsm_products' AND column_name='brand_id'"
+            if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+              NB=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QB" 2>/dev/null || echo 0)
+              NBC=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QBC" 2>/dev/null || echo 0)
+            else
+              NB=$(mysql -N -e "$QB" 2>/dev/null || echo 0)
+              NBC=$(mysql -N -e "$QBC" 2>/dev/null || echo 0)
+            fi
+            echo "  marki : tabela $NB/1 · powiązanie z produktem $NBC/1"
+            if [ "${NB:-0}" -lt 1 ] || [ "${NBC:-0}" -lt 1 ]; then echo "  ^ ATTENTION : les marques n'ont pas de table ou pas de lien produit"; fail=1; fi
             echo "  CMS (treści) : $NT / 3 tabele · sklep $NTS tekstów · strona $NTL · języki $NTG"
             if [ "${NT:-0}" -lt 3 ]; then echo "  ^ ATTENTION : le contenu des sites publics n'a pas de table"; fail=1; fi
             if [ "${NTS:-0}" -lt 100 ]; then echo "  ^ ATTENTION : la boutique n'a presque aucun texte — page muette"; fail=1; fi

@@ -350,3 +350,20 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
   color: var(--success); font-size: 13.5px; font-weight: 600;
 }
 .added-note a { color: inherit; text-decoration: underline; }
+
+/* --- Marques ---------------------------------------------------------------
+   Le logo est posé sur un fond neutre et contraint en hauteur : les logos
+   fournis n'ont jamais le même gabarit, et sans cette contrainte une image
+   carrée écraserait la carte pendant qu'une image large resterait minuscule.
+   object-fit: contain garde les proportions quoi qu'on nous envoie. */
+.brand-mark { display: block; height: 22px; margin: 0 0 6px; }
+.brand-mark img { height: 100%; width: auto; max-width: 120px; object-fit: contain; display: block; }
+.brand-mark--text { font: 600 11px/22px var(--font-mono); letter-spacing: .08em;
+                    text-transform: uppercase; color: var(--text-muted); }
+.brand-mark--lg { height: 40px; margin: 0; }
+.brand-mark--lg img { max-width: 190px; }
+.brand-mark--lg.brand-mark--text { font-size: 14px; line-height: 40px; }
+.brand-line { display: flex; align-items: center; gap: 14px; margin: 0 0 14px;
+              padding: 0 0 14px; border-bottom: 1px solid var(--border-subtle); }
+.brand-line .brand-name { display: flex; flex-direction: column; gap: 1px; font-size: 15px; }
+.brand-line .brand-name a { color: var(--brand); }

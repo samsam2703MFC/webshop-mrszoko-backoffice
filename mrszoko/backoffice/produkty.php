@@ -17,6 +17,7 @@ $API = console_api_dir();
 require_once $API . '/shop.php';
 require_once $API . '/media.php';
 require_once $API . '/stock.php';
+require_once $API . '/brand.php';
 
 /** La table produits stocke des złotys, pas des grosze : conversion locale. */
 function zl($v): string { return number_format((float) $v, 2, ',', "\u{202F}") . "\u{202F}zł"; }
@@ -46,6 +47,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } else {
         $id = (string) ($_POST['id'] ?? '');
         $openId = $id;
+
+        // ---- Marques -------------------------------------------------------
+        if (isset($_POST['marka_zapisz'])) {
+            $bid = (int) $_POST['marka_zapisz'] ?: null;
+            [$b, $errs] = wsm_brand_save($pdo, $_POST, $_FILES['logo'] ?? [], $bid);
+            if ($errs) {
+                $fieldErrors = $errs;
+                $flash = 'Popraw dane marki: ' . implode(' · ', $errs); $kind = 'err';
+            } else {
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), $bid ? 'Zmiana' : 'Dodanie',
+                          'wsm_brands ' . $b['name'], 'Sieć');
+                $flash = 'Zapisano markę ' . $b['name'] . '.';
+            }
+            $openId = '';
+        } elseif (isset($_POST['marka_usun'])) {
+            [$ok, $msg] = wsm_brand_delete($pdo, (int) $_POST['marka_usun']);
+            if ($ok) wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Usunięcie', 'wsm_brands #' . (int) $_POST['marka_usun'], 'Sieć');
+            $flash = $msg; $kind = $ok ? 'ok' : 'err';
+            $openId = '';
+        } else
 
         // ---- Désactiver / réactiver / supprimer ----------------------------
         // Désactiver retire le produit du catalogue et du magasin sans toucher
@@ -132,6 +153,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     if (isset($_POST['prix']) && $_POST['prix'] !== '') {
                         $set[] = 'prix = ?'; $vals[] = (float) str_replace(',', '.', (string) $_POST['prix']);
                     }
+                    // La marque est une référence : la chaîne vide veut dire
+                    // « aucune », et NULL est le bon marqueur en base — 0
+                    // pointerait vers une ligne qui n'existe pas.
+                    if (isset($_POST['brand_id'])) {
+                        $bid = (int) $_POST['brand_id'];
+                        $set[] = 'brand_id = ?'; $vals[] = $bid > 0 ? $bid : null;
+                    }
                     $vals[] = $id;
                     if ($set) {
                         $pdo->prepare("UPDATE wsm_products SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
@@ -156,6 +184,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
     }
 }
+
+$brands = wsm_brands_all($pdo);
+$brandCounts = wsm_brand_counts($pdo);
 
 $rows = $pdo->query(
     "SELECT p.*, c.name AS cat FROM wsm_products p
@@ -327,6 +358,19 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
             <small>Pokazywana na karcie produktu.</small>
           </label>
 
+          <label class="f">Marka
+            <select name="brand_id"<?= $isAdmin ? '' : ' disabled' ?>>
+              <option value="">— bez marki —</option>
+              <?php foreach ($brands as $b): ?>
+              <option value="<?= (int) $b['id'] ?>"<?= (int) ($p['brand_id'] ?? 0) === (int) $b['id'] ? ' selected' : '' ?>>
+                <?= h((string) $b['name']) ?><?= (int) $b['active'] === 1 ? '' : ' (wyłączona)' ?>
+              </option>
+              <?php endforeach; ?>
+            </select>
+            <small>Logo pokazuje się na kafelku i na karcie produktu w sklepie.
+              Marki dodaje się <a class="view" href="produkty.php#marki">niżej na tej stronie</a>.</small>
+          </label>
+
           <label class="f">Pochodzenie
             <input type="text" name="origin" value="<?= h((string) $p['origin']) ?>" placeholder="Madagaskar"<?= $isAdmin ? '' : ' disabled' ?>>
           </label>
@@ -382,4 +426,97 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
     <?php endif; ?>
   </details>
   <?php endforeach; ?>
+
+<?php
+// ---------------------------------------------------------------------------
+//  Marques
+//
+//  Une marque vit ici plutôt que sur chaque fiche produit : le logo, le nom et
+//  l'adresse du site se corrigent UNE fois et se voient partout. La fiche
+//  produit ne fait que la désigner.
+// ---------------------------------------------------------------------------
+$editB = isset($_GET['marka']) ? wsm_brand($pdo, (int) $_GET['marka']) : null;
+?>
+<div class="panel" id="marki">
+  <h2>Marki</h2>
+  <p class="muted small">
+    Logo marki pokazuje się na kafelku w katalogu i na karcie produktu w sklepie.
+    Wgrywany plik zachowuje <b>przezroczystość</b> — logo z przezroczystym tłem nie dostanie
+    kremowego prostokąta. Marka bez logo pokazuje swoją nazwę: pusty kadr wygląda jak zepsuty obrazek.
+  </p>
+
+  <?php if ($brands): ?>
+  <div class="tablewrap">
+  <table class="rwd">
+    <thead><tr><th>Logo</th><th>Nazwa</th><th>Strona</th><th class="num">Produkty</th><th>Stan</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($brands as $b): $n = $brandCounts[(int) $b['id']] ?? 0; ?>
+    <tr>
+      <td data-l="Logo">
+        <?php if ((string) $b['logo_url'] !== ''): ?>
+          <img src="<?= h(img_src((string) $b['logo_url'])) ?>" alt="<?= h((string) $b['name']) ?>"
+               style="height:26px;width:auto;max-width:110px;object-fit:contain;display:block">
+        <?php else: ?><span class="muted small">brak logo</span><?php endif; ?>
+      </td>
+      <td data-l="Nazwa"><b><?= h((string) $b['name']) ?></b><br>
+        <code class="muted" style="font-size:11.5px"><?= h((string) $b['slug']) ?></code></td>
+      <td data-l="Strona"><?= (string) $b['site_url'] !== ''
+            ? '<a href="' . h((string) $b['site_url']) . '" target="_blank" rel="noopener">otwórz ↗</a>'
+            : '<span class="muted">—</span>' ?></td>
+      <td data-l="Produkty" class="num"><?= $n ?></td>
+      <td data-l="Stan"><span class="tag <?= (int) $b['active'] === 1 ? 'ok' : 'off' ?>">
+            <?= (int) $b['active'] === 1 ? 'czynna' : 'wyłączona' ?></span></td>
+      <td data-l="">
+        <?php if ($isAdmin): ?>
+        <div class="actions">
+          <a class="code" href="produkty.php?marka=<?= (int) $b['id'] ?>#marki">Edytuj</a>
+          <?php if ($n === 0): ?>
+          <form method="post" onsubmit="return confirm('Usunąć markę <?= h((string) $b['name']) ?>?')">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <button class="danger" type="submit" name="marka_usun" value="<?= (int) $b['id'] ?>">Usuń</button>
+          </form>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+  <?php else: ?>
+  <p class="muted small">Nie ma jeszcze żadnej marki.</p>
+  <?php endif; ?>
+
+  <?php if ($isAdmin): ?>
+  <h3><?= $editB ? 'Edycja marki — ' . h((string) $editB['name']) : 'Nowa marka' ?></h3>
+  <form method="post" enctype="multipart/form-data" class="grid2">
+    <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+    <input type="hidden" name="marka_zapisz" value="<?= (int) ($editB['id'] ?? 0) ?>">
+    <label class="field"><span>Nazwa</span>
+      <input type="text" name="name" value="<?= h((string) ($editB['name'] ?? '')) ?>" required maxlength="120"></label>
+    <label class="field"><span>Strona marki (https://)</span>
+      <input type="url" name="site_url" value="<?= h((string) ($editB['site_url'] ?? '')) ?>" placeholder="https://"></label>
+    <label class="field"><span>Logo (PNG z przezroczystością, SVG nie)</span>
+      <input type="file" name="logo" accept="image/png,image/webp,image/jpeg,image/gif"></label>
+    <label class="field"><span>Kolejność</span>
+      <input type="number" name="sort_order" value="<?= (int) ($editB['sort_order'] ?? 0) ?>" style="max-width:120px"></label>
+    <label class="field" style="grid-column:1/-1"><span>Notatka wewnętrzna</span>
+      <input type="text" name="note" value="<?= h((string) ($editB['note'] ?? '')) ?>" maxlength="255"
+             placeholder="np. kontakt handlowy, warunki"></label>
+    <label class="field" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" name="active" value="1" <?= !$editB || (int) $editB['active'] === 1 ? 'checked' : '' ?>>
+      <span style="margin:0">Czynna — widoczna w sklepie</span></label>
+    <?php if ($editB && (string) $editB['logo_url'] !== ''): ?>
+    <label class="field" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" name="remove_logo" value="1">
+      <span style="margin:0">Usuń obecne logo</span></label>
+    <?php endif; ?>
+    <div class="actions" style="grid-column:1/-1">
+      <button class="primary" type="submit"><?= $editB ? 'Zapisz markę' : 'Dodaj markę' ?></button>
+      <?php if ($editB): ?><a class="code" href="produkty.php#marki">Anuluj</a><?php endif; ?>
+    </div>
+  </form>
+  <?php endif; ?>
+</div>
 <?php console_foot();

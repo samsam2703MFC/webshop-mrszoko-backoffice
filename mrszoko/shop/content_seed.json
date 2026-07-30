@@ -344,7 +344,8 @@
       "cart.discount": "Rabat ilościowy",
       "cart.discount_next": "Dodaj jeszcze {x}, aby uzyskać rabat {p} %.",
       "cart.backorder": "Część produktów przygotujemy na zamówienie — potwierdzimy termin e-mailem.",
-      "order.backorder": "Część zamówienia przygotujemy na zamówienie. Skontaktujemy się z Tobą e-mailem w sprawie terminu wysyłki."
+      "order.backorder": "Część zamówienia przygotujemy na zamówienie. Skontaktujemy się z Tobą e-mailem w sprawie terminu wysyłki.",
+      "product.brand": "Marka"
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -512,7 +513,8 @@
       "cart.discount": "Знижка за обсяг",
       "cart.discount_next": "Додайте ще {x}, щоб отримати знижку {p} %.",
       "cart.backorder": "Частину товарів виготовимо на замовлення — підтвердимо термін електронною поштою.",
-      "order.backorder": "Частину замовлення виготовимо на замовлення. Ми напишемо вам щодо терміну відправлення."
+      "order.backorder": "Частину замовлення виготовимо на замовлення. Ми напишемо вам щодо терміну відправлення.",
+      "product.brand": "Бренд"
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -680,7 +682,8 @@
       "cart.discount": "Volume discount",
       "cart.discount_next": "Add {x} more to get {p} % off.",
       "cart.backorder": "Some items will be made to order — we will confirm the date by e-mail.",
-      "order.backorder": "Part of this order will be made to order. We will e-mail you about the shipping date."
+      "order.backorder": "Part of this order will be made to order. We will e-mail you about the shipping date.",
+      "product.brand": "Brand"
     }
   }
 }
