@@ -43,6 +43,17 @@ CREATE TABLE IF NOT EXISTS wsm_categories (
 
 CREATE TABLE IF NOT EXISTS wsm_products (
   id              TEXT PRIMARY KEY,
+  -- Vitrine de la boutique (textes traduits dans wsm_shop_i18n)
+  slug            TEXT NOT NULL DEFAULT '',
+  shop_visible    INTEGER NOT NULL DEFAULT 0,
+  stock           INTEGER NOT NULL DEFAULT 0,
+  image_url       TEXT NOT NULL DEFAULT '',
+  swatch_from     TEXT NOT NULL DEFAULT '--choco-500',
+  swatch_to       TEXT NOT NULL DEFAULT '--choco-800',
+  origin          TEXT NOT NULL DEFAULT '',
+  cocoa           TEXT NOT NULL DEFAULT '',
+  unit_label      TEXT NOT NULL DEFAULT '',
+  badge           TEXT NOT NULL DEFAULT '',
   -- Expédition InPost + fiscalité tpay
   sku             TEXT NOT NULL DEFAULT '',
   ean             TEXT NOT NULL DEFAULT '',
@@ -304,4 +315,142 @@ CREATE TABLE IF NOT EXISTS wsm_landing_products (
   price_perkg_pln REAL,
   price_from_eur  REAL,
   price_perkg_eur REAL
+);
+
+-- ============================================================================
+--  BOUTIQUE EN LIGNE — miroir SQLite (dev / CI), structurellement identique.
+--  Montants en GROSZE (entiers) : jamais de flottant sur de l'argent.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS wsm_shipping_methods (
+  id           TEXT PRIMARY KEY,
+  carrier      TEXT NOT NULL DEFAULT 'inpost',
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  active       INTEGER NOT NULL DEFAULT 1,
+  price_net    INTEGER NOT NULL DEFAULT 0,
+  vat_rate     REAL NOT NULL DEFAULT 0.23,
+  free_from    INTEGER NOT NULL DEFAULT 0,
+  max_weight_g INTEGER NOT NULL DEFAULT 25000
+);
+
+CREATE TABLE IF NOT EXISTS wsm_orders (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  code            TEXT NOT NULL UNIQUE,
+  access_token    TEXT NOT NULL,
+  lang            TEXT NOT NULL DEFAULT 'pl',
+  currency        TEXT NOT NULL DEFAULT 'PLN',
+  status          TEXT NOT NULL DEFAULT 'nowe',
+  payment_status  TEXT NOT NULL DEFAULT 'oczekuje',
+  client_id       INTEGER REFERENCES wsm_clients(id) ON DELETE SET NULL,
+  client_type     TEXT NOT NULL DEFAULT 'osoba',
+  email           TEXT NOT NULL DEFAULT '',
+  phone           TEXT NOT NULL DEFAULT '',
+  first_name      TEXT NOT NULL DEFAULT '',
+  last_name       TEXT NOT NULL DEFAULT '',
+  company         TEXT NOT NULL DEFAULT '',
+  nip             TEXT NOT NULL DEFAULT '',
+  vat_eu          TEXT NOT NULL DEFAULT '',
+  invoice         INTEGER NOT NULL DEFAULT 0,
+  bill_street     TEXT NOT NULL DEFAULT '',
+  bill_building   TEXT NOT NULL DEFAULT '',
+  bill_postcode   TEXT NOT NULL DEFAULT '',
+  bill_city       TEXT NOT NULL DEFAULT '',
+  bill_country    TEXT NOT NULL DEFAULT 'PL',
+  delivery_method TEXT NOT NULL DEFAULT 'inpost_locker',
+  inpost_point    TEXT NOT NULL DEFAULT '',
+  ship_street     TEXT NOT NULL DEFAULT '',
+  ship_building   TEXT NOT NULL DEFAULT '',
+  ship_postcode   TEXT NOT NULL DEFAULT '',
+  ship_city       TEXT NOT NULL DEFAULT '',
+  ship_country    TEXT NOT NULL DEFAULT 'PL',
+  items_net       INTEGER NOT NULL DEFAULT 0,
+  items_vat       INTEGER NOT NULL DEFAULT 0,
+  items_gross     INTEGER NOT NULL DEFAULT 0,
+  shipping_net    INTEGER NOT NULL DEFAULT 0,
+  shipping_vat    INTEGER NOT NULL DEFAULT 0,
+  shipping_gross  INTEGER NOT NULL DEFAULT 0,
+  total_net       INTEGER NOT NULL DEFAULT 0,
+  total_vat       INTEGER NOT NULL DEFAULT 0,
+  total_gross     INTEGER NOT NULL DEFAULT 0,
+  weight_g        INTEGER NOT NULL DEFAULT 0,
+  parcel_template TEXT NOT NULL DEFAULT '',
+  note            TEXT,
+  created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  paid_at         TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wsm_order_items (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id   INTEGER NOT NULL REFERENCES wsm_orders(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  sku        TEXT NOT NULL DEFAULT '',
+  ean        TEXT NOT NULL DEFAULT '',
+  qty        INTEGER NOT NULL DEFAULT 1,
+  unit_net   INTEGER NOT NULL DEFAULT 0,
+  unit_gross INTEGER NOT NULL DEFAULT 0,
+  vat_rate   REAL NOT NULL DEFAULT 0.23,
+  line_net   INTEGER NOT NULL DEFAULT 0,
+  line_vat   INTEGER NOT NULL DEFAULT 0,
+  line_gross INTEGER NOT NULL DEFAULT 0,
+  weight_g   INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS wsm_payments (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id     INTEGER NOT NULL REFERENCES wsm_orders(id) ON DELETE CASCADE,
+  provider     TEXT NOT NULL DEFAULT 'tpay',
+  tr_id        TEXT NOT NULL DEFAULT '',
+  tr_title     TEXT NOT NULL DEFAULT '',
+  amount       INTEGER NOT NULL DEFAULT 0,
+  currency     TEXT NOT NULL DEFAULT 'PLN',
+  status       TEXT NOT NULL DEFAULT 'oczekuje',
+  redirect_url TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wsm_payment_events (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id     INTEGER REFERENCES wsm_orders(id) ON DELETE SET NULL,
+  provider     TEXT NOT NULL DEFAULT 'tpay',
+  event_key    TEXT NOT NULL UNIQUE,
+  status       TEXT NOT NULL DEFAULT '',
+  amount       INTEGER NOT NULL DEFAULT 0,
+  signature_ok INTEGER NOT NULL DEFAULT 0,
+  raw          TEXT,
+  created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wsm_shipments (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id        INTEGER NOT NULL REFERENCES wsm_orders(id) ON DELETE CASCADE,
+  carrier         TEXT NOT NULL DEFAULT 'inpost',
+  service         TEXT NOT NULL DEFAULT 'inpost_locker',
+  target_point    TEXT NOT NULL DEFAULT '',
+  parcel_template TEXT NOT NULL DEFAULT '',
+  weight_g        INTEGER NOT NULL DEFAULT 0,
+  shipment_id     TEXT NOT NULL DEFAULT '',
+  tracking_number TEXT NOT NULL DEFAULT '',
+  label_url       TEXT NOT NULL DEFAULT '',
+  status          TEXT NOT NULL DEFAULT 'do_utworzenia',
+  created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wsm_order_events (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id   INTEGER NOT NULL REFERENCES wsm_orders(id) ON DELETE CASCADE,
+  event      TEXT NOT NULL,
+  detail     TEXT NOT NULL DEFAULT '',
+  actor      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wsm_shop_i18n (
+  lang TEXT NOT NULL,
+  k    TEXT NOT NULL,
+  v    TEXT NOT NULL,
+  PRIMARY KEY (lang, k)
 );

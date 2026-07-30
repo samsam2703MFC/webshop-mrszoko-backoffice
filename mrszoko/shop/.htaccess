@@ -1,0 +1,43 @@
+# ============================================================================
+#  Boutique Mister Szoko — routage et sécurité.
+#  Ce fichier NE PEUT PAS hériter des règles mod_rewrite du dossier parent :
+#  RewriteEngine se réactive répertoire par répertoire. Tout ce qui doit
+#  s'appliquer ici est donc réécrit ici, redirection HTTPS comprise.
+# ============================================================================
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # HTTPS d'abord : inutile de router une requête qu'on va rediriger.
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=308,L]
+
+  # URL lisibles : /p/mon-produit, /koszyk, /zamowienie/MS-…
+  # Les fichiers réels (css, js, images) sont servis tels quels.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(.*)$ index.php/$1 [L,QSA]
+</IfModule>
+
+# Le contenu du panier et l'adresse de l'acheteur sont dans les pages :
+# aucun cache partagé ne doit les conserver.
+<IfModule mod_headers.c>
+  <FilesMatch "\.php$">
+    Header always set Cache-Control "private, no-cache, must-revalidate"
+  </FilesMatch>
+  # Les ressources statiques, elles, sont figées et peuvent durer.
+  <FilesMatch "\.(css|js|png|jpg|jpeg|webp|svg|woff2)$">
+    Header always set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# La source du contenu ne se sert pas au public.
+<Files "content_seed.json">
+  Require all denied
+</Files>

@@ -25,6 +25,18 @@ $seed = !in_array('--no-seed', $args, true);
 $cfg = wsm_config();
 $pdo = wsm_pdo();
 
+// ---- Synchronisation du contenu éditorial (sortie immédiate) ---------------
+// Ajoute les libellés livrés depuis le dernier déploiement SANS écraser ceux
+// que la console a modifiés. Joué à chaque déploiement : sans lui, un nouveau
+// bouton livré dans le code resterait vide sur une base déjà seedée.
+if (in_array('--sync-content', $args, true)) {
+    $pdo = wsm_bootstrap();
+    require_once __DIR__ . '/seed.php';
+    [$keys, $ship] = wsm_sync_content($pdo);
+    echo "contenu synchronisé : $keys libellés ajoutés, $ship modes de livraison ajoutés\n";
+    exit(0);
+}
+
 // ---- Rebranding L'Atelier → Mister Szoko (sortie immédiate) ----------------
 // Les bases déjà seedées portent les libellés de démonstration L'Atelier. Ce
 // passage les réécrit en place. Idempotent : une fois exécuté, REPLACE() ne

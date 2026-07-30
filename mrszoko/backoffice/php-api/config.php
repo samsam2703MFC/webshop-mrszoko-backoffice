@@ -41,6 +41,34 @@ $cfg = [
     // rien n'est nécessaire. Ne renseigner qu'une origine précise, jamais '*' :
     // les requêtes portent une session par cookie.
     'cors_origin' => getenv('WSM_CORS_ORIGIN') ?: '',
+
+    // Adresse publique de la boutique — sert à composer les URL de retour et
+    // de notification envoyées à tpay. Vide : déduite de la requête en cours.
+    'shop_url' => getenv('WSM_SHOP_URL') ?: '',
+
+    // ---- tpay.com : encaissement ------------------------------------------
+    // AUCUN défaut. Sans client_id/secret, aucune transaction n'est créée ;
+    // sans security_code, aucune notification n'est acceptée (fail-closed).
+    // Ces valeurs vivent dans config.local.php sur le serveur, jamais ici :
+    // ce dépôt est public.
+    'tpay' => [
+        'merchant_id'   => getenv('WSM_TPAY_MERCHANT_ID') ?: '',
+        'client_id'     => getenv('WSM_TPAY_CLIENT_ID') ?: '',
+        'client_secret' => getenv('WSM_TPAY_CLIENT_SECRET') ?: '',
+        'security_code' => getenv('WSM_TPAY_SECURITY_CODE') ?: '',
+        'sandbox'       => (getenv('WSM_TPAY_SANDBOX') ?: '1') !== '0',
+    ],
+
+    // ---- InPost ShipX : expédition ----------------------------------------
+    // geowidget_token est le jeton PUBLIC du sélecteur de Paczkomat (il part
+    // dans la page) ; token est le jeton SERVEUR ShipX (il n'en sort jamais).
+    'inpost' => [
+        'token'           => getenv('WSM_INPOST_TOKEN') ?: '',
+        'organization_id' => getenv('WSM_INPOST_ORG_ID') ?: '',
+        'geowidget_token' => getenv('WSM_INPOST_GEOWIDGET_TOKEN') ?: '',
+        'sending_method'  => getenv('WSM_INPOST_SENDING_METHOD') ?: 'parcel_locker',
+        'sandbox'         => (getenv('WSM_INPOST_SANDBOX') ?: '1') !== '0',
+    ],
 ];
 
 // Optional local override (untracked, gitignored): drop a config.local.php on the

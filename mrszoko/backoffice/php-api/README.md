@@ -92,9 +92,75 @@ Invalid input returns `422` with a per-field map (`{"error":"validation","fields
 which the console shows next to the offending field. Proof: `tests/e2e_commerce.php`
 (40 assertions).
 
+## The shop — who decides the price
+
+The storefront lives in `../../shop` and is rendered **server-side by PHP from
+these tables**. The browser only ever sends product ids and quantities; every
+price, VAT amount, shipping fee and total is recomputed here (`shop.php`). A
+tampered basket changes nothing about what gets charged — `tests/e2e_shop.php`
+asserts exactly that.
+
+Money is carried in **grosze (integers)**. Floats have no business holding money:
+`0.1 + 0.2` is not `0.3` in binary, and a VAT line has to add up. Consumer prices
+are stored gross (`wsm_products.prix`, Polish B2C convention); net is derived and
+VAT is the *remainder*, so `net + VAT == gross` always holds, line by line.
+
+| Table | Holds |
+| --- | --- |
+| `wsm_orders` | one order: buyer snapshot, delivery target, all totals |
+| `wsm_order_items` | frozen lines — an invoice must not move when a price does |
+| `wsm_payments` | tpay attempts (transaction id, amount, status) |
+| `wsm_payment_events` | every notification received; `event_key` **UNIQUE** = no double capture |
+| `wsm_shipments` | InPost parcel: service, locker code, template, tracking |
+| `wsm_order_events` | audit trail per order |
+| `wsm_shipping_methods` | delivery options and prices — data, not code |
+| `wsm_shop_i18n` | every shop string in pl / uk / en |
+
+Stock is decremented **inside the order transaction** (`UPDATE … WHERE stock >= ?`),
+so two simultaneous orders for the last bag cannot both succeed.
+
+The parcel template (A/B/C) is computed from the **whole basket's volume**, not
+from the largest single item — two 6 cm bags each fit an 8 cm locker, together
+they do not. It stays an estimate (a real packing solver would be needed); the
+console labels it as such and the packer can override.
+
+## tpay — what makes the money real
+
+`POST /shop/tpay/notify` is the only thing that marks an order paid. The browser
+return URL never does: it is under the buyer's control. Three guards, all tested:
+
+1. **Signature first.** `md5(id + tr_id + tr_amount + tr_crc + security_code)`,
+   compared with `hash_equals`. A rejected notification is archived under a
+   throwaway key — if it took the real idempotency key, knowing a `tr_id` would
+   be enough to stop a legitimate payment from ever being booked.
+2. **Amount recheck.** An authentic notification for the wrong amount is refused.
+3. **Idempotency in the database.** `wsm_payment_events.event_key UNIQUE`. tpay
+   resends until it reads `TRUE`; the unique index — not application logic — is
+   what stops a second capture, because two concurrent retries would race.
+
+Without `security_code` configured, **every** notification is refused (`503`).
+Without `client_id`/`client_secret`, no transaction is created: the order still
+exists and waits. Nothing has a default value.
+
+InPost is the same shape: `inpost.php` builds the exact ShipX payload and shows
+it in the console *before* the integration is switched on, so missing data is
+visible immediately. Without a ShipX token nothing is sent — the parcel is
+prepared by hand and the shipment row stays `oczekuje_na_konfiguracje`.
+
 ## Configuration
 
 All in `config.php`, entirely env-driven (see the header there).
+
+Payment and shipping credentials have **no defaults** and never belong in this
+repository (it is public). Set them in `config.local.php` on the server, or as
+`WSM_TPAY_CLIENT_ID`, `WSM_TPAY_CLIENT_SECRET`, `WSM_TPAY_SECURITY_CODE`,
+`WSM_INPOST_TOKEN`, `WSM_INPOST_ORG_ID`, `WSM_INPOST_GEOWIDGET_TOKEN`.
+Both integrations default to **sandbox**; set `WSM_TPAY_SANDBOX=0` /
+`WSM_INPOST_SANDBOX=0` to go live.
+
+Editorial content is additive on deploy: `php migrate.php --sync-content` adds
+strings shipped since the last release **without** overwriting anything edited
+from the console.
 
 ## Endpoints
 
@@ -108,6 +174,20 @@ All in `config.php`, entirely env-driven (see the header there).
 | GET | `/landing/content?lang=pl\|uk\|en` | `wsm_landing_i18n` · `wsm_landing_products` — everything the landing renders (strings + product cards, texts resolved server-side; unknown lang → default `pl`) |
 | POST | `/franchisor/landing-string` | upsert/delete one i18n string (admin) |
 | POST | `/franchisor/landing-product` | upsert/delete one landing product card (admin) |
+| **Sklep — boutique (public)** | | |
+| GET | `/shop/catalog?lang=pl\|uk\|en` | `wsm_products` · `wsm_shop_i18n` · `wsm_shipping_methods` |
+| GET | `/shop/product/{slug}` | one product, texts resolved server-side |
+| POST | `/shop/quote` | prices the basket — **ids and quantities only**, prices ignored |
+| POST | `/shop/order` | creates the order, decrements stock, opens the tpay transaction |
+| GET | `/shop/order/{code}?t=…` | order status; the token is compared with `hash_equals` |
+| POST | `/shop/tpay/notify` | signed payment notification, idempotent (replies `TRUE`) |
+| **Boutique côté console (protégé)** | | |
+| GET | `/franchisor/orders` | order list |
+| GET | `/franchisor/orders/{id}` | one order + events + the ShipX payload it would send |
+| GET | `/franchisor/shop-kpis` | orders, paid, pending, revenue, average basket |
+| GET | `/franchisor/shop-config` | integration state only — never a secret |
+| POST | `/franchisor/orders/{id}/status` | status transition (admin) |
+| POST | `/franchisor/orders/{id}/ship` | create the InPost shipment (admin, paid orders only) |
 | **Commerce (tpay + InPost)** | | |
 | POST | `/franchisor/client` | upsert/delete `wsm_clients` — validated payer + invoice data |
 | POST | `/franchisor/client-point` | upsert/delete `wsm_client_points` — locker code or courier address |
