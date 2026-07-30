@@ -756,14 +756,20 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
         $ins = $pdo->prepare(
             "INSERT INTO wsm_order_items
                (order_id, product_id, name, sku, ean, qty, unit_net, unit_gross, vat_rate,
-                line_net, line_vat, line_gross, weight_g, backorder)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                line_net, line_vat, line_gross, weight_g, backorder, unit_cost)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
+        // Le coût de revient est lu ici, au moment d'écrire la ligne, et jamais
+        // porté par le devis : celui-ci part tel quel dans la réponse publique
+        // de /shop/quote, et le prix d'achat n'a rien à y faire.
+        $cost = $pdo->prepare("SELECT base_cost FROM wsm_products WHERE id = ?");
         foreach ($quote['lines'] as $l) {
+            $cost->execute([$l['id']]);
+            $unitCost = wsm_grosze($cost->fetchColumn() ?: 0);
             $ins->execute([$orderId, $l['id'], $l['name'], $l['sku'], $l['ean'], $l['qty'],
                 $l['unit_net'], $l['unit_gross'], $l['vat_rate'],
                 $l['line_net'], $l['line_vat'], $l['line_gross'], $l['weight_g'],
-                (int) ($l['backorder'] ?? 0)]);
+                (int) ($l['backorder'] ?? 0), $unitCost]);
         }
 
         $pdo->prepare(

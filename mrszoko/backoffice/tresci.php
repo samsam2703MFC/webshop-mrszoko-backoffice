@@ -58,7 +58,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // à chaque page : ce sont des valeurs de façade, et jusqu'ici elles
         // n'étaient modifiables qu'en redéployant. Les voici éditables.
         $up = $pdo->prepare("UPDATE wsm_shipping_methods
-                                SET price_net = ?, free_from = ?, max_weight_g = ?, active = ?
+                                SET price_net = ?, free_from = ?, max_weight_g = ?, active = ?, cost_net = ?
                               WHERE id = ?");
         $n = 0;
         foreach ((array) ($_POST['d'] ?? []) as $id => $row) {
@@ -67,6 +67,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 wsm_cms_grosze($row['free_from'] ?? ''),
                 max(1, (int) ($row['max_weight_g'] ?? 25000)),
                 empty($row['active']) ? 0 : 1,
+                wsm_cms_grosze($row['cost_net'] ?? ''),
                 (string) $id,
             ]);
             $n++;
@@ -223,12 +224,16 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
     bierze się właśnie stąd. Cena jest <b>netto</b>; VAT (23 %) dolicza sklep, tak jak dla towaru.
     Próg 0 zł oznacza „nigdy za darmo”. Odznaczona metoda znika z wyboru, ale zamówienia,
     które już ją mają, pozostają nietknięte.
-    Zasięg krajów ustawia się w <a href="kraje.php">Krajach</a>.</p>
+    Zasięg krajów ustawia się w <a href="kraje.php">Krajach</a>.<br>
+    <b>Koszt u przewoźnika</b> to Wasz rachunek za paczkę — klient go nie widzi. Bez niego
+    <a href="audyt.php">Audyt</a> nie umie powiedzieć, jaką część kosztu dostawy pokrywa klient:
+    przyjmuje wtedy cenę sprzedaży i pokazuje 100 % z definicji.</p>
   <form method="post">
     <input type="hidden" name="dostawa" value="1">
     <div class="tablewrap">
     <table class="rwd">
       <thead><tr><th>Metoda</th><th>Czynna</th><th class="num">Cena netto (zł)</th>
+                 <th class="num">Koszt u przewoźnika (zł)</th>
                  <th class="num">Gratis od (zł brutto)</th><th class="num">Maks. waga (g)</th><th class="num">Brutto</th></tr></thead>
       <tbody>
       <?php foreach ($ship as $s): $id = (string) $s['id'];
@@ -242,6 +247,9 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
               <?= (int) $s['active'] === 1 ? 'checked' : '' ?>></td>
         <td data-l="Cena netto" class="num"><input type="text" inputmode="decimal" style="width:100px"
               name="d[<?= h($id) ?>][price_net]" value="<?= h($zl2($s['price_net'])) ?>"></td>
+        <td data-l="Koszt u przewoźnika" class="num"><input type="text" inputmode="decimal" style="width:100px"
+              name="d[<?= h($id) ?>][cost_net]" value="<?= h($zl2($s['cost_net'] ?? 0)) ?>"
+              placeholder="0,00"></td>
         <td data-l="Gratis od" class="num"><input type="text" inputmode="decimal" style="width:110px"
               name="d[<?= h($id) ?>][free_from]" value="<?= h($zl2($s['free_from'])) ?>"></td>
         <td data-l="Maks. waga" class="num"><input type="number" min="1" style="width:110px"
