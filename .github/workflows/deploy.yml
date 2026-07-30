@@ -195,6 +195,26 @@ jobs:
                 echo '</IfModule>'
               } >> "$DIR/.htaccess"
             fi
+            # L'API a son propre .htaccess (RewriteBase + routage vers index.php) :
+            # les règles du parent ne s'y appliquent pas. On préfixe donc sa
+            # redirection — en 308, qui préserve la méthode des POST. Le rsync
+            # réécrit ce fichier à chaque déploiement, l'étape le re-préfixe.
+            if [ -f "$API/.htaccess" ] && ! grep -q 'WSM_HTTPS_REDIRECT' "$API/.htaccess"; then
+              TMP=$(mktemp)
+              {
+                echo '# WSM_HTTPS_REDIRECT — ajouté par le déploiement, TLS vérifié au préalable.'
+                echo '<IfModule mod_rewrite.c>'
+                echo '  RewriteEngine On'
+                echo '  RewriteCond %{HTTPS} !=on'
+                echo '  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=308,L]'
+                echo '</IfModule>'
+                echo ''
+                cat "$API/.htaccess"
+              } > "$TMP"
+              mv "$TMP" "$API/.htaccess"
+              chmod 644 "$API/.htaccess"
+              echo "redirection HTTPS ajoutée aussi à l'API (308, préserve les POST)"
+            fi
             echo "HTTPS opérationnel (200) → redirection http→https + HSTS activées"
           else
             echo "HTTPS ne répond pas (code $HTTPS_CODE) → redirection NON activée (le site resterait inaccessible)."
@@ -212,13 +232,13 @@ jobs:
             "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
           fail=0
           run() { URL="$1"; MIN="${2:-1}"
-            out=$(curl -s -o /dev/null -w "%{http_code}|%{size_download}|%{content_type}" "$URL")
+            out=$(curl -skL -o /dev/null -w "%{http_code}|%{size_download}|%{content_type}" "$URL")
             IFS='|' read -r code size type <<< "$out"
             size="${size%.*}"
             echo "  $code  $type  ${size}b  $URL"
             if [ "$code" != "200" ] || [ "${size:-0}" -lt "$MIN" ]; then
               echo "  ^ NOT OK — corps de la réponse :"
-              curl -s "$URL" | head -c 300; echo
+              curl -skL "$URL" | head -c 300; echo
               fail=1
             fi
           }
@@ -245,7 +265,7 @@ jobs:
           echo "== authentification (preuve de cloisonnement) =="
           API="$BO/api"
           TOK=$(php -r '$c=@include "'"$DIR_API"'/config.local.php"; echo is_array($c)?($c["admin_token"]??""):"";' 2>/dev/null || echo "")
-          codeOf() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          codeOf() { curl -skL -o /dev/null -w '%{http_code}' "$@"; }
           for r in kpis users audit delivery-clients; do
             c=$(codeOf "$API/franchisor/$r")
             echo "  $c  GET /franchisor/$r  (sans identité — attendu 401)"
