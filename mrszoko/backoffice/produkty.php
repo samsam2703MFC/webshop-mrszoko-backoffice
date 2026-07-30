@@ -11,26 +11,14 @@
 // ============================================================================
 declare(strict_types=1);
 
-$API = is_dir(__DIR__ . '/api') ? __DIR__ . '/api' : __DIR__ . '/php-api';
-require_once $API . '/db.php';
-require_once $API . '/auth.php';
+require_once __DIR__ . '/console.php';
+[$pdo, $me, $isAdmin] = console_boot();
+$API = console_api_dir();
 require_once $API . '/shop.php';
 require_once $API . '/media.php';
-require_once $API . '/delivery.php';   // wsm_audit() — la piste d'audit de la console
 
-header('Content-Type: text/html; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('Cache-Control: private, no-store');
-
-$pdo = wsm_bootstrap();
-
-wsm_session_start();
-$me = wsm_current_user($pdo);
-if (!$me) { header('Location: ./', true, 302); exit; }
-$isAdmin = ($me['role'] ?? '') === WSM_ROLE_ADMIN;
-
-function h(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-function pln($v): string { return number_format((float) $v, 2, ',', "\u{202F}") . "\u{202F}zł"; }
+/** La table produits stocke des złotys, pas des grosze : conversion locale. */
+function zl($v): string { return number_format((float) $v, 2, ',', "\u{202F}") . "\u{202F}zł"; }
 
 // Le chemin enregistré en base est relatif à la boutique (« media/… ») :
 // depuis /backoffice/ il faut remonter d'un cran pour l'afficher.
@@ -121,95 +109,40 @@ $rows = $pdo->query(
 $writable = is_dir(wsm_media_dir()) ? is_writable(wsm_media_dir()) : is_writable(dirname(wsm_media_dir()));
 $nVisible = count(array_filter($rows, fn($r) => (int) $r['shop_visible'] === 1));
 $nPhoto   = count(array_filter($rows, fn($r) => (int) $r['shop_visible'] === 1 && (string) $r['image_url'] !== ''));
-?><!DOCTYPE html>
-<html lang="pl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Produkty i zdjęcia — Mister Szoko</title>
-<link rel="icon" type="image/png" href="img/logo.png">
-<link rel="stylesheet" href="_ds/mister-szoko/global.css">
-<link rel="stylesheet" href="_ds/mister-szoko/brand.css">
-<style>
-  body { margin: 0; font-family: var(--font-sans); background: var(--bg-page-alt); color: var(--text-body); }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px; }
-  header.bar { background: var(--choco-800); color: var(--cream-50); }
-  .bar-in { max-width: 1240px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-  .bar-in img.logo { height: 40px; width: auto; }
-  .bar-in h1 { font-family: var(--font-display); font-size: 20px; margin: 0; font-weight: 600; }
-  .bar-in a { color: var(--cream-100); font-size: 13px; font-weight: 600; text-decoration: none;
-              border-bottom: 1px solid var(--choco-600); }
-  .bar-in .who { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--choco-200); }
-  .flash { border-radius: 10px; padding: 11px 15px; margin-bottom: 18px; font-size: 14px; }
-  .flash.ok  { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
-  .flash.err { background: color-mix(in srgb, var(--danger) 13%, transparent); color: var(--danger); }
-  .warnbox { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--caramel-600);
-             border-radius: 10px; padding: 11px 15px; margin-bottom: 18px; font-size: 13.5px; }
-  .hint { color: var(--text-muted); font-size: 13.5px; margin: 0 0 20px; max-width: 78ch; line-height: 1.55; }
-  .kpis { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
-  .kpi { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
-         padding: 14px 18px; box-shadow: var(--shadow-xs); }
-  .kpi b { display: block; font-family: var(--font-mono); font-size: 22px; color: var(--text-strong); }
-  .kpi span { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
 
+console_head('Produkty i zdjęcia', $me, <<<'CSS'
+  .hint { color: var(--text-muted); font-size: 13.5px; margin: 0 0 20px; max-width: 78ch; line-height: 1.55; }
   .item { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
           margin-bottom: 14px; box-shadow: var(--shadow-xs); overflow: hidden; }
-  .item > summary { display: flex; align-items: center; gap: 16px; padding: 12px 16px; cursor: pointer; list-style: none; }
+  .item > summary { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; list-style: none; }
   .item > summary::-webkit-details-marker { display: none; }
   .item[open] > summary { border-bottom: 1px solid var(--border-subtle); background: var(--surface-raised); }
-  .thumb { width: 62px; height: 62px; flex: none; border-radius: 10px; object-fit: cover; background: var(--cream-200); }
+  .thumb { width: 56px; height: 56px; flex: none; border-radius: 10px; object-fit: cover; background: var(--cream-200); }
   .thumb.empty { display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px;
                  color: var(--text-muted); text-align: center; line-height: 1.25; padding: 4px; }
-  .sum-name { font-family: var(--font-display); font-size: 17px; color: var(--text-strong); font-weight: 600; }
+  .sum-name { font-family: var(--font-display); font-size: 16px; color: var(--text-strong); font-weight: 600; }
   .sum-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
-  .sum-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-  .tag { font-family: var(--font-mono); font-size: 11px; padding: 3px 9px; border-radius: 999px;
-         background: var(--cream-200); color: var(--choco-700); white-space: nowrap; }
+  .sum-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
   .tag.on  { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
   .tag.off { background: var(--cream-300); color: var(--text-muted); }
-  .tag.no  { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--caramel-600); }
-
-  .edit { padding: 20px 16px; display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
+  .edit { padding: 18px 14px; display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 820px) { .edit { grid-template-columns: 260px 1fr; gap: 24px; } }
   .preview img, .preview .ph { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 12px;
                                background: var(--cream-200); display: block; }
   .preview .ph { display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  label.f { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--text-strong); }
-  label.f input[type=text], label.f input[type=number], label.f input[type=file], label.f input[type=url] {
-    font-family: var(--font-sans); font-size: 14px; font-weight: 400; padding: 9px 12px;
-    border: 1px solid var(--border-default); border-radius: 9px; background: var(--bg-page); color: var(--text-strong); }
+  label.f { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600;
+            color: var(--text-strong); margin-bottom: 12px; }
+  label.f input { font-weight: 400; }
   label.f small { font-weight: 400; color: var(--text-muted); font-size: 12px; }
   label.f small.err { color: var(--danger); font-weight: 600; }
-  label.chk { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; cursor: pointer; }
-  label.chk input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--brand); }
-  .actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
-  button { font-family: var(--font-sans); font-size: 13.5px; font-weight: 600; border-radius: 9px;
-           border: 1px solid var(--border-default); padding: 9px 16px; background: var(--surface-card);
-           color: var(--text-strong); cursor: pointer; }
-  button.primary { background: var(--brand); color: var(--cream-50); border-color: var(--brand); }
-  button.danger  { background: transparent; border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); }
+  label.chk { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; cursor: pointer; margin-bottom: 10px; }
+  label.chk input { accent-color: var(--brand); }
+  button.danger { background: transparent; border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); }
   a.view { font-size: 13px; color: var(--brand); font-weight: 600; text-decoration: none; }
   a.view:hover { text-decoration: underline; }
-  @media (max-width: 780px) { .edit { grid-template-columns: 1fr; } .grid2 { grid-template-columns: 1fr; } }
-</style>
-</head>
-<body>
-<header class="bar">
-  <div class="bar-in">
-    <img class="logo" src="img/logo.png" alt="Mister Szoko">
-    <h1>Produkty i zdjęcia</h1>
-    <a href="./">← Konsola</a>
-    <a href="zamowienia.php">Zamówienia</a>
-    <a href="kontrahenci.php">Kontrahenci i VAT UE</a>
-    <a href="kraje.php">Kraje i VAT</a>
-    <a href="rabaty.php">Rabaty</a>
-    <a href="../shop/" target="_blank" rel="noopener">Sklep</a>
-    <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
-  </div>
-</header>
-
-<div class="wrap">
-  <?php if ($flash !== ''): ?><p class="flash <?= h($kind) ?>"><?= h($flash) ?></p><?php endif; ?>
+CSS, '');
+console_flash($flash, $kind);
+?>
   <?php if (!$isAdmin): ?>
     <p class="warnbox">Twoja rola pozwala tylko przeglądać. Zmiany może zapisywać rola <b>Centrala</b>.</p>
   <?php elseif (!$writable): ?>
@@ -244,7 +177,7 @@ $nPhoto   = count(array_filter($rows, fn($r) => (int) $r['shop_visible'] === 1 &
       <?php endif; ?>
       <div>
         <div class="sum-name"><?= h((string) $p['nom']) ?></div>
-        <div class="sum-meta"><?= h($id) ?> · <?= h((string) ($p['cat'] ?? '')) ?> · <?= h(pln($p['prix'])) ?></div>
+        <div class="sum-meta"><?= h($id) ?> · <?= h((string) ($p['cat'] ?? '')) ?> · <?= h(zl($p['prix'])) ?></div>
       </div>
       <div class="sum-right">
         <?php if ($vis && $img === ''): ?><span class="tag no">bez zdjęcia</span><?php endif; ?>
@@ -337,6 +270,4 @@ $nPhoto   = count(array_filter($rows, fn($r) => (int) $r['shop_visible'] === 1 &
     </form>
   </details>
   <?php endforeach; ?>
-</div>
-</body>
-</html>
+<?php console_foot();

@@ -79,6 +79,37 @@ server-resolved pricing & margin), and a **delivery module** — create a test
 delivery, assign a driver/round, confirm by QR/PIN, with a full status +
 event trail.
 
+## Server-rendered console screens (PHP, alongside the export)
+
+The Claude Design export is 193 KB of generated markup; patching it by hand
+would be lost at the next export. Everything that touches money, stock or
+customer data is therefore a **standalone PHP page** next to it, sharing the
+same session, the same roles and the same `wsm_` tables:
+
+| Screen | What it does |
+| --- | --- |
+| `zamowienia.php` | orders: payment state, InPost label, ShipX payload, history |
+| `poczta.php` | **messages to customers**: outbox, templates per language, automatic replies |
+| `produkty.php` | catalogue: prices, stock, photo upload |
+| `kontrahenci.php` | business customers: NIP / EU VAT checked against VIES |
+| `kraje.php` | countries served and the 0 % reverse-charge rule |
+| `rabaty.php` | volume discount tiers, by basket **weight** |
+| `ustawienia.php` | tpay / InPost / mail credentials — placeholder `xxxx` until filled |
+
+They share `console.php` (boot, session, navigation) and `console.css`
+(**mobile-first**: tables fold into cards under 760 px, 44 px touch targets,
+16 px inputs so iOS doesn't zoom). `console-nav.js` adds a launcher to the
+exported console — injected into the deployed copy at deploy time, so the
+export itself stays untouched.
+
+**Automatic replies.** `php-api/mail.php` writes every message to `wsm_messages`
+*before* sending it, and `event_key` is UNIQUE, so a repeated event can't mail
+the customer twice. Four events are wired: order received, **order beyond stock
+("we'll contact you by e-mail")**, payment received, parcel dispatched. If no
+mail account is configured, messages stay queued and visible — nothing is lost.
+Proved offline by `php-api/tests/e2e_mail.php` (59 assertions) with an injected
+transport.
+
 ## Database — `webshop_mrszoko` (tables `wsm_`)
 
 Every table is now backed by a real database, **`webshop_mrszoko`**, whose tables

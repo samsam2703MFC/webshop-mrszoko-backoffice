@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/commerce.php';
 require_once __DIR__ . '/vies.php';
+require_once __DIR__ . '/mail.php';
 
 const WSM_SHOP_LANGS       = ['pl', 'uk', 'en'];
 const WSM_SHOP_DEFAULT_LANG = 'pl';
@@ -748,7 +749,18 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
         return [null, ['db' => $ex->getMessage()]];
     }
 
-    return [wsm_order_by_id($pdo, $orderId), []];
+    $order = wsm_order_by_id($pdo, $orderId);
+
+    // Accusé de réception. Une commande qui dépasse le stock reçoit le message
+    // qui tient la promesse commerciale : elle passe, et on recontacte avec la
+    // date. L'envoi ne peut pas faire échouer la commande — elle est déjà
+    // écrite, et un serveur de mail muet laisse le message en file.
+    if ($order) {
+        wsm_mail_auto($pdo, 'zamowienie', $order);
+        if (!empty($order['backorder'])) wsm_mail_auto($pdo, 'na_zamowienie', $order);
+    }
+
+    return [$order, []];
 }
 
 function wsm_order_event(PDO $pdo, int $orderId, string $event, string $detail = '', string $actor = ''): void {
@@ -846,6 +858,8 @@ function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bo
         ->execute([$orderId]);
     $pdo->prepare("UPDATE wsm_payments SET status='oplacone' WHERE order_id=?")->execute([$orderId]);
     wsm_order_event($pdo, $orderId, 'oplacone', '', $actor);
+    $paid = wsm_order_by_id($pdo, $orderId);
+    if ($paid) wsm_mail_auto($pdo, 'platnosc', $paid);
     return true;
 }
 

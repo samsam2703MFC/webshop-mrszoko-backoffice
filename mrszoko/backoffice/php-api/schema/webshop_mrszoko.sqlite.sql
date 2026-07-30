@@ -490,3 +490,41 @@ CREATE TABLE IF NOT EXISTS wsm_discount_tiers (
   label        TEXT NOT NULL DEFAULT '',
   active       INTEGER NOT NULL DEFAULT 1
 );
+
+-- --- Poczta : modèles, file d'envoi (miroir SQLite) -------------------------
+CREATE TABLE IF NOT EXISTS wsm_mail_templates (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  code    TEXT NOT NULL,
+  lang    TEXT NOT NULL DEFAULT 'pl',
+  name    TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  body    TEXT NOT NULL DEFAULT '',
+  event   TEXT NOT NULL DEFAULT '',
+  active  INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (code, lang)
+);
+
+CREATE TABLE IF NOT EXISTS wsm_messages (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id      INTEGER NULL REFERENCES wsm_orders(id) ON DELETE SET NULL,
+  email         TEXT NOT NULL DEFAULT '',
+  direction     TEXT NOT NULL DEFAULT 'wyjscie',
+  subject       TEXT NOT NULL DEFAULT '',
+  body          TEXT NOT NULL DEFAULT '',
+  template_code TEXT NOT NULL DEFAULT '',
+  event_key     TEXT NULL UNIQUE,
+  status        TEXT NOT NULL DEFAULT 'kolejka',
+  error         TEXT NOT NULL DEFAULT '',
+  actor         TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sent_at       TEXT DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_messages_order ON wsm_messages (order_id, id);
+
+CREATE TABLE IF NOT EXISTS wsm_settings (
+  cle        TEXT PRIMARY KEY,
+  val        TEXT NOT NULL DEFAULT '',
+  secret     INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by TEXT NOT NULL DEFAULT ''
+);

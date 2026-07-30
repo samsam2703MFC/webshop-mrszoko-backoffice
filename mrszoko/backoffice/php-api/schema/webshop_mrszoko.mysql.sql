@@ -639,3 +639,57 @@ CREATE TABLE IF NOT EXISTS `wsm_discount_tiers` (
   PRIMARY KEY (`id`),
   KEY `idx_wsm_discount_weight` (`min_weight_g`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Poczta : la messagerie du back-office ----------------------------------
+-- Le modèle est une donnée : sujet et corps s'éditent en console, par langue,
+-- et `event` attache le modèle à un fait (commande, hors stock, paiement,
+-- expédition) pour que la réponse parte sans que personne y pense.
+CREATE TABLE IF NOT EXISTS `wsm_mail_templates` (
+  `id`      INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `code`    VARCHAR(60)  NOT NULL,
+  `lang`    VARCHAR(5)   NOT NULL DEFAULT 'pl',
+  `name`    VARCHAR(120) NOT NULL DEFAULT '',
+  `subject` VARCHAR(250) NOT NULL DEFAULT '',
+  `body`    TEXT         NOT NULL,
+  `event`   VARCHAR(40)  NOT NULL DEFAULT '',
+  `active`  TINYINT(1)   NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_mail_templates` (`code`, `lang`),
+  KEY `idx_wsm_mail_templates_event` (`event`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Chaque message est écrit AVANT de partir. `event_key` est UNIQUE : c'est la
+-- base qui garantit qu'une réponse automatique ne part qu'une fois, même si
+-- deux notifications arrivent en même temps.
+CREATE TABLE IF NOT EXISTS `wsm_messages` (
+  `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`      INT UNSIGNED NULL DEFAULT NULL,
+  `email`         VARCHAR(200) NOT NULL DEFAULT '',
+  `direction`     VARCHAR(10)  NOT NULL DEFAULT 'wyjscie',
+  `subject`       VARCHAR(250) NOT NULL DEFAULT '',
+  `body`          MEDIUMTEXT   NOT NULL,
+  `template_code` VARCHAR(60)  NOT NULL DEFAULT '',
+  `event_key`     VARCHAR(100) NULL DEFAULT NULL,
+  `status`        VARCHAR(12)  NOT NULL DEFAULT 'kolejka',
+  `error`         VARCHAR(250) NOT NULL DEFAULT '',
+  `actor`         VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `sent_at`       DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_messages_event` (`event_key`),
+  KEY `idx_wsm_messages_order` (`order_id`, `id`),
+  CONSTRAINT `fk_wsm_messages_order`
+    FOREIGN KEY (`order_id`) REFERENCES `wsm_orders` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Réglages d'intégration saisis en console -------------------------------
+-- tpay, InPost, compte d'envoi. Le fichier serveur reste prioritaire ; cette
+-- table ne remplit que ce qu'il laisse vide (voir settings.php).
+CREATE TABLE IF NOT EXISTS `wsm_settings` (
+  `cle`        VARCHAR(60) NOT NULL,
+  `val`        TEXT        NOT NULL,
+  `secret`     TINYINT(1)  NOT NULL DEFAULT 0,
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_by` VARCHAR(120) NOT NULL DEFAULT '',
+  PRIMARY KEY (`cle`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

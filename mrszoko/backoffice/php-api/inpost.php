@@ -162,6 +162,13 @@ function wsm_inpost_create(PDO $pdo, array $order): array {
         ->execute([$order['id']]);
     wsm_order_event($pdo, (int) $order['id'], 'wysylka_utworzona', $tracking, 'inpost');
 
+    // Le client apprend le départ de sa paczka par la messagerie, pas en
+    // regardant l'écran d'un back-office qu'il ne voit pas.
+    if (function_exists('wsm_mail_auto')) {
+        $fresh = wsm_order_by_id($pdo, (int) $order['id']);
+        if ($fresh) wsm_mail_auto($pdo, 'wysylka', $fresh);
+    }
+
     $st = $pdo->prepare("SELECT * FROM wsm_shipments WHERE order_id = ? ORDER BY id DESC LIMIT 1");
     $st->execute([$order['id']]);
     return [$st->fetch() ?: null, null];
