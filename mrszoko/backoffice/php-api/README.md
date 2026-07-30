@@ -41,16 +41,48 @@ The canonical MySQL DDL is `schema/webshop_mrszoko.mysql.sql`; the SQLite
 mirror (`schema/webshop_mrszoko.sqlite.sql`, dev/CI fallback) is kept
 structurally identical.
 
+## Authentication
+
+Nothing under `/franchisor/*` is public — **reads included**. Two ways in, and
+neither has a default secret (fail-closed):
+
+1. **User session** — `POST /auth/login {email, password}` against
+   `wsm_users.password_hash` (`password_hash`/`PASSWORD_DEFAULT`). Sets an
+   HttpOnly, SameSite=Lax session cookie (Secure as soon as the request is
+   HTTPS); the id is regenerated on login. Idle sessions expire after 8 h.
+   Five failed attempts lock the account for 15 minutes; wrong password and
+   unknown e-mail return the exact same `401`, after a randomised delay.
+2. **Service token** — `X-Admin-Token`, for automation and the test suites.
+   Compared with `hash_equals`. **If no token is configured the whole token
+   path is disabled** — there is no `dev-admin-token` fallback any more.
+
+Roles from `wsm_users` are enforced, not decorative: any active account may
+**read**, only role `Centrala` may **write** (`403 forbidden_role` otherwise).
+The audit trail records the real actor, not a generic label.
+
+Accounts have no password until one is set, so the demo users cannot log in:
+
+```bash
+php migrate.php --set-password <email> <password> [role] [name]
+php migrate.php --ensure-admin <email> <password>   # no-op if a login exists
+```
+
+CORS emits nothing by default (front and API are same-origin). Set
+`WSM_CORS_ORIGIN` to an explicit origin — never `*`, since requests carry a
+session cookie.
+
 ## Configuration
 
-All in `config.php`, entirely env-driven (see the header there). Writes require
-the admin token via the `X-Admin-Token` header — the front-end already sends
-`localStorage['adminToken']`.
+All in `config.php`, entirely env-driven (see the header there).
 
 ## Endpoints
 
 | Method | Route | Source table(s) |
 | --- | --- | --- |
+| **Authentication** | | |
+| POST | `/auth/login` | `wsm_users` — opens a session |
+| POST | `/auth/logout` | destroys the session |
+| GET | `/auth/me` | current identity (session or service token) |
 | **Landing Mister Szoko (public)** | | |
 | GET | `/landing/content?lang=pl\|uk\|en` | `wsm_landing_i18n` · `wsm_landing_products` — everything the landing renders (strings + product cards, texts resolved server-side; unknown lang → default `pl`) |
 | POST | `/franchisor/landing-string` | upsert/delete one i18n string (admin) |

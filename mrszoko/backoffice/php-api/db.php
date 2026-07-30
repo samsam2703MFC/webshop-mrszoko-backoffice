@@ -93,7 +93,47 @@ function wsm_bootstrap(bool $seed = true): PDO {
             wsm_seed($pdo);
         }
     }
+    wsm_ensure_auth_columns($pdo);
     return $pdo;
+}
+
+/** Les colonnes d'une table existantes, en minuscules (MySQL + SQLite). */
+function wsm_table_columns(PDO $pdo, string $table): array {
+    $cfg = wsm_config();
+    try {
+        if ($cfg['engine'] === 'mysql') {
+            $st = $pdo->prepare("SELECT LOWER(column_name) FROM information_schema.columns
+                                 WHERE table_schema = DATABASE() AND table_name = ?");
+            $st->execute([$table]);
+            return $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        }
+        $rows = $pdo->query("PRAGMA table_info(" . $table . ")")->fetchAll();
+        return array_map(fn($r) => strtolower((string) $r['name']), $rows);
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * Ajoute les colonnes d'authentification à wsm_users si elles manquent.
+ * Nécessaire car CREATE TABLE IF NOT EXISTS ne touche pas une table déjà
+ * créée (c'est le cas de la base MySQL de production). Idempotent.
+ */
+function wsm_ensure_auth_columns(PDO $pdo): void {
+    $have = wsm_table_columns($pdo, 'wsm_users');
+    if (!$have) return;                                   // table absente : le schéma la créera complète
+    $mysql = wsm_config()['engine'] === 'mysql';
+    $add = [
+        'password_hash'   => $mysql ? 'VARCHAR(255) NULL DEFAULT NULL' : 'TEXT DEFAULT NULL',
+        'last_login'      => $mysql ? 'DATETIME NULL DEFAULT NULL'     : 'TEXT DEFAULT NULL',
+        'failed_attempts' => $mysql ? 'INT NOT NULL DEFAULT 0'         : 'INTEGER NOT NULL DEFAULT 0',
+        'locked_until'    => $mysql ? 'DATETIME NULL DEFAULT NULL'     : 'TEXT DEFAULT NULL',
+    ];
+    foreach ($add as $col => $decl) {
+        if (in_array($col, $have, true)) continue;
+        try { $pdo->exec("ALTER TABLE wsm_users ADD COLUMN " . ($mysql ? "`$col`" : $col) . " $decl"); }
+        catch (Throwable $e) { /* concurrence : une autre requête vient de l'ajouter */ }
+    }
 }
 
 /**

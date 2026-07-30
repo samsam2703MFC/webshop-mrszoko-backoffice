@@ -8,9 +8,13 @@
 //  Production (MySQL):
 //    WSM_DB_ENGINE=mysql
 //    WSM_DB_HOST=127.0.0.1  WSM_DB_PORT=3306
-//    WSM_DB_NAME=webshop_mrszoko
+//    WSM_DB_NAME=mrszoko
 //    WSM_DB_USER=...  WSM_DB_PASS=...
-//    WSM_ADMIN_TOKEN=<shared admin token>   (sent by the front as X-Admin-Token)
+//    WSM_ADMIN_TOKEN=<service token>   (en-tête X-Admin-Token, automatisation)
+//
+//  Les humains ne se connectent PAS avec ce jeton : ils ouvrent une session
+//  (e-mail + mot de passe) — voir auth.php. Le jeton n'a pas de valeur par
+//  défaut : s'il est vide, la voie jeton est désactivée.
 //
 //  Local / CI (SQLite, default):
 //    WSM_DB_ENGINE=sqlite (default)
@@ -27,11 +31,16 @@ $cfg = [
         'pass'    => getenv('WSM_DB_PASS') ?: '',
     ],
     'sqlite_path' => getenv('WSM_SQLITE_PATH') ?: (__DIR__ . '/data/webshop_mrszoko.sqlite'),
-    // Admin token required for every write endpoint. Overridable via env.
-    // The default is a dev-only placeholder — set WSM_ADMIN_TOKEN in prod.
-    'admin_token' => getenv('WSM_ADMIN_TOKEN') ?: 'dev-admin-token',
-    // Allow the front-end (served from a different path/origin during dev) to call us.
-    'cors_origin' => getenv('WSM_CORS_ORIGIN') ?: '*',
+    // Jeton de SERVICE (automatisation / tests), en-tête X-Admin-Token.
+    // AUCUNE valeur par défaut : vide = voie jeton entièrement désactivée
+    // (fail-closed). En production il est écrit dans config.local.php ; en
+    // local, exportez WSM_ADMIN_TOKEN (voir serve.sh).
+    'admin_token' => getenv('WSM_ADMIN_TOKEN') ?: '',
+    // Partage inter-origine : vide = aucun en-tête CORS émis. Le front est
+    // servi sur la MÊME origine que l'API (/mrszoko/backoffice → ./api), donc
+    // rien n'est nécessaire. Ne renseigner qu'une origine précise, jamais '*' :
+    // les requêtes portent une session par cookie.
+    'cors_origin' => getenv('WSM_CORS_ORIGIN') ?: '',
 ];
 
 // Optional local override (untracked, gitignored): drop a config.local.php on the

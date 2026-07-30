@@ -91,9 +91,15 @@ CREATE TABLE IF NOT EXISTS wsm_users (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
   nom    TEXT NOT NULL,
   email  TEXT NOT NULL UNIQUE,
-  role   TEXT NOT NULL DEFAULT 'Franchise',
+  role   TEXT NOT NULL DEFAULT 'Franczyza',
   portee TEXT NOT NULL DEFAULT '',
-  act    INTEGER NOT NULL DEFAULT 1
+  act    INTEGER NOT NULL DEFAULT 1,
+  -- Authentification (voir auth.php) : sans hachage, le compte ne peut pas
+  -- se connecter.
+  password_hash   TEXT DEFAULT NULL,
+  last_login      TEXT DEFAULT NULL,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until    TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS wsm_user_shops (

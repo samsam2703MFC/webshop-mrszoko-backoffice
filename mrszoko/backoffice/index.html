@@ -6,6 +6,7 @@
 <script>window.__resources={"https://unpkg.com/react@18.3.1/umd/react.production.min.js":"vendor/react.js","https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js":"vendor/react-dom.js"};</script>
 <script src="api-config.js"></script>
 <script src="bo_server.js"></script>
+<script src="auth-gate.js"></script>
 <script>
 /* Hydrate la donnée réelle (API PHP /franchisor/*) AVANT de booter le runtime,
    avec repli seed : si l'API ne répond pas / pas de jeton, on rend le seed.
@@ -13,11 +14,14 @@
    - menu builder via /franchisor/menus → window.__FR_MENUS (lu par menu_api.js) */
 (function(){
   function boot(){ var s=document.createElement('script'); s.src='./support.js'; document.head.appendChild(s); }
+  // La porte (auth-gate.js) résout quand une session utilisateur — ou un jeton
+  // de service — est établie ; sans API elle laisse passer (mode démo).
+  function start(){
   var fr = window.__FR || {}, jobs = [];
   try {
     if (window.BOServer && window.BOServer.hydrate) jobs.push(window.BOServer.hydrate());
     if (fr.base) {
-      jobs.push(fetch(fr.base + '/franchisor/menus', { headers: fr.token ? {'X-Admin-Token': fr.token} : {}, credentials: 'omit' })
+      jobs.push(fetch(fr.base + '/franchisor/menus', { headers: fr.token ? {'X-Admin-Token': fr.token} : {}, credentials: 'same-origin' })
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(d){ if (d && typeof d === 'object' && !Array.isArray(d)) window.__FR_MENUS = d; })
         .catch(function(){}));
@@ -26,6 +30,8 @@
     var to=setTimeout(go, 4000);             // ne jamais bloquer le boot
     Promise.all(jobs).then(go, go);
   } catch(e){ boot(); }
+  }
+  if (window.WSMAuth) window.WSMAuth.gate(start); else start();
 })();
 </script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
@@ -825,15 +831,15 @@ class Component extends DCLogic {
     const fr=(typeof window!=='undefined'&&window.__FR)||{};
     if(!window.__CPGEO && !this._geoLoading && fr.base){ this._geoLoading=true;
       Promise.all([
-        fetch(fr.base+'/geo/postcodes?all=1',{credentials:'omit'}).then(r=>r.ok?r.json():null),
-        fetch(fr.base+'/geo/postcodes?groups=1',{credentials:'omit'}).then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch(fr.base+'/geo/postcodes?all=1',{credentials:'same-origin'}).then(r=>r.ok?r.json():null),
+        fetch(fr.base+'/geo/postcodes?groups=1',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).catch(()=>null),
       ]).then(([a,gr])=>{
         if(Array.isArray(a)&&a.length){ const idx={}; a.forEach(e=>{ idx[String(e[0])]={city:e[1],lat:e[2],lng:e[3]}; });
           const communes={}; a.forEach(e=>{ const c=String(e[1]); (communes[c]=communes[c]||[]).push(String(e[0])); });
           window.__CPGEO=window.__CPGEO||{list:a,idx,communes,groups:Array.isArray(gr)?gr:[]}; this.setState(s=>({_rev:(s._rev||0)+1})); }
       }).catch(()=>{}); }
     if(!this._geoData && !this._geoDataLoading && fr.base){ this._geoDataLoading=true;
-      fetch(fr.base+'/franchisor/geo-clients',{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'omit'})
+      fetch(fr.base+'/franchisor/geo-clients',{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'same-origin'})
         .then(r=>r.ok?r.json():null).then(d=>{ if(d&&Array.isArray(d.clients)){ this._geoData=d; this.setState(s=>({_rev:(s._rev||0)+1})); } }).catch(()=>{}); }
     if(!window.L){ clearTimeout(this._gmT); this._gmT=setTimeout(()=>this.geoEnsure(),160); return; }
     const el=document.getElementById('map-geo'); if(!el) return;
@@ -908,8 +914,8 @@ class Component extends DCLogic {
     const fr=(typeof window!=='undefined'&&window.__FR)||{};
     if(!window.__CPGEO && !this._geoLoading && fr.base){ this._geoLoading=true;
       Promise.all([
-        fetch(fr.base+'/geo/postcodes?all=1',{credentials:'omit'}).then(r=>r.ok?r.json():null),
-        fetch(fr.base+'/geo/postcodes?groups=1',{credentials:'omit'}).then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch(fr.base+'/geo/postcodes?all=1',{credentials:'same-origin'}).then(r=>r.ok?r.json():null),
+        fetch(fr.base+'/geo/postcodes?groups=1',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).catch(()=>null),
       ]).then(([a,g])=>{
         if(Array.isArray(a)&&a.length){ const idx={}; a.forEach(e=>{ idx[String(e[0])]={city:e[1],lat:e[2],lng:e[3]}; });
           const communes={}; a.forEach(e=>{ const c=String(e[1]); (communes[c]=communes[c]||[]).push(String(e[0])); });
@@ -956,33 +962,33 @@ class Component extends DCLogic {
   czEdit(z){ return ()=>this.setState({czOpen:true,czDraft:'',cz:{id:z.id,name:z.name,shop_id:z.shop_id==null?'':String(z.shop_id),cps:String(z.postcodes||'').split(/[^0-9]+/).filter(Boolean),exclusive:!!z.exclusive}}); }
   czNew(){ this.setState({czOpen:true,czDraft:'',cz:{id:0,name:'',shop_id:'',cps:[],exclusive:true}}); }
   czClose(){ this.setState({czOpen:false}); }
-  czReload(){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base) return; fetch(fr.base+'/franchisor/catchment',{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'omit'}).then(r=>r.ok?r.json():null).then(rows=>{ if(Array.isArray(rows)&&window.BOServer){ window.BOServer.save('catchment',rows); this.setState(st=>({_rev:(st._rev||0)+1})); } }).catch(()=>{}); }
+  czReload(){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base) return; fetch(fr.base+'/franchisor/catchment',{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(rows=>{ if(Array.isArray(rows)&&window.BOServer){ window.BOServer.save('catchment',rows); this.setState(st=>({_rev:(st._rev||0)+1})); } }).catch(()=>{}); }
   czSave(){ const c=this.state.cz; if(!c.name.trim()){ this.printJob('⚠ Nadaj strefie nazwę'); return; }
     if(this.state.czDraft&&this.state.czDraft.trim()) this.czAddCp();
     const c2=this.state.cz; const postcodes=c2.cps.join(' · ');
     const fr=(typeof window!=='undefined'&&window.__FR)||{};
     const payload={id:c2.id||undefined,name:c2.name,shop_id:c2.shop_id===''?null:parseInt(c2.shop_id,10),postcodes,exclusive:c2.exclusive,active:1};
     if(!fr.base){ const rows=window.BOServer?window.BOServer.table('catchment'):[]; if(c2.id){ const i=rows.findIndex(r=>r.id===c2.id); if(i>=0) rows[i]={...rows[i],...payload}; } else rows.push({...payload,id:Date.now()}); if(window.BOServer) window.BOServer.save('catchment',rows); this.setState(st=>({czOpen:false,_rev:(st._rev||0)+1})); this.printJob('✔ Strefa zapisana (lokalnie)'); return; }
-    fetch(fr.base+'/franchisor/catchment',{method:'POST',headers:{'Content-Type':'application/json',...(fr.token?{'X-Admin-Token':fr.token}:{})},body:JSON.stringify(payload),credentials:'omit'})
+    fetch(fr.base+'/franchisor/catchment',{method:'POST',headers:{'Content-Type':'application/json',...(fr.token?{'X-Admin-Token':fr.token}:{})},body:JSON.stringify(payload),credentials:'same-origin'})
       .then(async r=>{ const v=await r.json().catch(()=>({})); if(!r.ok){ this.printJob('⚠ '+(v.error||('Erreur '+r.status))); return; } this.setState({czOpen:false}); this.printJob('✔ Strefa pierwotna zapisana: '+c2.name); this.czReload(); })
       .catch(()=>this.printJob('⚠ Sieć niedostępna'));
   }
   czDel(z){ return ()=>{ if(!confirm('Usunąć strefę pierwotną « '+z.name+' » ?')) return; const fr=(typeof window!=='undefined'&&window.__FR)||{};
     if(!fr.base){ const rows=(window.BOServer?window.BOServer.table('catchment'):[]).filter(r=>r.id!==z.id); if(window.BOServer) window.BOServer.save('catchment',rows); this.setState(st=>({_rev:(st._rev||0)+1})); return; }
-    fetch(fr.base+'/franchisor/catchment',{method:'POST',headers:{'Content-Type':'application/json',...(fr.token?{'X-Admin-Token':fr.token}:{})},body:JSON.stringify({delete:z.id}),credentials:'omit'})
+    fetch(fr.base+'/franchisor/catchment',{method:'POST',headers:{'Content-Type':'application/json',...(fr.token?{'X-Admin-Token':fr.token}:{})},body:JSON.stringify({delete:z.id}),credentials:'same-origin'})
       .then(()=>{ this.printJob('✖ Strefa usunięta'); this.czReload(); }).catch(()=>{}); }; }
   frPost(path, payload){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base){ this.printJob('✔ Zapisano (lokalnie)'); return Promise.resolve(false); }
     const h=Object.assign({'Content-Type':'application/json'}, fr.token?{'X-Admin-Token':fr.token}:{});
-    return fetch(fr.base+path,{method:'POST',headers:h,body:JSON.stringify(payload),credentials:'omit'})
+    return fetch(fr.base+path,{method:'POST',headers:h,body:JSON.stringify(payload),credentials:'same-origin'})
       .then(r=>r.ok?r.json():Promise.reject(r.status)).then(()=>{ this.printJob('✔ Zapisano w bazie'); return true; })
       .catch(()=>{ this.printJob('⚠ Zapis nie powiódł się'); return false; }); }
   // Lecture API (GET) — null si pas d'API/jeton (mode seed).
   frGet(path){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base) return Promise.resolve(null);
-    return fetch(fr.base+path,{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'omit'}).then(r=>r.ok?r.json():null).catch(()=>null); }
+    return fetch(fr.base+path,{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'same-origin'}).then(r=>r.ok?r.json():null).catch(()=>null); }
   // POST renvoyant le corps JSON + statut (pour la logique livraison).
   frPostR(path, payload){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base) return Promise.resolve(null);
     const h=Object.assign({'Content-Type':'application/json'}, fr.token?{'X-Admin-Token':fr.token}:{});
-    return fetch(fr.base+path,{method:'POST',headers:h,body:JSON.stringify(payload),credentials:'omit'})
+    return fetch(fr.base+path,{method:'POST',headers:h,body:JSON.stringify(payload),credentials:'same-origin'})
       .then(r=>r.json().catch(()=>({})).then(j=>({ok:r.ok,status:r.status,body:j}))).catch(()=>null); }
   // Livraisons : (re)charge deliveries/drivers/clients depuis l'API vers BOServer.
   livEnsure(){ if(this.state.screen!=='livraisons') return; const fr=(typeof window!=='undefined'&&window.__FR)||{};

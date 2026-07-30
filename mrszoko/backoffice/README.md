@@ -19,6 +19,15 @@ python3 -m http.server 8080
 
 No build step.
 
+## Access
+
+The console is behind a login (e-mail + password). `auth-gate.js` checks
+`api/auth/me` before the app boots and shows the Polish login screen when no
+identity is established; a "Wyloguj" button signs out. Accounts, roles and
+password rules live in `php-api/` — see its README. The first administrator is
+created by the deploy (credentials left in `/root/mrszoko-admin.txt` on the
+server, readable by root only).
+
 **Language: Polish.** All screen labels live in the page and are in Polish; all
 demo/business data comes from the `wsm_` tables (or the JS seed fallback) and is
 seeded in Polish. Stored workflow codes (delivery statuses `planifiée/assignée/

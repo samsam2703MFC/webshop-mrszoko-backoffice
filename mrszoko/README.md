@@ -21,7 +21,10 @@ Everything served under `http://185.180.206.46/mrszoko`.
   labels translated in the page; seed data translated identically in
   `bo_server.js` and `php-api/seed.php`; stored workflow codes — delivery
   statuses/events — stay as-is and are mapped to Polish at display time).
-  See `backoffice/README.md`.
+  **Access is authenticated**: a login screen (`auth-gate.js`) gates the app,
+  every `/franchisor/*` endpoint — reads included — requires a session or a
+  service token, and only role `Centrala` may write. See
+  `backoffice/README.md` and `backoffice/php-api/README.md`.
 
 - **`design-system/`** — the Mister Szoko design system, imported from the
   Claude Design handoff (claude.ai/design): brand guide (`readme.md`), tokens,

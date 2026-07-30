@@ -6,14 +6,49 @@
 //    php migrate.php            # create schema + seed if empty (idempotent)
 //    php migrate.php --fresh    # drop everything and rebuild from scratch
 //    php migrate.php --no-seed  # schema only
+//
+//  Comptes (authentification — voir auth.php) :
+//    php migrate.php --set-password <email> <mot-de-passe> [role] [nom]
+//        crée le compte s'il n'existe pas, sinon repose son mot de passe.
+//    php migrate.php --ensure-admin <email> <mot-de-passe>
+//        ne fait rien si un compte capable de se connecter existe déjà ;
+//        sinon crée ce compte administrateur. Idempotent : c'est l'amorçage
+//        utilisé par le déploiement.
 // ============================================================================
 require __DIR__ . '/db.php';
+require __DIR__ . '/delivery.php';   // wsm_audit(), utilisé par auth.php
+require __DIR__ . '/auth.php';
 
 $args = array_slice($argv, 1);
 $fresh = in_array('--fresh', $args, true);
 $seed = !in_array('--no-seed', $args, true);
 $cfg = wsm_config();
 $pdo = wsm_pdo();
+
+// ---- Gestion des comptes (sortie immédiate) --------------------------------
+$idx = array_search('--set-password', $args, true);
+$ensure = array_search('--ensure-admin', $args, true);
+if ($idx !== false || $ensure !== false) {
+    $at = $idx !== false ? $idx : $ensure;
+    $email = $args[$at + 1] ?? '';
+    $pass  = $args[$at + 2] ?? '';
+    if ($email === '' || $pass === '') {
+        fwrite(STDERR, "usage: php migrate.php " . $args[$at] . " <email> <mot-de-passe> [role] [nom]\n");
+        exit(2);
+    }
+    $pdo = wsm_bootstrap();                       // garantit schéma + colonnes d'auth
+    if ($ensure !== false && wsm_has_login_account($pdo)) {
+        echo "un compte de connexion existe déjà — aucun changement\n";
+        exit(0);
+    }
+    try {
+        echo wsm_set_password($pdo, $email, $pass, $args[$at + 3] ?? WSM_ROLE_ADMIN, $args[$at + 4] ?? '') . "\n";
+    } catch (InvalidArgumentException $e) {
+        fwrite(STDERR, 'erreur : ' . $e->getMessage() . "\n");
+        exit(2);
+    }
+    exit(0);
+}
 
 echo "engine: {$cfg['engine']}\n";
 
