@@ -242,3 +242,28 @@ CREATE TABLE IF NOT EXISTS wsm_incidents (
   geo         TEXT NOT NULL DEFAULT '',
   created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- --- Landing Mister Szoko (contenu du site public, 3 langues) ---------------
+-- Tout le texte de la landing vit ici (aucun libellé en dur dans la page) ;
+-- seedé depuis landing/content_seed.json, éditable via l'API admin.
+CREATE TABLE IF NOT EXISTS wsm_landing_i18n (
+  lang TEXT NOT NULL,
+  k    TEXT NOT NULL,
+  v    TEXT NOT NULL,
+  PRIMARY KEY (lang, k)
+);
+
+-- Données structurées des cartes produit (les textes sont dans wsm_landing_i18n
+-- sous product.<id>.name/.meta/.specs).
+CREATE TABLE IF NOT EXISTS wsm_landing_products (
+  id              TEXT PRIMARY KEY,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  swatch_from     TEXT NOT NULL DEFAULT '--choco-900',
+  swatch_to      TEXT NOT NULL DEFAULT '--choco-700',
+  fluidity        INTEGER NOT NULL DEFAULT 3,
+  active          INTEGER NOT NULL DEFAULT 1,
+  price_from_pln  REAL,
+  price_perkg_pln REAL,
+  price_from_eur  REAL,
+  price_perkg_eur REAL
+);

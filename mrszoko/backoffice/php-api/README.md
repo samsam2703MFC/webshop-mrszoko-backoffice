@@ -40,6 +40,11 @@ the admin token via the `X-Admin-Token` header — the front-end already sends
 
 | Method | Route | Source table(s) |
 | --- | --- | --- |
+| **Landing Mister Szoko (public)** | | |
+| GET | `/landing/content?lang=pl\|uk\|en` | `wsm_landing_i18n` · `wsm_landing_products` — everything the landing renders (strings + product cards, texts resolved server-side; unknown lang → default `pl`) |
+| POST | `/franchisor/landing-string` | upsert/delete one i18n string (admin) |
+| POST | `/franchisor/landing-product` | upsert/delete one landing product card (admin) |
+| **Franchisor (console)** | | |
 | GET | `/franchisor/kpis` | `wsm_kpis` |
 | GET | `/franchisor/shops` | `wsm_shops` |
 | GET | `/franchisor/catalog` | `wsm_categories` · `wsm_products` |
