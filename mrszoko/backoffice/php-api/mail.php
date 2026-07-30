@@ -37,7 +37,18 @@ const WSM_MAIL_EVENTS = [
     'wysylka'          => 'Przesyłka nadana',
     'zadanie_zaplaty'  => 'Prośba o płatność (proforma)',
     'przypomnienie'    => 'Przypomnienie o płatności',
+    // Les changements d'état saisis à la main dans la console. Ils portent le
+    // nom du statut : le back-office n'a alors rien à traduire, il passe le
+    // statut et le modèle correspondant est trouvé — ou il n'y en a pas, et
+    // aucun message ne part. Un état sans modèle est silencieux, pas cassé.
+    'w_realizacji'     => 'Zamówienie w realizacji',
+    'wyslane'          => 'Zamówienie wysłane',
+    'dostarczone'      => 'Zamówienie dostarczone',
+    'anulowane'        => 'Zamówienie anulowane',
 ];
+
+/** Les états dont un changement manuel peut prévenir le client. */
+const WSM_MAIL_STATUS_EVENTS = ['w_realizacji', 'wyslane', 'dostarczone', 'anulowane'];
 
 const WSM_MAIL_STATUSES = ['kolejka', 'wyslana', 'blad'];
 
@@ -164,6 +175,9 @@ function wsm_mail_vars(?array $order): array {
         'paczkomat' => (string) ($order['inpost_point'] ?? ''),
         'link'      => $link,
         'status'    => (string) ($order['status'] ?? ''),
+        // Le numéro de suivi, quand il existe. Un « votre colis est parti »
+        // sans numéro oblige le client à écrire pour demander lequel.
+        'sledzenie' => (string) ($order['shipment']['tracking_number'] ?? ''),
         'data'      => substr((string) ($order['created_at'] ?? date('Y-m-d')), 0, 10),
     ];
 }
@@ -173,9 +187,21 @@ function wsm_mail_vars(?array $order): array {
  * laissée en place : un client ne doit jamais recevoir « {{imie}} ».
  */
 function wsm_mail_render(string $text, array $vars): string {
-    return (string) preg_replace_callback('/\{\{\s*([a-z_]+)\s*\}\}/i', function ($m) use ($vars) {
+    $out = (string) preg_replace_callback('/\{\{\s*([a-z_]+)\s*\}\}/i', function ($m) use ($vars) {
         return (string) ($vars[strtolower($m[1])] ?? '');
     }, $text);
+
+    // Une ligne dont TOUT le contenu variable s'est révélé vide est retirée, et
+    // pas laissée en suspens. Sans ça, un envoi sans numéro de suivi produit
+    // « Numer przesyłki: » tout seul — le client comprend qu'il manque quelque
+    // chose, et il a raison. La règle est étroite : la ligne doit avoir contenu
+    // un {{jeton}} et ne plus contenir qu'un libellé suivi de deux points.
+    $lignes = explode("\n", $out);
+    foreach (explode("\n", $text) as $i => $src) {
+        if (!str_contains($src, '{{')) continue;
+        if (preg_match('/^\s*[^:{}]{1,40}:\s*$/u', $lignes[$i] ?? '')) $lignes[$i] = null;
+    }
+    return implode("\n", array_filter($lignes, fn($l) => $l !== null));
 }
 
 /**
@@ -217,6 +243,50 @@ function wsm_mail_vars_invoice(array $inv): array {
  *
  * @return int identifiant du message, 0 si déjà envoyé aujourd'hui
  */
+/**
+ * Le message qui accompagne un changement d'état saisi à la main.
+ *
+ * Deux garde-fous, parce que c'est un envoi déclenché par un clic :
+ *  • un état sans modèle n'envoie RIEN et ne se plaint pas — on ne va pas
+ *    empêcher quelqu'un de passer une commande en « w realizacji » sous
+ *    prétexte que personne n'a écrit le texte correspondant ;
+ *  • la clé d'événement porte l'état, donc repasser deux fois par le même
+ *    état ne réexpédie pas le même message. Faire l'aller-retour
+ *    « wysłane → w realizacji → wysłane » ne doit pas écrire deux fois au
+ *    client.
+ *
+ * @return int identifiant du message, 0 si rien n'est parti
+ */
+function wsm_mail_for_status(PDO $pdo, array $order, string $status, string $actor = ''): int {
+    if (!in_array($status, WSM_MAIL_STATUS_EVENTS, true)) return 0;
+    try {
+        $lang = (string) ($order['lang'] ?? 'pl');
+        $tpl = wsm_mail_template_for_event($pdo, $status, $lang);
+        if (!$tpl) return 0;
+        $to = (string) ($order['email'] ?? '');
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return 0;
+        $vars = wsm_mail_vars($order);
+        $id = wsm_mail_queue($pdo, [
+            'order_id'      => (int) ($order['id'] ?? 0) ?: null,
+            'email'         => $to,
+            'direction'     => 'wyjscie',
+            'subject'       => wsm_mail_render((string) $tpl['subject'], $vars),
+            'body'          => wsm_mail_render((string) $tpl['body'], $vars),
+            'template_code' => (string) $tpl['code'],
+            'event_key'     => 'status:' . (int) ($order['id'] ?? 0) . ':' . $status,
+            'actor'         => $actor ?: 'konsola',
+        ]);
+        if ($id === 0) return 0;
+        if (function_exists('wsm_order_event')) {
+            wsm_order_event($pdo, (int) $order['id'], 'wiadomosc', $tpl['code'] . ' → ' . $to, $actor ?: 'konsola');
+        }
+        if (wsm_mail_enabled()) wsm_mail_send($pdo, $id);
+        return $id;
+    } catch (Throwable $e) {
+        return 0;                          // le changement d'état prime sur son annonce
+    }
+}
+
 function wsm_mail_for_invoice(PDO $pdo, array $inv, string $event, string $actor = ''): int {
     try {
         $tpl = wsm_mail_template_for_event($pdo, $event, 'pl');

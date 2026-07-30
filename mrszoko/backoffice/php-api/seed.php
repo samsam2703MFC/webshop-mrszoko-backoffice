@@ -781,6 +781,120 @@ Mister Szoko", 'przypomnienie'];
 
 Mister Szoko", 'przypomnienie'];
 
+    // ---- Changements d'état saisis dans la console -------------------------
+    //  Le texte reste court : un client qui reçoit quatre messages pour une
+    //  commande ne lit que la première ligne de chacun.
+    $t[] = ['w_realizacji', 'pl', 'W realizacji', 'Zamówienie {{numer}} jest w realizacji',
+"Dzień dobry {{imie}},
+
+zabraliśmy się do Państwa zamówienia {{numer}}. Damy znać, gdy paczka ruszy w drogę.
+
+Podgląd zamówienia: {{link}}
+
+Mister Szoko", 'w_realizacji'];
+
+    $t[] = ['w_realizacji', 'en', 'In progress', 'Order {{numer}} is being prepared',
+"Hello {{imie}},
+
+we have started preparing your order {{numer}}. We will write again when the parcel is on its way.
+
+Order details: {{link}}
+
+Mister Szoko", 'w_realizacji'];
+
+    $t[] = ['w_realizacji', 'uk', 'У роботі', 'Замовлення {{numer}} у роботі',
+"Доброго дня, {{imie}}!
+
+Ми взялися за Ваше замовлення {{numer}}. Повідомимо, щойно посилка вирушить.
+
+Перегляд замовлення: {{link}}
+
+Mister Szoko", 'w_realizacji'];
+
+    $t[] = ['wyslane', 'pl', 'Wysłane', 'Zamówienie {{numer}} wysłane',
+"Dzień dobry {{imie}},
+
+zamówienie {{numer}} zostało wysłane.
+
+Numer przesyłki: {{sledzenie}}
+Sposób dostawy: {{dostawa}} {{paczkomat}}
+
+Podgląd zamówienia: {{link}}
+
+Mister Szoko", 'wyslane'];
+
+    $t[] = ['wyslane', 'en', 'Shipped', 'Order {{numer}} has been shipped',
+"Hello {{imie}},
+
+order {{numer}} is on its way.
+
+Tracking number: {{sledzenie}}
+Delivery: {{dostawa}} {{paczkomat}}
+
+Order details: {{link}}
+
+Mister Szoko", 'wyslane'];
+
+    $t[] = ['wyslane', 'uk', 'Відправлено', 'Замовлення {{numer}} відправлено',
+"Доброго дня, {{imie}}!
+
+Замовлення {{numer}} вирушило до Вас.
+
+Номер відправлення: {{sledzenie}}
+Доставка: {{dostawa}} {{paczkomat}}
+
+Перегляд замовлення: {{link}}
+
+Mister Szoko", 'wyslane'];
+
+    $t[] = ['dostarczone', 'pl', 'Dostarczone', 'Zamówienie {{numer}} dostarczone',
+"Dzień dobry {{imie}},
+
+zamówienie {{numer}} zostało dostarczone. Mamy nadzieję, że wszystko dotarło w porządku —
+jeśli coś jest nie tak, prosimy o odpowiedź na tę wiadomość.
+
+Mister Szoko", 'dostarczone'];
+
+    $t[] = ['dostarczone', 'en', 'Delivered', 'Order {{numer}} delivered',
+"Hello {{imie}},
+
+order {{numer}} has been delivered. We hope everything arrived in good condition —
+if anything is wrong, simply reply to this message.
+
+Mister Szoko", 'dostarczone'];
+
+    $t[] = ['dostarczone', 'uk', 'Доставлено', 'Замовлення {{numer}} доставлено',
+"Доброго дня, {{imie}}!
+
+Замовлення {{numer}} доставлено. Сподіваємось, усе прибуло в порядку —
+якщо щось не так, просто дайте відповідь на цей лист.
+
+Mister Szoko", 'dostarczone'];
+
+    $t[] = ['anulowane', 'pl', 'Anulowane', 'Zamówienie {{numer}} anulowane',
+"Dzień dobry {{imie}},
+
+zamówienie {{numer}} zostało anulowane. Jeśli była to pomyłka albo płatność już wyszła,
+prosimy o kontakt — wyjaśnimy to od razu.
+
+Mister Szoko", 'anulowane'];
+
+    $t[] = ['anulowane', 'en', 'Cancelled', 'Order {{numer}} cancelled',
+"Hello {{imie}},
+
+order {{numer}} has been cancelled. If this was a mistake, or your payment has already left,
+please get in touch — we will sort it out straight away.
+
+Mister Szoko", 'anulowane'];
+
+    $t[] = ['anulowane', 'uk', 'Скасовано', 'Замовлення {{numer}} скасовано',
+"Доброго дня, {{imie}}!
+
+Замовлення {{numer}} скасовано. Якщо це помилка або оплата вже пішла,
+будь ласка, зв'яжіться з нами — ми одразу все з'ясуємо.
+
+Mister Szoko", 'anulowane'];
+
     // ---- Modèle libre, sans événement : la réponse écrite à la main --------
     $t[] = ['kontakt', 'pl', 'Odpowiedź do klienta (pusty)', 'W sprawie zamówienia {{numer}}',
 "Dzień dobry {{imie}},

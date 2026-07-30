@@ -229,6 +229,63 @@ ok('port par défaut cohérent avec SSL', wsm_mail_cfg()['smtp_port'] === 465, w
 ok('un sujet accentué est encodé', str_starts_with(wsm_mail_encode('Zamówienie'), '=?UTF-8?B?'));
 ok('un sujet ASCII ne l\'est pas', wsm_mail_encode('Order MS-1') === 'Order MS-1');
 
+// ---- Changements d'état : le client est prévenu, une fois ---------------------
+//  C'est un envoi déclenché par un clic dans la console : les deux dangers sont
+//  d'écrire deux fois au client, et de bloquer un changement d'état parce que
+//  personne n'a écrit le modèle correspondant.
+echo "\n-- powiadomienia o zmianie statusu --\n";
+require_once dirname(__DIR__) . '/seed.php';
+wsm_seed_mail_templates_topup($pdo);          // les modèles d'état arrivent sur une base existante
+
+foreach (['w_realizacji', 'wyslane', 'dostarczone', 'anulowane'] as $ev) {
+    ok("un modèle existe pour « $ev »", wsm_mail_template_for_event($pdo, $ev, 'pl') !== null);
+    ok("« $ev » figure dans les événements de la console", isset(WSM_MAIL_EVENTS[$ev]));
+}
+
+$pdo->prepare("DELETE FROM wsm_messages WHERE event_key LIKE ?")->execute(['status:' . (int) $order['id'] . ':%']);
+$s1 = wsm_mail_for_status($pdo, $order, 'wyslane', 'test');
+ok('le message de mise en expédition part', $s1 > 0, $s1);
+$s2 = wsm_mail_for_status($pdo, $order, 'wyslane', 'test');
+ok('repasser par le même état ne réécrit pas au client', $s2 === 0, $s2);
+
+$s3 = wsm_mail_for_status($pdo, $order, 'dostarczone', 'test');
+ok('un autre état, un autre message', $s3 > 0 && $s3 !== $s1, [$s1, $s3]);
+
+$m = $pdo->query("SELECT * FROM wsm_messages WHERE id = " . (int) $s1)->fetch();
+ok('le sujet porte le numéro de commande', str_contains((string) $m['subject'], (string) $order['code']),
+    $m['subject'] ?? null);
+ok('aucun {{jeton}} non remplacé', !str_contains((string) $m['body'], '{{'), $m['body'] ?? null);
+ok('le message est rattaché à la commande', (int) $m['order_id'] === (int) $order['id']);
+
+// Les états internes ne dérangent personne : « nowe » et « oplacone » ne sont
+// pas des nouvelles pour le client, qui vient justement de commander.
+ok('« nowe » n\'écrit pas au client', wsm_mail_for_status($pdo, $order, 'nowe', 'test') === 0);
+ok('« oplacone » non plus (la confirmation de paiement a son propre modèle)',
+    wsm_mail_for_status($pdo, $order, 'oplacone', 'test') === 0);
+ok('un état inventé n\'écrit rien', wsm_mail_for_status($pdo, $order, 'cos-nowego', 'test') === 0);
+
+// Une commande sans adresse valable ne doit pas faire échouer le changement.
+$sansMail = $order; $sansMail['email'] = 'nie-adres';
+ok('une adresse invalide n\'envoie rien et ne casse rien',
+    wsm_mail_for_status($pdo, $sansMail, 'anulowane', 'test') === 0);
+
+// Le numéro de suivi doit atteindre le modèle « wysłane ».
+$avecSuivi = $order; $avecSuivi['shipment'] = ['tracking_number' => '6200012345678'];
+$vars = wsm_mail_vars($avecSuivi);
+ok('le numéro de suivi est une variable de modèle', ($vars['sledzenie'] ?? '') === '6200012345678', $vars['sledzenie'] ?? null);
+ok('sans expédition, il est vide plutôt qu\'absent', isset(wsm_mail_vars($order)['sledzenie']));
+
+// Une ligne réduite à un libellé vide est retirée, pas laissée en suspens.
+$modele = "Dzień dobry,\n\nNumer przesyłki: {{sledzenie}}\nSposób dostawy: {{dostawa}}\n\nMister Szoko";
+$plein = wsm_mail_render($modele, $vars);
+ok('avec un numéro, la ligne de suivi est là', str_contains($plein, '6200012345678'));
+$vide = wsm_mail_render($modele, wsm_mail_vars($order));
+ok('sans numéro, la ligne de suivi disparaît', !str_contains($vide, 'Numer przesyłki'), $vide);
+ok('mais les lignes renseignées restent', str_contains($vide, 'Sposób dostawy'), $vide);
+ok('et le corps du message est intact', str_contains($vide, 'Mister Szoko') && str_contains($vide, 'Dzień dobry'));
+ok('une ligne sans variable n\'est jamais touchée',
+    str_contains(wsm_mail_render("Uwaga:\n{{nieznane}}", []), 'Uwaga:'));
+
 // ---- Nettoyage --------------------------------------------------------------
 $pdo->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$pid]);
 $pdo->exec("DELETE FROM wsm_settings WHERE cle LIKE 'tpay.%'");

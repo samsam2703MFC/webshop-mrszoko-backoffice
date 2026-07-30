@@ -173,3 +173,61 @@ function wsm_inpost_create(PDO $pdo, array $order): array {
     $st->execute([$order['id']]);
     return [$st->fetch() ?: null, null];
 }
+
+/**
+ * L'étiquette du transporteur, en PDF.
+ *
+ * Elle ne s'ouvre pas d'un simple lien : ShipX exige le jeton porteur, qu'un
+ * navigateur n'a pas et ne doit pas avoir. La console la récupère donc
+ * elle-même et la relaie — c'est le seul moyen d'imprimer l'étiquette
+ * OBLIGATOIRE (celle qui porte le code-barres) sans publier le jeton.
+ *
+ * On ne met pas le PDF en cache : une étiquette réimprimée doit être celle que
+ * le transporteur reconnaît aujourd'hui, pas celle d'avant une modification
+ * d'adresse.
+ *
+ * @param string $format 'pdf' ou 'zpl' · $size 'A6' ou 'A4'
+ * @return array [contenu binaire|null, type MIME, erreur|null]
+ */
+function wsm_inpost_label(array $shipment, string $format = 'pdf', string $size = 'A6'): array {
+    $sid = trim((string) ($shipment['shipment_id'] ?? ''));
+    if ($sid === '') return [null, '', 'przesyłka nie została jeszcze utworzona w InPost'];
+    if (!wsm_inpost_enabled()) return [null, '', 'inpost_nieskonfigurowany'];
+
+    $format = in_array($format, ['pdf', 'zpl', 'epl'], true) ? $format : 'pdf';
+    $size   = in_array($size, ['A6', 'A4'], true) ? $size : 'A6';
+
+    $c  = wsm_inpost_cfg();
+    $url = wsm_inpost_base() . '/v1/shipments/' . rawurlencode($sid) . '/label'
+         . '?format=' . $format . '&type=' . ($size === 'A4' ? 'A6P' : 'normal');
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 25,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $c['token'], 'Accept: application/pdf'],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $mime = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    curl_close($ch);
+
+    if ($code < 200 || $code >= 300 || $raw === false || $raw === '') {
+        // Le corps d'erreur de ShipX est du JSON ; on le remonte tel quel plutôt
+        // que d'afficher « échec » et de laisser chercher.
+        $j = json_decode((string) $raw, true);
+        return [null, '', 'shipx_' . $code . ': ' . mb_substr((string) ($j['message'] ?? $raw), 0, 180)];
+    }
+    return [(string) $raw, $mime !== '' ? $mime : 'application/pdf', null];
+}
+
+/**
+ * Le lien public de l'étiquette, tel que ShipX le publie parfois sur l'envoi.
+ * Rangé sur l'expédition quand on le voit passer : il évite un aller-retour,
+ * mais ne remplace pas wsm_inpost_label() — tous les comptes n'en ont pas.
+ */
+function wsm_inpost_remember_label(PDO $pdo, int $orderId, string $url): void {
+    if (!filter_var($url, FILTER_VALIDATE_URL)) return;
+    $pdo->prepare("UPDATE wsm_shipments SET label_url = ? WHERE order_id = ?")->execute([$url, $orderId]);
+}
