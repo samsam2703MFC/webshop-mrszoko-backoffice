@@ -50,7 +50,6 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
     </a>
     <nav class="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
       <a class="navlink" href="<?= e(u()) ?>#katalog"><?= e($S['nav.shop'] ?? '') ?></a>
-      <a class="navlink" href="<?= e(u()) ?>#pracownia"><?= e($S['nav.landing'] ?? '') ?></a>
       <a class="navlink" href="<?= e(u()) ?>#pro"><?= e($S['story.pro.eyebrow'] ?? '') ?></a>
     </nav>
     <div class="head-right">
@@ -83,7 +82,6 @@ function layout_footer(array $S): void {
       <?php if (($S['footer.email'] ?? '') !== ''): ?>
       <a href="mailto:<?= e($S['footer.email']) ?>"><?= e($S['footer.email']) ?></a>
       <?php endif; ?>
-      <a href="<?= e(u()) ?>#pracownia"><?= e($S['nav.landing'] ?? '') ?></a>
       <a href="<?= e(shop_base() . '/../backoffice/') ?>"><?= e($S['footer.console'] ?? '') ?></a>
     </nav>
   </div>

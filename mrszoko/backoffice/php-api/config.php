@@ -59,6 +59,19 @@ $cfg = [
         'sandbox'       => (getenv('WSM_TPAY_SANDBOX') ?: '1') !== '0',
     ],
 
+    // ---- VIES : vérification des numéros de TVA intracommunautaire ---------
+    // Service public de la Commission européenne : aucun identifiant requis.
+    // `requester` est NOTRE numéro de TVA — sans lui, VIES ne délivre pas de
+    // numéro de consultation, et il n'y a donc pas de preuve opposable.
+    // `enabled=0` coupe l'appel réseau (utile en CI ou hors ligne) : les
+    // numéros ne sont alors validés que sur la forme.
+    'vies' => [
+        'enabled'   => (getenv('WSM_VIES_ENABLED') ?: '1') !== '0',
+        'requester' => getenv('WSM_VIES_REQUESTER') ?: '',
+        'timeout'   => (int) (getenv('WSM_VIES_TIMEOUT') ?: 6),
+        'ttl'       => (int) (getenv('WSM_VIES_TTL') ?: 2592000),
+    ],
+
     // ---- InPost ShipX : expédition ----------------------------------------
     // geowidget_token est le jeton PUBLIC du sélecteur de Paczkomat (il part
     // dans la page) ; token est le jeton SERVEUR ShipX (il n'en sort jamais).

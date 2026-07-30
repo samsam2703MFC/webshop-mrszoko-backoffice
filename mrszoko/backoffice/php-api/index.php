@@ -7,13 +7,17 @@
 // ============================================================================
 declare(strict_types=1);
 
-require __DIR__ . '/db.php';
-require __DIR__ . '/delivery.php';
-require __DIR__ . '/auth.php';
-require __DIR__ . '/commerce.php';
-require __DIR__ . '/shop.php';
-require __DIR__ . '/tpay.php';
-require __DIR__ . '/inpost.php';
+// require_once et pas require : ces modules se requièrent aussi entre eux
+// (shop.php charge vies.php, tpay.php charge shop.php…). Un simple require
+// rechargerait le fichier et PHP refuserait de redéclarer ses fonctions.
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/delivery.php';
+require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/commerce.php';
+require_once __DIR__ . '/shop.php';
+require_once __DIR__ . '/tpay.php';
+require_once __DIR__ . '/inpost.php';
+require_once __DIR__ . '/vies.php';
 
 $cfg = wsm_config();
 
@@ -346,6 +350,17 @@ if ($method === 'POST') {
             wsm_send(['ok' => true, 'id' => $id, 'image_url' => $url]);
         }
 
+        // ---- VIES : vérifier un numéro sans rien enregistrer -----------------
+        // Ce que la console appelle derrière le bouton « Sprawdź ». Renvoie
+        // toujours 200 : « indisponible » est une réponse, pas une erreur.
+        case 'vies': {
+            $r = wsm_vies_check($pdo, (string) ($body['vat_eu'] ?? ''), !empty($body['force']));
+            $r['blocks'] = wsm_vies_blocks($r);
+            $r['reverse_charge'] = wsm_vies_reverse_charge($r);
+            $r['provable'] = wsm_vies_can_prove();
+            wsm_send($r);
+        }
+
         // ---- client B2B : payeur tpay + destinataire InPost -----------------
         case 'client': {
             if (!empty($body['delete'])) {
@@ -369,6 +384,18 @@ if ($method === 'POST') {
             ];
             if (!$isUpdate && $base['raison'] === '') wsm_fail_fields(['raison' => 'wymagana']);
             $row = array_merge($base, $c);
+
+            // ---- VIES : le numéro de TVA est-il RÉEL, pas seulement bien formé ?
+            // Un numéro que VIES déclare inconnu est refusé ici. Un service
+            // indisponible ne bloque rien : on enregistre l'état « unavailable »
+            // et l'écran Kontrahenci propose de revérifier.
+            if (($c['vat_eu'] ?? '') !== '') {
+                $vr = wsm_vies_check($pdo, $c['vat_eu'], !empty($body['vies_force']));
+                if (wsm_vies_blocks($vr)) wsm_fail_fields(['vat_eu' => $vr['reason'] ?: 'nieznany w VIES']);
+                $row = array_merge($row, wsm_vies_columns($vr));
+            } else {
+                $row = array_merge($row, wsm_vies_columns(['status' => 'skipped']));
+            }
 
             if ($isUpdate) {
                 $set = implode(',', array_map(fn($k) => "$k=?", array_keys($row)));

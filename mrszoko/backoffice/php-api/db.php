@@ -96,6 +96,7 @@ function wsm_bootstrap(bool $seed = true): PDO {
     wsm_ensure_auth_columns($pdo);
     wsm_ensure_commerce_columns($pdo);
     wsm_ensure_shop($pdo);
+    wsm_ensure_vies($pdo);
     return $pdo;
 }
 
@@ -190,6 +191,22 @@ function wsm_ensure_commerce_columns(PDO $pdo): void {
         'height_mm'       => $int,
         'parcel_template' => $txt(1),
     ]);
+}
+
+/**
+ * Contrôles VIES : la table d'historique, plus l'état du dernier contrôle
+ * porté sur le client et sur la commande. Idempotent.
+ */
+function wsm_ensure_vies(PDO $pdo): void {
+    if (!wsm_table_exists($pdo, 'wsm_vies_checks')) wsm_apply_schema($pdo);
+    $cols = [
+        'vat_status'       => ["VARCHAR(16) NOT NULL DEFAULT ''", "TEXT NOT NULL DEFAULT ''"],
+        'vat_checked_at'   => ['DATETIME NULL DEFAULT NULL',      'TEXT DEFAULT NULL'],
+        'vat_name'         => ["VARCHAR(200) NOT NULL DEFAULT ''", "TEXT NOT NULL DEFAULT ''"],
+        'vat_consultation' => ["VARCHAR(64) NOT NULL DEFAULT ''",  "TEXT NOT NULL DEFAULT ''"],
+    ];
+    wsm_ensure_columns($pdo, 'wsm_clients', $cols);
+    wsm_ensure_columns($pdo, 'wsm_orders',  $cols);
 }
 
 /** Une table existe-t-elle ? (MySQL + SQLite) */

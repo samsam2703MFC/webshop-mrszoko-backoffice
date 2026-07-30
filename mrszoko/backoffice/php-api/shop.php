@@ -18,6 +18,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/commerce.php';
+require_once __DIR__ . '/vies.php';
 
 const WSM_SHOP_LANGS       = ['pl', 'uk', 'en'];
 const WSM_SHOP_DEFAULT_LANG = 'pl';
@@ -509,6 +510,13 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     if ($errors) return [null, $errors];
     if ($quote['total_gross'] <= 0) return [null, ['items' => 'koszyk pusty']];
 
+    // ---- VIES : le numéro de TVA saisi à la caisse est-il réel ? ------------
+    // Un numéro que VIES déclare inconnu ferait rejeter la facture : mieux vaut
+    // le dire au client maintenant qu'après l'encaissement. En revanche, si le
+    // service est en panne, la commande passe — on garde l'état pour plus tard.
+    $vies = wsm_vies_check($pdo, (string) $buyer['vat_eu']);
+    if (wsm_vies_blocks($vies)) return [null, ['vat_eu' => $vies['reason'] ?: 'nieznany w VIES']];
+
     $pdo->beginTransaction();
     try {
         // Stock : relu et décrémenté DANS la transaction. Deux commandes
@@ -545,7 +553,7 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
             'total_net' => $quote['total_net'], 'total_vat' => $quote['total_vat'], 'total_gross' => $quote['total_gross'],
             'weight_g' => $quote['weight_g'], 'parcel_template' => $quote['parcel_template'],
             'note' => $buyer['note'],
-        ];
+        ] + wsm_vies_columns($vies);
         $names = array_keys($cols);
         $sql = 'INSERT INTO wsm_orders (' . implode(',', $names) . ') VALUES (' .
                implode(',', array_fill(0, count($names), '?')) . ')';
@@ -637,6 +645,9 @@ function wsm_order_hydrate(PDO $pdo, array $o): array {
         'email' => (string) $o['email'], 'phone' => (string) $o['phone'],
         'first_name' => (string) $o['first_name'], 'last_name' => (string) $o['last_name'],
         'company' => (string) $o['company'], 'nip' => (string) $o['nip'], 'invoice' => (int) $o['invoice'],
+        'vat_eu' => (string) ($o['vat_eu'] ?? ''),
+        'vat' => ['status' => (string) ($o['vat_status'] ?? ''), 'checked_at' => $o['vat_checked_at'] ?? null,
+                  'name' => (string) ($o['vat_name'] ?? ''), 'consultation' => (string) ($o['vat_consultation'] ?? '')],
         'bill' => ['street' => $o['bill_street'], 'building' => $o['bill_building'],
                    'postcode' => $o['bill_postcode'], 'city' => $o['bill_city'], 'country' => $o['bill_country']],
         'delivery_method' => (string) $o['delivery_method'], 'inpost_point' => (string) $o['inpost_point'],
