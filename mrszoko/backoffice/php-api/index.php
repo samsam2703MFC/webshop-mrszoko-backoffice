@@ -172,7 +172,7 @@ if ($method === 'POST') {
                     $pdo->prepare("INSERT INTO wsm_landing_i18n (lang,k,v) VALUES (?,?,?)")->execute([$body['lang'], $body['k'], (string) $body['v']]);
                 }
             }
-            wsm_audit($pdo, 'Console marque', 'Modification', 'wsm_landing_i18n ' . $body['lang'] . ':' . $body['k'], 'Landing');
+            wsm_audit($pdo, 'Konsola marki', 'Zmiana', 'wsm_landing_i18n ' . $body['lang'] . ':' . $body['k'], 'Landing');
             wsm_send(['ok' => true]);
         }
 
@@ -207,7 +207,7 @@ if ($method === 'POST') {
                 $pdo->prepare("INSERT INTO wsm_landing_products ($cols) VALUES ($ph)")
                     ->execute([(string) $body['id'], ...array_values($row)]);
             }
-            wsm_audit($pdo, 'Console marque', 'Modification', 'wsm_landing_products ' . $body['id'], 'Landing');
+            wsm_audit($pdo, 'Konsola marki', 'Zmiana', 'wsm_landing_products ' . $body['id'], 'Landing');
             wsm_send(['ok' => true]);
         }
 
@@ -219,7 +219,7 @@ if ($method === 'POST') {
             } else {
                 $pdo->prepare("INSERT INTO wsm_params (cle,type,val) VALUES (?,?,?)")->execute([$body['cle'], $body['type'] ?? 'text', (string) ($body['val'] ?? '')]);
             }
-            wsm_audit($pdo, 'Console marque', 'Modification', 'wsm_params ' . $body['cle'], 'Réseau');
+            wsm_audit($pdo, 'Konsola marki', 'Zmiana', 'wsm_params ' . $body['cle'], 'Sieć');
             wsm_send(['ok' => true]);
         }
 

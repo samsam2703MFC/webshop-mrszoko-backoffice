@@ -17,7 +17,11 @@ Everything served under `http://185.180.206.46/mrszoko`.
 
 - **`backoffice/`** — the Console marque · Siège (franchisor back-office) and its
   PHP API (`php-api/`, `webshop_mrszoko` DB). Served at **`/mrszoko/backoffice`**,
-  API at **`/mrszoko/backoffice/api`**. See `backoffice/README.md`.
+  API at **`/mrszoko/backoffice/api`**. **UI and demo data are in Polish** (screen
+  labels translated in the page; seed data translated identically in
+  `bo_server.js` and `php-api/seed.php`; stored workflow codes — delivery
+  statuses/events — stay as-is and are mapped to Polish at display time).
+  See `backoffice/README.md`.
 
 - **`design-system/`** — the Mister Szoko design system, imported from the
   Claude Design handoff (claude.ai/design): brand guide (`readme.md`), tokens,

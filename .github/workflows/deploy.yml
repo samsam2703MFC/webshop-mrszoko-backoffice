@@ -84,6 +84,12 @@ jobs:
           chown -R www-data:www-data "$DIR/backoffice/api/data" 2>/dev/null \
             || chmod -R 777 "$DIR/backoffice/api/data"
           command -v rsync >/dev/null || { echo 'rsync manquant sur le serveur — apt-get install -y rsync'; exit 1; }
+          # TRANSITOIRE (retirer après un déploiement réussi) : la base SQLite du
+          # serveur a été seedée avec les données de démo françaises ; le seed est
+          # désormais polonais. On supprime le fichier pour que le premier hit
+          # re-bootstrape (schéma + seed PL + contenu landing re-seedé depuis
+          # content_seed.json). Uniquement des données de démo/seed.
+          rm -f "$DIR/backoffice/api/data/"*.sqlite && echo 'base SQLite purgée (re-seed au 1er hit)'
           # L'API tourne par défaut sur SQLite (aucun config.local.php MySQL) :
           # le driver PDO sqlite doit exister côté Apache. Constaté manquant au
           # run #9 (500 «could not find driver») — on l'installe si absent.

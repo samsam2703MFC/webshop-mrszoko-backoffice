@@ -56,10 +56,10 @@
   <aside style="background:var(--color-surface);border-right:.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:18px 20px 15px;border-bottom:.5px solid var(--color-border-tertiary)">
       <img src="img/logo.png" alt="L'Atelier" style="width:100%;max-width:206px;height:auto;display:block"/>
-      <div style="display:flex;align-items:center;gap:7px;margin-top:9px"><span style="width:7px;height:7px;border-radius:50%;background:var(--color-primary)"></span><span style="font:600 10px/1 var(--font-ui);letter-spacing:.09em;text-transform:uppercase;color:var(--color-primary)">Console marque · Siège</span></div>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:9px"><span style="width:7px;height:7px;border-radius:50%;background:var(--color-primary)"></span><span style="font:600 10px/1 var(--font-ui);letter-spacing:.09em;text-transform:uppercase;color:var(--color-primary)">Konsola marki · Centrala</span></div>
     </div>
     <nav class="lz" style="flex:1;overflow-y:auto;padding:10px 12px 20px;display:flex;flex-direction:column;gap:3px">
-      <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:4px;border-radius:8px;text-decoration:none;background:var(--color-background-secondary);color:var(--color-text-muted);font:500 12px/1 var(--font-ui)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 19l-7-7 7-7"/><path d="M3 12h18"/></svg><span>Retour à l'ERP</span></a>
+      <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:4px;border-radius:8px;text-decoration:none;background:var(--color-background-secondary);color:var(--color-text-muted);font:500 12px/1 var(--font-ui)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 19l-7-7 7-7"/><path d="M3 12h18"/></svg><span>Powrót do ERP</span></a>
       <sc-for list="{{ navBlocks }}" as="b" hint-placeholder-count="3">
         <sc-if value="{{ b.plain }}" hint-placeholder-val="{{ true }}"><div style="margin:14px 8px 6px;font:600 10px/1 var(--font-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-muted)">{{ b.label }}</div></sc-if>
         <sc-if value="{{ b.collapsible }}" hint-placeholder-val="{{ false }}"><button onClick="{{ b.toggle }}" style="{{ b.headStyle }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="{{ b.chevStyle }}"><path d="M9 6l6 6-6 6"/></svg><span style="flex:1;font:600 10px/1 var(--font-ui);letter-spacing:.1em;text-transform:uppercase">{{ b.label }}</span></button></sc-if>
@@ -70,9 +70,9 @@
         </sc-if>
       </sc-for>
     </nav>
-    <div onClick="{{ openProfile }}" title="Profil & paramètres du site" style="padding:12px 16px;border-top:.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:10px;cursor:pointer">
+    <div onClick="{{ openProfile }}" title="Profil i ustawienia serwisu" style="padding:12px 16px;border-top:.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:10px;cursor:pointer">
       <div style="width:30px;height:30px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px var(--font-ui)">SR</div>
-      <div style="line-height:1.2"><div style="font:500 12px var(--font-ui);color:var(--color-text)">Sophie Renard</div><div style="font:400 10px var(--font-ui);color:var(--color-text-muted)">Admin réseau · Siège</div></div>
+      <div style="line-height:1.2"><div style="font:500 12px var(--font-ui);color:var(--color-text)">Sophie Renard</div><div style="font:400 10px var(--font-ui);color:var(--color-text-muted)">Admin sieci · Centrala</div></div>
       <span style="margin-left:auto;color:var(--color-text-muted)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>
     </div>
   </aside>
@@ -85,7 +85,7 @@
         <span style="font:400 12px var(--font-ui);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pageSub }}</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex:none">
-        <span style="font:400 12px var(--font-ui);color:var(--color-text-muted);white-space:nowrap">jeu. 17 juil. 2026</span>
+        <span style="font:400 12px var(--font-ui);color:var(--color-text-muted);white-space:nowrap">czw. 17 lip 2026</span>
       </div>
     </header>
 
@@ -100,9 +100,9 @@
           </sc-for>
         </div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div class="t-section-title" style="font-size:15px;margin-bottom:3px">Boutiques du réseau</div>
-          <div style="font:400 11px var(--font-ui);color:var(--color-text-muted);margin-bottom:14px">Vue consolidée · CA du mois · adoption de la whitelist marque</div>
-          <div style="display:grid;grid-template-columns:1.7fr .9fr .8fr .9fr .9fr .8fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Boutique</span><span class="t-admin-label">Ville</span><span class="t-admin-label" style="text-align:center">Webshop</span><span class="t-admin-label" style="text-align:right">CA boutique</span><span class="t-admin-label" style="text-align:right">CA bureau</span><span class="t-admin-label" style="text-align:right">Adoption</span></div>
+          <div class="t-section-title" style="font-size:15px;margin-bottom:3px">Sklepy sieci</div>
+          <div style="font:400 11px var(--font-ui);color:var(--color-text-muted);margin-bottom:14px">Widok skonsolidowany · obrót miesiąca · adopcja whitelisty marki</div>
+          <div style="display:grid;grid-template-columns:1.7fr .9fr .8fr .9fr .9fr .8fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Sklep</span><span class="t-admin-label">Miasto</span><span class="t-admin-label" style="text-align:center">Webshop</span><span class="t-admin-label" style="text-align:right">Obrót sklepu</span><span class="t-admin-label" style="text-align:right">Obrót biurowy</span><span class="t-admin-label" style="text-align:right">Adopcja</span></div>
           <sc-for list="{{ shopsRows }}" as="s" hint-placeholder-count="5">
             <div style="display:grid;grid-template-columns:1.7fr .9fr .8fr .9fr .9fr .8fr;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:500 12.5px var(--font-ui);color:var(--color-text)">{{ s.nom }}</span>
@@ -120,9 +120,9 @@
       <!-- BOUTIQUES (CRUD) -->
       <sc-if value="{{ isBoutiques }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_shops ← franchise_shops · synchronisé</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_shops ← franchise_shops · synchronizowane</span></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:grid;grid-template-columns:1.6fr 1fr .8fr .9fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Boutique</span><span class="t-admin-label">Ville</span><span class="t-admin-label" style="text-align:center">Webshop</span><span class="t-admin-label">Contrat</span><span class="t-admin-label" style="text-align:center">Actif</span><span></span></div>
+          <div style="display:grid;grid-template-columns:1.6fr 1fr .8fr .9fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Sklep</span><span class="t-admin-label">Miasto</span><span class="t-admin-label" style="text-align:center">Webshop</span><span class="t-admin-label">Umowa</span><span class="t-admin-label" style="text-align:center">Aktywny</span><span></span></div>
           <sc-for list="{{ shopsRows }}" as="s" hint-placeholder-count="5">
             <div style="display:grid;grid-template-columns:1.6fr 1fr .8fr .9fr .7fr 40px;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <div style="display:flex;align-items:center;gap:9px"><span style="width:10px;height:10px;border-radius:3px;background:{{ s.accent }};flex:none"></span><span style="font:500 12.5px var(--font-ui);color:var(--color-text)">{{ s.nom }}</span></div>
@@ -140,22 +140,22 @@
       <!-- CATALOGUE -->
       <sc-if value="{{ isCatalogue }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_products · product_categories · ws_season ← ERP (lecture)</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">Prix réf. & gouvernance éditables · catalogue synchronisé ERP</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_products · product_categories · ws_season ← ERP (odczyt)</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">Cena ref. i zarządzanie edytowalne · katalog synchronizowany z ERP</span></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="font:400 11px/1.5 var(--font-ui);color:var(--color-text-muted);margin-bottom:12px"><strong>Prix réf.</strong> conseillé réseau · <strong>Webshop</strong> = click &amp; collect (« ruby ») · <strong>Bureau</strong> = livraison bureau (« apricot »), canal indépendant · <strong>Obligatoire</strong> verrouille l'assortiment franchisé · adoption = % boutiques</div>
+          <div style="font:400 11px/1.5 var(--font-ui);color:var(--color-text-muted);margin-bottom:12px"><strong>Cena ref.</strong> sugerowana sieci · <strong>Webshop</strong> = click &amp; collect (« ruby ») · <strong>Biuro</strong> = dostawa biurowa („apricot”), kanał niezależny · <strong>Obowiązkowy</strong> blokuje asortyment franczyzobiorcy · adopcja = % sklepów</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;background:var(--color-background-secondary);border:.5px solid var(--color-border-tertiary);border-radius:9px;padding:9px 12px">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="2" style="flex:none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></svg>
-            <input type="text" value="{{ catSearch }}" onChange="{{ setCatSearch }}" placeholder="Rechercher un produit ou une catégorie…" style="flex:1;min-width:0;border:none;background:transparent;outline:none;font:500 12.5px var(--font-ui);color:var(--color-text)"/>
-            <sc-if value="{{ catSearchActive }}" hint-placeholder-val="{{ false }}"><button onClick="{{ clearCatSearch }}" style="border:none;background:transparent;cursor:pointer;color:var(--color-text-muted);font:600 11px var(--font-ui);padding:2px 6px;flex:none">Effacer</button></sc-if>
+            <input type="text" value="{{ catSearch }}" onChange="{{ setCatSearch }}" placeholder="Szukaj produktu lub kategorii…" style="flex:1;min-width:0;border:none;background:transparent;outline:none;font:500 12.5px var(--font-ui);color:var(--color-text)"/>
+            <sc-if value="{{ catSearchActive }}" hint-placeholder-val="{{ false }}"><button onClick="{{ clearCatSearch }}" style="border:none;background:transparent;cursor:pointer;color:var(--color-text-muted);font:600 11px var(--font-ui);padding:2px 6px;flex:none">Wyczyść</button></sc-if>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-right:2px">Saison</span><sc-for list="{{ seasonChips }}" as="sc" hint-placeholder-count="3"><button onClick="{{ sc.pick }}" style="{{ sc.style }}">{{ sc.label }}</button></sc-for></div>
+            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-right:2px">Sezon</span><sc-for list="{{ seasonChips }}" as="sc" hint-placeholder-count="3"><button onClick="{{ sc.pick }}" style="{{ sc.style }}">{{ sc.label }}</button></sc-for></div>
             <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-              <button onClick="{{ toggleAllCats }}" title="Déplier ou replier toutes les catégories" style="border:none;background:transparent;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font:600 11px var(--font-ui);color:var(--color-text-muted);padding:4px 6px"><span style="font-size:10px;color:var(--color-primary);width:9px;text-align:center">{{ allCatsCaret }}</span>{{ allCatsLabel }}</button>
-              <div style="display:flex;align-items:center;gap:8px"><span style="font:500 11px var(--font-ui);color:var(--color-text-muted)">Produits actifs webshop uniquement</span><button onClick="{{ catFilterToggle }}" style="{{ catFilterStyle }}"><span style="{{ catFilterKnob }}"></span></button></div>
+              <button onClick="{{ toggleAllCats }}" title="Rozwiń lub zwiń wszystkie kategorie" style="border:none;background:transparent;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font:600 11px var(--font-ui);color:var(--color-text-muted);padding:4px 6px"><span style="font-size:10px;color:var(--color-primary);width:9px;text-align:center">{{ allCatsCaret }}</span>{{ allCatsLabel }}</button>
+              <div style="display:flex;align-items:center;gap:8px"><span style="font:500 11px var(--font-ui);color:var(--color-text-muted)">Tylko produkty aktywne w webshopie</span><button onClick="{{ catFilterToggle }}" style="{{ catFilterStyle }}"><span style="{{ catFilterKnob }}"></span></button></div>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:2.2fr .85fr 1.5fr .8fr .8fr .95fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Catégorie / produit</span><span class="t-admin-label" style="text-align:right">Prix réf.</span><div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:0 12px"><span class="t-admin-label" style="text-align:center">Webshop</span><span class="t-admin-label" style="text-align:center">Bureau</span></div><span class="t-admin-label" style="text-align:center">Oblig.</span><span class="t-admin-label" style="text-align:center">Menu</span><span class="t-admin-label">Adoption</span><span></span></div>
+          <div style="display:grid;grid-template-columns:2.2fr .85fr 1.5fr .8fr .8fr .95fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Kategoria / produkt</span><span class="t-admin-label" style="text-align:right">Cena ref.</span><div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:0 12px"><span class="t-admin-label" style="text-align:center">Webshop</span><span class="t-admin-label" style="text-align:center">Biuro</span></div><span class="t-admin-label" style="text-align:center">Obow.</span><span class="t-admin-label" style="text-align:center">Menu</span><span class="t-admin-label">Adopcja</span><span></span></div>
           <sc-for list="{{ catTree }}" as="r" hint-placeholder-count="8">
             <sc-if value="{{ r.isCat }}" hint-placeholder-val="{{ true }}">
               <div style="display:grid;grid-template-columns:2.2fr .85fr 1.5fr .8fr .8fr .95fr 40px;align-items:center;padding:11px 6px;background:var(--color-background-secondary);border-radius:8px;margin-top:8px">
@@ -180,7 +180,7 @@
             </sc-if>
             <sc-if value="{{ r.isProd }}" hint-placeholder-val="{{ false }}">
               <div style="display:grid;grid-template-columns:2.2fr .85fr 1.5fr .8fr .8fr .95fr 40px;align-items:center;padding:10px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
-                <div style="display:flex;align-items:center;gap:8px;min-width:0;padding-left:24px"><span style="font:500 11px var(--font-ui);color:var(--color-text)">{{ r.nom }}</span><sc-if value="{{ r.photoMissing }}" hint-placeholder-val="{{ false }}"><span title="Aucune photo produit — déposer {id}.png|jpg dans assets/product_pictures/" style="display:inline-flex;align-items:center;gap:4px;font:600 8.5px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:#b26a00;background:#fdf3e3;border-radius:10px;padding:2px 7px;flex:none"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/><path d="M1 1l22 22"/></svg>Sans photo</span></sc-if><sc-if value="{{ r.hasSaison }}" hint-placeholder-val="{{ false }}"><span style="{{ r.saisonPill }};display:inline-flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5L19 19M19 5l-2.5 2.5M7.5 16.5L5 19"/><circle cx="12" cy="12" r="3.5"/></svg>{{ r.saison }}</span></sc-if></div>
+                <div style="display:flex;align-items:center;gap:8px;min-width:0;padding-left:24px"><span style="font:500 11px var(--font-ui);color:var(--color-text)">{{ r.nom }}</span><sc-if value="{{ r.photoMissing }}" hint-placeholder-val="{{ false }}"><span title="Aucune photo produit — déposer {id}.png|jpg dans assets/product_pictures/" style="display:inline-flex;align-items:center;gap:4px;font:600 8.5px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:#b26a00;background:#fdf3e3;border-radius:10px;padding:2px 7px;flex:none"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/><path d="M1 1l22 22"/></svg>Bez zdjęcia</span></sc-if><sc-if value="{{ r.hasSaison }}" hint-placeholder-val="{{ false }}"><span style="{{ r.saisonPill }};display:inline-flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5L19 19M19 5l-2.5 2.5M7.5 16.5L5 19"/><circle cx="12" cy="12" r="3.5"/></svg>{{ r.saison }}</span></sc-if></div>
                 <div style="display:flex;justify-content:flex-end"><input type="number" step="0.01" value="{{ r.prix }}" onChange="{{ r.setPrix }}" style="width:70px;text-align:right;border:.5px solid var(--color-border-secondary);border-radius:7px;padding:6px 7px;font:600 12px var(--font-ui);color:var(--color-text);background:var(--color-surface)"/></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;background:var(--color-background-secondary);border-radius:16px;padding:4px 6px;margin:0 6px"><div style="display:flex;justify-content:center"><button onClick="{{ r.toggleBw }}" style="{{ r.bwStyle }}"><span style="{{ r.bwKnob }}"></span></button></div><div style="display:flex;justify-content:center"><button onClick="{{ r.toggleOd }}" style="{{ r.odStyle }}"><span style="{{ r.odKnob }}"></span></button></div></div>
                 <div style="display:flex;justify-content:center"><button onClick="{{ r.toggleBm }}" style="{{ r.bmStyle }}"><span style="{{ r.bmKnob }}"></span></button></div>
@@ -198,11 +198,11 @@
       <sc-if value="{{ isPromos }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><div class="t-section-title" style="font-size:15px">Bons marque</div><div style="{{ srcHint }}">ws_vouchers · shop_id NULL = tout le réseau ⇩</div></div><button onClick="{{ addVoucher }}" class="btn-primary" style="font-size:12px;flex:none">+ Bon marque</button></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><div class="t-section-title" style="font-size:15px">Kupony marki</div><div style="{{ srcHint }}">ws_vouchers · shop_id NULL = cała sieć ⇩</div></div><button onClick="{{ addVoucher }}" class="btn-primary" style="font-size:12px;flex:none">+ Kupon marki</button></div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
             <sc-for list="{{ vouchersM }}" as="v" hint-placeholder-count="3">
               <div style="border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:14px 16px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font:700 14px var(--font-mono,monospace);color:var(--color-primary);letter-spacing:.05em">{{ v.code }}</span><span style="{{ porteeBadge }}">Réseau</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font:700 14px var(--font-mono,monospace);color:var(--color-primary);letter-spacing:.05em">{{ v.code }}</span><span style="{{ porteeBadge }}">Sieć</span></div>
                 <div style="font:500 13px var(--font-ui);color:var(--color-text)">{{ v.valeur }}</div>
                 <div style="font:400 11px var(--font-ui);color:var(--color-text-muted);margin-top:2px">{{ v.type }} · {{ v.validite }}</div>
               </div>
@@ -210,8 +210,8 @@
           </div>
         </div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><div class="t-section-title" style="font-size:15px">Règles de prix réseau</div><div style="{{ srcHint }}">ws_pricing_rules · shop_id NULL</div></div><button onClick="{{ addPricing }}" class="btn-secondary" style="font-size:12px;flex:none">+ Règle</button></div>
-          <div style="display:grid;grid-template-columns:1.8fr 1.1fr .9fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Règle</span><span class="t-admin-label">Cible</span><span class="t-admin-label" style="text-align:right">Effet</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><div class="t-section-title" style="font-size:15px">Reguły cenowe sieci</div><div style="{{ srcHint }}">ws_pricing_rules · shop_id NULL</div></div><button onClick="{{ addPricing }}" class="btn-secondary" style="font-size:12px;flex:none">+ Reguła</button></div>
+          <div style="display:grid;grid-template-columns:1.8fr 1.1fr .9fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Reguła</span><span class="t-admin-label">Cel</span><span class="t-admin-label" style="text-align:right">Efekt</span></div>
           <sc-for list="{{ pricingR }}" as="r" hint-placeholder-count="3">
             <div style="display:grid;grid-template-columns:1.8fr 1.1fr .9fr;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:500 12.5px var(--font-ui);color:var(--color-text)">{{ r.nom }}</span>
@@ -232,8 +232,8 @@
           </sc-for>
         </div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><div class="t-section-title" style="font-size:15px">Livraisons bureau</div><div style="{{ srcHint }}">wsm_deliveries ← wsm_clients · wsm_client_points · wsm_drivers · confirmation QR/PIN</div></div><button onClick="{{ createTestDelivery }}" class="btn-primary" style="font-size:12px;flex:none">+ Livraison test</button></div>
-          <div style="display:grid;grid-template-columns:1fr 1.5fr 1fr .85fr .65fr .65fr 160px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Réf.</span><span class="t-admin-label">Client · point</span><span class="t-admin-label">Chauffeur</span><span class="t-admin-label">Statut</span><span class="t-admin-label" style="text-align:right">CA</span><span class="t-admin-label" style="text-align:right">Marge</span><span></span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><div class="t-section-title" style="font-size:15px">Dostawy biurowe</div><div style="{{ srcHint }}">wsm_deliveries ← wsm_clients · wsm_client_points · wsm_drivers · potwierdzenie QR/PIN</div></div><button onClick="{{ createTestDelivery }}" class="btn-primary" style="font-size:12px;flex:none">+ Dostawa testowa</button></div>
+          <div style="display:grid;grid-template-columns:1fr 1.5fr 1fr .85fr .65fr .65fr 160px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Ref.</span><span class="t-admin-label">Klient · punkt</span><span class="t-admin-label">Kierowca</span><span class="t-admin-label">Status</span><span class="t-admin-label" style="text-align:right">Obrót</span><span class="t-admin-label" style="text-align:right">Marża</span><span></span></div>
           <sc-for list="{{ livRows }}" as="d" hint-placeholder-count="4">
             <div style="display:grid;grid-template-columns:1fr 1.5fr 1fr .85fr .65fr .65fr 160px;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:700 11.5px var(--font-mono,monospace);color:var(--color-text)">{{ d.ref }}</span>
@@ -243,9 +243,9 @@
               <span style="font:600 12px var(--font-ui);color:var(--color-text);text-align:right">{{ d.caTxt }}</span>
               <span style="font:600 12px var(--font-ui);color:{{ d.margeColor }};text-align:right">{{ d.margeTxt }}</span>
               <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
-                <sc-if value="{{ d.canAssign }}" hint-placeholder-val="{{ true }}"><button onClick="{{ d.assign }}" style="{{ d.assignStyle }}">Assigner</button></sc-if>
-                <sc-if value="{{ d.canConfirm }}" hint-placeholder-val="{{ false }}"><button onClick="{{ d.confirm }}" style="{{ d.confirmStyle }}">Confirmer</button></sc-if>
-                <sc-if value="{{ d.done }}" hint-placeholder-val="{{ false }}"><span style="font:600 11px var(--font-ui);color:#2d7a3e">✓ Livrée</span></sc-if>
+                <sc-if value="{{ d.canAssign }}" hint-placeholder-val="{{ true }}"><button onClick="{{ d.assign }}" style="{{ d.assignStyle }}">Przypisz</button></sc-if>
+                <sc-if value="{{ d.canConfirm }}" hint-placeholder-val="{{ false }}"><button onClick="{{ d.confirm }}" style="{{ d.confirmStyle }}">Potwierdź</button></sc-if>
+                <sc-if value="{{ d.done }}" hint-placeholder-val="{{ false }}"><span style="font:600 11px var(--font-ui);color:#2d7a3e">✓ Dostarczona</span></sc-if>
               </div>
             </div>
           </sc-for>
@@ -257,9 +257,9 @@
       <!-- COMMUNICATIONS -->
       <sc-if value="{{ isComms }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_email_templates (clé × langue × marque)</span><button onClick="{{ addTemplate }}" class="btn-primary" style="font-size:12px;flex:none">+ Modèle</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_email_templates (klucz × język × marka)</span><button onClick="{{ addTemplate }}" class="btn-primary" style="font-size:12px;flex:none">+ Szablon</button></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:grid;grid-template-columns:1.4fr 2fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Modèle</span><span class="t-admin-label">Sujet</span><span class="t-admin-label" style="text-align:center">Langue</span><span></span></div>
+          <div style="display:grid;grid-template-columns:1.4fr 2fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Szablon</span><span class="t-admin-label">Temat</span><span class="t-admin-label" style="text-align:center">Język</span><span></span></div>
           <sc-for list="{{ templates }}" as="t" hint-placeholder-count="5">
             <div style="display:grid;grid-template-columns:1.4fr 2fr .7fr 40px;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:600 11.5px var(--font-mono,monospace);color:var(--color-text)">{{ t.cle }}</span>
@@ -277,29 +277,29 @@
       <sc-if value="{{ isGeo }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:14px">
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:14px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-            <span class="t-admin-label">Boutique</span>
-            <select onChange="{{ geoSetShop }}" style="border:.5px solid var(--color-border-secondary);border-radius:8px;padding:8px 11px;font:12.5px var(--font-ui);background:#fff"><option value="">Toutes les boutiques</option><sc-for list="{{ geoShopOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.label }}</option></sc-for></select>
-            <span class="t-admin-label">Franchisé</span>
-            <select onChange="{{ geoSetFr }}" style="border:.5px solid var(--color-border-secondary);border-radius:8px;padding:8px 11px;font:12.5px var(--font-ui);background:#fff"><option value="">Vue franchiseur — tout le réseau</option><sc-for list="{{ geoFrOpts }}" as="o" hint-placeholder-count="2"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.label }}</option></sc-for></select>
+            <span class="t-admin-label">Sklep</span>
+            <select onChange="{{ geoSetShop }}" style="border:.5px solid var(--color-border-secondary);border-radius:8px;padding:8px 11px;font:12.5px var(--font-ui);background:#fff"><option value="">Wszystkie sklepy</option><sc-for list="{{ geoShopOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.label }}</option></sc-for></select>
+            <span class="t-admin-label">Franczyzobiorca</span>
+            <select onChange="{{ geoSetFr }}" style="border:.5px solid var(--color-border-secondary);border-radius:8px;padding:8px 11px;font:12.5px var(--font-ui);background:#fff"><option value="">Widok franczyzodawcy — cała sieć</option><sc-for list="{{ geoFrOpts }}" as="o" hint-placeholder-count="2"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.label }}</option></sc-for></select>
             <span style="margin-left:auto;font:11.5px var(--font-ui);color:var(--color-text-muted)">{{ geoCountTxt }}</span>
           </div>
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:0;overflow:hidden;position:relative">
             <div id="map-geo" style="width:100%;height:520px;background:var(--color-background-secondary)"></div>
             <div style="position:absolute;top:12px;right:12px;z-index:500;background:rgba(255,255,255,.96);border:.5px solid var(--color-border-tertiary);border-radius:10px;padding:10px 14px;font:11.5px var(--font-ui);display:flex;flex-direction:column;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.10)">
               <div style="font:700 11.5px var(--font-ui);padding-bottom:2px;border-bottom:.5px solid var(--color-border-tertiary)">{{ geoLegTot }}</div>
-              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#E8B84B;border:1.5px solid #b28a1f;flex:none"></span>Clients office (B2B)<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegOff }}</span></div>
-              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#3B6BC9;border:1.5px solid #24488f;flex:none"></span>Clients particuliers<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegPriv }}</span></div>
-              <div style="display:flex;align-items:center;gap:7px"><span style="width:14px;height:14px;border-radius:50%;background:conic-gradient(#E8B84B 0 140deg,#3B6BC9 0 360deg);border:1.5px solid #fff;box-shadow:0 0 0 1px #ccc;flex:none;display:flex;align-items:center;justify-content:center"><span style="background:#fff;border-radius:999px;font:700 7px sans-serif;padding:0 2px">n</span></span>Zone à n clients (clic = détail + %)</div>
-              <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-primary);border:1.5px solid #5e1220;flex:none"></span>Boutique (clic = isoler ses clients)</div>
+              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#E8B84B;border:1.5px solid #b28a1f;flex:none"></span>Klienci biurowi (B2B)<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegOff }}</span></div>
+              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#3B6BC9;border:1.5px solid #24488f;flex:none"></span>Klienci indywidualni<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegPriv }}</span></div>
+              <div style="display:flex;align-items:center;gap:7px"><span style="width:14px;height:14px;border-radius:50%;background:conic-gradient(#E8B84B 0 140deg,#3B6BC9 0 360deg);border:1.5px solid #fff;box-shadow:0 0 0 1px #ccc;flex:none;display:flex;align-items:center;justify-content:center"><span style="background:#fff;border-radius:999px;font:700 7px sans-serif;padding:0 2px">n</span></span>Strefa n klientów (klik = szczegóły + %)</div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-primary);border:1.5px solid #5e1220;flex:none"></span>Sklep (klik = izoluj jego klientów)</div>
             </div>
             <sc-if value="{{ geoHlTxt }}" hint-placeholder-val="{{ false }}">
               <div style="position:absolute;bottom:12px;left:12px;z-index:500;background:rgba(255,255,255,.96);border:.5px solid var(--color-border-tertiary);border-radius:8px;padding:7px 12px;font:600 11.5px var(--font-ui);color:var(--color-primary)">{{ geoHlTxt }}</div>
             </sc-if>
           </div>
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-            <div class="t-section-title" style="font-size:15px;margin-bottom:3px">Répartition par arrondissement</div>
-            <div style="font:400 11px var(--font-ui);color:var(--color-text-muted);margin-bottom:14px">Clients affichés par plage bpost · % de la masse totale · suit les filtres boutique / franchisé</div>
-            <div style="display:grid;grid-template-columns:1.6fr .55fr .55fr 1.3fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Arrondissement</span><span class="t-admin-label" style="text-align:right">Clients</span><span class="t-admin-label" style="text-align:right">% masse</span><span></span></div>
+            <div class="t-section-title" style="font-size:15px;margin-bottom:3px">Rozkład wg okręgu</div>
+            <div style="font:400 11px var(--font-ui);color:var(--color-text-muted);margin-bottom:14px">Klienci wg zakresów bpost · % masy całkowitej · reaguje na filtry sklep / franczyzobiorca</div>
+            <div style="display:grid;grid-template-columns:1.6fr .55fr .55fr 1.3fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Okręg</span><span class="t-admin-label" style="text-align:right">Klienci</span><span class="t-admin-label" style="text-align:right">% masy</span><span></span></div>
             <sc-for list="{{ geoArr }}" as="r" hint-placeholder-count="4">
               <div style="display:grid;grid-template-columns:1.6fr .55fr .55fr 1.3fr;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
                 <span style="font:500 12.5px var(--font-ui);color:var(--color-text)">{{ r.name }}</span>
@@ -308,28 +308,28 @@
                 <div style="padding-left:18px"><div style="height:7px;border-radius:999px;background:var(--color-background-secondary);overflow:hidden"><div style="{{ r.barStyle }}"></div></div></div>
               </div>
             </sc-for>
-            <sc-if value="{{ geoArrEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 6px;font:400 12px var(--font-ui);color:var(--color-text-muted)">Aucun client localisé.</div></sc-if>
+            <sc-if value="{{ geoArrEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 6px;font:400 12px var(--font-ui);color:var(--color-text-muted)">Brak zlokalizowanych klientów.</div></sc-if>
           </div>
         </div>
       </sc-if>
       <sc-if value="{{ isZones }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:14px">
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:#fdf9f3;border-color:#eadfce">
-            <div style="font:12.5px/1.55 var(--font-ui);color:var(--color-text-muted);max-width:640px"><strong style="color:var(--color-text)">Découpez le territoire de la marque en zones primaires</strong> et affectez chacune à un point de vente. Un code postal ne peut appartenir qu'à une seule zone primaire — le franchisé bâtit ensuite ses zones secondaires à l'intérieur de ce cadre.</div>
-            <button onClick="{{ czNew }}" style="flex:none;background:var(--color-primary);color:#fff;border:none;border-radius:9px;padding:11px 18px;font:600 12.5px var(--font-ui);cursor:pointer;box-shadow:0 1px 3px rgba(141,29,44,.25)">+ Nouvelle zone</button>
+            <div style="font:12.5px/1.55 var(--font-ui);color:var(--color-text-muted);max-width:640px"><strong style="color:var(--color-text)">Podziel terytorium marki na strefy pierwotne</strong> i przypisz każdą do punktu sprzedaży. Kod pocztowy może należeć tylko do jednej strefy pierwotnej — franczyzobiorca buduje potem swoje strefy wtórne w tych ramach.</div>
+            <button onClick="{{ czNew }}" style="flex:none;background:var(--color-primary);color:#fff;border:none;border-radius:9px;padding:11px 18px;font:600 12.5px var(--font-ui);cursor:pointer;box-shadow:0 1px 3px rgba(141,29,44,.25)">+ Nowa strefa</button>
           </div>
           <sc-if value="{{ czEmpty }}" hint-placeholder-val="{{ false }}">
-            <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;text-align:center;padding:38px;color:var(--color-text-muted);font:13px var(--font-ui)">Aucune zone primaire pour l'instant — créez la première pour poser le cadre du réseau.</div>
+            <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;text-align:center;padding:38px;color:var(--color-text-muted);font:13px var(--font-ui)">Na razie brak stref pierwotnych — utwórz pierwszą, aby wyznaczyć ramy sieci.</div>
           </sc-if>
           <sc-for list="{{ czRows }}" as="z" hint-placeholder-count="2">
             <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px">
               <div style="display:flex;align-items:center;gap:12px">
                 <div class="t-section-title" style="font-size:17px;flex:none">{{ z.name }}</div>
                 <span style="{{ z.shopPill }}">{{ z.shopLabel }}</span>
-                <sc-if value="{{ z.isExcl }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);background:#fbe9eb;color:var(--color-primary);border:.5px solid #f0cdd2">Territoire exclusif</span></sc-if>
+                <sc-if value="{{ z.isExcl }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);background:#fbe9eb;color:var(--color-primary);border:.5px solid #f0cdd2">Terytorium wyłączne</span></sc-if>
                 <span style="margin-left:auto;flex:none;color:var(--color-text-muted);font:11.5px var(--font-ui)">{{ z.cpCount }}</span>
-                <button onClick="{{ z.edit }}" style="flex:none;background:transparent;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:6px 13px;font:600 11.5px var(--font-ui);cursor:pointer">Éditer</button>
-                <button onClick="{{ z.del }}" title="Supprimer" style="flex:none;background:transparent;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:6px 10px;font:600 11.5px var(--font-ui);cursor:pointer;color:var(--color-primary)">✕</button>
+                <button onClick="{{ z.edit }}" style="flex:none;background:transparent;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:6px 13px;font:600 11.5px var(--font-ui);cursor:pointer">Edytuj</button>
+                <button onClick="{{ z.del }}" title="Usuń" style="flex:none;background:transparent;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:6px 10px;font:600 11.5px var(--font-ui);cursor:pointer;color:var(--color-primary)">✕</button>
               </div>
               <div style="display:flex;flex-wrap:wrap;gap:6px">
                 <sc-for list="{{ z.cpChips }}" as="c" hint-placeholder-count="6">
@@ -339,7 +339,7 @@
             </div>
           </sc-for>
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:0;overflow:hidden">
-            <div style="padding:12px 18px;display:flex;align-items:center;gap:10px"><span class="t-admin-label">Carte du territoire</span><span style="font:11px var(--font-ui);color:var(--color-text-muted)">un point par code postal · une couleur par zone primaire</span></div>
+            <div style="padding:12px 18px;display:flex;align-items:center;gap:10px"><span class="t-admin-label">Mapa terytorium</span><span style="font:11px var(--font-ui);color:var(--color-text-muted)">punkt per kod pocztowy · kolor per strefa pierwotna</span></div>
             <div id="map-zones" style="width:100%;height:380px;background:var(--color-background-secondary)"></div>
           </div>
           <sc-if value="{{ czOpen }}" hint-placeholder-val="{{ false }}">
@@ -347,14 +347,14 @@
               <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;width:640px;max-width:92vw;max-height:86vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.28)">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div class="t-section-title" style="font-size:18px">{{ czFormTitle }}</div><button onClick="{{ czClose }}" style="background:transparent;border:none;font:600 16px var(--font-ui);cursor:pointer;color:var(--color-text-muted)">✕</button></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-                  <label style="display:flex;flex-direction:column;gap:6px"><span class="t-admin-label">Nom de la zone</span><input value="{{ czF.name }}" onInput="{{ czSetName }}" placeholder="Bruxelles Capitale" style="border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 12px;font:13px var(--font-ui)"></label>
-                  <label style="display:flex;flex-direction:column;gap:6px"><span class="t-admin-label">Point de vente affecté</span><select onChange="{{ czSetShop }}" style="border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 12px;font:13px var(--font-ui);background:#fff"><option value="">— Réseau (non affectée) —</option><sc-for list="{{ czShopOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.label }}</option></sc-for></select></label>
+                  <label style="display:flex;flex-direction:column;gap:6px"><span class="t-admin-label">Nazwa strefy</span><input value="{{ czF.name }}" onInput="{{ czSetName }}" placeholder="Bruxelles Capitale" style="border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 12px;font:13px var(--font-ui)"></label>
+                  <label style="display:flex;flex-direction:column;gap:6px"><span class="t-admin-label">Przypisany punkt sprzedaży</span><select onChange="{{ czSetShop }}" style="border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 12px;font:13px var(--font-ui);background:#fff"><option value="">— Sieć (nieprzypisana) —</option><sc-for list="{{ czShopOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.label }}</option></sc-for></select></label>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
-                  <span class="t-admin-label">Codes postaux de la zone</span>
+                  <span class="t-admin-label">Kody pocztowe strefy</span>
                   <div style="display:flex;gap:8px">
-                    <input value="{{ czDraft }}" onInput="{{ czSetDraftH }}" onKeyDown="{{ czKey }}" placeholder="CP, commune, arrondissement… (ex. 1000 · Anderlecht · Brabant wallon)" style="flex:1;border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 12px;font:13px var(--font-ui)">
-                    <button onClick="{{ czAdd }}" style="flex:none;background:var(--color-background-secondary);border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 16px;font:600 12px var(--font-ui);cursor:pointer">Ajouter</button>
+                    <input value="{{ czDraft }}" onInput="{{ czSetDraftH }}" onKeyDown="{{ czKey }}" placeholder="Kod, gmina, okręg… (np. 1000 · Anderlecht · Brabant wallon)" style="flex:1;border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 12px;font:13px var(--font-ui)">
+                    <button onClick="{{ czAdd }}" style="flex:none;background:var(--color-background-secondary);border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 16px;font:600 12px var(--font-ui);cursor:pointer">Dodaj</button>
                   </div>
                   <sc-if value="{{ czHasSug }}" hint-placeholder-val="{{ false }}">
                     <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:.5px solid var(--color-border-tertiary);border-radius:9px;background:var(--color-background-secondary)">
@@ -368,10 +368,10 @@
                       <span style="display:inline-flex;align-items:center;gap:6px;border-radius:7px;padding:4px 6px 4px 10px;font:600 11.5px var(--font-mono,monospace);background:#fdf3e7;color:#6b4420;border:.5px solid #ead9c3">{{ c.cp }}<button onClick="{{ c.remove }}" style="background:transparent;border:none;cursor:pointer;font:700 11px var(--font-ui);color:#8C4A2F;padding:0 2px">✕</button></span>
                     </sc-for>
                   </div>
-                  <div style="font:11px var(--font-ui);color:var(--color-text-muted)">Chaque code est vérifié à l'ajout : s'il appartient déjà à une autre zone primaire, il est refusé avec le nom de la zone en conflit.</div>
+                  <div style="font:11px var(--font-ui);color:var(--color-text-muted)">Każdy kod jest sprawdzany przy dodaniu: jeśli należy już do innej strefy pierwotnej, zostaje odrzucony z nazwą strefy w konflikcie.</div>
                 </div>
-                <label style="display:flex;align-items:center;gap:9px;font:12.5px var(--font-ui);margin-top:14px"><input type="checkbox" checked="{{ czF.exclusive }}" onChange="{{ czSetExcl }}">Territoire exclusif — aucune zone secondaire d'un autre point de vente ne peut y opérer</label>
-                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px"><button onClick="{{ czClose }}" style="background:transparent;border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 18px;font:600 12.5px var(--font-ui);cursor:pointer">Annuler</button><button onClick="{{ czSave }}" style="background:var(--color-primary);color:#fff;border:none;border-radius:9px;padding:10px 22px;font:600 12.5px var(--font-ui);cursor:pointer">Enregistrer la zone</button></div>
+                <label style="display:flex;align-items:center;gap:9px;font:12.5px var(--font-ui);margin-top:14px"><input type="checkbox" checked="{{ czF.exclusive }}" onChange="{{ czSetExcl }}">Terytorium wyłączne — żadna strefa wtórna innego punktu nie może tu działać</label>
+                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px"><button onClick="{{ czClose }}" style="background:transparent;border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 18px;font:600 12.5px var(--font-ui);cursor:pointer">Anuluj</button><button onClick="{{ czSave }}" style="background:var(--color-primary);color:#fff;border:none;border-radius:9px;padding:10px 22px;font:600 12.5px var(--font-ui);cursor:pointer">Zapisz strefę</button></div>
               </div>
             </div>
           </sc-if>
@@ -379,9 +379,9 @@
       </sc-if>
       <sc-if value="{{ isUsers }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">bo_users · bo_user_shops (RBAC)</span><button onClick="{{ addUser }}" class="btn-primary" style="font-size:12px;flex:none">+ Utilisateur</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">bo_users · bo_user_shops (RBAC)</span><button onClick="{{ addUser }}" class="btn-primary" style="font-size:12px;flex:none">+ Użytkownik</button></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:grid;grid-template-columns:1.4fr 1.6fr .9fr 1.3fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Nom</span><span class="t-admin-label">Email</span><span class="t-admin-label">Rôle</span><span class="t-admin-label">Portée</span><span class="t-admin-label" style="text-align:center">Actif</span><span></span></div>
+          <div style="display:grid;grid-template-columns:1.4fr 1.6fr .9fr 1.3fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Nazwa</span><span class="t-admin-label">E-mail</span><span class="t-admin-label">Rola</span><span class="t-admin-label">Zakres</span><span class="t-admin-label" style="text-align:center">Aktywny</span><span></span></div>
           <sc-for list="{{ usersRows }}" as="u" hint-placeholder-count="4">
             <div style="display:grid;grid-template-columns:1.4fr 1.6fr .9fr 1.3fr .7fr 40px;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:500 12.5px var(--font-ui);color:var(--color-text)">{{ u.nom }}</span>
@@ -398,9 +398,9 @@
 
       <sc-if value="{{ isComms }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_email_templates (clé × langue × marque)</span><button onClick="{{ addTemplate }}" class="btn-primary" style="font-size:12px;flex:none">+ Modèle</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">ws_email_templates (klucz × język × marka)</span><button onClick="{{ addTemplate }}" class="btn-primary" style="font-size:12px;flex:none">+ Szablon</button></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:grid;grid-template-columns:1.4fr 2fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Modèle</span><span class="t-admin-label">Sujet</span><span class="t-admin-label" style="text-align:center">Langue</span><span></span></div>
+          <div style="display:grid;grid-template-columns:1.4fr 2fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Szablon</span><span class="t-admin-label">Temat</span><span class="t-admin-label" style="text-align:center">Język</span><span></span></div>
           <sc-for list="{{ templates }}" as="t" hint-placeholder-count="5">
             <div style="display:grid;grid-template-columns:1.4fr 2fr .7fr 40px;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:600 11.5px var(--font-mono,monospace);color:var(--color-text)">{{ t.cle }}</span>
@@ -417,9 +417,9 @@
       <!-- UTILISATEURS & RÔLES -->
       <sc-if value="{{ isUsers }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">bo_users · bo_user_shops (RBAC)</span><button onClick="{{ addUser }}" class="btn-primary" style="font-size:12px;flex:none">+ Utilisateur</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="{{ tableBadge }}">bo_users · bo_user_shops (RBAC)</span><button onClick="{{ addUser }}" class="btn-primary" style="font-size:12px;flex:none">+ Użytkownik</button></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:grid;grid-template-columns:1.4fr 1.6fr .9fr 1.3fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Nom</span><span class="t-admin-label">Email</span><span class="t-admin-label">Rôle</span><span class="t-admin-label">Portée</span><span class="t-admin-label" style="text-align:center">Actif</span><span></span></div>
+          <div style="display:grid;grid-template-columns:1.4fr 1.6fr .9fr 1.3fr .7fr 40px;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Nazwa</span><span class="t-admin-label">E-mail</span><span class="t-admin-label">Rola</span><span class="t-admin-label">Zakres</span><span class="t-admin-label" style="text-align:center">Aktywny</span><span></span></div>
           <sc-for list="{{ usersRows }}" as="u" hint-placeholder-count="4">
             <div style="display:grid;grid-template-columns:1.4fr 1.6fr .9fr 1.3fr .7fr 40px;align-items:center;padding:11px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:500 12.5px var(--font-ui);color:var(--color-text)">{{ u.nom }}</span>
@@ -438,9 +438,9 @@
       <sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:16px">
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><div class="t-section-title" style="font-size:15px">Journal d'audit</div><span style="{{ tableBadge }}">bo_audit</span></div>
-          <div style="font:400 11px var(--font-ui);color:var(--color-text-muted);margin-bottom:14px">Toute écriture sensible est tracée · horodatage, acteur, action, entité, boutique</div>
-          <div style="display:grid;grid-template-columns:1fr 1.3fr 1.6fr 1.1fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Horodatage</span><span class="t-admin-label">Acteur</span><span class="t-admin-label">Action</span><span class="t-admin-label">Boutique</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><div class="t-section-title" style="font-size:15px">Dziennik audytu</div><span style="{{ tableBadge }}">bo_audit</span></div>
+          <div style="font:400 11px var(--font-ui);color:var(--color-text-muted);margin-bottom:14px">Każdy wrażliwy zapis jest śledzony · czas, wykonawca, akcja, encja, sklep</div>
+          <div style="display:grid;grid-template-columns:1fr 1.3fr 1.6fr 1.1fr;padding:8px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Znacznik czasu</span><span class="t-admin-label">Wykonawca</span><span class="t-admin-label">Akcja</span><span class="t-admin-label">Sklep</span></div>
           <sc-for list="{{ auditRows }}" as="a" hint-placeholder-count="6">
             <div style="display:grid;grid-template-columns:1fr 1.3fr 1.6fr 1.1fr;align-items:center;padding:10px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
               <span style="font:400 11px var(--font-mono,monospace);color:var(--color-text-muted)">{{ a.ts }}</span>
@@ -461,7 +461,7 @@
         <sc-if value="{{ schemaOpen }}" hint-placeholder-val="{{ true }}">
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-left:3px solid var(--color-primary);border-radius:12px;padding:16px 18px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:9px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg><span style="font:600 13px var(--font-ui);color:var(--color-text)">Rapport de schéma · à confronter avant tout DDL</span></div>
+            <div style="display:flex;align-items:center;gap:9px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg><span style="font:600 13px var(--font-ui);color:var(--color-text)">Raport schematu · do weryfikacji przed każdym DDL</span></div>
             <button onClick="{{ schemaDismiss }}" style="background:transparent;border:none;cursor:pointer;color:var(--color-text-muted);font-size:20px;line-height:1">×</button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px">
@@ -480,22 +480,22 @@
         <sc-if value="{{ isMenuList }}" hint-placeholder-val="{{ true }}">
         <div style="display:flex;flex-direction:column;gap:14px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-            <div><div class="t-section-title" style="font-size:15px">Menus disponibles</div><div style="font:400 11px var(--font-ui);color:var(--color-text-muted)">Un menu = un déclencheur (catégorie / produit) + ses formules</div></div>
-            <button onClick="{{ openCreate }}" class="btn-primary" style="font-size:12px;flex:none">+ Créer un menu</button>
+            <div><div class="t-section-title" style="font-size:15px">Dostępne menu</div><div style="font:400 11px var(--font-ui);color:var(--color-text-muted)">Menu = wyzwalacz (kategoria / produkt) + jego zestawy</div></div>
+            <button onClick="{{ openCreate }}" class="btn-primary" style="font-size:12px;flex:none">+ Utwórz menu</button>
           </div>
           <sc-if value="{{ menuCreate }}" hint-placeholder-val="{{ false }}">
           <div style="background:var(--color-surface);border:.5px solid var(--color-primary);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:13px">
-            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 12.5px var(--font-ui);color:var(--color-text)">Nouveau menu</span><button onClick="{{ closeCreate }}" style="background:transparent;border:none;cursor:pointer;color:var(--color-text-muted);font-size:20px;line-height:1">×</button></div>
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 12.5px var(--font-ui);color:var(--color-text)">Nowe menu</span><button onClick="{{ closeCreate }}" style="background:transparent;border:none;cursor:pointer;color:var(--color-text-muted);font-size:20px;line-height:1">×</button></div>
             <div style="display:flex;flex-direction:column;gap:12px">
-              <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Nom du menu</label><input type="text" value="{{ menuNewName }}" onChange="{{ setMenuNewName }}" placeholder="ex. Menu du Midi" style="width:100%;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:9px 11px;font:500 13px var(--font-ui);color:var(--color-text);background:var(--color-surface);box-sizing:border-box"/></div>
-              <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Description</label><input type="text" value="{{ menuNewDesc }}" onChange="{{ setMenuNewDesc }}" placeholder="ex. Plat + boisson + dessert" style="width:100%;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:9px 11px;font:500 13px var(--font-ui);color:var(--color-text);background:var(--color-surface);box-sizing:border-box"/></div>
-              <div style="font:400 10.5px var(--font-ui);color:var(--color-text-muted)">Le déclencheur (catégorie / produit) et les formules se définissent ensuite dans la composition.</div>
-              <button onClick="{{ doCreateMenu }}" class="btn-primary" style="font-size:12px;align-self:flex-start">Créer le menu →</button>
+              <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Nazwa menu</label><input type="text" value="{{ menuNewName }}" onChange="{{ setMenuNewName }}" placeholder="np. Menu lunchowe" style="width:100%;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:9px 11px;font:500 13px var(--font-ui);color:var(--color-text);background:var(--color-surface);box-sizing:border-box"/></div>
+              <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Opis</label><input type="text" value="{{ menuNewDesc }}" onChange="{{ setMenuNewDesc }}" placeholder="np. Danie + napój + deser" style="width:100%;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:9px 11px;font:500 13px var(--font-ui);color:var(--color-text);background:var(--color-surface);box-sizing:border-box"/></div>
+              <div style="font:400 10.5px var(--font-ui);color:var(--color-text-muted)">Wyzwalacz (kategoria / produkt) i zestawy definiuje się dalej w kompozycji.</div>
+              <button onClick="{{ doCreateMenu }}" class="btn-primary" style="font-size:12px;align-self:flex-start">Utwórz menu →</button>
             </div>
           </div>
           </sc-if>
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:8px 18px 14px">
-            <div style="display:grid;grid-template-columns:2fr 1.2fr 1fr .8fr 28px;padding:10px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Menu</span><span class="t-admin-label">Catégorie</span><span class="t-admin-label">Menu effectif</span><span class="t-admin-label" style="text-align:right">Formules</span><span></span></div>
+            <div style="display:grid;grid-template-columns:2fr 1.2fr 1fr .8fr 28px;padding:10px 6px;border-bottom:.5px solid var(--color-border-tertiary)"><span class="t-admin-label">Menu</span><span class="t-admin-label">Kategoria</span><span class="t-admin-label">Menu efektywne</span><span class="t-admin-label" style="text-align:right">Zestawy</span><span></span></div>
             <sc-for list="{{ availableMenus }}" as="m" hint-placeholder-count="3">
               <div onClick="{{ m.rowClick }}" style="display:grid;grid-template-columns:2fr 1.2fr 1fr .8fr 28px;align-items:center;padding:12px 6px;border-bottom:.5px solid var(--color-border-tertiary);cursor:pointer">
                 <span style="font:600 13px var(--font-ui);color:var(--color-text)">{{ m.name }}</span>
@@ -505,7 +505,7 @@
                 <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px"><button onClick="{{ m.delMenu }}" style="width:26px;height:26px;border-radius:6px;border:.5px solid var(--color-border-tertiary);background:var(--color-surface);cursor:pointer;color:var(--color-primary);display:flex;align-items:center;justify-content:center;flex:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button><span style="color:var(--color-text-muted);font-size:16px">›</span></div>
               </div>
             </sc-for>
-            <sc-if value="{{ noMenus }}" hint-placeholder-val="{{ false }}"><div style="text-align:center;padding:26px;color:var(--color-text-muted);font:400 12.5px var(--font-ui)">Aucun menu — cliquez « Créer un menu ».</div></sc-if>
+            <sc-if value="{{ noMenus }}" hint-placeholder-val="{{ false }}"><div style="text-align:center;padding:26px;color:var(--color-text-muted);font:400 12.5px var(--font-ui)">Brak menu — kliknij „Utwórz menu”.</div></sc-if>
           </div>
         </div>
         </sc-if>
@@ -513,37 +513,37 @@
         <!-- MENU EDIT (builder) -->
         <sc-if value="{{ isMenuEdit }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:flex;align-items:center;gap:12px"><button onClick="{{ backToList }}" class="btn-secondary" style="font-size:12px;padding:8px 12px;min-height:auto">← Menus</button><span style="font-family:var(--font-display);font-size:19px;color:var(--color-text)">{{ menuProductName }}</span></div>
+        <div style="display:flex;align-items:center;gap:12px"><button onClick="{{ backToList }}" class="btn-secondary" style="font-size:12px;padding:8px 12px;min-height:auto">← Menu</button><span style="font-family:var(--font-display);font-size:19px;color:var(--color-text)">{{ menuProductName }}</span></div>
 
         <!-- STEP 1 -->
-        <div style="display:flex;align-items:center;gap:10px;margin-top:2px"><span style="width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px var(--font-ui);flex:none">1</span><span style="font:600 13px var(--font-ui);color:var(--color-text)">Produit &amp; prix de base</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">produit · ws_products</span></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px"><span style="width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px var(--font-ui);flex:none">1</span><span style="font:600 13px var(--font-ui);color:var(--color-text)">Produkt &amp; cena bazowa</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">produkt · ws_products</span></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
           <div style="flex:1;min-width:160px"><span style="display:block;font:600 9.5px var(--font-ui);letter-spacing:.09em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:3px">Menu · ws_products</span><span style="font-family:var(--font-display);font-size:16px;color:var(--color-text)">{{ menuProductName }}</span></div>
           <div style="display:flex;align-items:center;gap:9px;background:var(--color-background-secondary);border-radius:9px;padding:8px 13px">
-            <div style="line-height:1.2"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted)">Prix de base (€)</div><input type="number" step="0.01" min="0" value="{{ menuBasePriceRaw }}" onChange="{{ setMenuBasePrice }}" style="width:84px;border:.5px solid var(--color-border-secondary);border-radius:7px;padding:5px 8px;font:700 14px var(--font-ui);color:var(--color-text);background:var(--color-surface);margin-top:3px"/></div>
+            <div style="line-height:1.2"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted)">Cena bazowa (€)</div><input type="number" step="0.01" min="0" value="{{ menuBasePriceRaw }}" onChange="{{ setMenuBasePrice }}" style="width:84px;border:.5px solid var(--color-border-secondary);border-radius:7px;padding:5px 8px;font:700 14px var(--font-ui);color:var(--color-text);background:var(--color-surface);margin-top:3px"/></div>
           </div>
 
         </div>
         <!-- STEP 2 -->
-        <div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px var(--font-ui);flex:none">2</span><span style="font:600 13px var(--font-ui);color:var(--color-text)">Déclencheur du menu</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">catégorie arme · produit surcharge · résolu serveur</span></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px var(--font-ui);flex:none">2</span><span style="font:600 13px var(--font-ui);color:var(--color-text)">Wyzwalacz menu</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">kategoria uzbraja · produkt nadpisuje · rozstrzyga serwer</span></div>
         <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:14px 18px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
             <div style="{{ catSelWrap }}">
-              <label style="display:block;font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Catégorie déclencheuse</label>
+              <label style="display:block;font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Kategoria wyzwalająca</label>
               <div style="display:flex;align-items:center;gap:8px">
                 <select value="{{ triggerCatValue }}" onChange="{{ setTriggerCat }}" style="flex:1;min-width:0;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:9px 11px;font:500 12.5px var(--font-ui);color:var(--color-text);background:var(--color-surface)">
                   <sc-for list="{{ triggerCats }}" as="o" hint-placeholder-count="2"><option value="{{ o.value }}">{{ o.label }}</option></sc-for>
                 </select>
-                <button onClick="{{ commitCat }}" style="{{ catValStyle }}" title="Valider la catégorie"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></button>
+                <button onClick="{{ commitCat }}" style="{{ catValStyle }}" title="Zatwierdź kategorię"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></button>
               </div>
             </div>
             <div style="{{ forcedWrap }}">
-              <label style="display:block;font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Produit déclencheur</label>
+              <label style="display:block;font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:6px">Produkt wyzwalający</label>
               <div style="display:flex;align-items:center;gap:8px">
                 <select value="{{ triggerProdValue }}" onChange="{{ setTriggerProd }}" style="flex:1;min-width:0;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:9px 11px;font:500 12.5px var(--font-ui);color:var(--color-text);background:var(--color-surface)">
                   <sc-for list="{{ triggerProdOptions }}" as="o" hint-placeholder-count="2"><option value="{{ o.value }}">{{ o.label }}</option></sc-for>
                 </select>
-                <button onClick="{{ commitProd }}" style="{{ prodValStyle }}" title="Valider le produit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></button>
+                <button onClick="{{ commitProd }}" style="{{ prodValStyle }}" title="Zatwierdź produkt"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></button>
               </div>
               <div style="margin-top:6px;font:500 10px var(--font-ui);color:var(--color-text-muted);max-width:220px">{{ menuForcedInfo }}</div>
             </div>
@@ -551,16 +551,16 @@
         </div>
 
         <!-- STEP 3 -->
-        <div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px var(--font-ui);flex:none">3</span><span style="font:600 13px var(--font-ui);color:var(--color-text)">Formules · max 3</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">une formule = un ensemble d'étapes</span></div>
-        <sc-if value="{{ step3Lock }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border-radius:10px;padding:11px 14px;font:500 11.5px var(--font-ui);color:var(--color-text-muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Validez d'abord un déclencheur (catégorie ou produit) à l'étape 2.</div></sc-if>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px var(--font-ui);flex:none">3</span><span style="font:600 13px var(--font-ui);color:var(--color-text)">Zestawy · max 3</span><span style="font:400 11px var(--font-ui);color:var(--color-text-muted)">zestaw = sekwencja kroków</span></div>
+        <sc-if value="{{ step3Lock }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border-radius:10px;padding:11px 14px;font:500 11.5px var(--font-ui);color:var(--color-text-muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Najpierw zatwierdź wyzwalacz (kategorię lub produkt) w kroku 2.</div></sc-if>
         <!-- editor + preview -->
         <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;align-items:start;{{ step3Wrap }}">
 
           <!-- EDITOR -->
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-              <div><div class="t-section-title" style="font-size:14px">Formules</div><div style="font:400 10.5px var(--font-mono,monospace);color:var(--color-text-muted)">ws_bundles → slots → choices</div></div>
-              <button onClick="{{ addBundle }}" class="btn-primary" style="font-size:12px;flex:none">+ Formule</button>
+              <div><div class="t-section-title" style="font-size:14px">Zestawy</div><div style="font:400 10.5px var(--font-mono,monospace);color:var(--color-text-muted)">ws_bundles → slots → choices</div></div>
+              <button onClick="{{ addBundle }}" class="btn-primary" style="font-size:12px;flex:none">+ Zestaw</button>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:8px">
               <sc-for list="{{ bundleTabs }}" as="b" hint-placeholder-count="2">
@@ -571,25 +571,25 @@
             <sc-if value="{{ hasActiveBundle }}" hint-placeholder-val="{{ true }}">
             <div style="border-top:.5px solid var(--color-border-tertiary);padding-top:14px;display:flex;flex-direction:column;gap:13px">
               <div style="display:grid;grid-template-columns:1fr 130px;gap:10px">
-                <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:5px">Nom · label</label><input type="text" value="{{ abName }}" onChange="{{ setAbName }}" style="{{ miniInput }};width:100%"/></div>
-                <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:5px">Modif. prix</label><input type="number" step="0.10" value="{{ abMod }}" onChange="{{ setAbMod }}" style="{{ miniInput }};width:100%;text-align:right"/></div>
+                <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:5px">Nazwa · etykieta</label><input type="text" value="{{ abName }}" onChange="{{ setAbName }}" style="{{ miniInput }};width:100%"/></div>
+                <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:5px">Zmiana ceny</label><input type="number" step="0.10" value="{{ abMod }}" onChange="{{ setAbMod }}" style="{{ miniInput }};width:100%;text-align:right"/></div>
               </div>
-              <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:5px">Description</label><input type="text" value="{{ abDesc }}" onChange="{{ setAbDesc }}" style="{{ miniInput }};width:100%"/></div>
+              <div><label style="display:block;font:600 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:5px">Opis</label><input type="text" value="{{ abDesc }}" onChange="{{ setAbDesc }}" style="{{ miniInput }};width:100%"/></div>
               <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                <div style="display:flex;align-items:center;gap:8px"><span style="font:500 11.5px var(--font-ui);color:var(--color-text-muted)">Active</span><button onClick="{{ abActToggle }}" style="{{ abActStyle }}"><span style="{{ abActKnob }}"></span></button></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="font:500 11.5px var(--font-ui);color:var(--color-text-muted)">Aktywna</span><button onClick="{{ abActToggle }}" style="{{ abActStyle }}"><span style="{{ abActKnob }}"></span></button></div>
                 <div style="flex:1"></div>
                 <button onClick="{{ abUp }}" style="{{ sqBtnGlobal }}">↑</button>
                 <button onClick="{{ abDown }}" style="{{ sqBtnGlobal }}">↓</button>
-                <button onClick="{{ abDup }}" class="btn-secondary" style="font-size:11px;padding:7px 12px;min-height:auto">⧉ Dupliquer</button>
-                <button onClick="{{ abDel }}" style="font-size:11px;padding:7px 12px;border:.5px solid var(--color-border-tertiary);border-radius:8px;background:var(--color-surface);color:var(--color-primary);cursor:pointer">✖ Supprimer</button>
+                <button onClick="{{ abDup }}" class="btn-secondary" style="font-size:11px;padding:7px 12px;min-height:auto">⧉ Duplikuj</button>
+                <button onClick="{{ abDel }}" style="font-size:11px;padding:7px 12px;border:.5px solid var(--color-border-tertiary);border-radius:8px;background:var(--color-surface);color:var(--color-primary);cursor:pointer">✖ Usuń</button>
               </div>
 
-              <div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span style="width:20px;height:20px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--font-ui);flex:none">4</span><span style="font:600 12px var(--font-ui);color:var(--color-text)">Composition des formules</span><span style="font:400 10.5px var(--font-ui);color:var(--color-text-muted)">étapes &amp; choix</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span style="width:20px;height:20px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--font-ui);flex:none">4</span><span style="font:600 12px var(--font-ui);color:var(--color-text)">Kompozycja zestawów</span><span style="font:400 10.5px var(--font-ui);color:var(--color-text-muted)">kroki &amp; wybory</span></div>
               <div style="display:flex;flex-direction:column;gap:12px;align-items:stretch">
               <sc-if value="{{ catTriggerAuto }}" hint-placeholder-val="{{ false }}">
                 <div style="background:var(--color-background-secondary);border:.5px dashed var(--color-border-secondary);border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:10px">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
-                  <div style="line-height:1.35"><div style="font:600 11.5px var(--font-ui);color:var(--color-text)">Étape 1 · Produit déclencheur — verrouillé</div><div style="font:400 10.5px var(--font-ui);color:var(--color-text-muted)">{{ catTriggerMsg }}</div></div>
+                  <div style="line-height:1.35"><div style="font:600 11.5px var(--font-ui);color:var(--color-text)">Krok 1 · Produkt wyzwalający — zablokowany</div><div style="font:400 10.5px var(--font-ui);color:var(--color-text-muted)">{{ catTriggerMsg }}</div></div>
                 </div>
               </sc-if>
               <sc-for list="{{ editSlots }}" as="s" hint-placeholder-count="3">
@@ -597,14 +597,14 @@
                 <div style="{{ s.cardStyle }}">
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
                     <input type="text" value="{{ s.label }}" onChange="{{ s.setLabel }}" style="{{ s.miniInput }};flex:1;background:var(--color-surface)"/>
-                    <div style="display:flex;align-items:center;gap:6px"><span style="font:500 10px var(--font-ui);color:var(--color-text-muted)">Active</span><button onClick="{{ s.sActToggle }}" style="{{ s.sActStyle }}"><span style="{{ s.sActKnob }}"></span></button></div>
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font:500 10px var(--font-ui);color:var(--color-text-muted)">Aktywna</span><button onClick="{{ s.sActToggle }}" style="{{ s.sActStyle }}"><span style="{{ s.sActKnob }}"></span></button></div>
                     <button onClick="{{ s.up }}" style="{{ s.sqBtn }}">↑</button>
                     <button onClick="{{ s.down }}" style="{{ s.sqBtn }}">↓</button>
                   </div>
                   <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:11px">
-                    <div style="display:flex;align-items:center;gap:7px"><span style="font:500 11px var(--font-ui);color:var(--color-text-muted)">Requis · required</span><button onClick="{{ s.reqToggle }}" style="{{ s.reqStyle }}"><span style="{{ s.reqKnob }}"></span></button></div>
+                    <div style="display:flex;align-items:center;gap:7px"><span style="font:500 11px var(--font-ui);color:var(--color-text-muted)">Wymagany · required</span><button onClick="{{ s.reqToggle }}" style="{{ s.reqStyle }}"><span style="{{ s.reqKnob }}"></span></button></div>
                     <div style="display:flex;align-items:center;gap:4px;background:var(--color-surface);border-radius:9px;padding:3px;border:.5px solid var(--color-border-tertiary)">
-                      <button onClick="{{ s.setSingle }}" style="{{ s.singleStyle }}">Choisir 1</button>
+                      <button onClick="{{ s.setSingle }}" style="{{ s.singleStyle }}">Wybierz 1</button>
                       <button onClick="{{ s.setMulti }}" style="{{ s.multiStyle }}">Multi</button>
                     </div>
                     <sc-if value="{{ s.multi }}" hint-placeholder-val="{{ false }}">
@@ -628,7 +628,7 @@
                             <div style="padding:9px;border-bottom:.5px solid var(--color-border-tertiary)">
                               <div style="display:flex;align-items:center;gap:7px;background:var(--color-background-secondary);border-radius:7px;padding:7px 9px">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-                                <input type="text" value="{{ c.choiceSearch }}" onChange="{{ c.setChoiceSearch }}" placeholder="Rechercher un produit…" style="flex:1;border:none;background:transparent;outline:none;font:500 12.5px var(--font-ui);color:var(--color-text)"/>
+                                <input type="text" value="{{ c.choiceSearch }}" onChange="{{ c.setChoiceSearch }}" placeholder="Szukaj produktu…" style="flex:1;border:none;background:transparent;outline:none;font:500 12.5px var(--font-ui);color:var(--color-text)"/>
                               </div>
                             </div>
                             <div class="lz" style="max-height:220px;overflow-y:auto;padding:5px">
@@ -640,7 +640,7 @@
                           </sc-if>
                         </div>
                         <div style="display:flex;align-items:center;gap:4px"><span style="font:600 11px var(--font-ui);color:var(--color-text-muted)">Δ</span><input type="number" step="0.10" value="{{ c.delta }}" onChange="{{ c.setDelta }}" style="{{ c.miniInput }};width:58px;text-align:right"/></div>
-                        <div style="display:flex;align-items:center;gap:4px"><span style="font:600 11px var(--font-ui);color:#8C4A2F" title="Coût matière">€</span><input type="number" step="0.10" value="{{ c.cost }}" onChange="{{ c.setCost }}" style="{{ c.miniInput }};width:56px;text-align:right"/></div>
+                        <div style="display:flex;align-items:center;gap:4px"><span style="font:600 11px var(--font-ui);color:#8C4A2F" title="Koszt surowca">€</span><input type="number" step="0.10" value="{{ c.cost }}" onChange="{{ c.setCost }}" style="{{ c.miniInput }};width:56px;text-align:right"/></div>
                         <button onClick="{{ c.actToggle }}" style="{{ c.actStyle }}"><span style="{{ c.actKnob }}"></span></button>
                         <button onClick="{{ c.up }}" style="{{ c.sqBtn }}">↑</button>
                         <button onClick="{{ c.down }}" style="{{ c.sqBtn }}">↓</button>
@@ -648,38 +648,38 @@
                       </div>
                     </sc-for>
                   </div>
-                  <button onClick="{{ s.addChoice }}" class="btn-secondary" style="font-size:11px;padding:7px 12px;min-height:auto;margin-top:9px">+ Choix</button>
+                  <button onClick="{{ s.addChoice }}" class="btn-secondary" style="font-size:11px;padding:7px 12px;min-height:auto;margin-top:9px">+ Wybór</button>
                 </div>
                 </sc-if>
                 <sc-if value="{{ s.ph }}" hint-placeholder-val="{{ false }}">
                 <div style="border:.5px dashed var(--color-border-secondary);border-radius:11px;padding:13px;background:var(--color-background-secondary);opacity:.6;display:flex;align-items:center;gap:9px">
                   <input type="text" value="{{ s.name }}" disabled style="{{ s.miniInput }};flex:1;background:var(--color-surface)"/>
-                  <div style="display:flex;align-items:center;gap:6px"><span style="font:500 10px var(--font-ui);color:var(--color-text-muted)">Active</span><button onClick="{{ s.addToggle }}" style="{{ s.phStyle }}"><span style="{{ s.phKnob }}"></span></button></div>
+                  <div style="display:flex;align-items:center;gap:6px"><span style="font:500 10px var(--font-ui);color:var(--color-text-muted)">Aktywna</span><button onClick="{{ s.addToggle }}" style="{{ s.phStyle }}"><span style="{{ s.phKnob }}"></span></button></div>
                 </div>
                 </sc-if>
               </sc-for>
               </div>
-              <button onClick="{{ addSlot }}" class="btn-secondary" style="font-size:12px;align-self:flex-start">+ Ajouter une étape</button>
+              <button onClick="{{ addSlot }}" class="btn-secondary" style="font-size:12px;align-self:flex-start">+ Dodaj krok</button>
             </div>
             </sc-if>
             <sc-if value="{{ noBundle }}" hint-placeholder-val="{{ false }}">
-              <div style="text-align:center;padding:34px 20px;color:var(--color-text-muted);font:400 12.5px var(--font-ui)">Aucune formule pour ce produit — créez-en une pour démarrer.</div>
+              <div style="text-align:center;padding:34px 20px;color:var(--color-text-muted);font:400 12.5px var(--font-ui)">Brak zestawów dla tego produktu — utwórz pierwszy, aby zacząć.</div>
             </sc-if>
           </div>
 
           <!-- PREVIEW -->
           <div style="position:sticky;top:0;display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#2d7a3e"></span><span style="font:600 10px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted)">Aperçu client · modale produit</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#2d7a3e"></span><span style="font:600 10px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted)">Podgląd klienta · okno produktu</span></div>
             <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:14px;overflow:hidden;box-shadow:0 10px 34px rgba(0,0,0,.07)">
               <div style="padding:16px 18px;border-bottom:.5px solid var(--color-border-tertiary)">
                 <div style="font-family:var(--font-display);font-size:19px;color:var(--color-text)">{{ previewProduct }}</div>
-                <sc-if value="{{ previewDisabled }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font:500 10.5px var(--font-ui);color:var(--color-primary)">⚠ Menu masqué côté client · menu_effectif = 0</div></sc-if>
-                <sc-if value="{{ armedEmpty }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font:500 10.5px var(--font-ui);color:#b26a00">⚠ Menu armé mais aucune formule active — rien ne s'affichera côté client</div></sc-if>
+                <sc-if value="{{ previewDisabled }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font:500 10.5px var(--font-ui);color:var(--color-primary)">⚠ Menu ukryte po stronie klienta · menu_effectif = 0</div></sc-if>
+                <sc-if value="{{ armedEmpty }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font:500 10.5px var(--font-ui);color:#b26a00">⚠ Menu uzbrojone, ale bez aktywnego zestawu — klient nic nie zobaczy</div></sc-if>
               </div>
               <div class="lz" style="max-height:52vh;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:16px">
                 <sc-if value="{{ catTriggerAuto }}" hint-placeholder-val="{{ false }}">
                   <div>
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font:600 12.5px var(--font-ui);color:var(--color-text)">Votre {{ catTriggerLabel }}</span><span style="display:inline-flex;align-items:center;font:600 9px var(--font-ui);border-radius:20px;padding:3px 8px;background:var(--color-background-secondary);color:var(--color-text-muted)">Inclus · verrouillé</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font:600 12.5px var(--font-ui);color:var(--color-text)">Votre {{ catTriggerLabel }}</span><span style="display:inline-flex;align-items:center;font:600 9px var(--font-ui);border-radius:20px;padding:3px 8px;background:var(--color-background-secondary);color:var(--color-text-muted)">W zestawie · zablokowane</span></div>
                     <div style="display:flex;align-items:center;gap:9px;border:.5px solid var(--color-primary);border-radius:10px;padding:9px 11px;background:#fbe9eb">
                       <span style="width:16px;height:16px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px">✓</span>
                       <span style="font:500 12px var(--font-ui);color:var(--color-text)">Le produit choisi ({{ catTriggerLabel }})</span>
@@ -703,21 +703,21 @@
                 </sc-for>
               </div>
               <div style="padding:15px 18px;border-top:.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:space-between;background:var(--color-background-secondary)">
-                <div style="display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><span style="font:500 10px var(--font-ui);color:var(--color-text-muted)">Total recalculé serveur · bloqué</span></div>
+                <div style="display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><span style="font:500 10px var(--font-ui);color:var(--color-text-muted)">Suma przeliczana na serwerze · zablokowana</span></div>
                 <span style="font:700 20px var(--font-ui);color:var(--color-primary)">{{ previewTotal }}</span>
               </div>
             </div>
             <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:14px;padding:16px 18px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px"><span style="font:600 12px var(--font-ui);letter-spacing:.02em;color:var(--color-text)">Marge du menu</span><span style="font:600 10px var(--font-mono,monospace);color:var(--color-text-muted)">coût matière · food cost</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px"><span style="font:600 12px var(--font-ui);letter-spacing:.02em;color:var(--color-text)">Marża menu</span><span style="font:600 10px var(--font-mono,monospace);color:var(--color-text-muted)">koszt surowca · food cost</span></div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px">
-                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Prix menu · bloqué</div><div style="font:700 16px var(--font-ui);color:var(--color-text)">{{ marPrice }}</div></div>
-                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Coût matière</div><div style="font:700 16px var(--font-ui);color:#8C4A2F">{{ marCost }}</div></div>
-                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Marge brute</div><div style="font:700 16px var(--font-ui);color:{{ marMarginColor }}">{{ marMargin }}</div></div>
+                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Cena menu · zablokowana</div><div style="font:700 16px var(--font-ui);color:var(--color-text)">{{ marPrice }}</div></div>
+                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Koszt surowca</div><div style="font:700 16px var(--font-ui);color:#8C4A2F">{{ marCost }}</div></div>
+                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Marża brutto</div><div style="font:700 16px var(--font-ui);color:{{ marMarginColor }}">{{ marMargin }}</div></div>
                 <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Food cost</div><div style="font:700 16px var(--font-ui);color:{{ marFoodColor }}">{{ marFoodPct }}</div></div>
               </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font:600 10px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted)">Taux de marge</span><span style="font:700 12px var(--font-ui);color:{{ marMarginColor }}">{{ marMarginPct }}</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font:600 10px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted)">Stopa marży</span><span style="font:700 12px var(--font-ui);color:{{ marMarginColor }}">{{ marMarginPct }}</span></div>
               <div style="height:8px;background:var(--color-background-secondary);border-radius:5px;overflow:hidden;margin-bottom:13px"><div style="width:{{ marPctW }};height:100%;background:{{ marMarginColor }};border-radius:5px"></div></div>
-              <div style="display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border-radius:9px;padding:9px 11px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.8"><path d="M3 12h18"/><path d="M7 8l-4 4 4 4"/><path d="M17 8l4 4-4 4"/></svg><span style="font:500 10.5px var(--font-ui);color:var(--color-text-muted)">Marge selon choix client</span><span style="flex:1"></span><span style="font:700 11.5px var(--font-ui);color:var(--color-text)">{{ marRange }}</span></div>
+              <div style="display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border-radius:9px;padding:9px 11px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.8"><path d="M3 12h18"/><path d="M7 8l-4 4 4 4"/><path d="M17 8l4 4-4 4"/></svg><span style="font:500 10.5px var(--font-ui);color:var(--color-text-muted)">Marża wg wyboru klienta</span><span style="flex:1"></span><span style="font:700 11.5px var(--font-ui);color:var(--color-text)">{{ marRange }}</span></div>
             </div>
           </div>
 
@@ -756,7 +756,7 @@
         </sc-for>
         <sc-if value="{{ isVoucherForm }}" hint-placeholder-val="{{ false }}">
         <div style="border-top:.5px dashed var(--color-border-tertiary);padding-top:15px">
-          <label style="display:block;font:600 11px var(--font-ui);letter-spacing:.04em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Bon dédié à</label>
+          <label style="display:block;font:600 11px var(--font-ui);letter-spacing:.04em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px">Kupon dedykowany dla</label>
           <div style="display:flex;gap:7px;margin-bottom:11px">
             <sc-for list="{{ vtModes }}" as="m" hint-placeholder-count="3"><button onClick="{{ m.pick }}" style="{{ m.style }}">{{ m.label }}</button></sc-for>
           </div>
@@ -777,7 +777,7 @@
         </sc-if>
       </div>
       <div style="padding:14px 24px 20px;border-top:.5px solid var(--color-border-tertiary);display:flex;gap:10px">
-        <button onClick="{{ formClose }}" class="btn-secondary" style="flex:1;font-size:13px">Annuler</button>
+        <button onClick="{{ formClose }}" class="btn-secondary" style="flex:1;font-size:13px">Anuluj</button>
         <button onClick="{{ formSubmit }}" class="btn-primary" style="flex:2;font-size:13px">{{ formSave }}</button>
       </div>
     </div>
@@ -796,7 +796,7 @@
         <button onClick="{{ closeProfile }}" style="background:transparent;border:none;cursor:pointer;color:var(--color-text-muted);font-size:22px;line-height:1;padding:0">×</button>
       </div>
       <div style="padding:16px 24px 20px;display:flex;flex-direction:column">
-        <div style="font:600 10px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Paramètres du site · ws_param</div>
+        <div style="font:600 10px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:6px">Parametry serwisu · ws_param</div>
         <sc-for list="{{ profileParams }}" as="p" hint-placeholder-count="3">
           <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:.5px solid var(--color-border-tertiary)">
             <span style="flex:1;min-width:0;font:500 12.5px var(--font-mono,monospace);color:var(--color-text);overflow:hidden;text-overflow:ellipsis">{{ p.cle }}</span>
@@ -804,7 +804,7 @@
             <sc-if value="{{ p.isText }}" hint-placeholder-val="{{ false }}"><span style="display:flex;gap:6px;align-items:center"><input type="text" value="{{ p.value }}" onChange="{{ p.setVal }}" style="width:120px;border:.5px solid var(--color-border-secondary);border-radius:7px;padding:7px 9px;font:500 12px var(--font-ui);color:var(--color-text);background:var(--color-surface)"/><button onClick="{{ p.save }}" class="btn-secondary" style="font-size:11px;padding:6px 10px;min-height:auto">✓</button></span></sc-if>
           </div>
         </sc-for>
-        <div style="margin-top:12px;font:400 10.5px var(--font-ui);color:var(--color-text-muted)">Les valeurs 0/1 s'affichent en interrupteur (ex. <b>bo_show_source</b> = afficher l'origine des données). Enregistré immédiatement · POST /franchisor/param · journalisé bo_audit.</div>
+        <div style="margin-top:12px;font:400 10.5px var(--font-ui);color:var(--color-text-muted)">Les valeurs 0/1 s'affichent en interrupteur (ex. <b>bo_show_source</b> = pokazuj źródło danych). Zapis natychmiastowy · POST /franchisor/param · logowane w bo_audit.</div>
       </div>
     </div>
   </div>
@@ -874,7 +874,7 @@ class Component extends DCLogic {
         const dim=S.geoHl!=null && c.shop_id!==S.geoHl;
         const col=c.type==='office'?'#E8B84B':'#3B6BC9', bord=c.type==='office'?'#b28a1f':'#24488f';
         const mk=L.circleMarker([lat,lng],{radius:7,color:bord,weight:1.5,fillColor:col,fillOpacity:dim?0.12:0.8,opacity:dim?0.15:1});
-        mk.bindPopup('<div style="font:12.5px sans-serif;min-width:180px"><strong>'+esc(c.name)+'</strong><br>'+(c.type==='office'?'Client office (B2B)':'Client particulier')+'<br>Boutique : '+esc(shopName[c.shop_id]||'—')+'<br>CA total : '+(c.ca?c.ca.toLocaleString('fr-BE',{minimumFractionDigits:2})+' €':'—')+'</div>');
+        mk.bindPopup('<div style="font:12.5px sans-serif;min-width:180px"><strong>'+esc(c.name)+'</strong><br>'+(c.type==='office'?'Klient biurowy (B2B)':'Klient indywidualny')+'<br>Sklep: '+esc(shopName[c.shop_id]||'—')+'<br>Obrót łącznie: '+(c.ca?c.ca.toLocaleString('pl-PL',{minimumFractionDigits:2})+' €':'—')+'</div>');
         g.addLayer(mk); return; }
       pts.push([e.lat,e.lng]);
       const off=cl.filter(c=>c.type==='office').length, priv=cl.length-off;
@@ -888,8 +888,8 @@ class Component extends DCLogic {
       const names=cl.slice().sort((a,b)=>(+b.ca||0)-(+a.ca||0)).slice(0,8)
         .map(c=>'<span style="color:'+(c.type==='office'?'#b28a1f':'#24488f')+'">●</span> '+esc(c.name)).join('<br>');
       mk.bindPopup('<div style="font:12.5px sans-serif;min-width:210px"><strong>'+esc(cp)+' '+esc(e.city||'')+'</strong><br>'
-        +cl.length+' clients — <strong>'+pct+' %</strong> du total affiché<br>'
-        +off+' office · '+priv+' particuliers<br>CA cumulé : '+(ca?ca.toLocaleString('fr-BE',{minimumFractionDigits:2})+' €':'—')
+        +cl.length+' klientów — <strong>'+pct+' %</strong> wyświetlanej sumy<br>'
+        +off+' biurowych · '+priv+' indywidualnych<br>Obrót łącznie: '+(ca?ca.toLocaleString('pl-PL',{minimumFractionDigits:2})+' €':'—')
         +'<hr style="margin:6px 0;border:none;border-top:1px solid #ddd">'+names+(cl.length>8?'<br>… +'+(cl.length-8)+' autres':'')+'</div>');
       g.addLayer(mk); });
     (D.shops||[]).filter(s2=>shopSet?shopSet.includes(Number(s2.id)):true).forEach(s2=>{
@@ -898,7 +898,7 @@ class Component extends DCLogic {
       if(!e) return; pts.push([e.lat,e.lng]);
       const ic=L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-primary);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);color:#fff;font:700 12px sans-serif">A</span></div>',iconSize:[26,26],iconAnchor:[13,26]});
       const mk=L.marker([e.lat,e.lng],{icon:ic});
-      mk.bindTooltip(s2.name+' — cliquer pour isoler ses clients');
+      mk.bindTooltip(s2.name+' — kliknij, aby izolować jego klientów');
       mk.on('click',()=>this.setState(st=>({geoHl:st.geoHl===Number(s2.id)?null:Number(s2.id)})));
       g.addLayer(mk); });
     g.addTo(m); this._geoLayer=g;
@@ -939,7 +939,7 @@ class Component extends DCLogic {
   czPickGroup(cps,label){ return ()=>{ const cur=this.state.cz; const have=[...cur.cps]; let added=0,conflits=0,deja=0;
     for(const cp of cps){ if(have.includes(cp)){ deja++; continue; } if(this.czConflict(cp)){ conflits++; continue; } have.push(cp); added++; }
     this.setState(st=>({cz:{...st.cz,cps:have},czDraft:''}));
-    this.printJob('✔ '+label+' : '+added+' CP ajoutés'+(conflits?' · '+conflits+' refusés (déjà attribués ailleurs)':'')+(deja?' · '+deja+' déjà dans la zone':'')); }; }
+    this.printJob('✔ '+label+' : '+added+' kodów dodanych'+(conflits?' · '+conflits+' odrzuconych (już przydzielonych gdzie indziej)':'')+(deja?' · '+deja+' już w strefie':'')); }; }
   czSet(k){ return (e)=>{ const v=(k==='exclusive')?e.target.checked:e.target.value; this.setState(st=>({cz:{...st.cz,[k]:v}})); }; }
   czSetDraft(e){ this.setState({czDraft:e.target.value}); }
   czConflict(cp){ const cur=this.state.cz; const rows=(window.BOServer?window.BOServer.table('catchment'):[]);
@@ -947,9 +947,9 @@ class Component extends DCLogic {
   czAddCp(){ const raw=(this.state.czDraft||'').split(/[^0-9]+/).filter(Boolean); if(!raw.length) return;
     const cur=this.state.cz; const cps=[...cur.cps]; const rejets=[];
     for(const cp of raw){ if(cps.includes(cp)) continue; if(!/^[0-9]{4,5}$/.test(cp)){ rejets.push(cp+' (format)'); continue; }
-      const chez=this.czConflict(cp); if(chez){ rejets.push(cp+' → déjà dans « '+chez+' »'); continue; } cps.push(cp); }
+      const chez=this.czConflict(cp); if(chez){ rejets.push(cp+' → już w « '+chez+' »'); continue; } cps.push(cp); }
     this.setState(st=>({cz:{...st.cz,cps},czDraft:''}));
-    if(rejets.length) this.printJob('⚠ CP refusé(s) : '+rejets.join(' · '));
+    if(rejets.length) this.printJob('⚠ Kody odrzucone: '+rejets.join(' · '));
   }
   czKeyCp(e){ if(e.key==='Enter'){ e.preventDefault(); this.czAddCp(); } }
   czRemoveCp(cp){ return ()=>this.setState(st=>({cz:{...st.cz,cps:st.cz.cps.filter(x=>x!==cp)}})); }
@@ -957,25 +957,25 @@ class Component extends DCLogic {
   czNew(){ this.setState({czOpen:true,czDraft:'',cz:{id:0,name:'',shop_id:'',cps:[],exclusive:true}}); }
   czClose(){ this.setState({czOpen:false}); }
   czReload(){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base) return; fetch(fr.base+'/franchisor/catchment',{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'omit'}).then(r=>r.ok?r.json():null).then(rows=>{ if(Array.isArray(rows)&&window.BOServer){ window.BOServer.save('catchment',rows); this.setState(st=>({_rev:(st._rev||0)+1})); } }).catch(()=>{}); }
-  czSave(){ const c=this.state.cz; if(!c.name.trim()){ this.printJob('⚠ Donnez un nom à la zone'); return; }
+  czSave(){ const c=this.state.cz; if(!c.name.trim()){ this.printJob('⚠ Nadaj strefie nazwę'); return; }
     if(this.state.czDraft&&this.state.czDraft.trim()) this.czAddCp();
     const c2=this.state.cz; const postcodes=c2.cps.join(' · ');
     const fr=(typeof window!=='undefined'&&window.__FR)||{};
     const payload={id:c2.id||undefined,name:c2.name,shop_id:c2.shop_id===''?null:parseInt(c2.shop_id,10),postcodes,exclusive:c2.exclusive,active:1};
-    if(!fr.base){ const rows=window.BOServer?window.BOServer.table('catchment'):[]; if(c2.id){ const i=rows.findIndex(r=>r.id===c2.id); if(i>=0) rows[i]={...rows[i],...payload}; } else rows.push({...payload,id:Date.now()}); if(window.BOServer) window.BOServer.save('catchment',rows); this.setState(st=>({czOpen:false,_rev:(st._rev||0)+1})); this.printJob('✔ Zone enregistrée (local)'); return; }
+    if(!fr.base){ const rows=window.BOServer?window.BOServer.table('catchment'):[]; if(c2.id){ const i=rows.findIndex(r=>r.id===c2.id); if(i>=0) rows[i]={...rows[i],...payload}; } else rows.push({...payload,id:Date.now()}); if(window.BOServer) window.BOServer.save('catchment',rows); this.setState(st=>({czOpen:false,_rev:(st._rev||0)+1})); this.printJob('✔ Strefa zapisana (lokalnie)'); return; }
     fetch(fr.base+'/franchisor/catchment',{method:'POST',headers:{'Content-Type':'application/json',...(fr.token?{'X-Admin-Token':fr.token}:{})},body:JSON.stringify(payload),credentials:'omit'})
-      .then(async r=>{ const v=await r.json().catch(()=>({})); if(!r.ok){ this.printJob('⚠ '+(v.error||('Erreur '+r.status))); return; } this.setState({czOpen:false}); this.printJob('✔ Zone primaire enregistrée : '+c2.name); this.czReload(); })
-      .catch(()=>this.printJob('⚠ Réseau indisponible'));
+      .then(async r=>{ const v=await r.json().catch(()=>({})); if(!r.ok){ this.printJob('⚠ '+(v.error||('Erreur '+r.status))); return; } this.setState({czOpen:false}); this.printJob('✔ Strefa pierwotna zapisana: '+c2.name); this.czReload(); })
+      .catch(()=>this.printJob('⚠ Sieć niedostępna'));
   }
-  czDel(z){ return ()=>{ if(!confirm('Supprimer la zone primaire « '+z.name+' » ?')) return; const fr=(typeof window!=='undefined'&&window.__FR)||{};
+  czDel(z){ return ()=>{ if(!confirm('Usunąć strefę pierwotną « '+z.name+' » ?')) return; const fr=(typeof window!=='undefined'&&window.__FR)||{};
     if(!fr.base){ const rows=(window.BOServer?window.BOServer.table('catchment'):[]).filter(r=>r.id!==z.id); if(window.BOServer) window.BOServer.save('catchment',rows); this.setState(st=>({_rev:(st._rev||0)+1})); return; }
     fetch(fr.base+'/franchisor/catchment',{method:'POST',headers:{'Content-Type':'application/json',...(fr.token?{'X-Admin-Token':fr.token}:{})},body:JSON.stringify({delete:z.id}),credentials:'omit'})
-      .then(()=>{ this.printJob('✖ Zone supprimée'); this.czReload(); }).catch(()=>{}); }; }
-  frPost(path, payload){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base){ this.printJob('✔ Enregistré (local)'); return Promise.resolve(false); }
+      .then(()=>{ this.printJob('✖ Strefa usunięta'); this.czReload(); }).catch(()=>{}); }; }
+  frPost(path, payload){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base){ this.printJob('✔ Zapisano (lokalnie)'); return Promise.resolve(false); }
     const h=Object.assign({'Content-Type':'application/json'}, fr.token?{'X-Admin-Token':fr.token}:{});
     return fetch(fr.base+path,{method:'POST',headers:h,body:JSON.stringify(payload),credentials:'omit'})
-      .then(r=>r.ok?r.json():Promise.reject(r.status)).then(()=>{ this.printJob('✔ Enregistré en base'); return true; })
-      .catch(()=>{ this.printJob('⚠ Échec enregistrement'); return false; }); }
+      .then(r=>r.ok?r.json():Promise.reject(r.status)).then(()=>{ this.printJob('✔ Zapisano w bazie'); return true; })
+      .catch(()=>{ this.printJob('⚠ Zapis nie powiódł się'); return false; }); }
   // Lecture API (GET) — null si pas d'API/jeton (mode seed).
   frGet(path){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; if(!fr.base) return Promise.resolve(null);
     return fetch(fr.base+path,{headers:fr.token?{'X-Admin-Token':fr.token}:{},credentials:'omit'}).then(r=>r.ok?r.json():null).catch(()=>null); }
@@ -999,20 +999,20 @@ class Component extends DCLogic {
       const rows=(window.BOServer?window.BOServer.table('deliveries'):[])||[]; const cli=clients[0]||{raison:'—',points:[{}]}; const pt=(cli.points&&cli.points[0])||{};
       const yr=new Date().getFullYear(); const code=((pt.validation==='PIN')?'PIN':'QR')+'-'+Math.floor(1000+Math.random()*9000);
       rows.unshift({id:Date.now(),ref:'LIV-'+yr+'-'+String(rows.length+1).padStart(4,'0'),client:cli.raison,point:pt.libelle||'—',driver:'',driver_color:'#8D1D2C',round:'',status:'planifiée',window:pt.fenetre||'',validation:pt.validation||'QR',confirm_code:code,confirmed:0,ca:420,couts:180,marge:240});
-      if(window.BOServer)window.BOServer.save('deliveries',rows); this.setState(st=>({_rev:(st._rev||0)+1})); this.printJob('✔ Livraison test '+rows[0].ref+' · code '+code+' (local)'); return; }
-    if(!pointId){ this.printJob('⚠ Aucun point de livraison disponible'); return; }
-    this.frPostR('/franchisor/deliveries',{point_id:pointId,ca:420,couts:180,notes:'Livraison test'})
-      .then(res=>{ if(res&&res.ok&&res.body&&res.body.ref){ this.printJob('✔ Livraison test '+res.body.ref+' · code '+res.body.confirm_code); this.livReload(); }
-        else this.printJob('⚠ '+((res&&res.body&&res.body.error)||'Échec création')); }); }
+      if(window.BOServer)window.BOServer.save('deliveries',rows); this.setState(st=>({_rev:(st._rev||0)+1})); this.printJob('✔ Livraison test '+rows[0].ref+' · kod '+code+' (local)'); return; }
+    if(!pointId){ this.printJob('⚠ Brak dostępnego punktu dostawy'); return; }
+    this.frPostR('/franchisor/deliveries',{point_id:pointId,ca:420,couts:180,notes:'Dostawa testowa'})
+      .then(res=>{ if(res&&res.ok&&res.body&&res.body.ref){ this.printJob('✔ Livraison test '+res.body.ref+' · kod '+res.body.confirm_code); this.livReload(); }
+        else this.printJob('⚠ '+((res&&res.body&&res.body.error)||'Utworzenie nie powiodło się')); }); }
   livAssign(d){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; const drivers=(window.BOServer?window.BOServer.table('drivers'):[])||[]; const drv=drivers[0];
-    if(!fr.base){ this._livMutate(d.id,{status:'assignée',driver:(drv&&drv.nom)||'Chauffeur',driver_color:(drv&&drv.color)||'#8D1D2C'}); this.printJob('✔ '+d.ref+' assignée à '+((drv&&drv.nom)||'—')); return; }
-    this.frPostR('/franchisor/deliveries/'+d.id+'/assign',{driver_id:drv?drv.id:null}).then(res=>{ if(res&&res.ok){ this.printJob('✔ '+d.ref+' assignée'); this.livReload(); } else this.printJob('⚠ Échec assignation'); }); }
+    if(!fr.base){ this._livMutate(d.id,{status:'assignée',driver:(drv&&drv.nom)||'Kierowca',driver_color:(drv&&drv.color)||'#8D1D2C'}); this.printJob('✔ '+d.ref+' przypisana do '+((drv&&drv.nom)||'—')); return; }
+    this.frPostR('/franchisor/deliveries/'+d.id+'/assign',{driver_id:drv?drv.id:null}).then(res=>{ if(res&&res.ok){ this.printJob('✔ '+d.ref+' przypisana'); this.livReload(); } else this.printJob('⚠ Przypisanie nie powiodło się'); }); }
   livConfirm(d){ const fr=(typeof window!=='undefined'&&window.__FR)||{};
-    if(!fr.base){ this._livMutate(d.id,{status:'livrée',confirmed:1}); this.printJob('✔ '+d.ref+' livrée ('+d.validation+')'); return; }
-    this.frPostR('/franchisor/deliveries/'+d.id+'/confirm',{code:d.confirm_code||''}).then(res=>{ if(res&&res.ok){ this.printJob('✔ '+d.ref+' livrée · confirmée '+d.validation); this.livReload(); } else this.printJob('⚠ '+((res&&res.body&&res.body.error)||'Échec confirmation')); }); }
+    if(!fr.base){ this._livMutate(d.id,{status:'livrée',confirmed:1}); this.printJob('✔ '+d.ref+' dostarczona ('+d.validation+')'); return; }
+    this.frPostR('/franchisor/deliveries/'+d.id+'/confirm',{code:d.confirm_code||''}).then(res=>{ if(res&&res.ok){ this.printJob('✔ '+d.ref+' dostarczona · potwierdzona '+d.validation); this.livReload(); } else this.printJob('⚠ '+((res&&res.body&&res.body.error)||'Potwierdzenie nie powiodło się')); }); }
   _livMutate(id,patch){ const rows=((window.BOServer?window.BOServer.table('deliveries'):[])||[]).map(r=>r.id===id?Object.assign({},r,patch):r); if(window.BOServer)window.BOServer.save('deliveries',rows); this.setState(st=>({_rev:(st._rev||0)+1})); }
-  eur(n){ return n.toLocaleString('fr-BE',{minimumFractionDigits:0})+' €'; }
-  eur2(n){ return (Math.round(n*100)/100).toLocaleString('fr-BE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+  eur(n){ return n.toLocaleString('pl-PL',{minimumFractionDigits:0})+' €'; }
+  eur2(n){ return (Math.round(n*100)/100).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
   componentDidMount(){ import('./menu_api.js').then(api=>{ this.api=api; const db=api.initDB(); this.setState({menus:db, menuProductId:this.state.menuProductId||Object.keys(db).filter(k=>k!=='_categories')[0]}); }).catch(e=>{ console.error('menu_api load failed',e); this.setState({menuErr:true}); }); }
   pid(){ return this.state.menuProductId || Object.keys(this.state.menus||{}).filter(k=>k!=='_categories')[0] || ''; }
   apply(db){ this.setState({menus:db}); this.saveMenu(db); }
@@ -1024,12 +1024,12 @@ class Component extends DCLogic {
         slots:(bu.slots||[]).map(s=>({ label:s.label, required:s.required, kind:s.kind, min_select:s.min_select, max_select:s.max_select, active:s.active,
           choices:(s.choices||[]).map(c=>({ label:c.label, img:c.img, delta:c.delta, cost:c.cost, active:c.active })) })) })) };
     clearTimeout(this._menuT); this._menuT=setTimeout(()=>this.frPost('/franchisor/menu',payload),700); }
-  addBundle(){ if(!this.api)return; const cur=this.state.menus&&this.state.menus[this.pid()]; if(cur&&cur.bundles.length>=3){ this.printJob('Maximum 3 formules par produit'); return; } const r=this.api.addBundle(this.pid()); this.setState({menus:r.db,activeBundle:r.id||this.state.activeBundle}); this.saveMenu(r.db); this.printJob('✔ Formule créée'); }
-  duplicateBundle(id){ if(!this.api)return; const r=this.api.duplicateBundle(this.pid(),id); this.setState({menus:r.db,activeBundle:r.id||this.state.activeBundle}); this.saveMenu(r.db); this.printJob('✔ Formule dupliquée (étapes + choix)'); }
+  addBundle(){ if(!this.api)return; const cur=this.state.menus&&this.state.menus[this.pid()]; if(cur&&cur.bundles.length>=3){ this.printJob('Maximum 3 formules par produit'); return; } const r=this.api.addBundle(this.pid()); this.setState({menus:r.db,activeBundle:r.id||this.state.activeBundle}); this.saveMenu(r.db); this.printJob('✔ Zestaw utworzony'); }
+  duplicateBundle(id){ if(!this.api)return; const r=this.api.duplicateBundle(this.pid(),id); this.setState({menus:r.db,activeBundle:r.id||this.state.activeBundle}); this.saveMenu(r.db); this.printJob('✔ Zestaw zduplikowany (kroki + wybory)'); }
   toggleBundleActive(id){ if(!this.api)return; this.apply(this.api.toggleBundle(this.pid(),id)); }
   moveBundle(id,d){ if(!this.api)return; this.apply(this.api.moveBundle(this.pid(),id,d)); this.printJob('↕ POST /admin/bundles · sort_order'); }
   setBundleField(id,f,v){ if(!this.api)return; this.apply(this.api.updateBundle(this.pid(),id,{[f]:v})); }
-  addSlot(bid){ if(!this.api)return; const tl=this.state.trigLock; const hasTrig=!!(tl&&tl.id===this.pid()); const max=hasTrig?2:3; const b=this.state.menus&&this.state.menus[this.pid()]&&this.state.menus[this.pid()].bundles.find(x=>x.id===bid); if(b&&b.slots.length>=max){ this.printJob(hasTrig?'Max 2 étapes (l\'étape 1 = produit déclencheur)':'Maximum 3 étapes par formule'); return; } this.apply(this.api.addSlot(this.pid(),bid)); }
+  addSlot(bid){ if(!this.api)return; const tl=this.state.trigLock; const hasTrig=!!(tl&&tl.id===this.pid()); const max=hasTrig?2:3; const b=this.state.menus&&this.state.menus[this.pid()]&&this.state.menus[this.pid()].bundles.find(x=>x.id===bid); if(b&&b.slots.length>=max){ this.printJob(hasTrig?'Maks. 2 kroki (krok 1 = produkt wyzwalający)':'Maksymalnie 3 kroki na zestaw'); return; } this.apply(this.api.addSlot(this.pid(),bid)); }
   removeSlot(bid,sid){ if(!this.api)return; this.apply(this.api.removeSlot(this.pid(),bid,sid)); }
   moveSlot(bid,sid,d){ if(!this.api)return; this.apply(this.api.moveSlot(this.pid(),bid,sid,d)); }
   setSlotField(bid,sid,f,v){ if(!this.api)return; this.apply(this.api.updateSlot(this.pid(),bid,sid,{[f]:v})); }
@@ -1040,7 +1040,7 @@ class Component extends DCLogic {
   moveChoice(bid,sid,cid,d){ if(!this.api)return; this.apply(this.api.moveChoice(this.pid(),bid,sid,cid,d)); }
   setChoiceField(bid,sid,cid,f,v){ if(!this.api)return; this.apply(this.api.updateChoice(this.pid(),bid,sid,cid,{[f]:v})); }
   toggleChoiceActive(bid,sid,cid){ if(!this.api)return; this.apply(this.api.toggleChoice(this.pid(),bid,sid,cid)); }
-  pickImage(bid,sid,cid){ if(!this.api)return; this.apply(this.api.cycleImage(this.pid(),bid,sid,cid)); this.printJob('Bibliothèque média · public/assets/**'); }
+  pickImage(bid,sid,cid){ if(!this.api)return; this.apply(this.api.cycleImage(this.pid(),bid,sid,cid)); this.printJob('Biblioteka mediów · public/assets/**'); }
 
   selectSingle(sid,cid){ this.setState(st=>({sel:{...st.sel,[sid]:cid}})); }
   toggleMulti(sid,cid,max){ this.setState(st=>{ const cur=Array.isArray(st.sel[sid])?st.sel[sid]:[]; let nx; if(cur.includes(cid))nx=cur.filter(x=>x!==cid); else if(cur.length>=max)nx=[...cur.slice(1),cid]; else nx=[...cur,cid]; return {sel:{...st.sel,[sid]:nx}}; }); }
@@ -1053,46 +1053,46 @@ class Component extends DCLogic {
     const shopNames=shopList.map(s=>s.nom||s.name).filter(Boolean);
     const shopVilles=[...new Set(shopList.map(s=>(s.ville||s.city||'').replace(/\s*\d{4,}\s*$/,'').trim()).filter(Boolean))];
     const villes=shopVilles.length?shopVilles:['Bruxelles','Anderlecht','Uccle','Schaerbeek','Louvain','Waterloo'];
-    const cats=['Boulangerie','Pâtisserie fraîche','Chocolaterie','Traiteur','Glaces'];
+    const cats=['Pieczywo','Ciasta świeże','Czekolada','Katering','Lody'];
     const sel=a=>a.map(x=>({value:x,label:x}));
     return {
-      shop:{ title:'Boutique', table:'shops (+ ws_shops)', save:'Enregistrer', fields:[
-        {k:'nom',label:'Enseigne',type:'text',ph:'L\'Atelier — …'},
-        {k:'ville',label:'Ville',type:'select',options:sel(villes),def:villes[0]},
-        {k:'contrat',label:'Contrat',type:'select',options:sel(['Franchise','Succursale','Master']),def:'Franchise'},
-        {k:'accent',label:'Accent (branding)',type:'select',options:sel(['Ruby Red','Abricot','Old Copper']),def:'Ruby Red'},
+      shop:{ title:'Sklep', table:'shops (+ ws_shops)', save:'Zapisz', fields:[
+        {k:'nom',label:'Szyld',type:'text',ph:'L\'Atelier — …'},
+        {k:'ville',label:'Miasto',type:'select',options:sel(villes),def:villes[0]},
+        {k:'contrat',label:'Umowa',type:'select',options:sel(['Franczyza','Oddział','Master']),def:'Franczyza'},
+        {k:'accent',label:'Akcent (branding)',type:'select',options:sel(['Ruby Red','Morela','Old Copper']),def:'Ruby Red'},
       ]},
-      product:{ title:'Produit', table:'ws_products', save:'Créer', fields:[
-        {k:'nom',label:'Nom',type:'text',ph:'ex. Éclair chocolat'},
-        {k:'cat',label:'Catégorie',type:'select',options:sel(cats),def:cats[0]},
-        {k:'prix',label:'Prix de référence (€)',type:'number',def:3.5},
+      product:{ title:'Produkt', table:'ws_products', save:'Utwórz', fields:[
+        {k:'nom',label:'Nazwa',type:'text',ph:'np. Ekler czekoladowy'},
+        {k:'cat',label:'Kategoria',type:'select',options:sel(cats),def:cats[0]},
+        {k:'prix',label:'Cena referencyjna (€)',type:'number',def:3.5},
       ]},
-      voucher:{ title:'Bon', table:'ws_vouchers', save:'Créer le bon', fields:[
-        {k:'code',label:'Code',type:'text',ph:'ex. BIENVENUE10'},
-        {k:'type',label:'Type (type)',type:'select',options:sel(['percent','amount','free_delivery','add_office']),def:'percent'},
-        {k:'value',label:'Valeur (value)',type:'number',def:10},
-        {k:'min_order',label:'Commande min. (min_order €)',type:'number',def:20},
-        {k:'max_uses',label:'Utilisations max (max_uses · vide = illimité)',type:'number',def:100},
-        {k:'expires_at',label:'Expiration (expires_at)',type:'text',def:'2027-01-01'},
-        {k:'shops',label:'Boutiques ciblées — vide = bon marque réseau ⇩ (shop_id NULL)',type:'checks',options:(shopNames.length?shopNames:['—'])},
-        {k:'active',label:'Actif (active)',type:'bool',def:true},
+      voucher:{ title:'Kupon', table:'ws_vouchers', save:'Utwórz kupon', fields:[
+        {k:'code',label:'Kod',type:'text',ph:'np. WITAMY10'},
+        {k:'type',label:'Typ (type)',type:'select',options:sel(['percent','amount','free_delivery','add_office']),def:'percent'},
+        {k:'value',label:'Wartość (value)',type:'number',def:10},
+        {k:'min_order',label:'Zamówienie min. (min_order €)',type:'number',def:20},
+        {k:'max_uses',label:'Maks. użyć (max_uses · puste = bez limitu)',type:'number',def:100},
+        {k:'expires_at',label:'Wygasa (expires_at)',type:'text',def:'2027-01-01'},
+        {k:'shops',label:'Sklepy docelowe — puste = kupon sieciowy marki ⇩ (shop_id NULL)',type:'checks',options:(shopNames.length?shopNames:['—'])},
+        {k:'active',label:'Aktywny (active)',type:'bool',def:true},
       ]},
-      pricing:{ title:'Règle de prix réseau', table:'ws_pricing_rules (shop_id NULL)', save:'Créer', fields:[
-        {k:'nom',label:'Libellé',type:'text',ph:'ex. Menu marque printemps'},
-        {k:'cible',label:'Cible',type:'text',ph:'catégorie / produit'},
-        {k:'effet',label:'Effet',type:'text',ph:'ex. 19,90 € ou −10 %'},
+      pricing:{ title:'Reguła cenowa sieci', table:'ws_pricing_rules (shop_id NULL)', save:'Utwórz', fields:[
+        {k:'nom',label:'Etykieta',type:'text',ph:'np. Wiosenne menu marki'},
+        {k:'cible',label:'Cel',type:'text',ph:'kategoria / produkt'},
+        {k:'effet',label:'Efekt',type:'text',ph:'np. 19,90 € lub −10 %'},
       ]},
-      user:{ title:'Utilisateur', table:'bo_users (+ bo_user_shops)', save:'Enregistrer', fields:[
-        {k:'nom',label:'Nom',type:'text',ph:'Prénom Nom'},
-        {k:'email',label:'Email',type:'text',ph:'prenom@latelier.be'},
-        {k:'role',label:'Rôle',type:'select',options:sel(['Siège','Franchise']),def:'Franchise'},
-        {k:'portee',label:'Portée (boutiques)',type:'text',ph:'ex. Bruxelles-Centre, Uccle'},
+      user:{ title:'Użytkownik', table:'bo_users (+ bo_user_shops)', save:'Zapisz', fields:[
+        {k:'nom',label:'Nazwa',type:'text',ph:'Imię Nazwisko'},
+        {k:'email',label:'E-mail',type:'text',ph:'imie@latelier.be'},
+        {k:'role',label:'Rola',type:'select',options:sel(['Centrala','Franczyza']),def:'Franczyza'},
+        {k:'portee',label:'Zakres (sklepy)',type:'text',ph:'np. Bruxelles-Centre, Uccle'},
       ]},
-      template:{ title:'Modèle d\'email', table:'ws_email_templates', save:'Enregistrer', fields:[
-        {k:'cle',label:'Clé',type:'select',options:sel(['order_confirm','order_ready','invoice','office_onboarding','office_reject']),def:'order_confirm'},
-        {k:'langue',label:'Langue',type:'select',options:sel(['FR','NL','EN','DE']),def:'FR'},
-        {k:'sujet',label:'Sujet',type:'text',ph:'Votre commande {{commande_ref}}'},
-        {k:'corps',label:'Corps',type:'area',ph:'Bonjour {{client_nom}}, …'},
+      template:{ title:'Szablon e-maila', table:'ws_email_templates', save:'Zapisz', fields:[
+        {k:'cle',label:'Klucz',type:'select',options:sel(['order_confirm','order_ready','invoice','office_onboarding','office_reject']),def:'order_confirm'},
+        {k:'langue',label:'Język',type:'select',options:sel(['FR','NL','EN','DE']),def:'FR'},
+        {k:'sujet',label:'Temat',type:'text',ph:'Twoje zamówienie {{commande_ref}}'},
+        {k:'corps',label:'Treść',type:'area',ph:'Dzień dobry {{client_nom}}, …'},
       ]},
     };
   }
@@ -1107,7 +1107,7 @@ class Component extends DCLogic {
   vtPick(item){ this.setState({vtSel:item, vtResults:[]}); }
   submitForm(){ const key=this.state.formKey, c=this.formDefs()[key]; if(!c) return; const v=this.state.formVals||{};
     const tk=this.state.vtKind||'NETWORK'; const tsel=this.state.vtSel||null;
-    if(key==='voucher' && tk!=='NETWORK' && !tsel){ this.printJob('Sélectionne la cible du bon (personne ou entreprise)'); return; }
+    if(key==='voucher' && tk!=='NETWORK' && !tsel){ this.printJob('Wybierz cel kuponu (osoba lub firma)'); return; }
     this.setState({formKey:null, vtKind:'NETWORK', vtQ:'', vtResults:[], vtSel:null});
     // Mappe le formulaire → endpoint d'écriture ; repli toast si non câblé.
     let path=null, payload=null;
@@ -1117,7 +1117,7 @@ class Component extends DCLogic {
     else if(key==='user'){ path='/franchisor/user'; payload={nom:v.nom,email:v.email,role:v.role,portee:v.portee,active:true}; }
     else if(key==='template'){ path='/franchisor/email-template'; payload={cle:v.cle,langue:v.langue,sujet:v.sujet,corps:v.corps}; }
     if(path && !((key==='shop'||key==='product') && v.id==null)){ this.frPost(path,payload); }
-    else { this.printJob((this.state.formEdit?'✔ Mis à jour dans ':'✔ Enregistré dans ')+c.table); } }
+    else { this.printJob((this.state.formEdit?'✔ Zaktualizowano w ':'✔ Zapisano w ')+c.table); } }
   navStyle(s){ const on=this.state.screen===s; return 'display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;border:none;border-radius:9px;cursor:pointer;font:'+(on?'600':'500')+' 13px/1 var(--font-ui);text-align:left;'+(on?'background:var(--color-primary);color:#fff':'background:transparent;color:var(--color-text)'); }
   renderVals(){
     const S=this.state;
@@ -1132,8 +1132,8 @@ class Component extends DCLogic {
 
     const paramNavOpen=S.paramNavOpen!==undefined?S.paramNavOpen:false;
     const navRaw=[
-      {label:'Pilotage',plain:true,open:true,items:[['dash','Tableau de bord réseau',COPPER],['boutiques','Boutiques',APRICOT],['catalogue','Catalogue','var(--color-primary)'],['menus','Menus & formules',COPPER],['promos','Promotions réseau',APRICOT],['livraisons','Livraisons',APRICOT],['geo','Analyse géographique',COPPER]]},
-      {label:'Paramétrage',collapsible:true,open:paramNavOpen,items:[['comms','Communications','var(--color-primary)'],['users','Utilisateurs & rôles',COPPER],['zones','Zones de chalandise',APRICOT]]},
+      {label:'Zarządzanie',plain:true,open:true,items:[['dash','Pulpit sieci',COPPER],['boutiques','Sklepy',APRICOT],['catalogue','Katalog','var(--color-primary)'],['menus','Menu i zestawy',COPPER],['promos','Promocje sieci',APRICOT],['livraisons','Dostawy',APRICOT],['geo','Analiza geograficzna',COPPER]]},
+      {label:'Ustawienia',collapsible:true,open:paramNavOpen,items:[['comms','Komunikacja','var(--color-primary)'],['users','Użytkownicy i role',COPPER],['zones','Strefy zasięgu',APRICOT]]},
     ];
     const navBlocks=navRaw.map(b=>({label:b.label, plain:!b.collapsible, collapsible:!!b.collapsible, open:b.open,
       toggle:()=>this.setState(st=>({paramNavOpen:!(st.paramNavOpen!==undefined?st.paramNavOpen:false)})),
@@ -1141,10 +1141,10 @@ class Component extends DCLogic {
       chevStyle:'flex:none;transition:transform .15s'+(b.open?';transform:rotate(90deg)':''),
       items:b.items.map(([s,label,c])=>({label,go:this.go(s),style:this.navStyle(s),dot:dot(this.state.screen===s?'#fff':c),badge:'',badgeStyle:'display:none'}))}));
 
-    const titles={dash:'Tableau de bord réseau',boutiques:'Boutiques',audit:'Journal d\'audit',catalogue:'Catalogue',gouvernance:'Gouvernance produit',prix:'Prix de référence',menus:'Menus & formules',promos:'Promotions réseau',livraisons:'Livraisons',config:'Config marque',comms:'Communications',users:'Utilisateurs & rôles',zones:'Zones de chalandise',geo:'Analyse géographique'};
-    const subs={dash:'Consolidé multi-boutiques · L\'Atelier By',boutiques:'Identité · branding · webshop',audit:'Traçabilité des actions sensibles',catalogue:'Produits · catégories · i18n',gouvernance:'Whitelist & obligations réseau',prix:'Prix conseillés marque',menus:'Éditeur de formules produit · ws_bundles',promos:'Bons & règles à portée réseau',livraisons:'Livraisons bureau · tournées · confirmation QR/PIN · wsm_deliveries',config:'Paramètres généraux (liste blanche)',comms:'Modèles d\'email transactionnels',users:'Comptes back-office & portée (RBAC)',zones:'Zones primaires par point de vente · codes postaux · ws_franchisor_catchment',geo:'Carte des clients · répartition autour des boutiques du réseau'};
+    const titles={dash:'Pulpit sieci',boutiques:'Sklepy',audit:'Dziennik audytu',catalogue:'Katalog',gouvernance:'Zarządzanie produktem',prix:'Cena referencyjna',menus:'Menu i zestawy',promos:'Promocje sieci',livraisons:'Dostawy',config:'Konfiguracja marki',comms:'Komunikacja',users:'Użytkownicy i role',zones:'Strefy zasięgu',geo:'Analiza geograficzna'};
+    const subs={dash:'Widok skonsolidowany sieci · L\'Atelier By',boutiques:'Tożsamość · branding · webshop',audit:'Śledzenie działań wrażliwych',catalogue:'Produkty · kategorie · i18n',gouvernance:'Whitelista i obowiązki sieci',prix:'Ceny sugerowane marki',menus:'Edytor zestawów produktu · ws_bundles',promos:'Kupony i reguły w zasięgu sieci',livraisons:'Dostawy biurowe · trasy · potwierdzenie QR/PIN · wsm_deliveries',config:'Ustawienia ogólne (whitelista)',comms:'Szablony e-maili transakcyjnych',users:'Konta back-office i zakres (RBAC)',zones:'Strefy pierwotne per punkt sprzedaży · kody pocztowe · ws_franchisor_catchment',geo:'Mapa klientów · rozkład wokół sklepów sieci'};
 
-    const scopeOpts=[{value:'__all',label:'Réseau (14 boutiques)'},{value:'bxl',label:'Bruxelles-Centre'},{value:'and',label:'Anderlecht'},{value:'ucc',label:'Uccle'}];
+    const scopeOpts=[{value:'__all',label:'Sieć (14 sklepów)'},{value:'bxl',label:'Bruxelles-Centre'},{value:'and',label:'Anderlecht'},{value:'ucc',label:'Uccle'}];
     // Valeur d'un paramètre ws_param : override local (modale profil, réactif) sinon
     // la valeur hydratée depuis /franchisor/params.
     const paramVal=(cle)=>{ const ov=(S.paramOv||{}); if(ov[cle]!==undefined)return String(ov[cle]); const p=(SRV('params')||[]).find(x=>x&&x.cle===cle); return p?String(p.val):undefined; };
@@ -1162,14 +1162,14 @@ class Component extends DCLogic {
     const shopsRows=shopsRaw.map(s=>{ const w=tog('shopWeb_'+s.id,s.web), a=tog('shopAct_'+s.id,s.act); const ca=s.caShop+s.caOffice;
       const adColor=s.adoption>=85?'#2d7a3e':(s.adoption>=70?'#b26a00':'var(--color-primary)');
       return {...s, ca:ca?this.eur(ca):'—', caShopTxt:s.caShop?this.eur(s.caShop):'—', caOfficeTxt:s.caOffice?this.eur(s.caOffice):'—', adoption:s.adoption+' %', adColor,
-        webPill:pill(w.on?'#eaf5ec':'var(--color-background-secondary)',w.on?'#2d7a3e':'var(--color-text-muted)'), webTxt:w.on?'En ligne':'Coupé',
+        webPill:pill(w.on?'#eaf5ec':'var(--color-background-secondary)',w.on?'#2d7a3e':'var(--color-text-muted)'), webTxt:w.on?'Online':'Odcięty',
         webStyle:w.style,webKnob:w.knob,toggleWeb:()=>{ w.toggle(); this.frPost('/franchisor/shop',{id:s.id,webshop_enabled:!w.on}); },
         actStyle:a.style,actKnob:a.knob,toggleAct:()=>{ a.toggle(); this.frPost('/franchisor/shop',{id:s.id,active:!a.on}); },
         edit:this.editForm('shop',{id:s.id,nom:s.nom,ville:s.ville.replace(/\s\d+$/,''),contrat:(s.contrat&&s.contrat!=='—')?s.contrat:''})}; });
 
     // Catalogue + gouvernance + prix — arbre catégories › produits
     const CATALOG=SRV('catalog');
-    const stPill=s=>pill(s==='Publié'?'#eaf5ec':(s==='Brouillon'?'var(--color-background-secondary)':'#fbf1e3'),s==='Publié'?'#2d7a3e':(s==='Brouillon'?'var(--color-text-muted)':'#b26a00'));
+    const stPill=s=>pill(s==='Opublikowany'?'#eaf5ec':(s==='Szkic'?'var(--color-background-secondary)':'#fbf1e3'),s==='Opublikowany'?'#2d7a3e':(s==='Szkic'?'var(--color-text-muted)':'#b26a00'));
     const catTree=[];
     const activeOnly=S.flags['catActiveOnly']!==undefined?S.flags['catActiveOnly']:true;
     const seasonFilter=S.seasonFilter||'';
@@ -1179,7 +1179,7 @@ class Component extends DCLogic {
     const catAllOpen=CATALOG.length>0&&CATALOG.every((c,ci)=>{ const v=S.flags['catO_'+ci]; return v!==undefined?v:true; });
     const toggleAllCats=()=>{ const nv=!catAllOpen; this.setState(st=>{ const f={...st.flags}; CATALOG.forEach((c,ci)=>{ f['catO_'+ci]=nv; c.prods.forEach((p)=>{ if(p.sub_id!=null) f['subOpen_'+ci+'_'+String(p.sub_id)]=nv; }); }); return {flags:f}; }); };
     const seasonsList=[...new Set([].concat(...CATALOG.map(c=>c.prods.map(p=>p.saison).filter(Boolean))))];
-    const seasonChips=[{label:'Toutes saisons',value:''}].concat(seasonsList.map(sn=>({label:sn,value:sn}))).map(o=>({ label:o.label, active:o.value===seasonFilter, style:'border:none;cursor:pointer;border-radius:20px;padding:6px 13px;font:600 11px var(--font-ui);'+(o.value===seasonFilter?'background:var(--color-primary);color:#fff':'background:var(--color-background-secondary);color:var(--color-text-muted)'), pick:()=>this.setState({seasonFilter:o.value}) }));
+    const seasonChips=[{label:'Wszystkie sezony',value:''}].concat(seasonsList.map(sn=>({label:sn,value:sn}))).map(o=>({ label:o.label, active:o.value===seasonFilter, style:'border:none;cursor:pointer;border-radius:20px;padding:6px 13px;font:600 11px var(--font-ui);'+(o.value===seasonFilter?'background:var(--color-primary);color:#fff':'background:var(--color-background-secondary);color:var(--color-text-muted)'), pick:()=>this.setState({seasonFilter:o.value}) }));
     const swS=(on)=>'position:relative;width:34px;height:19px;border-radius:20px;border:none;cursor:pointer;flex:none;background:'+(on?'var(--color-primary)':'var(--color-border-secondary)');
     // Variante « apricot » — canal livraison bureau (ws_office).
     const swSa=(on)=>'position:relative;width:34px;height:19px;border-radius:20px;border:none;cursor:pointer;flex:none;background:'+(on?APRICOT:'var(--color-border-secondary)');
@@ -1192,12 +1192,12 @@ class Component extends DCLogic {
     const knL=(on,h)=>{ const k=h-4; return 'position:absolute;top:2px;left:'+(on?(32-k)+'px':'2px')+';width:'+k+'px;height:'+k+'px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)'; };
     // Paramètres du site (ws_param) pilotés depuis la modale profil. Valeur '0'/'1' -> toggle,
     // sinon champ texte. Persistance : POST /franchisor/param (upsert + audit). bo_show_source
-    // est garanti présent même si le param n'existe pas encore.
+    // est garanti présent même si le param n'jeszcze nie istnieje.
     const _pcles=[...new Set([...(SRV('params')||[]).map(p=>p&&p.cle).filter(Boolean),'bo_show_source'])];
     const profileParams=_pcles.map(cle=>{ const cur=(paramVal(cle)!==undefined?paramVal(cle):(cle==='bo_show_source'?'1':'')); const tgl=(cur==='0'||cur==='1'); const on=cur==='1';
       return tgl
         ? {cle,isBool:true,isText:false,swStyle:swS(on),knStyle:knS(on),toggle:()=>{ const nv=on?'0':'1'; this.setState(st=>({paramOv:{...(st.paramOv||{}),[cle]:nv}})); this.frPost('/franchisor/param',{cle,val:nv}); this.printJob('✔ '+cle+' = '+nv); }}
-        : {cle,isBool:false,isText:true,value:cur,setVal:(e)=>{ const v=e.target.value; this.setState(st=>({paramOv:{...(st.paramOv||{}),[cle]:v}})); }, save:()=>{ this.frPost('/franchisor/param',{cle,val:(paramVal(cle)||'')}); this.printJob('✔ '+cle+' enregistré'); }};
+        : {cle,isBool:false,isText:true,value:cur,setVal:(e)=>{ const v=e.target.value; this.setState(st=>({paramOv:{...(st.paramOv||{}),[cle]:v}})); }, save:()=>{ this.frPost('/franchisor/param',{cle,val:(paramVal(cle)||'')}); this.printJob('✔ '+cle+' zapisano'); }};
     });
     const slugId=(s)=>s.toLowerCase().replace(/[^a-z0-9]+/g,'-');
     CATALOG.forEach((c,ci)=>{ const ok='catO_'+ci; const open=catQuery?true:(S.flags[ok]!==undefined?S.flags[ok]:true);
@@ -1277,11 +1277,11 @@ class Component extends DCLogic {
     // Utilisateurs
     const usersRaw=SRV('users');
     const usersRows=usersRaw.map((u,i)=>{ const a=tog('userAct_'+i,u.act);
-      return {...u, rolePill:pill(u.role==='Siège'?'#fbe9eb':'var(--color-background-secondary)',u.role==='Siège'?'var(--color-primary)':'var(--color-text-muted)'),
+      return {...u, rolePill:pill(u.role==='Centrala'?'#fbe9eb':'var(--color-background-secondary)',u.role==='Centrala'?'var(--color-primary)':'var(--color-text-muted)'),
         actStyle:a.style,actKnob:a.knob,toggleAct:a.toggle, edit:this.editForm('user',{nom:u.nom,email:u.email,role:u.role,portee:u.portee})}; });
 
     // Audit
-    const vPill=v=>pill(v==='Création'?'#eaf5ec':(v==='Suppression'?'#fbe9eb':'#fbf1e3'),v==='Création'?'#2d7a3e':(v==='Suppression'?'var(--color-primary)':'#b26a00'));
+    const vPill=v=>pill(v==='Utworzenie'?'#eaf5ec':(v==='Usunięcie'?'#fbe9eb':'#fbf1e3'),v==='Utworzenie'?'#2d7a3e':(v==='Usunięcie'?'var(--color-primary)':'#b26a00'));
     const auditRows=SRV('audit').map(a=>({...a,actPill:vPill(a.verb)}));
 
     // ===== MENU BUILDER (ws_bundles → slots → choices) =====
@@ -1295,7 +1295,7 @@ class Component extends DCLogic {
     const IMGC={a:'#E8A15C',b:'#8C4A2F',c:'#9E2A3B',d:'#7a8c5a'};
     const imgBox=(img)=>{ const base='width:38px;height:38px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font:700 15px var(--font-ui);cursor:pointer;'; return img?(base+'background:'+(IMGC[img]||'#b98')+';color:#fff;border:none'):(base+'background:var(--color-background-secondary);color:var(--color-text-muted);border:1px dashed var(--color-border-secondary)'); };
     const pvImg=(img)=>'width:34px;height:34px;border-radius:8px;flex:none;'+(img?('background:'+(IMGC[img]||'#b98')):'background:var(--color-background-secondary)');
-    // Icône de catégorie = l'image PNG de ws_categories (img). Une étape validée
+    // Ikona kategorii = l'image PNG de ws_categories (img). Une étape validée
     // affiche la vignette de la catégorie du produit choisi. On résout les chemins
     // relatifs contre la racine WebShop (base API sans le suffixe /api).
     const FRBASE=(window.__FR&&window.__FR.base)||'';
@@ -1307,7 +1307,7 @@ class Component extends DCLogic {
     const pq=(S.productSearch||'').toLowerCase();
     const flatProds=[]; CATALOG.forEach(c=>{ c.prods.forEach(p=>{ const id=p.id||('cat-'+p.nom.toLowerCase().replace(/[^a-z0-9]+/g,'-')); flatProds.push({id,name:p.nom,cat:c.cat,price:p.prix,menu:!!p.menu}); }); });
     // Nom de produit -> catégorie : un choix dont le libellé = un produit connu
-    // hérite de l'icône de sa catégorie (étape validée).
+    // hérite de l'ikona jego kategorii (krok zatwierdzony).
     const prodCat={}; flatProds.forEach(pp=>{ if(pp.name)prodCat[pp.name]=pp.cat; });
     // Catégorie -> vignette PNG (ws_categories.img, résolue). Un choix dont le
     // libellé = un produit connu hérite de l'image de sa catégorie.
@@ -1327,22 +1327,22 @@ class Component extends DCLogic {
     const ovOn={ style:ovStyle(menuRes.override==='on'), click:setOv('on') };
     const ovOff={ style:ovStyle(menuRes.override==='off'), click:setOv('off') };
     const effYes=menuRes.effective===1;
-    const originTxt=menuRes.origin==='override'?'forcé':('hérité de '+(menuRes.category||'catégorie'));
-    const menuResBadge={ text:(effYes?'Oui':'Non')+' · '+originTxt, style:pill(effYes?'#eaf5ec':'#fbe9eb',effYes?'#2d7a3e':'var(--color-primary)') };
+    const originTxt=menuRes.origin==='override'?'wymuszone':('dziedziczone z '+(menuRes.category||'kategoria'));
+    const menuResBadge={ text:(effYes?'Tak':'Nie')+' · '+originTxt, style:pill(effYes?'#eaf5ec':'#fbe9eb',effYes?'#2d7a3e':'var(--color-primary)') };
     const armedEmpty=effYes&&M.bundles.filter(b=>b.active).length===0;
     const menuMode=S.menuMode||'list';
     const _cats=menusDB._categories||{};
     const menuKeys=Object.keys(menusDB).filter(k=>k!=='_categories');
-    const availableMenus=menuKeys.map(id=>{ const mm=menusDB[id]; const r2=this.api?this.api.resolveMenu(id):{effective:0,origin:'default'}; const nb=(mm.bundles||[]).length; return {id,mm,r2,nb}; }).filter(x=>x.r2.effective||x.nb>0).map(x=>({ id:x.id, name:x.mm.productName, category:x.mm.category||'—', nbLabel:x.nb+(x.nb>1?' formules':' formule'), originText:(x.r2.effective?'Oui':'Non')+' · '+(x.r2.origin==='override'?'forcé':'hérité'), originBadge:pill(x.r2.effective?'#eaf5ec':'#fbe9eb',x.r2.effective?'#2d7a3e':'var(--color-primary)'), rowClick:()=>this.setState({menuMode:'edit',menuProductId:x.id,sel:{},menuCreate:false}), delMenu:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); if(this.api)this.setState({menus:this.api.deleteProduct(x.id),menuMode:'list'}); this.printJob('✖ Menu supprimé (formules incluses)'); } }));
+    const availableMenus=menuKeys.map(id=>{ const mm=menusDB[id]; const r2=this.api?this.api.resolveMenu(id):{effective:0,origin:'default'}; const nb=(mm.bundles||[]).length; return {id,mm,r2,nb}; }).filter(x=>x.r2.effective||x.nb>0).map(x=>({ id:x.id, name:x.mm.productName, category:x.mm.category||'—', nbLabel:x.nb+(x.nb>1?' formules':' formule'), originText:(x.r2.effective?'Tak':'Nie')+' · '+(x.r2.origin==='override'?'wymuszone':'dziedziczone'), originBadge:pill(x.r2.effective?'#eaf5ec':'#fbe9eb',x.r2.effective?'#2d7a3e':'var(--color-primary)'), rowClick:()=>this.setState({menuMode:'edit',menuProductId:x.id,sel:{},menuCreate:false}), delMenu:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); if(this.api)this.setState({menus:this.api.deleteProduct(x.id),menuMode:'list'}); this.printJob('✖ Menu usunięte (wraz z zestawami)'); } }));
     const createCats=Object.keys(_cats).map(cn=>{ const on=!!_cats[cn].menu_default; return {name:cn, defStyle:switchS(on), defKnob:knobS(on), toggle:()=>{ if(this.api)this.setState({menus:this.api.setCategoryDefault(cn,on?0:1)}); } }; });
     const cq=(S.menuCreateSearch||'').toLowerCase();
     const createProducts=flatProds.filter(p=>p.name.toLowerCase().includes(cq)||p.cat.toLowerCase().includes(cq)).map(p=>({ name:p.name, catLabel:p.cat, pick:()=>{ if(!this.api)return; this.api.ensureProduct(p.id,p.name,p.price,p.cat); const db=this.api.setProductOverride(p.id,'on'); this.setState({menus:db,menuMode:'edit',menuProductId:p.id,sel:{},menuCreate:false}); } }));
-    const triggerCats=[{value:'',label:'— Aucune —'}].concat((CATALOG||[]).map(c=>c.cat).filter(cn=>this.api?!!this.api.getCategoryDefault(cn):false).map(cn=>({value:cn,label:cn})));
+    const triggerCats=[{value:'',label:'— Brak —'}].concat((CATALOG||[]).map(c=>c.cat).filter(cn=>this.api?!!this.api.getCategoryDefault(cn):false).map(cn=>({value:cn,label:cn})));
     const triggerProducts=menuKeys.filter(id=>menusDB[id].menuOverride==='on').map(id=>({name:menusDB[id].productName}));
     const forcedOn=M.menuOverride==='on';
     const slugId2=(s)=>s.toLowerCase().replace(/[^a-z0-9]+/g,'-');
     const eligibleProds=[]; (CATALOG||[]).forEach(c=>{ c.prods.forEach(p=>{ const id=p.id||('cat-'+slugId2(p.nom)); const rm=this.api?this.api.resolveMenu(id):{override:null}; if(rm.override==='on') eligibleProds.push({value:id,label:p.nom+' · '+c.cat}); }); });
-    const triggerProdOpts=[{value:'',label:'— Aucun —'}].concat(eligibleProds);
+    const triggerProdOpts=[{value:'',label:'— Brak —'}].concat(eligibleProds);
     const triggerProdVal=forcedOn?pid0:'';
     const catIsMenu=this.api?!!this.api.getCategoryDefault(M.category):false;
     const trigLock=(S.trigLock&&S.trigLock.id===pid0)?S.trigLock.side:null;
@@ -1363,10 +1363,10 @@ class Component extends DCLogic {
         reqStyle:switchS(s.required), reqKnob:knobS(s.required), reqToggle:()=>this.setSlotField(AB.id,s.id,'required',!s.required),
         single:s.kind==='single', multi:s.kind==='multi', singleStyle:segStyle(s.kind==='single'), multiStyle:segStyle(s.kind==='multi'),
         setSingle:()=>this.setSlotKind(AB.id,s.id,'single'), setMulti:()=>this.setSlotKind(AB.id,s.id,'multi'),
-        maxLabel:'jusqu\'à '+s.max_select, incMax:()=>this.setSlotMax(AB.id,s.id,1), decMax:()=>this.setSlotMax(AB.id,s.id,-1),
+        maxLabel:'do '+s.max_select, incMax:()=>this.setSlotMax(AB.id,s.id,1), decMax:()=>this.setSlotMax(AB.id,s.id,-1),
         up:()=>this.moveSlot(AB.id,s.id,-1), down:()=>this.moveSlot(AB.id,s.id,1), del:()=>this.removeSlot(AB.id,s.id),
         sActStyle:switchS(s.active), sActKnob:knobS(s.active), sActToggle:()=>this.setSlotField(AB.id,s.id,'active',!s.active), real:true, ph:false, cardStyle:'border:.5px solid var(--color-border-tertiary);border-radius:11px;padding:13px;background:var(--color-background-secondary)'+(s.active?'':';opacity:.5'),
-        invalid, invalidMsg:'Étape requise sans choix actif — bloquera la commande client', addChoice:()=>this.addChoice(AB.id,s.id), miniInput, sqBtn,
+        invalid, invalidMsg:'Krok wymagany bez aktywnego wyboru — zablokuje zamówienie klienta', addChoice:()=>this.addChoice(AB.id,s.id), miniInput, sqBtn,
         choices:s.choices.map(c=>{ const cImg=choiceCatImg(c.label); return ({ id:c.id, label:c.label, setLabel:e=>this.setChoiceField(AB.id,s.id,c.id,'label',e.target.value),
           openPicker:()=>this.setState({choicePickerFor:c.id,choiceSearch:''}), pickerOpen:(S.choicePickerFor===c.id), choiceSearch:S.choiceSearch||'', setChoiceSearch:e=>{ const v=e.target.value; this.setState({choiceSearch:v}); },
           options:(S.choicePickerFor===c.id)?flatProds.filter(pp=>pp.name.toLowerCase().includes((S.choiceSearch||'').toLowerCase())||pp.cat.toLowerCase().includes((S.choiceSearch||'').toLowerCase())).map(pp=>({name:pp.name,catLabel:pp.cat,style:'display:flex;align-items:center;padding:8px 10px;border-radius:7px;cursor:pointer',pick:()=>{ this.setChoiceField(AB.id,s.id,c.id,'label',pp.name); this.setState({choicePickerFor:null}); }})):[],
@@ -1376,15 +1376,15 @@ class Component extends DCLogic {
           actStyle:switchS(c.active), actKnob:knobS(c.active), actToggle:()=>this.toggleChoiceActive(AB.id,s.id,c.id),
           up:()=>this.moveChoice(AB.id,s.id,c.id,-1), down:()=>this.moveChoice(AB.id,s.id,c.id,1), del:()=>this.removeChoice(AB.id,s.id,c.id), miniInput, sqBtn }); }) };
     }):[];
-    // Déclencheur (catégorie OU produit) : l'étape 1 = le produit déclencheur
+    // Déclencheur (catégorie OU produit) : l'krok 1 = produkt wyzwalający
     // (auto/verrouillé), donc seulement 2 étapes éditables (2 & 3) ; sinon 3.
     const slotCap=hasTrigger?2:3, stepOffset=hasTrigger?1:0;
-    const slotView=editSlots.slice(0,slotCap); if(AB){ while(slotView.length<slotCap){ const idx=slotView.length+1+stepOffset; slotView.push({ph:true,real:false,name:'Étape '+idx,miniInput,phStyle:switchS(false),phKnob:knobS(false),addToggle:()=>this.addSlot(AB.id)}); } }
+    const slotView=editSlots.slice(0,slotCap); if(AB){ while(slotView.length<slotCap){ const idx=slotView.length+1+stepOffset; slotView.push({ph:true,real:false,name:'Krok '+idx,miniInput,phStyle:switchS(false),phKnob:knobS(false),addToggle:()=>this.addSlot(AB.id)}); } }
     const effSel={};
     const previewSlots=AB?AB.slots.filter(s=>s.active).map(s=>{ const acs=s.choices.filter(c=>c.active); const isSingle=s.kind==='single';
       let selected; if(isSingle){ selected=selMap[s.id]!==undefined?selMap[s.id]:(s.required&&acs[0]?acs[0].id:null); if(acs.every(c=>c.id!==selected))selected=(s.required&&acs[0]?acs[0].id:null); effSel[s.id]=selected; }
       else { selected=Array.isArray(selMap[s.id])?selMap[s.id]:[]; effSel[s.id]=selected; }
-      return { label:s.label, tag:s.required?(isSingle?'Choisir 1':'Obligatoire'):(isSingle?'Optionnel':'jusqu\'à '+s.max_select),
+      return { label:s.label, tag:s.required?(isSingle?'Wybierz 1':'Obowiązkowy'):(isSingle?'Optionnel':'do '+s.max_select),
         tagStyle:pill(s.required?'#fbe9eb':'var(--color-background-secondary)',s.required?'var(--color-primary)':'var(--color-text-muted)'),
         choices:acs.map(c=>{ const on=isSingle?selected===c.id:selected.includes(c.id); const cImg=choiceCatImg(c.label);
           // Vignette = image de catégorie (comme l'éditeur) ; la sélection est
@@ -1404,11 +1404,11 @@ class Component extends DCLogic {
     const marFoodColor=mar.foodCostPct<=30?'#2d7a3e':(mar.foodCostPct<=40?'#b26a00':'var(--color-primary)');
     const schemaOpen=(typeof window!=='undefined'&&window.BOServer)?!!window.BOServer.getParam('admin.schema_reports',1):true;
     const schemaItems=[
-      {tag:'DDL (b)',tagC:'var(--color-primary)',tagBg:'#fbe9eb',t:'Déclencheur catégorie + override produit',d:'ws_categories.menu_default TINYINT + ws_products.menu_override VARCHAR(8) NULL. menu_effectif = COALESCE(override, catégorie.menu_default, 0). DDL présenté, non exécuté.'},
-      {tag:'Doublon',tagC:'#b26a00',tagBg:'#fbf1e3',t:'has_menu_options redondant',d:'Une fois la bascule vérifiée, la colonne stockée devient redondante avec la valeur calculée → cesser de la lire ; DROP = DDL séparé à valider (repli d\'abord).'},
-      {tag:'À valider',tagC:'#b26a00',tagBg:'#fbf1e3',t:'ws_bundle_slots — sélection « jusqu\'à N »',d:'L\'API n\'expose que required. Colonnes kind / min_select / max_select absentes. DDL présenté, non exécuté : ADD kind ENUM(single,multi), ADD min_select INT, ADD max_select INT.'},
-      {tag:'Front only',tagC:'var(--color-text-muted)',tagBg:'var(--color-background-secondary)',t:'« À la carte » — pseudo-formule',d:'Préfixée par la modale produit côté client. Aucune ligne ws_bundles, non éditable ici.'},
-      {tag:'Mono-langue',tagC:'#2a5a9e',tagBg:'#eef3fb',t:'i18n formules / étapes / choix',d:'Pas de table de traduction pour bundles/slots/choices. Mono-langue assumé — sinon table d\'alias à valider (cf. product_alias).'},
+      {tag:'DDL (b)',tagC:'var(--color-primary)',tagBg:'#fbe9eb',t:'Wyzwalacz kategorii + nadpisanie produktu',d:'ws_categories.menu_default TINYINT + ws_products.menu_override VARCHAR(8) NULL. menu_effectif = COALESCE(override, kategoria.menu_default, 0). DDL przedstawiony, nie wykonany.'},
+      {tag:'Duplikat',tagC:'#b26a00',tagBg:'#fbf1e3',t:'has_menu_options redondant',d:'Po zweryfikowaniu przełączenia zapisana kolumna staje się redundantna wobec wartości wyliczanej → przestać ją czytać; DROP = osobny DDL do zatwierdzenia (najpierw fallback).'},
+      {tag:'Do zatwierdzenia',tagC:'#b26a00',tagBg:'#fbf1e3',t:'ws_bundle_slots — wybór „do N”',d:'API udostępnia tylko required. Brak kolumn kind / min_select / max_select. DDL przedstawiony, nie wykonany: ADD kind ENUM(single,multi), ADD min_select INT, ADD max_select INT.'},
+      {tag:'Front only',tagC:'var(--color-text-muted)',tagBg:'var(--color-background-secondary)',t:'„À la carte” — pseudo-zestaw',d:'Poprzedzana oknem produktu po stronie klienta. Brak wiersza ws_bundles, nieedytowalne tutaj.'},
+      {tag:'Jednojęzyczny',tagC:'#2a5a9e',tagBg:'#eef3fb',t:'i18n zestawy / kroki / wybory',d:'Brak tabeli tłumaczeń dla bundles/slots/choices. Przyjęto jeden język — inaczej tabela aliasów do zatwierdzenia (por. product_alias).'},
     ];
 
     // Form modal view
@@ -1417,9 +1417,9 @@ class Component extends DCLogic {
     // Ciblage du bon (modale voucher) : Réseau / Personne / Entreprise + recherche.
     const _vtKind=S.vtKind||'NETWORK';
     const _vtBtn=(on)=>'font:600 11px var(--font-ui);padding:7px 13px;border-radius:8px;cursor:pointer;border:.5px solid '+(on?'var(--color-primary)':'var(--color-border-secondary)')+';background:'+(on?'var(--color-primary)':'var(--color-surface)')+';color:'+(on?'#fff':'var(--color-text)');
-    const vtModes=[{k:'NETWORK',label:'Réseau'},{k:'CUSTOMER',label:'Personne'},{k:'OFFICE',label:'Entreprise'}].map(m=>({label:m.label,style:_vtBtn(_vtKind===m.k),pick:()=>this.setVtKind(m.k)}));
+    const vtModes=[{k:'NETWORK',label:'Sieć'},{k:'CUSTOMER',label:'Osoba'},{k:'OFFICE',label:'Firma'}].map(m=>({label:m.label,style:_vtBtn(_vtKind===m.k),pick:()=>this.setVtKind(m.k)}));
     const vtNeedsSearch=(_vtKind==='CUSTOMER'||_vtKind==='OFFICE');
-    const vtSearchPh=_vtKind==='CUSTOMER'?'Rechercher un client (mail, nom, téléphone)…':'Rechercher une entreprise / bureau (nom, ville)…';
+    const vtSearchPh=_vtKind==='CUSTOMER'?'Szukaj klienta (e-mail, nazwisko, telefon)…':'Szukaj firmy / biura (nazwa, miasto)…';
     const vtResults=(S.vtResults||[]).map(r=>{ const label=(_vtKind==='CUSTOMER')?((r.name||'—')+(r.email?(' · '+r.email):(r.phone?(' · '+r.phone):''))):((r.name||'—')+(r.city?(' · '+r.city):'')); return {label,pick:()=>this.vtPick({id:r.id,label})}; });
     const _vtSel=S.vtSel||null;
     const formFields=fCfg?fCfg.fields.map(f=>{ const val=S.formVals[f.k]!==undefined?S.formVals[f.k]:'';
@@ -1437,10 +1437,10 @@ class Component extends DCLogic {
 
     // --- Livraisons (module livraison · wsm_deliveries) ---
     const DELIV=SRV('deliveries')||[];
-    const livStatus={'brouillon':['#8a8f98','Brouillon'],'planifiée':['#C87A3F','Planifiée'],'assignée':['#3B3468','Assignée'],'en_cours':['#2563eb','En cours'],'livrée':['#2d7a3e','Livrée'],'échouée':['var(--color-primary)','Échouée']};
-    const eur0=(n)=>Math.round(+n||0).toLocaleString('fr-BE')+' €';
+    const livStatus={'brouillon':['#8a8f98','Szkic'],'planifiée':['#C87A3F','Zaplanowana'],'assignée':['#3B3468','Przypisana'],'en_cours':['#2563eb','W trakcie'],'livrée':['#2d7a3e','Dostarczona'],'échouée':['var(--color-primary)','Nieudana']};
+    const eur0=(n)=>Math.round(+n||0).toLocaleString('pl-PL')+' €';
     const livRows=DELIV.map(d=>{ const sm=livStatus[d.status]||['#8a8f98',d.status]; const done=d.status==='livrée'||!!d.confirmed;
-      return {ref:d.ref,client:d.client,point:d.point,driverTxt:d.driver||'— non assigné',statusLabel:sm[1],
+      return {ref:d.ref,client:d.client,point:d.point,driverTxt:d.driver||'— nieprzypisany',statusLabel:sm[1],
         statusPill:'display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);background:'+sm[0]+'22;color:'+sm[0],
         caTxt:eur0(d.ca),margeTxt:eur0(d.marge),margeColor:(+d.marge<0)?'var(--color-primary)':'#2d7a3e',
         canAssign:d.status==='planifiée',canConfirm:!done&&d.status!=='planifiée',done,
@@ -1449,21 +1449,21 @@ class Component extends DCLogic {
         confirmStyle:'border:none;cursor:pointer;border-radius:7px;padding:6px 11px;font:600 11px var(--font-ui);background:var(--color-primary);color:#fff'}; });
     const livDone=DELIV.filter(d=>d.status==='livrée'||d.confirmed).length;
     const livCa=DELIV.reduce((a,d)=>a+(+d.ca||0),0), livMarge=DELIV.reduce((a,d)=>a+(+d.marge||0),0);
-    const livKpis=[{label:'Livraisons',value:String(DELIV.length),sub:livDone+' livrées'},
-      {label:'CA livraison',value:eur0(livCa),sub:'cumulé'},
-      {label:'Marge',value:eur0(livMarge),sub:'CA − coûts'},
-      {label:'Taux de complétion',value:(DELIV.length?Math.round(livDone*100/DELIV.length):0)+' %',sub:livDone+'/'+DELIV.length}];
+    const livKpis=[{label:'Dostawy',value:String(DELIV.length),sub:livDone+' dostarczone'},
+      {label:'Obrót z dostaw',value:eur0(livCa),sub:'łącznie'},
+      {label:'Marża',value:eur0(livMarge),sub:'Obrót − koszty'},
+      {label:'Stopień kompletności',value:(DELIV.length?Math.round(livDone*100/DELIV.length):0)+' %',sub:livDone+'/'+DELIV.length}];
 
     return {
       navBlocks, pageTitle:titles[S.screen], pageSub:subs[S.screen],
       tableBadge, srcHint, pencilStyle, porteeBadge, langBadge,
       profileOpen:!!S.profileOpen, profileParams, openProfile:()=>this.openProfile(), closeProfile:()=>this.closeProfile(),
-      profName:'Sophie Renard', profRole:'Admin réseau · Siège', profInit:'SR',
+      profName:'Sophie Renard', profRole:'Admin sieci · Centrala', profInit:'SR',
       isDash:S.screen==='dash', kpis, shopsRows,
       isBoutiques:S.screen==='boutiques',
       isCatalogue:S.screen==='catalogue', catTree, seasonChips, catActiveOnly:activeOnly, catFilterStyle:swS(activeOnly), catFilterKnob:knS(activeOnly), catFilterToggle:()=>this.setState(st=>({flags:{...st.flags,catActiveOnly:!(st.flags['catActiveOnly']!==undefined?st.flags['catActiveOnly']:true)}})),
       catSearch:S.catSearch||'', catSearchActive:!!(S.catSearch&&S.catSearch.length), setCatSearch:(e)=>{ const v=e.target.value; this.setState({catSearch:v}); }, clearCatSearch:()=>this.setState({catSearch:''}),
-      allCatsLabel:catAllOpen?'Tout replier':'Tout déplier', allCatsCaret:catAllOpen?'▾':'▸', toggleAllCats,
+      allCatsLabel:catAllOpen?'Zwiń wszystko':'Rozwiń wszystko', allCatsCaret:catAllOpen?'▾':'▸', toggleAllCats,
       addProduct:this.openForm('product'),
       isPromos:S.screen==='promos', vouchersM, pricingR, addVoucher:this.openForm('voucher'), addPricing:this.openForm('pricing'),
       isLivraisons:S.screen==='livraisons', livRows, livKpis, livEmpty:DELIV.length===0, createTestDelivery:()=>this.createTestDelivery(),
@@ -1476,12 +1476,12 @@ class Component extends DCLogic {
       geoSetShop:(e)=>this.setState({geoShop:e.target.value,geoFr:'',geoHl:null}),
       geoSetFr:(e)=>this.setState({geoFr:e.target.value,geoShop:'',geoHl:null}),
       geoCountTxt:(function(self){ const F=self.geoFiltered(); const off=F.list.filter(c=>c.type==='office').length;
-        return F.list.length+' clients localisés ('+off+' office · '+(F.list.length-off)+' particuliers)'+(F.unloc?' · '+F.unloc+' clients non localisés':''); })(this),
+        return F.list.length+' klientów zlokalizowanych ('+off+' biurowych · '+(F.list.length-off)+' particuliers)'+(F.unloc?' · '+F.unloc+' klientów niezlokalizowanych':''); })(this),
       geoLegTot:(function(self,S){ const F=self.geoFiltered(); const tot=F.list.length;
-        let t=tot+' client'+(tot>1?'s':'')+' affiché'+(tot>1?'s':'');
+        let t=tot+' klientów wyświetlanych';
         if(S.geoShop||S.geoFr){ const D=self._geoData,geo=window.__CPGEO; let all=0;
           if(D&&geo)(D.clients||[]).forEach(c=>{ if(c.cp&&geo.idx[String(c.cp).trim()]) all++; });
-          if(all) t+=' · '+Math.round(tot*100/all)+' % du réseau'; }
+          if(all) t+=' · '+Math.round(tot*100/all)+' % sieci'; }
         return t; })(this,S),
       geoLegOff:(function(self){ const F=self.geoFiltered(); const tot=F.list.length||1;
         const off=F.list.filter(c=>c.type==='office').length; return off+' · '+Math.round(off*100/tot)+' %'; })(this),
@@ -1497,10 +1497,10 @@ class Component extends DCLogic {
           .filter(r=>r.n>0).sort((a,b)=>b.n-a.n); })(this),
       geoArrEmpty:(function(self){ const F=self.geoFiltered(); const G=window.__CPGEO;
         return !(G&&G.groups&&G.groups.length&&F.list.length); })(this),
-      geoHlTxt:S.geoHl!=null?'Boutique isolée — cliquer à nouveau sur son marqueur pour tout réafficher':'',
+      geoHlTxt:S.geoHl!=null?'Sklep wyizolowany — kliknij marker ponownie, aby pokazać wszystko':'',
       
       czRows:SRV('catchment').map(z=>{ const cps=String(z.postcodes||'').split(/[^0-9]+/).filter(Boolean);
-        return {...z,shopLabel:z.shop_name||(z.shop_id?('Shop #'+z.shop_id):'Réseau — non affectée'),assigned:!!(z.shop_name||z.shop_id),
+        return {...z,shopLabel:z.shop_name||(z.shop_id?('Sklep #'+z.shop_id):'Sieć — nieprzypisana'),assigned:!!(z.shop_name||z.shop_id),
           shopPill:'display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);'+((z.shop_name||z.shop_id)?'background:#fdf3e7;color:#8C4A2F;border:.5px solid #ead9c3':'background:var(--color-background-secondary);color:var(--color-text-muted);border:.5px solid var(--color-border-tertiary)'),
           isExcl:!!z.exclusive,cpChips:cps.map(cp=>({cp})),cpCount:cps.length+' CP',edit:this.czEdit(z),del:this.czDel(z)};}),
       czEmpty:SRV('catchment').length===0,
@@ -1509,7 +1509,7 @@ class Component extends DCLogic {
         // 1) arrondissements / régions
         (G.groups||[]).forEach(g=>{ if(g.name.toLowerCase().includes(ql)) out.push({label:'🗺 '+g.name+' — '+g.count+' CP',grp:true,pick:self.czPickGroup(g.cps,g.name)}); });
         // 2) communes entières (plusieurs CP)
-        Object.keys(G.communes||{}).forEach(c=>{ const cps=G.communes[c]; if(cps.length>1&&c.toLowerCase().includes(ql)) out.push({label:'🏘 '+c+' — tous ses '+cps.length+' CP',grp:true,pick:self.czPickGroup(cps,c)}); });
+        Object.keys(G.communes||{}).forEach(c=>{ const cps=G.communes[c]; if(cps.length>1&&c.toLowerCase().includes(ql)) out.push({label:'🏘 '+c+' — wszyscy jego '+cps.length+' CP',grp:true,pick:self.czPickGroup(cps,c)}); });
         const grpCount=out.length;
         // 3) codes individuels
         G.list.filter(e=>String(e[0]).indexOf(q)===0||String(e[1]).toLowerCase().includes(ql)).slice(0,Math.max(4,10-grpCount))
@@ -1521,7 +1521,7 @@ class Component extends DCLogic {
       czAdd:()=>this.czAddCp(), czKey:(e)=>this.czKeyCp(e), czSetDraftH:(e)=>this.czSetDraft(e),
       czSetName:this.czSet('name'), czSetShop:this.czSet('shop_id'), czSetExcl:this.czSet('exclusive'),
       czShopOpts:SRV('shops').map(sh=>({id:String(sh.id),label:sh.nom||sh.name||('#'+sh.id),sel:String(sh.id)===String(S.cz.shop_id)})),
-      czFormTitle:S.cz.id?'Modifier la zone primaire':'Nouvelle zone primaire', usersRows, addUser:this.openForm('user'),
+      czFormTitle:S.cz.id?'Edytuj strefę pierwotną':'Nowa strefa pierwotna', usersRows, addUser:this.openForm('user'),
       isMenus:S.screen==='menus', menuProductName:M.productName, menuBasePrice:this.eur2(M.basePrice),
       menuBasePriceRaw:M.basePrice, setMenuBasePrice:(e)=>{ const v=parseFloat(e.target.value)||0; if(this.api)this.apply(this.api.updateProduct(pid0,{basePrice:v})); },
       productPickerOpen:!!S.productPickerOpen, productSearch:S.productSearch||'', productOptions,
@@ -1533,11 +1533,11 @@ class Component extends DCLogic {
       abMod:AB?AB.price_modifier:0, setAbMod:AB?(e=>this.setBundleField(AB.id,'price_modifier',parseFloat(e.target.value)||0)):(()=>{}),
       abActStyle:AB?switchS(AB.active):'', abActKnob:AB?knobS(AB.active):'', abActToggle:AB?(()=>this.toggleBundleActive(AB.id)):(()=>{}),
       abDup:AB?(()=>this.duplicateBundle(AB.id)):(()=>{}), abUp:AB?(()=>this.moveBundle(AB.id,-1)):(()=>{}), abDown:AB?(()=>this.moveBundle(AB.id,1)):(()=>{}),
-      abDel:AB?(()=>{ if(!this.api)return; const db=this.api.deleteBundle(this.pid(),AB.id); const nb=(db[this.pid()]&&db[this.pid()].bundles[0])||{}; this.setState({menus:db,activeBundle:nb.id}); this.printJob('✖ Formule supprimée (étapes + choix)'); }):(()=>{}),
+      abDel:AB?(()=>{ if(!this.api)return; const db=this.api.deleteBundle(this.pid(),AB.id); const nb=(db[this.pid()]&&db[this.pid()].bundles[0])||{}; this.setState({menus:db,activeBundle:nb.id}); this.printJob('✖ Zestaw usunięty (kroki + wybory)'); }):(()=>{}),
       editSlots:slotView, addSlot:AB?(()=>this.addSlot(AB.id)):(()=>{}),
       catTriggerAuto:hasTrigger,
-      catTriggerLabel:(catCommitted?(M.category||'sélection'):(M.productName||'produit')),
-      catTriggerMsg:(catCommitted?('La '+(M.category||'sélection')+' choisie par le client devient automatiquement l\'étape 1. Configure ci-dessous les étapes suivantes.'):('Le produit déclencheur « '+(M.productName||'produit')+' » est l\'étape 1. Configure ci-dessous les étapes suivantes.')),
+      catTriggerLabel:(catCommitted?(M.category||'wybór'):(M.productName||'produkt')),
+      catTriggerMsg:(catCommitted?('La '+(M.category||'wybór')+' wybrana przez klienta staje się automatycznie krokiem 1. Skonfiguruj poniżej kolejne kroki.'):('Produkt wyzwalający « '+(M.productName||'produkt')+' » jest krokiem 1. Skonfiguruj poniżej kolejne kroki.')),
       previewSlots, previewTotal:this.eur2(mtotal), previewProduct:M.productName, previewDisabled:!effYes, armedEmpty,
       isMenuList:menuMode==='list', isMenuEdit:menuMode==='edit', menuCreate:!!S.menuCreate,
       openCreate:()=>this.setState({menuCreate:true}), closeCreate:()=>this.setState({menuCreate:false}), backToList:()=>this.setState({menuMode:'list',menuCreate:false}),
@@ -1545,17 +1545,17 @@ class Component extends DCLogic {
       menuCreateSearch:S.menuCreateSearch||'', setMenuCreateSearch:e=>{ const v=e.target.value; this.setState({menuCreateSearch:v}); },
       menuNewName:S.menuNewName||'', setMenuNewName:e=>{ const v=e.target.value; this.setState({menuNewName:v}); },
       menuNewDesc:S.menuNewDesc||'', setMenuNewDesc:e=>{ const v=e.target.value; this.setState({menuNewDesc:v}); },
-      doCreateMenu:()=>{ if(!this.api)return; const nm=(S.menuNewName||'').trim(); if(!nm){ this.printJob('Nom du menu requis'); return; } const id='menu-'+Date.now().toString(36); this.api.ensureProduct(id,nm,0,''); this.api.setProductOverride(id,'on'); const db=this.api.updateProduct(id,{description:S.menuNewDesc||''}); this.setState({menus:db,menuMode:'edit',menuProductId:id,sel:{},menuCreate:false,menuNewName:'',menuNewDesc:''}); this.printJob('✔ Menu créé'); },
+      doCreateMenu:()=>{ if(!this.api)return; const nm=(S.menuNewName||'').trim(); if(!nm){ this.printJob('Nazwa menu wymagana'); return; } const id='menu-'+Date.now().toString(36); this.api.ensureProduct(id,nm,0,''); this.api.setProductOverride(id,'on'); const db=this.api.updateProduct(id,{description:S.menuNewDesc||''}); this.setState({menus:db,menuMode:'edit',menuProductId:id,sel:{},menuCreate:false,menuNewName:'',menuNewDesc:''}); this.printJob('✔ Menu utworzone'); },
       catName:menuRes.category, catDefStyle:catDefToggle.style, catDefKnob:catDefToggle.knob, catDefToggle:catDefToggle.toggle,
       ovInherit, ovOn, ovOff, menuResBadge,
       triggerCats, triggerCatValue:M.category||'', setTriggerCat:e=>{ if(this.api)this.setState({menus:this.api.updateProduct(pid0,{category:e.target.value})}); },
       triggerProducts, hasTriggerProducts:triggerProducts.length>0,
       forcedStyle:switchS(forcedOn), forcedKnob:knobS(forcedOn), forcedToggle:()=>{ if(this.api)this.apply(this.api.setProductOverride(pid0,forcedOn?null:'on')); },
-      menuForcedInfo:catIsMenu?'✓ Cette catégorie est toujours en menu':'Activer pour forcer ce produit en menu',
+      menuForcedInfo:catIsMenu?'✓ Ta kategoria jest zawsze w menu':'Włącz, aby wymusić ten produkt w menu',
       catSelWrap:'opacity:'+(greyCat?'.4':'1')+(greyCat?';pointer-events:none':''), forcedWrap:'opacity:'+(greyForced?'.4':'1')+(greyForced?';pointer-events:none':''),
       triggerCatValue:catDraft, setTriggerCat:e=>this.setState({trigCatDraft:e.target.value}),
-      catValStyle:vBtn(!!catDraft), catCommitted, commitCat:()=>{ if(!this.api)return; if(catCommitted){ const db=this.api.setProductOverride(pid0,null); this.setState({menus:db,trigLock:null}); this.printJob('↩ Déclencheur annulé'); return; } if(!catDraft)return; this.api.setProductOverride(pid0,null); this.setState({menus:this.api.updateProduct(pid0,{category:catDraft}),trigProdDraft:'',trigLock:{id:pid0,side:'cat'}}); this.printJob('✔ Déclencheur : catégorie · '+catDraft); },
-      prodValStyle:vBtn(!!prodDraft), prodCommitted, commitProd:()=>{ if(!this.api)return; if(prodCommitted){ const db=this.api.setProductOverride(prodDraft||pid0,null); this.setState({menus:db,trigLock:null}); this.printJob('↩ Déclencheur annulé'); return; } if(!prodDraft)return; this.api.updateProduct(pid0,{category:''}); this.setState({menus:this.api.setProductOverride(prodDraft,'on'),menuProductId:prodDraft,sel:{},trigCatDraft:'',trigLock:{id:prodDraft,side:'prod'}}); this.printJob('✔ Déclencheur : produit'); },
+      catValStyle:vBtn(!!catDraft), catCommitted, commitCat:()=>{ if(!this.api)return; if(catCommitted){ const db=this.api.setProductOverride(pid0,null); this.setState({menus:db,trigLock:null}); this.printJob('↩ Wyzwalacz anulowany'); return; } if(!catDraft)return; this.api.setProductOverride(pid0,null); this.setState({menus:this.api.updateProduct(pid0,{category:catDraft}),trigProdDraft:'',trigLock:{id:pid0,side:'cat'}}); this.printJob('✔ Wyzwalacz: kategoria · '+catDraft); },
+      prodValStyle:vBtn(!!prodDraft), prodCommitted, commitProd:()=>{ if(!this.api)return; if(prodCommitted){ const db=this.api.setProductOverride(prodDraft||pid0,null); this.setState({menus:db,trigLock:null}); this.printJob('↩ Wyzwalacz anulowany'); return; } if(!prodDraft)return; this.api.updateProduct(pid0,{category:''}); this.setState({menus:this.api.setProductOverride(prodDraft,'on'),menuProductId:prodDraft,sel:{},trigCatDraft:'',trigLock:{id:prodDraft,side:'prod'}}); this.printJob('✔ Wyzwalacz: produkt'); },
       hasTrigger, step3Wrap:'opacity:'+(hasTrigger?'1':'.45')+(hasTrigger?'':';pointer-events:none'), step3Lock:!hasTrigger,
       triggerProdOptions:triggerProdOpts, triggerProdValue:prodDraft, setTriggerProd:e=>this.setState({trigProdDraft:e.target.value}),
       _oldProd:0,

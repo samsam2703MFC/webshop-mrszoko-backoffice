@@ -115,7 +115,7 @@ function wsm_delivery_next_ref(PDO $pdo): string {
  * validation method), generates a ref and a confirmation code, logs the event.
  * Accepts either point_id, or a client_code/client_id (uses that client's first point).
  */
-function wsm_delivery_create(PDO $pdo, array $in, string $actor = 'Console marque'): array {
+function wsm_delivery_create(PDO $pdo, array $in, string $actor = 'Konsola marki'): array {
     // Resolve the delivery point.
     $point = null;
     if (!empty($in['point_id'])) {
@@ -139,7 +139,7 @@ function wsm_delivery_create(PDO $pdo, array $in, string $actor = 'Console marqu
 
     $ref = wsm_delivery_next_ref($pdo);
     $method = $point['validation'] ?: 'QR';
-    $prefix = ['QR' => 'QR', 'PIN' => 'PIN', 'Signature' => 'SIG', 'Dépôt libre' => 'DEP'][$method] ?? 'QR';
+    $prefix = ['QR' => 'QR', 'PIN' => 'PIN', 'Podpis' => 'SIG', 'Zostawienie' => 'DEP'][$method] ?? 'QR';
     $code = $prefix . '-' . random_int(1000, 9999);
 
     $st = $pdo->prepare("INSERT INTO wsm_deliveries
@@ -151,12 +151,12 @@ function wsm_delivery_create(PDO $pdo, array $in, string $actor = 'Console marqu
         $in['scheduled_date'] ?? null, $in['notes'] ?? '',
     ]);
     $id = (int) $pdo->lastInsertId();
-    wsm_delivery_log($pdo, $id, 'créée', "Livraison $ref créée", $actor);
-    wsm_audit($pdo, $actor, 'Création', "wsm_deliveries $ref", 'Réseau');
+    wsm_delivery_log($pdo, $id, 'créée', "Dostawa $ref utworzona", $actor);
+    wsm_audit($pdo, $actor, 'Utworzenie', "wsm_deliveries $ref", 'Sieć');
     return wsm_delivery_get($pdo, $id);
 }
 
-function wsm_delivery_assign(PDO $pdo, int $id, ?int $driverId, ?int $roundId, string $actor = 'Console marque'): array {
+function wsm_delivery_assign(PDO $pdo, int $id, ?int $driverId, ?int $roundId, string $actor = 'Konsola marki'): array {
     $d = wsm_delivery_get($pdo, $id);
     if (!$d) throw new InvalidArgumentException('delivery_not_found');
     $driverName = '';
@@ -166,17 +166,17 @@ function wsm_delivery_assign(PDO $pdo, int $id, ?int $driverId, ?int $roundId, s
     }
     $st = $pdo->prepare("UPDATE wsm_deliveries SET driver_id=?, round_id=?, status=? WHERE id=?");
     $st->execute([$driverId, $roundId, 'assignée', $id]);
-    wsm_delivery_log($pdo, $id, 'assignée', 'Chauffeur ' . ($driverName ?: '—'), $actor);
+    wsm_delivery_log($pdo, $id, 'assignée', 'Kierowca ' . ($driverName ?: '—'), $actor);
     return wsm_delivery_get($pdo, $id);
 }
 
-function wsm_delivery_status(PDO $pdo, int $id, string $status, string $actor = 'Console marque'): array {
+function wsm_delivery_status(PDO $pdo, int $id, string $status, string $actor = 'Konsola marki'): array {
     if (!in_array($status, WSM_DELIVERY_STATUSES, true)) throw new InvalidArgumentException('bad_status');
     $d = wsm_delivery_get($pdo, $id);
     if (!$d) throw new InvalidArgumentException('delivery_not_found');
     $st = $pdo->prepare("UPDATE wsm_deliveries SET status=? WHERE id=?");
     $st->execute([$status, $id]);
-    wsm_delivery_log($pdo, $id, $status, 'Statut → ' . $status, $actor);
+    wsm_delivery_log($pdo, $id, $status, 'Status → ' . $status, $actor);
     return wsm_delivery_get($pdo, $id);
 }
 
@@ -185,7 +185,7 @@ function wsm_delivery_status(PDO $pdo, int $id, string $status, string $actor = 
  * must match the code issued at creation; on success the delivery is marked
  * livrée + confirmed and an audit row is written.
  */
-function wsm_delivery_confirm(PDO $pdo, int $id, string $code, string $actor = 'Console marque'): array {
+function wsm_delivery_confirm(PDO $pdo, int $id, string $code, string $actor = 'Konsola marki'): array {
     $d = wsm_delivery_get($pdo, $id);
     if (!$d) throw new InvalidArgumentException('delivery_not_found');
     if ($d['confirmed']) throw new RuntimeException('already_confirmed');
@@ -194,8 +194,8 @@ function wsm_delivery_confirm(PDO $pdo, int $id, string $code, string $actor = '
     }
     $st = $pdo->prepare("UPDATE wsm_deliveries SET status='livrée', confirmed=1, confirmed_at=? WHERE id=?");
     $st->execute([date('Y-m-d H:i:s'), $id]);
-    wsm_delivery_log($pdo, $id, 'livrée', "Confirmée par {$d['validation']} ($code)", $actor);
-    wsm_audit($pdo, $actor, 'Livraison', "wsm_deliveries {$d['ref']} confirmée", 'Réseau');
+    wsm_delivery_log($pdo, $id, 'livrée', "Potwierdzona przez {$d['validation']} ($code)", $actor);
+    wsm_audit($pdo, $actor, 'Dostawa', "wsm_deliveries {$d['ref']} potwierdzona", 'Sieć');
     return wsm_delivery_get($pdo, $id);
 }
 

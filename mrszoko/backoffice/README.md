@@ -1,6 +1,7 @@
 # back_office_ws_franchisor
 
-**Console marque · Siège** — the franchisor (head-office) back-office for the
+**Console marque · Siège** (Konsola marki · Centrala) — the franchisor
+(head-office) back-office for the
 **L'Atelier By** webshop. This is the reworked Claude Design export
 (`back_office_ws_franchisor.dc.html`) run **natively**, with its own
 **L'Atelier design system** (`_ds/…/global.css`, Gotham + Vank fonts) — no
@@ -17,6 +18,12 @@ python3 -m http.server 8080
 ```
 
 No build step.
+
+**Language: Polish.** All screen labels live in the page and are in Polish; all
+demo/business data comes from the `wsm_` tables (or the JS seed fallback) and is
+seeded in Polish. Stored workflow codes (delivery statuses `planifiée/assignée/
+en_cours/livrée/échouée`, event names) are internal enums — kept stable and
+mapped to Polish labels at display time.
 
 ## Architecture — data-driven, self-contained
 
