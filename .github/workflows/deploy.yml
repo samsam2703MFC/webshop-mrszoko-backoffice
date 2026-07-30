@@ -235,11 +235,26 @@ jobs:
           # sur le compte sans accès SSH — on change le secret, on redéploie.
           # Sans secret, --ensure-admin ne touche à rien si un compte existe.
           if [ -n "${ADM_PASS:-}" ]; then
-            OUT=$(cd "$API" && php migrate.php --set-password "$EMAIL" "$PASS" 2>&1) || { echo "$OUT"; exit 1; }
+            # Un secret refusé (trop court, adresse invalide) ne doit PAS faire
+            # tomber le déploiement : le site est par ailleurs sain et doit
+            # encore passer la vérification. On le dit fort, et on garde le
+            # compte existant intact.
+            if OUT=$(cd "$API" && php migrate.php --set-password "$EMAIL" "$PASS" 2>&1); then
+              echo "$OUT"
+            else
+              echo "  ^ ATTENTION : WSM_ADMIN_PASSWORD refusé — $OUT"
+              echo "  Le mot de passe n'a PAS été changé ; le compte existant reste utilisable."
+              # Sur une machine neuve, il n'y a justement PAS de compte existant :
+              # on en crée un avec un mot de passe tiré au hasard plutôt que de
+              # laisser la console sans aucun accès.
+              PASS=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)
+              OUT=$(cd "$API" && php migrate.php --ensure-admin "$EMAIL" "$PASS" 2>&1) || true
+              echo "$OUT"
+            fi
           else
             OUT=$(cd "$API" && php migrate.php --ensure-admin "$EMAIL" "$PASS" 2>&1) || { echo "$OUT"; exit 1; }
+            echo "$OUT"
           fi
-          echo "$OUT"
           case "$OUT" in
             *"compte créé"*)
               # Identifiants déposés hors racine web, lisibles par root seul.
