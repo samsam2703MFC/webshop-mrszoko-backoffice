@@ -11,6 +11,9 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/delivery.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/commerce.php';
+require __DIR__ . '/shop.php';
+require __DIR__ . '/tpay.php';
+require __DIR__ . '/inpost.php';
 
 $cfg = wsm_config();
 
@@ -54,9 +57,11 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $route = '';
 $lroute = '';
 $aroute = '';
+$sroute = '';
 if (preg_match('#/franchisor/(.*)$#', $path, $m)) $route = rtrim($m[1], '/');
 elseif (preg_match('#/landing/(.*)$#', $path, $m)) $lroute = rtrim($m[1], '/');
 elseif (preg_match('#/auth/(.*)$#', $path, $m)) $aroute = rtrim($m[1], '/');
+elseif (preg_match('#/shop/(.*)$#', $path, $m)) $sroute = rtrim($m[1], '/');
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 try {
@@ -122,6 +127,91 @@ if ($method === 'GET' && $lroute === 'content') {
 
     wsm_send(['lang' => $lang, 'default' => $default, 'langs' => $langs,
         'strings' => $strings, 'products' => $products]);
+}
+
+// ======================= BOUTIQUE EN LIGNE (public) =========================
+// La boutique est le site public : catalogue, devis, commande et suivi sont
+// ouverts. Ce qui est verrouillé, c'est ce qui coûte de l'argent — les prix
+// sont recalculés en base à chaque étape et la notification de paiement est
+// signée. Voir shop.php et tpay.php.
+if ($sroute !== '') {
+    $lang = wsm_shop_lang($pdo, $_GET['lang'] ?? ($_SERVER['HTTP_X_LANG'] ?? null));
+
+    if ($method === 'GET' && $sroute === 'catalog') {
+        wsm_send([
+            'lang' => $lang, 'langs' => wsm_shop_available_langs($pdo), 'currency' => 'PLN',
+            'strings'  => wsm_shop_strings($pdo, $lang),
+            'products' => wsm_shop_products($pdo, $lang),
+            'shipping' => wsm_shipping_methods($pdo, $lang),
+        ]);
+    }
+
+    if ($method === 'GET' && preg_match('#^product/(.+)$#', $sroute, $mm)) {
+        $p = wsm_shop_product($pdo, urldecode($mm[1]), $lang);
+        if (!$p) wsm_fail('product_not_found', 404);
+        wsm_send(['lang' => $lang, 'product' => $p]);
+    }
+
+    // Devis : le seul chiffrage qui fasse foi. Le panier envoie des id et des
+    // quantités, rien d'autre — un « price » dans le corps est ignoré.
+    if ($method === 'POST' && $sroute === 'quote') {
+        $b = wsm_body();
+        [$q, $e] = wsm_shop_quote($pdo, (array) ($b['items'] ?? []),
+            (string) ($b['delivery_method'] ?? ''), $lang);
+        if ($e) wsm_send(['error' => 'validation', 'fields' => $e, 'quote' => $q], 422);
+        wsm_send($q);
+    }
+
+    if ($method === 'POST' && $sroute === 'order') {
+        $b = wsm_body();
+        $b['lang'] = $b['lang'] ?? $lang;
+
+        // Garde-fou anti-boucle : au-delà de 5 commandes par heure pour la même
+        // adresse, on arrête. Une vraie personne n'en passe pas six d'affilée.
+        $email = strtolower(trim((string) ($b['email'] ?? '')));
+        if ($email !== '') {
+            $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_orders
+                                  WHERE email = ? AND created_at >= ?");
+            $st->execute([$email, date('Y-m-d H:i:s', time() - 3600)]);
+            if ((int) $st->fetchColumn() >= 5) wsm_fail('too_many_orders', 429);
+        }
+
+        [$order, $errors] = wsm_shop_create_order($pdo, $b);
+        if ($errors) wsm_send(['error' => 'validation', 'fields' => $errors], 422);
+
+        // Ouverture de la transaction tpay. Si le paiement n'est pas encore
+        // configuré, la commande existe quand même et attend un virement.
+        $base = wsm_shop_base_url();
+        $pay = wsm_tpay_start($pdo, $order,
+            $base . '/zamowienie/' . rawurlencode($order['code']) . '?t=' . $order['access_token'],
+            wsm_api_base_url() . '/shop/tpay/notify');
+
+        wsm_send([
+            'ok' => true, 'code' => $order['code'], 'token' => $order['access_token'],
+            'total_gross' => $order['total_gross'],
+            'url' => $base . '/zamowienie/' . rawurlencode($order['code']) . '?t=' . $order['access_token'],
+            'payment' => $pay,
+        ], 201);
+    }
+
+    if ($method === 'GET' && preg_match('#^order/(.+)$#', $sroute, $mm)) {
+        $o = wsm_order_by_code($pdo, urldecode($mm[1]), (string) ($_GET['t'] ?? ''));
+        if (!$o) wsm_fail('order_not_found', 404);
+        unset($o['access_token']);
+        wsm_send($o);
+    }
+
+    // Notification serveur-à-serveur de tpay (form-encoded). Réponse en texte
+    // brut : tpay attend littéralement « TRUE » pour cesser de réémettre.
+    if ($method === 'POST' && $sroute === 'tpay/notify') {
+        [$bodyTxt, $code] = wsm_tpay_notification($pdo, $_POST, file_get_contents('php://input') ?: '');
+        http_response_code($code);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo $bodyTxt;
+        exit;
+    }
+
+    wsm_fail('unknown_route: shop/' . $sroute, 404);
 }
 
 // ============================ READ ENDPOINTS ================================
@@ -190,6 +280,31 @@ if ($method === 'GET') {
         case 'delivery-events':
             $id = (int) ($_GET['delivery_id'] ?? 0);
             wsm_send(wsm_delivery_events($pdo, $id));
+
+        // ---- Boutique : ce que la console doit voir des ventes -------------
+        case 'orders':     wsm_send(wsm_orders_list($pdo, (int) ($_GET['limit'] ?? 200)));
+        case 'shop-kpis':  wsm_send(wsm_shop_kpis($pdo));
+        case 'shop-config':
+            // Aucun secret ici : uniquement l'état des intégrations, pour que
+            // la console dise « tpay non configuré » au lieu de rester muette.
+            wsm_send([
+                'tpay'    => ['enabled' => wsm_tpay_enabled(), 'can_verify' => wsm_tpay_can_verify(),
+                              'sandbox' => wsm_tpay_cfg()['sandbox']],
+                'inpost'  => ['enabled' => wsm_inpost_enabled(), 'sandbox' => wsm_inpost_cfg()['sandbox'],
+                              'geowidget' => wsm_inpost_geowidget_token() !== ''],
+                'shop_url' => wsm_shop_base_url(),
+            ]);
+    }
+    // /franchisor/orders/{id} — la commande complète, avec sa charge InPost
+    if (preg_match('#^orders/(\d+)$#', $route, $mm)) {
+        $o = wsm_order_by_id($pdo, (int) $mm[1]);
+        if (!$o) wsm_fail('order_not_found', 404);
+        $st = $pdo->prepare("SELECT event, detail, actor, created_at FROM wsm_order_events WHERE order_id = ? ORDER BY id");
+        $st->execute([(int) $mm[1]]);
+        $o['events'] = $st->fetchAll();
+        $o['inpost_payload']  = wsm_inpost_payload($o);
+        $o['inpost_blockers'] = wsm_inpost_blockers($o);
+        wsm_send($o);
     }
     // /franchisor/deliveries/{id}  and  /franchisor/deliveries/{id}/events
     if (preg_match('#^deliveries/(\d+)(/events)?$#', $route, $mm)) {
@@ -447,6 +562,33 @@ if ($method === 'POST') {
             }
         } catch (InvalidArgumentException $e) { wsm_fail($e->getMessage(), 422); }
         catch (RuntimeException $e) { wsm_fail($e->getMessage(), 409); }
+    }
+
+    // ---- Boutique : suivi d'une commande depuis la console ----------------
+    // /franchisor/orders/{id}/status  ·  /franchisor/orders/{id}/ship
+    if (preg_match('#^orders/(\d+)/(status|ship)$#', $route, $mm)) {
+        $id = (int) $mm[1];
+        $order = wsm_order_by_id($pdo, $id);
+        if (!$order) wsm_fail('order_not_found', 404);
+
+        if ($mm[2] === 'status') {
+            $new = (string) ($body['status'] ?? '');
+            if (!in_array($new, WSM_ORDER_STATUSES, true)) {
+                wsm_fail_fields(['status' => implode('|', WSM_ORDER_STATUSES)]);
+            }
+            $pdo->prepare("UPDATE wsm_orders SET status = ? WHERE id = ?")->execute([$new, $id]);
+            wsm_order_event($pdo, $id, 'status', $new, $actorName);
+            wsm_send(wsm_order_by_id($pdo, $id));
+        }
+
+        // Création de l'étiquette InPost. Refusée tant que la commande n'est
+        // pas payée : on n'expédie pas ce qui n'est pas encaissé.
+        if ($order['payment_status'] !== 'oplacone' && empty($body['force'])) {
+            wsm_fail('order_not_paid', 409);
+        }
+        [$shipment, $err] = wsm_inpost_create($pdo, $order);
+        if ($err !== null) wsm_send(['error' => $err, 'blockers' => wsm_inpost_blockers($order)], 409);
+        wsm_send(['ok' => true, 'shipment' => $shipment]);
     }
 
     wsm_fail('unknown_route: ' . $route, 404);

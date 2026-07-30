@@ -352,3 +352,138 @@ function wsm_seed_landing(PDO $pdo): void {
     }
     $pdo->commit();
 }
+
+/**
+ * Boutique en ligne — peuple wsm_shop_i18n, wsm_shipping_methods et les
+ * colonnes vitrine de wsm_products depuis la SOURCE UNIQUE
+ * shop/content_seed.json. Même principe que la landing : un seul fichier
+ * décrit le contenu, la base le sert, les pages ne contiennent aucun libellé.
+ *
+ * Idempotent et NON destructif pour les commandes : les textes et les tarifs
+ * sont remplacés, les produits sont créés ou mis à jour — jamais supprimés,
+ * parce qu'une ligne de commande passée y fait référence.
+ */
+function wsm_seed_shop(PDO $pdo): void {
+    require_once __DIR__ . '/commerce.php';               // wsm_inpost_template()
+
+    $file = __DIR__ . '/../../shop/content_seed.json';
+    if (!is_file($file)) return;
+    $doc = json_decode((string) file_get_contents($file), true);
+    if (!is_array($doc) || empty($doc['strings'])) return;
+
+    $pdo->beginTransaction();
+
+    // --- Textes -------------------------------------------------------------
+    $pdo->exec('DELETE FROM wsm_shop_i18n');
+    $si = $pdo->prepare('INSERT INTO wsm_shop_i18n (lang, k, v) VALUES (?,?,?)');
+    foreach ($doc['strings'] as $lang => $pairs) {
+        foreach ($pairs as $k => $v) $si->execute([$lang, $k, (string) $v]);
+    }
+
+    // --- Modes de livraison -------------------------------------------------
+    $pdo->exec('DELETE FROM wsm_shipping_methods');
+    $sm = $pdo->prepare('INSERT INTO wsm_shipping_methods
+        (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
+        VALUES (?,?,?,?,?,?,?,?)');
+    foreach ($doc['shipping'] ?? [] as $m) {
+        $sm->execute([$m['id'], $m['carrier'] ?? 'inpost', $m['sort_order'] ?? 0, $m['active'] ?? 1,
+            $m['price_net'] ?? 0, $m['vat_rate'] ?? 0.23, $m['free_from'] ?? 0, $m['max_weight_g'] ?? 25000]);
+    }
+
+    // --- Produits vendus en ligne ------------------------------------------
+    $lang0 = $doc['default'] ?? 'pl';
+    foreach ($doc['products'] ?? [] as $p) {
+        $catName = (string) ($p['category'] ?? 'Czekolada');
+        $st = $pdo->prepare('SELECT id FROM wsm_categories WHERE name = ?');
+        $st->execute([$catName]);
+        $catId = (int) $st->fetchColumn();
+        if (!$catId) {
+            $pdo->prepare('INSERT INTO wsm_categories (name, sort_order, active) VALUES (?,?,1)')
+                ->execute([$catName, 99]);
+            $catId = (int) $pdo->lastInsertId();
+        }
+
+        $shop = [
+            'slug' => $p['slug'] ?? $p['id'], 'shop_visible' => 1, 'stock' => $p['stock'] ?? 0,
+            'image_url' => $p['image_url'] ?? '',
+            'swatch_from' => $p['swatch_from'] ?? '--choco-500', 'swatch_to' => $p['swatch_to'] ?? '--choco-800',
+            'origin' => $p['origin'] ?? '', 'cocoa' => $p['cocoa'] ?? '',
+            'unit_label' => $p['unit_label'] ?? '', 'badge' => $p['badge'] ?? '',
+            'sku' => $p['sku'] ?? '', 'ean' => $p['ean'] ?? '',
+            'vat_rate' => $p['vat_rate'] ?? 0.23, 'weight_g' => $p['weight_g'] ?? 0,
+            'length_mm' => $p['length_mm'] ?? 0, 'width_mm' => $p['width_mm'] ?? 0, 'height_mm' => $p['height_mm'] ?? 0,
+            'parcel_template' => wsm_inpost_template((int) ($p['length_mm'] ?? 0), (int) ($p['width_mm'] ?? 0), (int) ($p['height_mm'] ?? 0)),
+            'category_id' => $catId,
+            'nom' => $doc['strings'][$lang0]['product.' . $p['id'] . '.name'] ?? $p['id'],
+            'prix' => $p['price'] ?? 0, 'statut' => 'Opublikowany',
+            'sort_order' => $p['sort_order'] ?? 0, 'active' => 1,
+        ];
+
+        $st = $pdo->prepare('SELECT 1 FROM wsm_products WHERE id = ?');
+        $st->execute([$p['id']]);
+        if ($st->fetchColumn()) {
+            $set = implode(', ', array_map(fn($k) => "$k = ?", array_keys($shop)));
+            $pdo->prepare("UPDATE wsm_products SET $set WHERE id = ?")
+                ->execute([...array_values($shop), $p['id']]);
+        } else {
+            $cols = array_merge(['id' => $p['id']], $shop);
+            $pdo->prepare('INSERT INTO wsm_products (' . implode(',', array_keys($cols)) . ') VALUES ('
+                . implode(',', array_fill(0, count($cols), '?')) . ')')
+                ->execute(array_values($cols));
+        }
+    }
+
+    $pdo->commit();
+}
+
+/**
+ * Complète les tables de contenu avec les clés ABSENTES, sans toucher aux
+ * existantes. C'est ce qui permet de livrer un nouveau libellé (un lien, un
+ * bouton) sans effacer les retouches faites depuis la console : le seed
+ * complet, lui, remplace tout et n'est joué qu'à la création de la base.
+ *
+ * @return array [clés i18n ajoutées, méthodes de livraison ajoutées]
+ */
+function wsm_sync_content(PDO $pdo): array {
+    $added = 0; $ship = 0;
+
+    $sync = function (string $table, string $file) use ($pdo, &$added): void {
+        if (!is_file($file)) return;
+        $doc = json_decode((string) file_get_contents($file), true);
+        if (!is_array($doc) || empty($doc['strings'])) return;
+        $have = [];
+        foreach ($pdo->query("SELECT lang, k FROM $table")->fetchAll() as $r) {
+            $have[$r['lang'] . "\0" . $r['k']] = true;
+        }
+        $ins = $pdo->prepare("INSERT INTO $table (lang, k, v) VALUES (?,?,?)");
+        foreach ($doc['strings'] as $lang => $pairs) {
+            foreach ($pairs as $k => $v) {
+                if (isset($have[$lang . "\0" . $k])) continue;
+                $ins->execute([$lang, $k, (string) $v]);
+                $added++;
+            }
+        }
+    };
+
+    $sync('wsm_landing_i18n', __DIR__ . '/../../landing/content_seed.json');
+    $sync('wsm_shop_i18n',    __DIR__ . '/../../shop/content_seed.json');
+
+    // Modes de livraison : ajoutés s'ils manquent, jamais retarifés d'office —
+    // un prix de port se décide en console, pas au déploiement.
+    $shopFile = __DIR__ . '/../../shop/content_seed.json';
+    if (is_file($shopFile)) {
+        $doc = json_decode((string) file_get_contents($shopFile), true);
+        $ins = $pdo->prepare('INSERT INTO wsm_shipping_methods
+            (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
+            VALUES (?,?,?,?,?,?,?,?)');
+        foreach ($doc['shipping'] ?? [] as $m) {
+            $st = $pdo->prepare('SELECT 1 FROM wsm_shipping_methods WHERE id = ?');
+            $st->execute([$m['id']]);
+            if ($st->fetchColumn()) continue;
+            $ins->execute([$m['id'], $m['carrier'] ?? 'inpost', $m['sort_order'] ?? 0, $m['active'] ?? 1,
+                $m['price_net'] ?? 0, $m['vat_rate'] ?? 0.23, $m['free_from'] ?? 0, $m['max_weight_g'] ?? 25000]);
+            $ship++;
+        }
+    }
+    return [$added, $ship];
+}

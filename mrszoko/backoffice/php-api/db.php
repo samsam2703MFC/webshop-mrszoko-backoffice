@@ -95,6 +95,7 @@ function wsm_bootstrap(bool $seed = true): PDO {
     }
     wsm_ensure_auth_columns($pdo);
     wsm_ensure_commerce_columns($pdo);
+    wsm_ensure_shop($pdo);
     return $pdo;
 }
 
@@ -189,6 +190,54 @@ function wsm_ensure_commerce_columns(PDO $pdo): void {
         'height_mm'       => $int,
         'parcel_template' => $txt(1),
     ]);
+}
+
+/** Une table existe-t-elle ? (MySQL + SQLite) */
+function wsm_table_exists(PDO $pdo, string $table): bool {
+    try {
+        $q = wsm_config()['engine'] === 'mysql'
+            ? $pdo->query("SHOW TABLES LIKE " . $pdo->quote($table))
+            : $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name=" . $pdo->quote($table));
+        return (bool) $q->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * Boutique en ligne : tables commande/paiement/expédition + colonnes vitrine
+ * sur wsm_products. La base de production existe déjà, donc
+ * CREATE TABLE IF NOT EXISTS suffit pour les nouvelles tables mais PAS pour
+ * les nouvelles colonnes d'une table déjà créée — d'où wsm_ensure_columns.
+ * Idempotent : appelé à chaque requête, ne fait rien quand tout est en place.
+ */
+function wsm_ensure_shop(PDO $pdo): void {
+    if (!wsm_table_exists($pdo, 'wsm_orders')) {
+        wsm_apply_schema($pdo);                       // idempotent : n'ajoute que ce qui manque
+    }
+    $txt = fn(int $n, string $d = "''") => ["VARCHAR($n) NOT NULL DEFAULT $d", "TEXT NOT NULL DEFAULT $d"];
+    wsm_ensure_columns($pdo, 'wsm_products', [
+        'slug'         => $txt(80),
+        'shop_visible' => ['TINYINT(1) NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
+        'stock'        => ['INT NOT NULL DEFAULT 0',        'INTEGER NOT NULL DEFAULT 0'],
+        'image_url'    => $txt(255),
+        'swatch_from'  => $txt(32, "'--choco-500'"),
+        'swatch_to'    => $txt(32, "'--choco-800'"),
+        'origin'       => $txt(80),
+        'cocoa'        => $txt(16),
+        'unit_label'   => $txt(40),
+        'badge'        => $txt(40),
+    ]);
+
+    // Contenu minimal de la boutique : modes de livraison + textes 3 langues.
+    // Seedé une seule fois ; ensuite la base fait foi et l'admin peut éditer.
+    try {
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_shipping_methods")->fetchColumn()
+            || !(int) $pdo->query("SELECT COUNT(*) FROM wsm_shop_i18n")->fetchColumn()) {
+            require_once __DIR__ . '/seed.php';
+            wsm_seed_shop($pdo);
+        }
+    } catch (Throwable $e) { /* tables absentes : le schéma vient d'échouer, on n'aggrave pas */ }
 }
 
 /**

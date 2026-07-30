@@ -60,6 +60,18 @@ CREATE TABLE IF NOT EXISTS `wsm_categories` (
 -- --- Products (catalogue) ---------------------------------------------------
 CREATE TABLE IF NOT EXISTS `wsm_products` (
   `id`              VARCHAR(48)  NOT NULL,
+  -- Vitrine de la boutique (les textes traduits vivent dans wsm_shop_i18n
+  -- sous product.<id>.name / .subtitle / .desc — rien en dur dans les pages)
+  `slug`            VARCHAR(80)  NOT NULL DEFAULT '',
+  `shop_visible`    TINYINT(1)   NOT NULL DEFAULT 0,
+  `stock`           INT NOT NULL DEFAULT 0,
+  `image_url`       VARCHAR(255) NOT NULL DEFAULT '',
+  `swatch_from`     VARCHAR(32)  NOT NULL DEFAULT '--choco-500',
+  `swatch_to`       VARCHAR(32)  NOT NULL DEFAULT '--choco-800',
+  `origin`          VARCHAR(80)  NOT NULL DEFAULT '',
+  `cocoa`           VARCHAR(16)  NOT NULL DEFAULT '',
+  `unit_label`      VARCHAR(40)  NOT NULL DEFAULT '',
+  `badge`           VARCHAR(40)  NOT NULL DEFAULT '',
   -- Expédition InPost + fiscalité tpay
   `sku`             VARCHAR(60)  NOT NULL DEFAULT '',
   `ean`             VARCHAR(14)  NOT NULL DEFAULT '',
@@ -401,4 +413,181 @@ CREATE TABLE IF NOT EXISTS `wsm_landing_products` (
   `price_from_eur`  DECIMAL(10,2) NULL,
   `price_perkg_eur` DECIMAL(10,2) NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+--  BOUTIQUE EN LIGNE — commandes, paiements (tpay), expéditions (InPost)
+-- ----------------------------------------------------------------------------
+--  Tous les montants sont en GROSZE (entiers). Jamais de flottant sur de
+--  l'argent : 0.1 + 0.2 != 0.3 en binaire, et une facture doit tomber juste.
+--  Le client n'envoie JAMAIS un prix : le serveur les relit dans wsm_products.
+-- ============================================================================
+
+-- --- Modes de livraison (tarifs pilotés par la base, pas par le code) -------
+CREATE TABLE IF NOT EXISTS `wsm_shipping_methods` (
+  `id`           VARCHAR(24)  NOT NULL,          -- inpost_locker | inpost_courier
+  `carrier`      VARCHAR(24)  NOT NULL DEFAULT 'inpost',
+  `sort_order`   INT NOT NULL DEFAULT 0,
+  `active`       TINYINT(1)   NOT NULL DEFAULT 1,
+  `price_net`    INT NOT NULL DEFAULT 0,         -- grosze, hors TVA
+  `vat_rate`     DECIMAL(4,2) NOT NULL DEFAULT 0.23,
+  `free_from`    INT NOT NULL DEFAULT 0,         -- franco en grosze TTC (0 = jamais)
+  `max_weight_g` INT NOT NULL DEFAULT 25000,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Commandes --------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_orders` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `code`            VARCHAR(24)  NOT NULL,       -- MS-260730-0001
+  `access_token`    VARCHAR(64)  NOT NULL,       -- relire sa commande sans compte
+  `lang`            VARCHAR(5)   NOT NULL DEFAULT 'pl',
+  `currency`        CHAR(3)      NOT NULL DEFAULT 'PLN',
+  `status`          VARCHAR(24)  NOT NULL DEFAULT 'nowe',
+  `payment_status`  VARCHAR(24)  NOT NULL DEFAULT 'oczekuje',
+  -- Acheteur : figé au moment de la commande (tpay payeur + InPost destinataire)
+  `client_id`       INT UNSIGNED NULL DEFAULT NULL,
+  `client_type`     VARCHAR(10)  NOT NULL DEFAULT 'osoba',
+  `email`           VARCHAR(200) NOT NULL DEFAULT '',
+  `phone`           VARCHAR(20)  NOT NULL DEFAULT '',
+  `first_name`      VARCHAR(120) NOT NULL DEFAULT '',
+  `last_name`       VARCHAR(120) NOT NULL DEFAULT '',
+  `company`         VARCHAR(200) NOT NULL DEFAULT '',
+  `nip`             VARCHAR(15)  NOT NULL DEFAULT '',
+  `vat_eu`          VARCHAR(20)  NOT NULL DEFAULT '',
+  `invoice`         TINYINT(1)   NOT NULL DEFAULT 0,
+  `bill_street`     VARCHAR(200) NOT NULL DEFAULT '',
+  `bill_building`   VARCHAR(30)  NOT NULL DEFAULT '',
+  `bill_postcode`   VARCHAR(10)  NOT NULL DEFAULT '',
+  `bill_city`       VARCHAR(120) NOT NULL DEFAULT '',
+  `bill_country`    CHAR(2)      NOT NULL DEFAULT 'PL',
+  -- Livraison
+  `delivery_method` VARCHAR(24)  NOT NULL DEFAULT 'inpost_locker',
+  `inpost_point`    VARCHAR(20)  NOT NULL DEFAULT '',
+  `ship_street`     VARCHAR(200) NOT NULL DEFAULT '',
+  `ship_building`   VARCHAR(30)  NOT NULL DEFAULT '',
+  `ship_postcode`   VARCHAR(10)  NOT NULL DEFAULT '',
+  `ship_city`       VARCHAR(120) NOT NULL DEFAULT '',
+  `ship_country`    CHAR(2)      NOT NULL DEFAULT 'PL',
+  -- Montants en grosze
+  `items_net`       INT NOT NULL DEFAULT 0,
+  `items_vat`       INT NOT NULL DEFAULT 0,
+  `items_gross`     INT NOT NULL DEFAULT 0,
+  `shipping_net`    INT NOT NULL DEFAULT 0,
+  `shipping_vat`    INT NOT NULL DEFAULT 0,
+  `shipping_gross`  INT NOT NULL DEFAULT 0,
+  `total_net`       INT NOT NULL DEFAULT 0,
+  `total_vat`       INT NOT NULL DEFAULT 0,
+  `total_gross`     INT NOT NULL DEFAULT 0,
+  `weight_g`        INT NOT NULL DEFAULT 0,
+  `parcel_template` CHAR(1)      NOT NULL DEFAULT '',
+  `note`            TEXT,
+  `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `paid_at`         DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_orders_code` (`code`),
+  KEY `idx_wsm_orders_status` (`status`),
+  KEY `idx_wsm_orders_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Lignes de commande (prix figés : une facture ne bouge plus) -------------
+CREATE TABLE IF NOT EXISTS `wsm_order_items` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`   INT UNSIGNED NOT NULL,
+  `product_id` VARCHAR(48)  NOT NULL,
+  `name`       VARCHAR(200) NOT NULL,
+  `sku`        VARCHAR(60)  NOT NULL DEFAULT '',
+  `ean`        VARCHAR(14)  NOT NULL DEFAULT '',
+  `qty`        INT NOT NULL DEFAULT 1,
+  `unit_net`   INT NOT NULL DEFAULT 0,
+  `unit_gross` INT NOT NULL DEFAULT 0,
+  `vat_rate`   DECIMAL(4,2) NOT NULL DEFAULT 0.23,
+  `line_net`   INT NOT NULL DEFAULT 0,
+  `line_vat`   INT NOT NULL DEFAULT 0,
+  `line_gross` INT NOT NULL DEFAULT 0,
+  `weight_g`   INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_order_items_order` (`order_id`),
+  CONSTRAINT `fk_wsm_order_items_order`
+    FOREIGN KEY (`order_id`) REFERENCES `wsm_orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Paiements tpay ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_payments` (
+  `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`     INT UNSIGNED NOT NULL,
+  `provider`     VARCHAR(24)  NOT NULL DEFAULT 'tpay',
+  `tr_id`        VARCHAR(64)  NOT NULL DEFAULT '',
+  `tr_title`     VARCHAR(64)  NOT NULL DEFAULT '',
+  `amount`       INT NOT NULL DEFAULT 0,
+  `currency`     CHAR(3)      NOT NULL DEFAULT 'PLN',
+  `status`       VARCHAR(24)  NOT NULL DEFAULT 'oczekuje',
+  `redirect_url` VARCHAR(500) NOT NULL DEFAULT '',
+  `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_payments_order` (`order_id`),
+  CONSTRAINT `fk_wsm_payments_order`
+    FOREIGN KEY (`order_id`) REFERENCES `wsm_orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Notifications de paiement : event_key UNIQUE = idempotence -------------
+-- tpay réémet sa notification jusqu'à recevoir « TRUE ». Sans cette clé unique
+-- une commande serait encaissée deux fois.
+CREATE TABLE IF NOT EXISTS `wsm_payment_events` (
+  `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`     INT UNSIGNED NULL DEFAULT NULL,
+  `provider`     VARCHAR(24)  NOT NULL DEFAULT 'tpay',
+  `event_key`    VARCHAR(160) NOT NULL,
+  `status`       VARCHAR(24)  NOT NULL DEFAULT '',
+  `amount`       INT NOT NULL DEFAULT 0,
+  `signature_ok` TINYINT(1)   NOT NULL DEFAULT 0,
+  `raw`          TEXT,
+  `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_payment_events_key` (`event_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Expéditions InPost ShipX ----------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_shipments` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`        INT UNSIGNED NOT NULL,
+  `carrier`         VARCHAR(24)  NOT NULL DEFAULT 'inpost',
+  `service`         VARCHAR(24)  NOT NULL DEFAULT 'inpost_locker',
+  `target_point`    VARCHAR(20)  NOT NULL DEFAULT '',
+  `parcel_template` CHAR(1)      NOT NULL DEFAULT '',
+  `weight_g`        INT NOT NULL DEFAULT 0,
+  `shipment_id`     VARCHAR(64)  NOT NULL DEFAULT '',
+  `tracking_number` VARCHAR(64)  NOT NULL DEFAULT '',
+  `label_url`       VARCHAR(500) NOT NULL DEFAULT '',
+  `status`          VARCHAR(32)  NOT NULL DEFAULT 'do_utworzenia',
+  `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_shipments_order` (`order_id`),
+  CONSTRAINT `fk_wsm_shipments_order`
+    FOREIGN KEY (`order_id`) REFERENCES `wsm_orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Journal d'une commande -------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_order_events` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`   INT UNSIGNED NOT NULL,
+  `event`      VARCHAR(48)  NOT NULL,
+  `detail`     VARCHAR(255) NOT NULL DEFAULT '',
+  `actor`      VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_order_events_order` (`order_id`),
+  CONSTRAINT `fk_wsm_order_events_order`
+    FOREIGN KEY (`order_id`) REFERENCES `wsm_orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Textes de la boutique (pl / uk / en) — aucun libellé en dur -----------
+CREATE TABLE IF NOT EXISTS `wsm_shop_i18n` (
+  `lang` VARCHAR(5)  NOT NULL,
+  `k`    VARCHAR(80) NOT NULL,
+  `v`    TEXT        NOT NULL,
+  PRIMARY KEY (`lang`, `k`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

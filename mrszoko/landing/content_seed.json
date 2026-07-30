@@ -1,7 +1,11 @@
 {
   "_comment": "SOURCE UNIQUE du contenu de la landing Mister Szoko. Consommée (1) par php-api/seed.php pour peupler wsm_landing_i18n + wsm_landing_products — la base fait foi au runtime, éditable via l'API admin — et (2) par app.js comme repli local si l'API est injoignable (Pages, dev file://, API down). Aucun texte n'est écrit dans index.html.",
   "default": "pl",
-  "langs": ["pl", "uk", "en"],
+  "langs": [
+    "pl",
+    "uk",
+    "en"
+  ],
   "strings": {
     "pl": {
       "lang.label": "PL",
@@ -13,6 +17,7 @@
       "a11y.home": "Mister Szoko — strona główna",
       "a11y.lang": "Wybór języka",
       "nav.range": "Oferta",
+      "nav.shop": "Sklep",
       "nav.formats": "Formaty i ceny",
       "nav.atelier": "Pracownia",
       "nav.pro": "Strefa pro",
@@ -81,6 +86,7 @@
       "a11y.home": "Mister Szoko — головна сторінка",
       "a11y.lang": "Вибір мови",
       "nav.range": "Асортимент",
+      "nav.shop": "Крамниця",
       "nav.formats": "Формати й ціни",
       "nav.atelier": "Майстерня",
       "nav.pro": "Про-зона",
@@ -149,6 +155,7 @@
       "a11y.home": "Mister Szoko — home",
       "a11y.lang": "Language selection",
       "nav.range": "Range",
+      "nav.shop": "Shop",
       "nav.formats": "Formats & pricing",
       "nav.atelier": "The workshop",
       "nav.pro": "Pro area",
@@ -209,13 +216,53 @@
     }
   },
   "products": [
-    { "id": "dark70",  "sort_order": 1, "swatch_from": "--choco-900", "swatch_to": "--choco-700", "fluidity": 4, "active": 1,
-      "price_from_pln": 169.90, "price_perkg_pln": 54.90, "price_from_eur": 39.90, "price_perkg_eur": 12.80 },
-    { "id": "milk38",  "sort_order": 2, "swatch_from": "--choco-600", "swatch_to": "--choco-400", "fluidity": 3, "active": 1,
-      "price_from_pln": 156.90, "price_perkg_pln": 50.30, "price_from_eur": 36.50, "price_perkg_eur": 11.70 },
-    { "id": "white31", "sort_order": 3, "swatch_from": "--cream-200", "swatch_to": "--cream-400", "fluidity": 3, "active": 1,
-      "price_from_pln": 149.90, "price_perkg_pln": 48.20, "price_from_eur": 34.90, "price_perkg_eur": 11.20 },
-    { "id": "ruby",    "sort_order": 4, "swatch_from": "--berry-600", "swatch_to": "--berry-500", "fluidity": 3, "active": 1,
-      "price_from_pln": 209.90, "price_perkg_pln": 67.10, "price_from_eur": 48.90, "price_perkg_eur": 15.60 }
+    {
+      "id": "dark70",
+      "sort_order": 1,
+      "swatch_from": "--choco-900",
+      "swatch_to": "--choco-700",
+      "fluidity": 4,
+      "active": 1,
+      "price_from_pln": 169.9,
+      "price_perkg_pln": 54.9,
+      "price_from_eur": 39.9,
+      "price_perkg_eur": 12.8
+    },
+    {
+      "id": "milk38",
+      "sort_order": 2,
+      "swatch_from": "--choco-600",
+      "swatch_to": "--choco-400",
+      "fluidity": 3,
+      "active": 1,
+      "price_from_pln": 156.9,
+      "price_perkg_pln": 50.3,
+      "price_from_eur": 36.5,
+      "price_perkg_eur": 11.7
+    },
+    {
+      "id": "white31",
+      "sort_order": 3,
+      "swatch_from": "--cream-200",
+      "swatch_to": "--cream-400",
+      "fluidity": 3,
+      "active": 1,
+      "price_from_pln": 149.9,
+      "price_perkg_pln": 48.2,
+      "price_from_eur": 34.9,
+      "price_perkg_eur": 11.2
+    },
+    {
+      "id": "ruby",
+      "sort_order": 4,
+      "swatch_from": "--berry-600",
+      "swatch_to": "--berry-500",
+      "fluidity": 3,
+      "active": 1,
+      "price_from_pln": 209.9,
+      "price_perkg_pln": 67.1,
+      "price_from_eur": 48.9,
+      "price_perkg_eur": 15.6
+    }
   ]
 }
