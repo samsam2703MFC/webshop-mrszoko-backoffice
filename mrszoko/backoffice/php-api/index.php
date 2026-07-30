@@ -28,16 +28,52 @@ function wsm_require_admin(): void {
     if (!hash_equals($cfg['admin_token'], $tok)) wsm_fail('unauthorized', 401);
 }
 
-// ---- Resolve the route after /franchisor/ ----------------------------------
+// ---- Resolve the route after /franchisor/ (admin) or /landing/ (public) ----
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $route = '';
+$lroute = '';
 if (preg_match('#/franchisor/(.*)$#', $path, $m)) $route = rtrim($m[1], '/');
+elseif (preg_match('#/landing/(.*)$#', $path, $m)) $lroute = rtrim($m[1], '/');
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 try {
     $pdo = wsm_bootstrap();  // ensure schema + seed on first hit
 } catch (Throwable $e) {
     wsm_fail('db_unavailable: ' . $e->getMessage(), 500);
+}
+
+// ======================= LANDING (public, read-only) ========================
+// GET /landing/content?lang=pl|uk|en — everything the landing page renders:
+// UI strings for the language + the product cards (texts resolved server-side
+// from wsm_landing_i18n). Public: the landing is the public site.
+if ($method === 'GET' && $lroute === 'content') {
+    wsm_ensure_landing($pdo);
+    $langs = array_map(fn($r) => $r['lang'],
+        $pdo->query("SELECT DISTINCT lang FROM wsm_landing_i18n ORDER BY lang")->fetchAll());
+    if (!$langs) wsm_fail('landing_content_empty', 503);
+    $default = in_array('pl', $langs, true) ? 'pl' : $langs[0];
+    $lang = $_GET['lang'] ?? $default;
+    if (!in_array($lang, $langs, true)) $lang = $default;
+
+    $st = $pdo->prepare("SELECT k, v FROM wsm_landing_i18n WHERE lang=?");
+    $st->execute([$lang]);
+    $strings = [];
+    foreach ($st->fetchAll() as $r) $strings[$r['k']] = $r['v'];
+
+    $products = array_map(fn($r) => [
+        'id' => $r['id'], 'fluidity' => (int) $r['fluidity'],
+        'swatch_from' => $r['swatch_from'], 'swatch_to' => $r['swatch_to'],
+        'price_from' => ['pln' => $r['price_from_pln'] !== null ? (float) $r['price_from_pln'] : null,
+                         'eur' => $r['price_from_eur'] !== null ? (float) $r['price_from_eur'] : null],
+        'price_perkg' => ['pln' => $r['price_perkg_pln'] !== null ? (float) $r['price_perkg_pln'] : null,
+                          'eur' => $r['price_perkg_eur'] !== null ? (float) $r['price_perkg_eur'] : null],
+        'name' => $strings['product.' . $r['id'] . '.name'] ?? $r['id'],
+        'meta' => $strings['product.' . $r['id'] . '.meta'] ?? '',
+        'specs' => $strings['product.' . $r['id'] . '.specs'] ?? '',
+    ], $pdo->query("SELECT * FROM wsm_landing_products WHERE active=1 ORDER BY sort_order")->fetchAll());
+
+    wsm_send(['lang' => $lang, 'default' => $default, 'langs' => $langs,
+        'strings' => $strings, 'products' => $products]);
 }
 
 // ============================ READ ENDPOINTS ================================
@@ -120,6 +156,61 @@ if ($method === 'POST') {
     $body = wsm_body();
 
     switch ($route) {
+        // ---- landing content (Mister Szoko public site) --------------------
+        case 'landing-string': {
+            // Upsert {lang,k,v} — or delete the key when v is null/absent.
+            if (empty($body['lang']) || empty($body['k'])) wsm_fail('lang_and_k_required');
+            wsm_ensure_landing($pdo);
+            if (!array_key_exists('v', $body) || $body['v'] === null) {
+                $pdo->prepare("DELETE FROM wsm_landing_i18n WHERE lang=? AND k=?")->execute([$body['lang'], $body['k']]);
+            } else {
+                $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_landing_i18n WHERE lang=? AND k=?");
+                $st->execute([$body['lang'], $body['k']]);
+                if ((int) $st->fetchColumn()) {
+                    $pdo->prepare("UPDATE wsm_landing_i18n SET v=? WHERE lang=? AND k=?")->execute([(string) $body['v'], $body['lang'], $body['k']]);
+                } else {
+                    $pdo->prepare("INSERT INTO wsm_landing_i18n (lang,k,v) VALUES (?,?,?)")->execute([$body['lang'], $body['k'], (string) $body['v']]);
+                }
+            }
+            wsm_audit($pdo, 'Console marque', 'Modification', 'wsm_landing_i18n ' . $body['lang'] . ':' . $body['k'], 'Landing');
+            wsm_send(['ok' => true]);
+        }
+
+        case 'landing-product': {
+            // Upsert one product card — or delete it with {delete: id}.
+            wsm_ensure_landing($pdo);
+            if (!empty($body['delete'])) {
+                $pdo->prepare("DELETE FROM wsm_landing_products WHERE id=?")->execute([(string) $body['delete']]);
+                wsm_send(['ok' => true]);
+            }
+            if (empty($body['id'])) wsm_fail('id_required');
+            $row = [
+                'sort_order' => (int) ($body['sort_order'] ?? 0),
+                'swatch_from' => $body['swatch_from'] ?? '--choco-900',
+                'swatch_to' => $body['swatch_to'] ?? '--choco-700',
+                'fluidity' => (int) ($body['fluidity'] ?? 3),
+                'active' => (int) ($body['active'] ?? 1),
+                'price_from_pln' => $body['price_from_pln'] ?? null,
+                'price_perkg_pln' => $body['price_perkg_pln'] ?? null,
+                'price_from_eur' => $body['price_from_eur'] ?? null,
+                'price_perkg_eur' => $body['price_perkg_eur'] ?? null,
+            ];
+            $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_landing_products WHERE id=?");
+            $st->execute([(string) $body['id']]);
+            if ((int) $st->fetchColumn()) {
+                $set = implode(',', array_map(fn($c) => "$c=?", array_keys($row)));
+                $pdo->prepare("UPDATE wsm_landing_products SET $set WHERE id=?")
+                    ->execute([...array_values($row), (string) $body['id']]);
+            } else {
+                $cols = 'id,' . implode(',', array_keys($row));
+                $ph = rtrim(str_repeat('?,', count($row) + 1), ',');
+                $pdo->prepare("INSERT INTO wsm_landing_products ($cols) VALUES ($ph)")
+                    ->execute([(string) $body['id'], ...array_values($row)]);
+            }
+            wsm_audit($pdo, 'Console marque', 'Modification', 'wsm_landing_products ' . $body['id'], 'Landing');
+            wsm_send(['ok' => true]);
+        }
+
         case 'param': {
             if (empty($body['cle'])) wsm_fail('cle_required');
             $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_params WHERE cle=?"); $st->execute([$body['cle']]);

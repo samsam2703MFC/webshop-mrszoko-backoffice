@@ -271,6 +271,8 @@ function wsm_seed(PDO $pdo): void {
     }
 
     $pdo->commit();
+
+    wsm_seed_landing($pdo);
 }
 
 /** Helper: insert one bundle + its slots + choices. */
@@ -287,4 +289,40 @@ function wsm_seed_bundle(callable $ins, string $pid, string $bid, string $name, 
                 'delta' => $c[3], 'cost' => $c[4], 'sort_order' => $c[5], 'active' => $c[6] ?? 1]);
         }
     }
+}
+
+/**
+ * Landing Mister Szoko — peuple wsm_landing_i18n + wsm_landing_products depuis
+ * la SOURCE UNIQUE landing/content_seed.json (aucun texte en dur, ni ici ni
+ * dans la page ; app.js utilise le même fichier comme repli hors-API).
+ * Idempotent : vide puis réinsère les deux tables (contenu éditorial pur).
+ * Chemin identique en repo et sur le serveur : ../../landing depuis php-api.
+ */
+function wsm_seed_landing(PDO $pdo): void {
+    $file = __DIR__ . '/../../landing/content_seed.json';
+    if (!is_file($file)) return; // pas de landing embarquée (ex: API seule) → tables vides
+    $doc = json_decode((string) file_get_contents($file), true);
+    if (!is_array($doc) || empty($doc['strings'])) return;
+
+    $pdo->beginTransaction();
+    $pdo->exec('DELETE FROM wsm_landing_i18n');
+    $pdo->exec('DELETE FROM wsm_landing_products');
+
+    $si = $pdo->prepare('INSERT INTO wsm_landing_i18n (lang, k, v) VALUES (?,?,?)');
+    foreach ($doc['strings'] as $lang => $pairs) {
+        foreach ($pairs as $k => $v) $si->execute([$lang, $k, (string) $v]);
+    }
+
+    $pi = $pdo->prepare('INSERT INTO wsm_landing_products
+        (id, sort_order, swatch_from, swatch_to, fluidity, active,
+         price_from_pln, price_perkg_pln, price_from_eur, price_perkg_eur)
+        VALUES (?,?,?,?,?,?,?,?,?,?)');
+    foreach ($doc['products'] ?? [] as $p) {
+        $pi->execute([$p['id'], $p['sort_order'] ?? 0,
+            $p['swatch_from'] ?? '--choco-900', $p['swatch_to'] ?? '--choco-700',
+            $p['fluidity'] ?? 3, $p['active'] ?? 1,
+            $p['price_from_pln'] ?? null, $p['price_perkg_pln'] ?? null,
+            $p['price_from_eur'] ?? null, $p['price_perkg_eur'] ?? null]);
+    }
+    $pdo->commit();
 }

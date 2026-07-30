@@ -1,18 +1,23 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="pl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mister Szoko — Chocolat de couverture pour professionnels</title>
-<meta name="description" content="Mister Szoko Pro : chocolat de couverture en callets pour les professionnels de la pâtisserie. Noire, lait, blanche, ruby — 2,5 / 10 / 20 kg, prix HT dégressifs.">
+<!-- Aucun texte en dur : tout le contenu vient de l'API (wsm_landing_i18n /
+     wsm_landing_products) avec repli sur content_seed.json — voir app.js. -->
+<title>Mister Szoko</title>
+<meta name="description" content="">
 <link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="alternate" hreflang="pl" href="?lang=pl">
+<link rel="alternate" hreflang="uk" href="?lang=uk">
+<link rel="alternate" hreflang="en" href="?lang=en">
 <link rel="stylesheet" href="tokens.css">
 <style>
   /* ==========================================================
      Mister Szoko — landing. Composée uniquement avec les tokens
      du design system (tokens.css) : chocolat/crème/caramel,
      Plus Jakarta Sans + Mulish + DM Mono, coins doux, ombres
-     chaudes, motion « melt ».
+     chaudes, motion « melt ». Texte : 100 % data-driven.
      ========================================================== */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -72,6 +77,18 @@
     transition: color var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
   }
   nav a.navlink:hover { color: var(--text-strong); border-bottom-color: var(--accent); }
+
+  /* ---- Sélecteur de langue (pilules mono) ---- */
+  .langs { display: inline-flex; gap: 2px; border: 1px solid var(--border-default); border-radius: var(--radius-pill); padding: 3px; }
+  .langs button {
+    font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500;
+    letter-spacing: var(--tracking-wide); text-transform: uppercase;
+    border: none; background: transparent; color: var(--text-muted);
+    padding: 5px 10px; border-radius: var(--radius-pill); cursor: pointer;
+    transition: background var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
+  }
+  .langs button:hover { color: var(--text-strong); }
+  .langs button[aria-current="true"] { background: var(--brand); color: var(--cream-50); }
 
   /* ---- Hero (panneau chocolat, filigrane logo) ---- */
   .hero { background: var(--choco-900); color: var(--cream-50); position: relative; overflow: hidden; }
@@ -165,21 +182,28 @@
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .btn, .pcard, nav a.navlink, footer a { transition: none; }
+    .btn, .pcard, nav a.navlink, footer a, .langs button { transition: none; }
     .btn:hover, .pcard:hover { transform: none; }
   }
 </style>
 </head>
 <body>
 
+<noscript>
+  <p style="padding:16px;text-align:center;font-family:monospace">
+    Ta strona wymaga JavaScript. · Ця сторінка потребує JavaScript. · This page requires JavaScript.
+  </p>
+</noscript>
+
 <header>
   <div class="container header-in">
-    <a href="#top" aria-label="Mister Szoko — accueil"><img class="header-logo" src="assets/logo.png" alt="Mister Szoko"></a>
-    <nav aria-label="Navigation principale">
-      <a class="navlink" href="#gamme">La gamme</a>
-      <a class="navlink" href="#formats">Formats &amp; prix</a>
-      <a class="navlink" href="#atelier">L'atelier</a>
-      <a class="btn btn--brand" href="#pro">Espace pro</a>
+    <a id="home-link" href="#top"><img class="header-logo" src="assets/logo.png" alt="Mister Szoko"></a>
+    <nav id="main-nav">
+      <a class="navlink" href="#gamme" data-i18n="nav.range"></a>
+      <a class="navlink" href="#formats" data-i18n="nav.formats"></a>
+      <a class="navlink" href="#atelier" data-i18n="nav.atelier"></a>
+      <a class="btn btn--brand" href="#pro" data-i18n="nav.pro"></a>
+      <div class="langs" id="lang-switch" role="group"></div>
     </nav>
   </div>
 </header>
@@ -190,19 +214,19 @@
   <section class="hero">
     <img class="hero-watermark" src="assets/logo.png" alt="" aria-hidden="true">
     <div class="container hero-in">
-      <div class="eyebrow">Couverture · Callets</div>
-      <h1>La couverture des professionnels, au meilleur prix du kilo.</h1>
-      <p class="lead">Noire, lait, blanche, ruby — en sachets de 2,5 kg et 10 kg ou cartons de 20 kg. Prix HT dégressifs : plus le format est grand, moins le kilo coûte cher.</p>
+      <div class="eyebrow" data-i18n="hero.eyebrow"></div>
+      <h1 data-i18n="hero.title"></h1>
+      <p class="lead" data-i18n="hero.lead"></p>
       <div class="hero-ctas">
-        <a class="btn btn--accent" href="#gamme">Découvrir la gamme</a>
-        <a class="btn btn--ghost-dark" href="#pro">Compte pro dès 40 kg/mois</a>
+        <a class="btn btn--accent" href="#gamme" data-i18n="hero.cta1"></a>
+        <a class="btn btn--ghost-dark" href="#pro" data-i18n="hero.cta2"></a>
       </div>
     </div>
     <div class="hero-strip">
       <div class="container hero-strip-in">
-        <span>Livraison en 48 h</span>
-        <span>Prix au kilo dégressif par format</span>
-        <span>Factures HT / TVA automatiques</span>
+        <span data-i18n="strip.1"></span>
+        <span data-i18n="strip.2"></span>
+        <span data-i18n="strip.3"></span>
       </div>
     </div>
   </section>
@@ -211,48 +235,11 @@
   <section class="block" id="gamme">
     <div class="container">
       <div class="section-head">
-        <div class="eyebrow">Catalogue</div>
-        <h2>Chocolat de couverture</h2>
-        <p class="sub">Des callets qui fondent vite, tempèrent proprement et tiennent le brillant. Chaque référence indique sa fluidité, son origine et son pourcentage de cacao.</p>
+        <div class="eyebrow" data-i18n="range.eyebrow"></div>
+        <h2 data-i18n="range.title"></h2>
+        <p class="sub" data-i18n="range.sub"></p>
       </div>
-      <div class="grid-products">
-        <article class="pcard">
-          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--choco-900), var(--choco-700));"><span>Photo produit</span></div>
-          <div class="pcard-body">
-            <div class="pcard-meta"><span>Noire · Madagascar</span><span class="dots" title="Fluidité 4/5"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
-            <h3>Noire 70&nbsp;%</h3>
-            <div class="specs">callets · cacao 70&nbsp;%</div>
-            <div class="price"><span>dès 39,90&nbsp;€ <span class="ht">HT</span></span><span class="perkg">12,80&nbsp;€/kg</span></div>
-          </div>
-        </article>
-        <article class="pcard">
-          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--choco-600), var(--choco-400));"><span>Photo produit</span></div>
-          <div class="pcard-body">
-            <div class="pcard-meta"><span>Lait · Ghana</span><span class="dots" title="Fluidité 3/5"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
-            <h3>Lait 38&nbsp;%</h3>
-            <div class="specs">callets · cacao 38&nbsp;%</div>
-            <div class="price"><span>dès 36,50&nbsp;€ <span class="ht">HT</span></span><span class="perkg">11,70&nbsp;€/kg</span></div>
-          </div>
-        </article>
-        <article class="pcard">
-          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--cream-200), var(--cream-400));"><span>Photo produit</span></div>
-          <div class="pcard-body">
-            <div class="pcard-meta"><span>Blanche</span><span class="dots" title="Fluidité 3/5"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
-            <h3>Blanche 31&nbsp;%</h3>
-            <div class="specs">callets · beurre de cacao 31&nbsp;%</div>
-            <div class="price"><span>dès 34,90&nbsp;€ <span class="ht">HT</span></span><span class="perkg">11,20&nbsp;€/kg</span></div>
-          </div>
-        </article>
-        <article class="pcard">
-          <div class="pcard-photo" style="background: linear-gradient(135deg, var(--berry-600), var(--berry-500));"><span>Photo produit</span></div>
-          <div class="pcard-body">
-            <div class="pcard-meta"><span>Spécialité</span><span class="dots" title="Fluidité 3/5"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
-            <h3>Ruby</h3>
-            <div class="specs">callets · fève ruby</div>
-            <div class="price"><span>dès 48,90&nbsp;€ <span class="ht">HT</span></span><span class="perkg">15,60&nbsp;€/kg</span></div>
-          </div>
-        </article>
-      </div>
+      <div class="grid-products" id="grid-products"></div>
     </div>
   </section>
 
@@ -260,27 +247,11 @@
   <section class="block" id="formats" style="background: var(--surface-card); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
     <div class="container">
       <div class="section-head">
-        <div class="eyebrow">Formats &amp; prix</div>
-        <h2>Le kilo baisse avec le format</h2>
-        <p class="sub">Trois conditionnements, un principe simple : le prix au kilo est dégressif. Les tarifs s'affichent HT, la TVA se calcule à la commande.</p>
+        <div class="eyebrow" data-i18n="formats.eyebrow"></div>
+        <h2 data-i18n="formats.title"></h2>
+        <p class="sub" data-i18n="formats.sub"></p>
       </div>
-      <div class="formats">
-        <div class="format">
-          <div class="fk">Sachet</div>
-          <div class="fs">2,5&nbsp;kg</div>
-          <p>Le format d'essai et des petites productions. Plein tarif.</p>
-        </div>
-        <div class="format">
-          <div class="fk">Sachet</div>
-          <div class="fs">10&nbsp;kg</div>
-          <p>Le format atelier. Environ −12&nbsp;% sur le prix du kilo.</p>
-        </div>
-        <div class="format">
-          <div class="fk">Carton</div>
-          <div class="fs">20&nbsp;kg</div>
-          <p>Le format production. Environ −20&nbsp;% sur le prix du kilo.</p>
-        </div>
-      </div>
+      <div class="formats" id="grid-formats"></div>
     </div>
   </section>
 
@@ -288,12 +259,12 @@
   <section class="block" id="atelier">
     <div class="container">
       <div class="section-head">
-        <div class="eyebrow">L'atelier</div>
-        <h2>Le chocolat, comme Mister Szoko l'entend</h2>
-        <p class="sub">Des fèves torréfiées lentement, un tempérage précis, une casse nette et une fonte longue en bouche. Nous ne vendons que ce que nous couvririons nous-mêmes.</p>
+        <div class="eyebrow" data-i18n="atelier.eyebrow"></div>
+        <h2 data-i18n="atelier.title"></h2>
+        <p class="sub" data-i18n="atelier.sub"></p>
       </div>
       <div class="section-head" style="margin-bottom: 0;">
-        <p class="sub" style="font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); color: var(--ink-500);">Expédié au froid. Livré vite. Ne fond qu'en bouche.</p>
+        <p class="sub" style="font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); color: var(--ink-500);" data-i18n="atelier.tagline"></p>
       </div>
     </div>
   </section>
@@ -304,11 +275,11 @@
       <div class="pro">
         <div class="pro-in">
           <div>
-            <div class="eyebrow" style="color: var(--caramel-400); margin-bottom: var(--space-2);">Espace pro</div>
-            <h2>Vous travaillez plus de 40&nbsp;kg par mois&nbsp;?</h2>
-            <p>La boutique en ligne Mister Szoko Pro ouvre bientôt : catalogue complet, remises volume, factures HT/TVA et commande en quatre clics. Laissez-nous votre adresse, vous serez prévenu à l'ouverture.</p>
+            <div class="eyebrow" style="color: var(--caramel-400); margin-bottom: var(--space-2);" data-i18n="pro.eyebrow"></div>
+            <h2 data-i18n="pro.title"></h2>
+            <p data-i18n="pro.text"></p>
           </div>
-          <a class="btn btn--accent" href="mailto:pro@misterszoko.com?subject=Ouverture%20de%20la%20boutique%20Mister%20Szoko%20Pro">Être prévenu de l'ouverture</a>
+          <a class="btn btn--accent" id="pro-cta" href="#" data-i18n="pro.cta"></a>
         </div>
       </div>
     </div>
@@ -320,20 +291,21 @@
   <div class="container footer-in">
     <div>
       <img class="flogo" src="assets/logo.png" alt="Mister Szoko">
-      <p class="fmono">Chocolat de couverture pour professionnels</p>
+      <p class="fmono" data-i18n="footer.tagline"></p>
     </div>
     <div class="fmono" style="display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-end;">
-      <a href="mailto:pro@misterszoko.com">pro@misterszoko.com</a>
-      <a href="../backoffice/">Console siège</a>
+      <a id="footer-email" href="#" data-i18n="footer.email"></a>
+      <a href="../backoffice/" data-i18n="footer.console"></a>
     </div>
   </div>
   <div class="footer-base">
     <div class="container footer-base-in">
-      <span>© 2026 Mister Szoko</span>
-      <span>Photos produit à venir — visuels provisoires</span>
+      <span data-i18n="footer.copyright"></span>
+      <span data-i18n="footer.note"></span>
     </div>
   </div>
 </footer>
 
+<script src="app.js"></script>
 </body>
 </html>

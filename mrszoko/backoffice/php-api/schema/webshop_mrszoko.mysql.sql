@@ -337,3 +337,29 @@ CREATE TABLE IF NOT EXISTS `wsm_incidents` (
   CONSTRAINT `fk_wsm_incidents_delivery`
     FOREIGN KEY (`delivery_id`) REFERENCES `wsm_deliveries` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Landing Mister Szoko (contenu du site public, 3 langues) ---------------
+-- Tout le texte de la landing vit ici (aucun libellé en dur dans la page) ;
+-- seedé depuis landing/content_seed.json, éditable via l'API admin.
+CREATE TABLE IF NOT EXISTS `wsm_landing_i18n` (
+  `lang` VARCHAR(5)  NOT NULL,
+  `k`    VARCHAR(64) NOT NULL,
+  `v`    TEXT        NOT NULL,
+  PRIMARY KEY (`lang`, `k`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Données structurées des cartes produit (les textes sont dans wsm_landing_i18n
+-- sous product.<id>.name/.meta/.specs).
+CREATE TABLE IF NOT EXISTS `wsm_landing_products` (
+  `id`              VARCHAR(32) NOT NULL,
+  `sort_order`      INT NOT NULL DEFAULT 0,
+  `swatch_from`     VARCHAR(32) NOT NULL DEFAULT '--choco-900',
+  `swatch_to`       VARCHAR(32) NOT NULL DEFAULT '--choco-700',
+  `fluidity`        TINYINT NOT NULL DEFAULT 3,
+  `active`          TINYINT(1) NOT NULL DEFAULT 1,
+  `price_from_pln`  DECIMAL(10,2) NULL,
+  `price_perkg_pln` DECIMAL(10,2) NULL,
+  `price_from_eur`  DECIMAL(10,2) NULL,
+  `price_perkg_eur` DECIMAL(10,2) NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

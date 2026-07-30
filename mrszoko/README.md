@@ -2,11 +2,18 @@
 
 Everything served under `http://185.180.206.46/mrszoko`.
 
-- **`landing/`** — the public Mister Szoko landing page. Static, self-contained:
-  `index.html` + the design-system tokens (`tokens.css` → `tokens/*.css`) + the
-  brand logo (`assets/logo.png`). Served at **`/mrszoko/landing`** (and `/mrszoko/`
-  redirects to it). Fonts load from Google Fonts per `tokens/fonts.css`
-  (substitutes — see the design-system fonts caveat).
+- **`landing/`** — the public Mister Szoko landing page, **trilingual (pl / uk /
+  en, default pl)** and **fully data-driven**: `index.html` contains zero copy;
+  `app.js` renders everything from `GET /mrszoko/backoffice/api/landing/content`
+  (tables `wsm_landing_i18n` + `wsm_landing_products`, editable through the
+  admin API without redeploying), falling back to `content_seed.json` — the
+  **same file** that seeds those tables server-side — when the API is
+  unreachable (GitHub Pages, dev, outage). Language picking: `?lang=` →
+  `localStorage` → browser language → `pl`; a PL/UA/EN switcher sits in the
+  header. Served at **`/mrszoko/landing`** (and `/mrszoko/` redirects to it).
+  Fonts load from Google Fonts per `tokens/fonts.css` (substitutes — see the
+  design-system fonts caveat). End-to-end proof:
+  `backoffice/php-api/tests/e2e_landing.php` (22 assertions).
 
 - **`backoffice/`** — the Console marque · Siège (franchisor back-office) and its
   PHP API (`php-api/`, `webshop_mrszoko` DB). Served at **`/mrszoko/backoffice`**,

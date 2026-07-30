@@ -93,3 +93,22 @@ function wsm_bootstrap(bool $seed = true): PDO {
     }
     return $pdo;
 }
+
+/**
+ * Upgrade path for databases created before the landing tables existed:
+ * the schema files are idempotent (IF NOT EXISTS), so re-applying them adds
+ * only what's missing, then the landing content is (re)seeded from
+ * landing/content_seed.json. No-op when the table is already there.
+ */
+function wsm_ensure_landing(PDO $pdo): void {
+    $cfg = wsm_config();
+    try {
+        $q = $cfg['engine'] === 'mysql'
+            ? $pdo->query("SHOW TABLES LIKE 'wsm_landing_i18n'")
+            : $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='wsm_landing_i18n'");
+        if ($q->fetchColumn()) return;
+    } catch (Throwable $e) { /* fall through and create */ }
+    wsm_apply_schema($pdo);
+    require_once __DIR__ . '/seed.php';
+    wsm_seed_landing($pdo);
+}
