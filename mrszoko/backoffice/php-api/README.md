@@ -71,6 +71,27 @@ CORS emits nothing by default (front and API are same-origin). Set
 `WSM_CORS_ORIGIN` to an explicit origin — never `*`, since requests carry a
 session cookie.
 
+## tpay.com and InPost — data captured
+
+Neither API is called yet; what exists is the **data they will require**, captured
+and validated at entry (`commerce.php`). A wrong NIP gets the invoice rejected and
+an 8-digit phone gets the shipment rejected — cheaper to block on the form than to
+discover it at checkout.
+
+| Need | Where | Validation |
+| --- | --- | --- |
+| tpay payer | `wsm_clients.email` (mandatory), `phone` | e-mail syntax; phone normalised to 9 digits (`+48` stripped) |
+| tpay invoice | `nip`, `vat_eu`, `bill_street/building/postcode/city/country` | NIP checksum; VIES format; postcode `NN-NNN` validated on the **raw** input |
+| tpay VAT | `wsm_products.vat_rate` | Polish rates only: 0 / 5 / 8 / 23 % (`23` accepted as 23 %) |
+| InPost receiver | `client_type`, `first_name`, `last_name`, `phone` | an individual must be named — InPost needs a named receiver |
+| InPost locker | `wsm_client_points.inpost_point`, `delivery_method` | code format (`KRA010`), stored uppercase |
+| InPost courier | `street`, `building`, `postcode`, `city`, `country` | all mandatory for the courier method |
+| InPost parcel | `wsm_products.weight_g`, `length/width/height_mm`, `parcel_template` | ≤ 25 kg; A/B/C **deduced** from dimensions, recomputed whenever they change |
+
+Invalid input returns `422` with a per-field map (`{"error":"validation","fields":{…}}`),
+which the console shows next to the offending field. Proof: `tests/e2e_commerce.php`
+(40 assertions).
+
 ## Configuration
 
 All in `config.php`, entirely env-driven (see the header there).
@@ -87,6 +108,10 @@ All in `config.php`, entirely env-driven (see the header there).
 | GET | `/landing/content?lang=pl\|uk\|en` | `wsm_landing_i18n` · `wsm_landing_products` — everything the landing renders (strings + product cards, texts resolved server-side; unknown lang → default `pl`) |
 | POST | `/franchisor/landing-string` | upsert/delete one i18n string (admin) |
 | POST | `/franchisor/landing-product` | upsert/delete one landing product card (admin) |
+| **Commerce (tpay + InPost)** | | |
+| POST | `/franchisor/client` | upsert/delete `wsm_clients` — validated payer + invoice data |
+| POST | `/franchisor/client-point` | upsert/delete `wsm_client_points` — locker code or courier address |
+| POST | `/franchisor/product` | product governance **and** shipping/VAT fields |
 | **Franchisor (console)** | | |
 | GET | `/franchisor/kpis` | `wsm_kpis` |
 | GET | `/franchisor/shops` | `wsm_shops` |
