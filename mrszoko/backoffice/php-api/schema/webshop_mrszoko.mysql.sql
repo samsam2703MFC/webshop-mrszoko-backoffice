@@ -786,3 +786,29 @@ CREATE TABLE IF NOT EXISTS `wsm_stock_moves` (
   KEY `idx_wsm_stock_moves` (`product_id`, `id`),
   KEY `idx_wsm_stock_moves_date` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Dokumenty magazynowe ---------------------------------------------------
+-- Une entrée n'est pas un ajustement : c'est une livraison, avec un
+-- fournisseur, une facture d'achat et plusieurs articles. Une sortie non plus :
+-- c'est un bon de livraison qui accompagne le colis. Les mouvements
+-- (wsm_stock_moves) restent la vérité comptable ; ce document les regroupe et
+-- leur donne un numéro qu'on peut citer au téléphone.
+CREATE TABLE IF NOT EXISTS `wsm_stock_docs` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `kind`       VARCHAR(4)   NOT NULL DEFAULT 'PZ',   -- PZ przyjęcie · WZ wydanie
+  `number`     VARCHAR(40)  NOT NULL,
+  `series`     VARCHAR(10)  NOT NULL DEFAULT '',
+  `seq`        INT UNSIGNED NOT NULL DEFAULT 0,
+  `order_id`   INT UNSIGNED NULL DEFAULT NULL,
+  `partner`    VARCHAR(160) NOT NULL DEFAULT '',     -- fournisseur ou destinataire
+  `ref`        VARCHAR(60)  NOT NULL DEFAULT '',     -- n° de facture d'achat / de commande
+  `issued_at`  DATE         NOT NULL,
+  `note`       VARCHAR(250) NOT NULL DEFAULT '',
+  `units`      INT          NOT NULL DEFAULT 0,
+  `value`      INT          NOT NULL DEFAULT 0,      -- en grosze
+  `actor`      VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_stock_docs_number` (`number`),
+  KEY `idx_wsm_stock_docs_order` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

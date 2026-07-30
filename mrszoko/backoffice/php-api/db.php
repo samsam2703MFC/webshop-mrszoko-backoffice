@@ -307,7 +307,14 @@ function wsm_ensure_invoices(PDO $pdo): void {
 
 /** Journal des mouvements de stock. Idempotent. */
 function wsm_ensure_stock(PDO $pdo): void {
-    if (!wsm_table_exists($pdo, 'wsm_stock_moves')) wsm_apply_schema($pdo);
+    if (!wsm_table_exists($pdo, 'wsm_stock_moves') || !wsm_table_exists($pdo, 'wsm_stock_docs')) {
+        wsm_apply_schema($pdo);
+    }
+    // Le mouvement rattaché à son document : c'est ce lien qui permet de
+    // rouvrir un bon et de retrouver exactement ce qui est entré ou sorti.
+    wsm_ensure_columns($pdo, 'wsm_stock_moves', [
+        'doc_id' => ['INT UNSIGNED NULL DEFAULT NULL', 'INTEGER DEFAULT NULL'],
+    ]);
 }
 
 /** Une table existe-t-elle ? (MySQL + SQLite) */

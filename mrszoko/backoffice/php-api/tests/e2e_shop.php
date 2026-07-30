@@ -454,6 +454,35 @@ ok('la somme des mouvements égale le stock',
 $ovv = array_values(array_filter(wsm_stock_overview($pdoV), fn($r) => $r['id'] === $sid));
 ok('le magasin voit ce produit', count($ovv) === 1);
 ok('rupture signalée quand le stock est à zéro', ($ovv[0]['status'] ?? '') === 'brak', $ovv[0]['status'] ?? null);
+
+// Le document : une livraison, plusieurs articles, tout ou rien.
+[$pzDoc, $pzErr] = wsm_stock_receive($pdoV, ['partner' => 'Dostawca Test', 'ref' => 'FZ/1', 'actor' => 'test'], [
+    ['product_id' => $sid, 'qty' => 4, 'unit_cost' => 1000],
+    ['product_id' => '',   'qty' => 0],                      // ligne vide : ignorée
+]);
+ok('le bon de réception est enregistré', $pzDoc !== null, $pzErr);
+ok('son numéro suit la série PZ', (bool) preg_match('#^PZ/\d{3}/\d{2}/\d{2}$#', (string) ($pzDoc['number'] ?? '')), $pzDoc['number'] ?? null);
+ok('les lignes vides sont ignorées', count($pzDoc['lines'] ?? []) === 1, count($pzDoc['lines'] ?? []));
+ok('le total du bon est juste', (int) ($pzDoc['units'] ?? 0) === 4 && (int) ($pzDoc['value'] ?? 0) === 4000,
+    [$pzDoc['units'] ?? null, $pzDoc['value'] ?? null]);
+ok('chaque mouvement cite son document',
+    (int) (wsm_stock_moves($pdoV, ['product_id' => $sid, 'limit' => 1])[0]['doc_id'] ?? 0) === (int) $pzDoc['id']);
+[$noLines, $errNo] = wsm_stock_receive($pdoV, ['partner' => 'X'], [['product_id' => '', 'qty' => 0]]);
+ok('un bon sans ligne est refusé', $noLines === null && $errNo !== null, $errNo);
+$stockNow = (int) $pdoV->query("SELECT stock FROM wsm_products WHERE id = " . $pdoV->quote($sid))->fetchColumn();
+ok('la réception a bien crédité le stock', $stockNow === 4, $stockNow);
+
+// Le bon de sortie : il nomme, il ne rebouge rien.
+$avantWZ = (int) $pdoV->query("SELECT stock FROM wsm_products WHERE id = " . $pdoV->quote($sid))->fetchColumn();
+[$wz, $wzErr] = wsm_stock_issue_wz($pdoV, $ordM, 'test');
+ok('le bon de livraison est émis', $wz !== null, $wzErr);
+ok('son numéro suit la série WZ', str_starts_with((string) ($wz['number'] ?? ''), 'WZ/'), $wz['number'] ?? null);
+ok('il ne touche pas au stock — la marchandise est déjà sortie à la commande',
+    (int) $pdoV->query("SELECT stock FROM wsm_products WHERE id = " . $pdoV->quote($sid))->fetchColumn() === $avantWZ);
+ok('il rattache les sorties de la commande', count($wz['lines'] ?? []) >= 1, count($wz['lines'] ?? []));
+[$wz2] = wsm_stock_issue_wz($pdoV, $ordM, 'test');
+ok('réémettre renvoie le même bon, pas un second', (int) ($wz2['id'] ?? 0) === (int) $wz['id']);
+
 $pdoV->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$sid]);
 
 require_once dirname(__DIR__) . '/media.php';
