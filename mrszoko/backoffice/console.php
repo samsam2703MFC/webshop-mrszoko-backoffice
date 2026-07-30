@@ -34,9 +34,18 @@ function console_boot(): array {
 
     $pdo = wsm_bootstrap();
     wsm_session_start();
+
+    // Déconnexion : en POST, jamais en GET. Une image distante pointant sur
+    // « ?wyloguj=1 » suffirait sinon à éjecter quelqu'un de sa session.
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_GET['wyloguj'])) {
+        wsm_logout();
+        header('Location: index.html', true, 303);
+        exit;
+    }
+
     $me = wsm_current_user($pdo);
     if (!$me) {
-        header('Location: ./', true, 302);
+        header('Location: index.html', true, 302);
         exit;
     }
     return [$pdo, $me, ($me['role'] ?? '') === WSM_ROLE_ADMIN];
@@ -104,32 +113,56 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
 <?php if ($extraCss !== ''): ?><style><?= $extraCss ?></style><?php endif; ?>
 </head>
 <body>
-<header class="bar">
-  <div class="bar-in">
-    <a class="brand" href="./"><img src="img/logo.png" alt="Mister Szoko"></a>
-    <h1><?= h($title) ?><?= $badge !== '' ? ' <span class="badge">' . h($badge) . '</span>' : '' ?></h1>
-    <input type="checkbox" id="wsm-menu" class="menu-toggle">
-    <label class="menu-btn" for="wsm-menu">Menu</label>
-    <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
+<!-- La case pilote le tiroir sur téléphone. Elle précède tout le reste :
+     c'est ce qui permet à une règle CSS d'ouvrir la colonne de gauche sans
+     une ligne de JavaScript. -->
+<input type="checkbox" id="wsm-menu" class="menu-toggle">
+<label class="scrim" for="wsm-menu" aria-hidden="true"></label>
+
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="pulpit.php">
+      <img src="img/logo.png" alt="Mister Szoko">
+      <span>Konsola<br><b>Mister Szoko</b></span>
+    </a>
+    <!-- Fermer le tiroir depuis l'intérieur : le voile n'est tapable que sur
+         la bande restée visible, ce qui ne suffit pas sur un petit écran. -->
+    <label class="side-close" for="wsm-menu" title="Zamknij menu">×</label>
+
     <nav class="menu">
+      <span class="sep">Webshop</span>
       <?php foreach (console_menu() as $f => $label): ?>
       <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
+
       <span class="sep">Konto</span>
       <?php foreach (console_erp_menu() as $k => $label): ?>
       <a href="./#ekran=<?= h($k) ?>"><?= h($label) ?></a>
       <?php endforeach; ?>
+
       <span class="sep">Publiczne</span>
       <a href="../shop/" target="_blank" rel="noopener">Sklep ↗</a>
     </nav>
-  </div>
-</header>
-<main class="wrap">
+
+    <form class="side-foot" method="post" action="?wyloguj=1">
+      <span class="who"><b><?= h((string) ($me['nom'] ?? '')) ?></b><br><?= h((string) ($me['role'] ?? '')) ?></span>
+      <button type="submit" title="Wyloguj się">Wyloguj</button>
+    </form>
+  </aside>
+
+  <div class="main">
+    <header class="bar">
+      <label class="menu-btn" for="wsm-menu">Menu</label>
+      <h1><?= h($title) ?><?= $badge !== '' ? ' <span class="badge">' . h($badge) . '</span>' : '' ?></h1>
+    </header>
+    <main class="wrap">
 <?php
 }
 
 function console_foot(): void {
-    ?></main>
+    ?>    </main>
+  </div>
+</div>
 </body>
 </html>
 <?php
