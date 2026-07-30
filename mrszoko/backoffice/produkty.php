@@ -46,6 +46,50 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } else {
         $id = (string) ($_POST['id'] ?? '');
         $openId = $id;
+
+        // ---- Désactiver / réactiver / supprimer ----------------------------
+        // Désactiver retire le produit du catalogue et du magasin sans toucher
+        // à l'histoire : les commandes passées, les factures et les mouvements
+        // continuent de le nommer. C'est presque toujours ce qu'on veut.
+        if (isset($_POST['aktywacja'])) {
+            $on = $_POST['aktywacja'] === '1' ? 1 : 0;
+            $pdo->prepare("UPDATE wsm_products SET active = ?, shop_visible = CASE WHEN ? = 0 THEN 0 ELSE shop_visible END WHERE id = ?")
+                ->execute([$on, $on, $id]);
+            wsm_audit($pdo, (string) ($me['nom'] ?? ''), $on ? 'Włączenie produktu' : 'Wyłączenie produktu', 'wsm_products ' . $id, 'Sieć');
+            $flash = $on ? 'Produkt włączony: ' . $id : 'Produkt wyłączony — zniknął ze sklepu i z magazynu.';
+            $kind = 'ok';
+        }
+        // Supprimer n'est possible QUE si rien ne s'y réfère. Un produit cité
+        // par une commande ou par une facture ne peut pas disparaître : le
+        // document deviendrait illisible, et une facture doit se relire à
+        // l'identique dans dix ans. Dans ce cas on propose la désactivation.
+        elseif (isset($_POST['usun'])) {
+            $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_order_items WHERE product_id = ?");
+            $st->execute([$id]);
+            $used = (int) $st->fetchColumn();
+            $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_stock_moves WHERE product_id = ?");
+            $st->execute([$id]);
+            $moved = (int) $st->fetchColumn();
+            if ($used > 0) {
+                $flash = 'Nie można usunąć: produkt występuje w ' . $used . ' pozycjach zamówień. '
+                       . 'Dokumenty muszą pozostać czytelne — wyłącz go zamiast usuwać.';
+                $kind = 'err';
+            } elseif ($moved > 0) {
+                $flash = 'Nie można usunąć: produkt ma ' . $moved . ' ruchów magazynowych. Wyłącz go zamiast usuwać.';
+                $kind = 'err';
+            } else {
+                $st = $pdo->prepare("SELECT image_url FROM wsm_products WHERE id = ?");
+                $st->execute([$id]);
+                $img = (string) $st->fetchColumn();
+                $pdo->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$id]);
+                if ($img !== '') wsm_media_delete($img);
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Usunięcie produktu', 'wsm_products ' . $id, 'Sieć');
+                $flash = 'Usunięto produkt ' . $id . '.';
+                $kind = 'ok';
+                $openId = '';
+            }
+        }
+        else {
         $st = $pdo->prepare("SELECT id, image_url FROM wsm_products WHERE id = ?");
         $st->execute([$id]);
         $cur = $st->fetch();
@@ -108,6 +152,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             } else {
                 $flash = 'Popraw zaznaczone pola.'; $kind = 'err';
             }
+        }
         }
     }
 }
@@ -179,6 +224,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
     $id = (string) $p['id'];
     $img = (string) $p['image_url'];
     $vis = (int) $p['shop_visible'] === 1;
+    $act = (int) ($p['active'] ?? 1) === 1;
     $open = $openId === $id; ?>
   <details class="item"<?= $open ? ' open' : '' ?> id="p-<?= h($id) ?>">
     <summary>
@@ -194,6 +240,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
       </div>
       <div class="sum-right">
         <?php if ($vis && $img === ''): ?><span class="tag no">bez zdjęcia</span><?php endif; ?>
+        <?php if (!$act): ?><span class="tag bad">wyłączony</span><?php endif; ?>
         <span class="tag <?= $vis ? 'on' : 'off' ?>"><?= $vis ? 'W sprzedaży' : 'Ukryty' ?></span>
         <span class="tag">stan <?= (int) $p['stock'] ?></span>
       </div>
@@ -304,6 +351,35 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
         <?php endif; ?>
       </div>
     </form>
+
+    <?php if ($isAdmin): ?>
+    <div class="edit" style="padding-top:0">
+      <div></div>
+      <div>
+        <h3 style="font-family:var(--font-display);font-size:15px;margin:0 0 6px">Cykl życia produktu</h3>
+        <p style="font-size:12.5px;color:var(--text-muted);line-height:1.6;margin:0 0 10px">
+          <b>Wyłączenie</b> zdejmuje produkt ze sklepu i z magazynu, ale zostawia historię:
+          dawne zamówienia i faktury nadal go nazywają. To niemal zawsze właściwy ruch.
+          <b>Usunięcie</b> jest możliwe tylko wtedy, gdy nic się do produktu nie odwołuje —
+          inaczej dokumenty przestałyby być czytelne.
+        </p>
+        <div class="actions">
+          <form method="post">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <input type="hidden" name="id" value="<?= h($id) ?>">
+            <button type="submit" name="aktywacja" value="<?= $act ? '0' : '1' ?>">
+              <?= $act ? 'Wyłącz produkt' : 'Włącz produkt' ?>
+            </button>
+          </form>
+          <form method="post" onsubmit="return confirm('Usunąć produkt <?= h($id) ?> bezpowrotnie?')">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <input type="hidden" name="id" value="<?= h($id) ?>">
+            <button class="danger" type="submit" name="usun" value="1">Usuń trwale</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
   </details>
   <?php endforeach; ?>
 <?php console_foot();

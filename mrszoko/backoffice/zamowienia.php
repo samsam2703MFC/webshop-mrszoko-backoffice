@@ -51,6 +51,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 $detail = isset($_GET['id']) ? wsm_order_by_id($pdo, (int) $_GET['id']) : null;
+
+// Vues imprimables : la feuille de préparation et l'étiquette. Sorties avant
+// tout rendu de la console — ce sont des documents, pas des écrans.
+if ($detail && isset($_GET['druk']))     { $o = $detail; include __DIR__ . '/zamowienie_druk.php'; exit; }
+if ($detail && isset($_GET['etykieta'])) { $o = $detail; include __DIR__ . '/etykieta_druk.php'; exit; }
 $orders = wsm_orders_list($pdo, 200);
 $kpis   = wsm_shop_kpis($pdo);
 $cfg    = ['tpay' => wsm_tpay_enabled(), 'inpost' => wsm_inpost_enabled()];
@@ -144,6 +149,11 @@ console_crumbs($detail
       </form>
     </div>
     <?php endif; ?>
+
+    <p class="actions" style="margin-top:18px">
+      <a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>&amp;druk=1" target="_blank" rel="noopener">Drukuj zamówienie ↗</a>
+      <a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>&amp;etykieta=1" target="_blank" rel="noopener">Drukuj etykietę ↗</a>
+    </p>
 
     <h2 style="margin-top:26px">Ładunek ShipX</h2>
     <p style="font-size:13px;color:var(--text-muted);margin:0 0 10px">
