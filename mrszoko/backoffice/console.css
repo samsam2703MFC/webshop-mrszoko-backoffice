@@ -22,14 +22,14 @@ body {
 /* --- Barre ---------------------------------------------------------------- */
 header.bar { background: var(--choco-800); color: var(--cream-50); position: sticky; top: 0; z-index: 20; }
 .bar-in {
-  max-width: 1240px; margin: 0 auto; padding: 10px 16px;
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  max-width: 1240px; margin: 0 auto; padding: 8px 16px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .bar-in .brand { display: flex; align-items: center; flex: 0 0 auto; }
 /* brand.css impose 96 px au galet (img[alt="Mister Szoko"], !important) — la
    bonne taille sur une page vitrine, trois fois trop haute dans une barre de
    console. On surcharge ici, et seulement ici. */
-.bar-in img { height: 38px !important; width: auto; max-width: none; flex: 0 0 auto; display: block; }
+.bar-in img { height: 28px !important; width: auto; max-width: none; flex: 0 0 auto; display: block; }
 .bar-in h1 {
   font-family: var(--font-display); font-size: 18px; margin: 0; font-weight: 600;
   flex: 1 1 auto; min-width: 0;
@@ -72,15 +72,25 @@ header.bar { background: var(--choco-800); color: var(--cream-50); position: sti
 }
 
 @media (min-width: 980px) {
-  .bar-in { padding: 12px 24px; gap: 18px; flex-wrap: nowrap; }
+  /* Deux lignes, jamais trois : l'identité de la page en haut, la navigation
+     en dessous. Elle NE SE REPLIE PAS — elle défile horizontalement. Une barre
+     qui s'enroule sur trois lignes mange l'écran et noie l'en-tête ; on garde
+     donc tous les écrans accessibles sans que la barre grossisse. */
+  .bar-in { padding: 8px 24px 0; gap: 16px; flex-wrap: wrap; }
   .bar-in h1 { flex: 0 0 auto; font-size: 20px; }
-  .bar-in .who { order: 5; margin-left: auto; }
+  .bar-in .who { order: 3; margin-left: auto; }
   .menu-btn { display: none; }
-  .menu { order: 2; display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px 14px;
-          align-items: center; width: auto; padding: 0; flex: 1 1 auto; min-width: 0; }
-  .menu a { border-bottom: 1px solid transparent; padding: 3px 0; font-size: 13px; }
+  .menu {
+    order: 4; display: flex; flex-direction: row; flex-wrap: nowrap; gap: 18px;
+    align-items: center; width: 100%; padding: 6px 0 7px; margin-top: 4px;
+    border-top: 1px solid var(--choco-600);
+    overflow-x: auto; overscroll-behavior-x: contain;
+    scrollbar-width: none;                     /* la barre de défilement gênerait plus qu'elle n'aide */
+  }
+  .menu::-webkit-scrollbar { display: none; }
+  .menu a { border-bottom: 2px solid transparent; padding: 2px 0; font-size: 13px; white-space: nowrap; }
   .menu a.on { border-bottom-color: var(--cream-100); }
-  .menu .sep { padding: 0 2px 0 6px; border-left: 1px solid var(--choco-600); }
+  .menu .sep { padding: 0; border-left: 1px solid var(--choco-600); padding-left: 14px; white-space: nowrap; }
   .wrap { padding: 24px; }
 }
 
