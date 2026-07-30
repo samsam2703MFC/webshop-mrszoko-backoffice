@@ -77,6 +77,7 @@ function wsm_settings_fields(): array {
         'invoice.iban'           => ['faktura', 'Numer rachunku (IBAN)',  ['invoice', 'iban'],           'WSM_INV_IBAN',           'text',   'Trafia na każdą fakturę z przelewem.'],
         'invoice.bank'           => ['faktura', 'Nazwa banku',            ['invoice', 'bank'],           'WSM_INV_BANK',           'text',   'Obok numeru rachunku.'],
         'invoice.payment_days'   => ['faktura', 'Termin płatności (dni)', ['invoice', 'payment_days'],   'WSM_INV_PAYMENT_DAYS',   'text',   '0 = płatne przy zamówieniu (tpay pobiera od razu).'],
+        'invoice.reminder_days'  => ['faktura', 'Przypomnienie po (dni)', ['invoice', 'reminder_days'], 'WSM_INV_REMINDER_DAYS', 'text', 'Ile dni po terminie wysłać przypomnienie. Puste lub 0 = nie przypominaj.'],
         'invoice.number_format'  => ['faktura', 'Format numeru',          ['invoice', 'number_format'],  'WSM_INV_NUMBER_FORMAT',  'text',   'xxx = kolejny numer, mm = miesiąc, yy = rok. Numeracja zeruje się wraz z tym, co jest w formacie.'],
     ];
 }

@@ -112,10 +112,23 @@ if ($method === 'GET' && $lroute === 'content') {
     $lang = $_GET['lang'] ?? $default;
     if (!in_array($lang, $langs, true)) $lang = $default;
 
+    // Comme pour la boutique : une valeur vide vaut « pas traduit » et retombe
+    // sur la langue par défaut. Sans ce repli, vider un champ dans la console
+    // effacerait le texte sur la page publique au lieu de revenir au polonais.
     $st = $pdo->prepare("SELECT k, v FROM wsm_landing_i18n WHERE lang=?");
     $st->execute([$lang]);
     $strings = [];
-    foreach ($st->fetchAll() as $r) $strings[$r['k']] = $r['v'];
+    foreach ($st->fetchAll() as $r) {
+        if (trim((string) $r['v']) === '') continue;
+        $strings[$r['k']] = $r['v'];
+    }
+    if ($lang !== $default) {
+        $st = $pdo->prepare("SELECT k, v FROM wsm_landing_i18n WHERE lang=?");
+        $st->execute([$default]);
+        foreach ($st->fetchAll() as $r) {
+            if (!isset($strings[$r['k']])) $strings[$r['k']] = $r['v'];
+        }
+    }
 
     $products = array_map(fn($r) => [
         'id' => $r['id'], 'fluidity' => (int) $r['fluidity'],

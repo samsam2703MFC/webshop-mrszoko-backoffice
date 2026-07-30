@@ -13,7 +13,8 @@
 declare(strict_types=1);
 
 $i = $detail;
-$kindTitle = ['faktura' => 'Faktura VAT', 'korekta' => 'Faktura korygująca', 'paragon' => 'E-paragon'];
+$kindTitle = ['faktura' => 'Faktura VAT', 'korekta' => 'Faktura korygująca',
+              'paragon' => 'E-paragon', 'proforma' => 'Faktura proforma'];
 $zl = fn(int $g) => number_format($g / 100, 2, ',', ' ');
 ?><!DOCTYPE html>
 <html lang="pl">
@@ -74,7 +75,7 @@ $zl = fn(int $g) => number_format($g / 100, 2, ',', ' ');
     <div>
       <h1><?= h($kindTitle[$i['kind']] ?? 'Dokument') ?></h1>
       <div class="no"><?= h($i['number']) ?></div>
-      <?php if ($i['kind'] === 'korekta' && $i['corrects_id']): ?>
+      <?php if (in_array($i['kind'], ['korekta', 'proforma'], true) && $i['corrects_id']): ?>
         <?php $src = wsm_invoice_by_id($pdo, (int) $i['corrects_id']); ?>
         <div class="no">do faktury <?= h($src['number'] ?? '') ?></div>
       <?php endif; ?>
@@ -155,6 +156,12 @@ $zl = fn(int $g) => number_format($g / 100, 2, ',', ' ');
   </div>
   <?php else: ?>
   <div class="pay">Dokument dla klienta indywidualnego bez NIP — e-paragon, nie faktura.</div>
+  <?php endif; ?>
+
+  <?php if ($i['kind'] === 'proforma'): ?>
+  <div class="rc"><b>Dokument nie jest fakturą VAT.</b> Faktura proforma jest propozycją zapłaty:
+    nie stanowi podstawy do odliczenia podatku naliczonego i nie jest ujmowana w ewidencji VAT.
+    Właściwa faktura zostanie wystawiona po otrzymaniu płatności.</div>
   <?php endif; ?>
 
   <?php if ($i['note'] !== ''): ?><div class="note">Uwaga: <?= h($i['note']) ?></div><?php endif; ?>

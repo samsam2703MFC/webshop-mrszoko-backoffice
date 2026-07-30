@@ -81,7 +81,14 @@ function wsm_shop_strings(PDO $pdo, string $lang): array {
     $st = $pdo->prepare("SELECT k, v FROM wsm_shop_i18n WHERE lang = ?");
     $st->execute([$lang]);
     $out = [];
-    foreach ($st->fetchAll() as $r) $out[(string) $r['k']] = (string) $r['v'];
+    foreach ($st->fetchAll() as $r) {
+        // Une valeur VIDE vaut « pas traduit ». La console permet d'effacer une
+        // traduction, et c'est même la façon normale de dire « à refaire » :
+        // il ne faut donc pas qu'un champ vidé blanchisse le libellé sur la
+        // page. Absent et vide sont traités pareil.
+        if (trim((string) $r['v']) === '') continue;
+        $out[(string) $r['k']] = (string) $r['v'];
+    }
     // Repli sur la langue par défaut pour toute clé pas encore traduite :
     // une chaîne manquante doit donner du polonais, pas un trou dans la page.
     if ($lang !== WSM_SHOP_DEFAULT_LANG) {

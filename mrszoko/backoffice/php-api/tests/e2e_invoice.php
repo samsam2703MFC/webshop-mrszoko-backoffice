@@ -211,6 +211,100 @@ foreach (['ksef_number', 'ksef_status', 'ksef_at'] as $c) {
 ok('les colonnes KSeF existent déjà — l\'intégration n\'exigera pas de migration',
     in_array('ksef_number', $colonnes, true) && in_array('ksef_status', $colonnes, true));
 
+// ---- 9. Proforma --------------------------------------------------------------
+//  Une proforma n'est pas un document fiscal : elle ne prend AUCUN numéro dans
+//  la suite des factures, et elle peut être réémise autant de fois qu'il faut.
+//  C'est exactement ce qui permet d'en tirer une depuis une facture existante.
+echo "\n-- proforma --\n";
+$seqAvant = (int) $pdo->query("SELECT COALESCE(MAX(seq),0) FROM wsm_invoices WHERE kind_group = 'faktura'")->fetchColumn();
+
+[$oPro] = wsm_shop_create_order($pdo, $b2b);
+[$pro, $ePro] = wsm_invoice_proforma($pdo, $oPro, 'test', 'zapłata z góry');
+ok('proforma émise depuis une commande', $pro !== null, $ePro);
+ok('son type la désigne comme telle', ($pro['kind'] ?? '') === 'proforma');
+ok('son numéro est préfixé PRO/', str_starts_with((string) ($pro['number'] ?? ''), 'PRO/'), $pro['number'] ?? null);
+ok('elle a sa propre suite de numéros', ($pro['kind_group'] ?? '') === 'proforma');
+ok('elle ne consomme aucun numéro de facture',
+    (int) $pdo->query("SELECT COALESCE(MAX(seq),0) FROM wsm_invoices WHERE kind_group = 'faktura'")->fetchColumn() === $seqAvant);
+ok('elle reprend le total de la commande', (int) $pro['total_gross'] === (int) $oPro['total_gross'],
+    [$pro['total_gross'], $oPro['total_gross']]);
+ok('netto + VAT == brutto sur la proforma',
+    $pro['total_net'] + $pro['total_vat'] === $pro['total_gross']);
+ok('la commande n\'a toujours pas de facture — une proforma n\'en est pas une',
+    wsm_invoice_for_order($pdo, (int) $oPro['id']) === null
+    || (wsm_invoice_for_order($pdo, (int) $oPro['id'])['kind'] ?? '') !== 'faktura');
+
+// Sur base d'une facture : le cas demandé — on repart d'un document émis.
+[$pro2, $ePro2] = wsm_invoice_proforma($pdo, $inv, 'test');
+ok('proforma tirée d\'une facture existante', $pro2 !== null, $ePro2);
+ok('elle pointe la facture d\'origine', (int) ($pro2['corrects_id'] ?? 0) === (int) $inv['id']);
+ok('elle recopie l\'acheteur de la facture', ($pro2['buyer_name'] ?? '') === (string) $inv['buyer_name']);
+ok('elle recopie les montants', (int) $pro2['total_gross'] === (int) $inv['total_gross']);
+ok('elle a autant de lignes que la facture', count($pro2['items']) === count($inv['items']),
+    [count($pro2['items']), count($inv['items'])]);
+ok('deux proformas, deux numéros', $pro2['number'] !== $pro['number'], [$pro['number'], $pro2['number']]);
+
+// La facture d'origine ne bouge pas : c'est toute la différence avec une correction.
+$invRelu = wsm_invoice_by_id($pdo, (int) $inv['id']);
+ok('la facture d\'origine reste intacte', (string) $invRelu['number'] === (string) $inv['number']
+    && (int) $invRelu['total_gross'] === (int) $inv['total_gross']);
+
+// ---- 10. Relances --------------------------------------------------------------
+//  On ne relance qu'une facture impayée dont l'échéance est passée. Jamais un
+//  paragon, jamais une proforma (qui EST une demande de paiement), jamais une
+//  facture réglée — et jamais deux fois le même jour.
+echo "\n-- monity i przypomnienia --\n";
+$pdo->prepare("UPDATE wsm_invoices SET due_at = ?, paid = 0 WHERE id = ?")
+    ->execute([date('Y-m-d', time() - 20 * 86400), (int) $inv['id']]);
+
+$overdue = wsm_invoices_overdue($pdo, 0);
+$ids = array_map(fn($x) => (int) $x['id'], $overdue);
+ok('la facture échue est listée', in_array((int) $inv['id'], $ids, true));
+ok('aucune proforma dans les relances',
+    !array_filter($overdue, fn($x) => $x['kind'] === 'proforma'));
+ok('aucun paragon dans les relances',
+    !array_filter($overdue, fn($x) => $x['kind'] === 'paragon'));
+
+$horsDelai = array_map(fn($x) => (int) $x['id'], wsm_invoices_overdue($pdo, 60));
+ok('un délai de 60 jours écarte une facture échue depuis 20',
+    !in_array((int) $inv['id'], $horsDelai, true));
+
+$pdo->prepare("DELETE FROM wsm_messages WHERE event_key LIKE ?")->execute(['przypomnienie:' . (int) $inv['id'] . ':%']);
+$m1 = wsm_mail_for_invoice($pdo, wsm_invoice_by_id($pdo, (int) $inv['id']), 'przypomnienie', 'test');
+ok('le rappel part', $m1 > 0, $m1);
+$m2 = wsm_mail_for_invoice($pdo, wsm_invoice_by_id($pdo, (int) $inv['id']), 'przypomnienie', 'test');
+ok('le même jour, il ne part pas deux fois', $m2 === 0, $m2);
+
+$msg = $pdo->query("SELECT * FROM wsm_messages WHERE id = " . (int) $m1)->fetch();
+ok('le rappel porte le numéro du document', str_contains((string) $msg['subject'], (string) $inv['number']),
+    $msg['subject'] ?? null);
+ok('il indique le compte à créditer', str_contains((string) $msg['body'], 'PL00'), $msg['body'] ?? null);
+ok('aucun {{jeton}} non remplacé', !str_contains((string) $msg['body'], '{{'), $msg['body'] ?? null);
+
+// La demande de paiement est un autre modèle, avec sa propre clé.
+$pdo->prepare("DELETE FROM wsm_messages WHERE event_key = ?")->execute(['zadanie_zaplaty:inv:' . (int) $inv['id']]);
+$z1 = wsm_mail_for_invoice($pdo, wsm_invoice_by_id($pdo, (int) $inv['id']), 'zadanie_zaplaty', 'test');
+ok('la demande de paiement part', $z1 > 0, $z1);
+ok('elle ne se confond pas avec le rappel', $z1 !== $m1);
+$z2 = wsm_mail_for_invoice($pdo, wsm_invoice_by_id($pdo, (int) $inv['id']), 'zadanie_zaplaty', 'test');
+ok('et ne part qu\'une fois', $z2 === 0, $z2);
+
+// Le passage automatique : idempotent, donc sans danger à chaque ouverture d'écran.
+wsm_config_overlay(['invoice' => ['reminder_days' => '7']]);
+$pdo->prepare("DELETE FROM wsm_messages WHERE event_key LIKE ?")->execute(['przypomnienie:%:' . date('Y-m-d')]);
+$r1 = wsm_invoice_reminders_run($pdo);
+$r2 = wsm_invoice_reminders_run($pdo);
+ok('le passage automatique relance au moins la facture échue', $r1 >= 1, $r1);
+ok('un second passage le même jour n\'envoie rien', $r2 === 0, $r2);
+
+wsm_config_overlay(['invoice' => ['reminder_days' => '0']]);
+ok('à 0 jour, les relances automatiques sont coupées', wsm_invoice_reminders_run($pdo) === 0);
+
+// Une facture réglée sort des relances.
+$pdo->prepare("UPDATE wsm_invoices SET paid = 1 WHERE id = ?")->execute([(int) $inv['id']]);
+ok('une facture payée ne figure plus dans les échues',
+    !in_array((int) $inv['id'], array_map(fn($x) => (int) $x['id'], wsm_invoices_overdue($pdo, 0)), true));
+
 // ---- Nettoyage ---------------------------------------------------------------
 $pdo->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$pid]);
 

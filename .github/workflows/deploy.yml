@@ -89,7 +89,7 @@ jobs:
              mrszoko/backoffice/faktura_druk.php mrszoko/backoffice/magazyn.php \
              mrszoko/backoffice/magazyn_druk.php mrszoko/backoffice/uzytkownicy.php \
              mrszoko/backoffice/audyt.php mrszoko/backoffice/zamowienie_druk.php \
-             mrszoko/backoffice/etykieta_druk.php \
+             mrszoko/backoffice/etykieta_druk.php mrszoko/backoffice/tresci.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -403,7 +403,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -587,6 +587,26 @@ jobs:
               NF=$(mysql -N -e "$QF" 2>/dev/null || echo 0)
               NFU=$(mysql -N -e "$QFU" 2>/dev/null || echo 0)
             fi
+            # CMS : les deux tables de contenu SONT les deux sites publics. Si
+            # elles étaient vides, la boutique et la page d'accueil s'afficheraient
+            # sans un mot — et l'écran Treści n'aurait rien à éditer.
+            QT="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_shop_i18n','wsm_landing_i18n','wsm_landing_products')"
+            if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+              NT=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QT" 2>/dev/null || echo 0)
+              NTS=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n" 2>/dev/null || echo 0)
+              NTL=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "SELECT COUNT(*) FROM mrszoko.wsm_landing_i18n" 2>/dev/null || echo 0)
+              NTG=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "SELECT COUNT(DISTINCT lang) FROM mrszoko.wsm_shop_i18n" 2>/dev/null || echo 0)
+            else
+              NT=$(mysql -N -e "$QT" 2>/dev/null || echo 0)
+              NTS=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n" 2>/dev/null || echo 0)
+              NTL=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_landing_i18n" 2>/dev/null || echo 0)
+              NTG=$(mysql -N -e "SELECT COUNT(DISTINCT lang) FROM mrszoko.wsm_shop_i18n" 2>/dev/null || echo 0)
+            fi
+            echo "  CMS (treści) : $NT / 3 tabele · sklep $NTS tekstów · strona $NTL · języki $NTG"
+            if [ "${NT:-0}" -lt 3 ]; then echo "  ^ ATTENTION : le contenu des sites publics n'a pas de table"; fail=1; fi
+            if [ "${NTS:-0}" -lt 100 ]; then echo "  ^ ATTENTION : la boutique n'a presque aucun texte — page muette"; fail=1; fi
+            if [ "${NTL:-0}" -lt 40 ]; then echo "  ^ ATTENTION : la page d'accueil n'a presque aucun texte"; fail=1; fi
+            if [ "${NTG:-0}" -lt 3 ]; then echo "  ^ ATTENTION : les trois langues ne sont pas toutes présentes"; fail=1; fi
             QS="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_stock_moves','wsm_stock_docs')"
             if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
               NS=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QS" 2>/dev/null || echo 0)

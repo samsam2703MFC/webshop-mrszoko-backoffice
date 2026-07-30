@@ -18,6 +18,8 @@ require_once __DIR__ . '/console.php';
 $API = console_api_dir();
 require_once $API . '/shop.php';
 require_once $API . '/mail.php';
+require_once $API . '/inbox.php';
+require_once $API . '/invoice.php';
 
 $flash = ''; $flashKind = 'ok';
 $view  = ($_GET['widok'] ?? '') === 'szablony' ? 'szablony' : 'poczta';
@@ -59,6 +61,48 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             } else {
                 $flash = $id ? 'Wiadomość zapisana w kolejce.' : 'Nie zapisano wiadomości.';
                 $flashKind = $id ? 'ok' : 'err';
+            }
+        }
+    } elseif (isset($_POST['przychodzaca'])) {
+        // Un message reçu, collé à la main. Tant que la boîte IMAP n'est pas
+        // branchée, c'est ainsi qu'une demande entre dans le système — et le
+        // reste du mécanisme est déjà celui qui servira à la relève.
+        $from = wsm_inbox_address((string) ($_POST['from'] ?? ''));
+        $body = (string) ($_POST['body'] ?? '');
+        if ($from === '')            { $flash = 'Podaj adres nadawcy.'; $flashKind = 'err'; }
+        elseif (trim($body) === '')  { $flash = 'Treść jest pusta.'; $flashKind = 'err'; }
+        else {
+            $id = wsm_inbox_store($pdo, $from, (string) ($_POST['subject'] ?? ''), $body, (string) ($me['nom'] ?? ''));
+            $flash = $id ? 'Zapisano wiadomość przychodzącą.' : 'Nie zapisano wiadomości.';
+            $flashKind = $id ? 'ok' : 'err';
+            if ($id) { header('Location: poczta.php?id=' . $id, true, 303); exit; }
+        }
+    } elseif (isset($_POST['zamow'])) {
+        // Les tuiles validées deviennent une commande — par le moteur de la
+        // boutique, pas par un chemin parallèle.
+        $msg = wsm_message_by_id($pdo, (int) $_POST['zamow']);
+        $items = [];
+        foreach ((array) ($_POST['qty'] ?? []) as $pid => $q) {
+            if (!empty($_POST['take'][$pid])) $items[(string) $pid] = (int) $q;
+        }
+        if (!$msg)        { $flash = 'Nie znaleziono wiadomości.'; $flashKind = 'err'; }
+        elseif (!$items)  { $flash = 'Nie zaznaczono żadnej pozycji.'; $flashKind = 'err'; }
+        else {
+            $extra = [];
+            foreach (['delivery_method', 'inpost_point', 'phone', 'company',
+                      'ship_street', 'ship_building', 'ship_postcode', 'ship_city'] as $k) {
+                if (trim((string) ($_POST[$k] ?? '')) !== '') $extra[$k] = trim((string) $_POST[$k]);
+            }
+            [$ord, $errs] = wsm_inbox_create_order($pdo, $msg, $items, $extra);
+            if (!$ord) {
+                $flash = 'Nie utworzono zamówienia: ' . implode(' · ', array_map(
+                    fn($k, $v) => $k . ' — ' . $v, array_keys($errs), $errs));
+                $flashKind = 'err';
+            } else {
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zamówienie z maila', $ord['code'], 'Sieć');
+                $pdo->prepare("UPDATE wsm_messages SET order_id = ? WHERE id = ?")
+                    ->execute([(int) $ord['id'], (int) $msg['id']]);
+                $flash = 'Utworzono zamówienie ' . $ord['code'] . ' — sprawdź je przed potwierdzeniem.';
             }
         }
     } elseif (isset($_POST['szablon'])) {
@@ -112,7 +156,18 @@ if ($pickTpl !== '') {
 $statusTag = ['wyslana' => 'ok', 'kolejka' => 'wait', 'blad' => 'bad'];
 $statusLbl = ['wyslana' => 'Wysłana', 'kolejka' => 'W kolejce', 'blad' => 'Błąd'];
 
-console_head('Poczta', $me, '', $kpis['queued'] ? $kpis['queued'] . ' w kolejce' : '');
+console_head('Poczta', $me, <<<'CSS'
+  .tiles { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 12px 0 4px; }
+  @media (min-width: 760px) { .tiles { grid-template-columns: 1fr 1fr; } }
+  .tile { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
+          padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: 12px;
+          background: var(--surface-card); cursor: pointer; }
+  .tile:has(input[type=checkbox]:checked) { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+  .tile .tb { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .tile .src { font-size: 12px; color: var(--text-body); font-style: italic; overflow-wrap: anywhere; }
+  .tile .meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+  .tile .tq input { width: 74px; }
+CSS, $kpis['queued'] ? $kpis['queued'] . ' w kolejce' : '');
 console_flash($flash, $flashKind);
 console_crumbs($detail
     ? ['Pulpit' => 'pulpit.php', 'Poczta' => 'poczta.php', $detail['subject'] => null]
@@ -219,6 +274,87 @@ console_crumbs($detail
       <?php endif; ?>
     </dl>
     <pre style="white-space:pre-wrap"><?= h($detail['body']) ?></pre>
+
+    <?php if ($detail['direction'] === 'wejscie'):
+      $an = wsm_inbox_parse($pdo, (string) $detail['body']);
+      $cli = wsm_inbox_client($pdo, (string) $detail['email']); ?>
+    <h3>Rozpoznane pozycje</h3>
+    <p class="muted small">
+      Propozycja, nie decyzja. Każdy kafelek pokazuje linię, z której pochodzi, i zgadniętą ilość —
+      popraw, odznacz, dopiero potem twórz zamówienie. Ceny biorą się <b>z katalogu</b>, nigdy z treści maila.
+      <?= $cli ? 'Nadawca rozpoznany jako <b>' . h((string) ($cli['raison'] ?? $cli['email'])) . '</b> — dane do wysyłki uzupełnią się same.'
+               : 'Nadawcy nie ma w kontrahentach — adres wysyłki trzeba będzie uzupełnić.' ?>
+    </p>
+
+    <?php if (!$an['lines']): ?>
+    <p class="muted small">Nie rozpoznano żadnego produktu.</p>
+    <?php else: ?>
+    <form method="post">
+      <input type="hidden" name="zamow" value="<?= (int) $detail['id'] ?>">
+      <div class="tiles">
+        <?php foreach ($an['lines'] as $ln): $p = $ln['product']; ?>
+        <label class="tile">
+          <span class="tk"><input type="checkbox" name="take[<?= h($p['id']) ?>]" value="1" checked></span>
+          <span class="tb">
+            <b><?= h($p['name']) ?></b>
+            <span class="src">„<?= h($ln['line']) ?>”</span>
+            <span class="meta"><?= h($ln['how']) ?> · stan <?= (int) $p['stock'] ?>
+              <?= $p['visible'] ? '' : ' · <span class="tag off">ukryty w sklepie</span>' ?></span>
+          </span>
+          <span class="tq">
+            <input type="number" name="qty[<?= h($p['id']) ?>]" min="1" value="<?= (int) $ln['qty'] ?>">
+          </span>
+        </label>
+        <?php endforeach; ?>
+      </div>
+
+      <?php
+      // Une commande ne peut pas naître sans destination. Pour un client connu
+      // on préremplit ; pour un inconnu, l'opérateur recopie ce qu'il lit dans
+      // le mail — c'est le seul endroit où l'humain doit taper.
+      $pre = fn(string $k, string $d = '') => h((string) ($cli[$k] ?? $d));
+      ?>
+      <h3>Wysyłka</h3>
+      <p class="muted small">Bez adresu zamówienia nie da się utworzyć. Sprawdź, co klient napisał w mailu.</p>
+      <div class="grid2">
+        <label class="field"><span>Sposób dostawy</span>
+          <select name="delivery_method" id="dm">
+            <option value="inpost_locker">Paczkomat InPost</option>
+            <option value="inpost_courier">Kurier InPost</option>
+          </select></label>
+        <label class="field"><span>Telefon</span>
+          <input type="text" name="phone" value="<?= $pre('phone') ?>" placeholder="600 100 200"></label>
+        <label class="field"><span>Paczkomat (kod)</span>
+          <input type="text" name="inpost_point" value="<?= $pre('inpost_point') ?>" placeholder="WRO01A"></label>
+        <label class="field"><span>Firma / nabywca</span>
+          <input type="text" name="company" value="<?= $pre('raison') ?>"></label>
+        <label class="field"><span>Ulica</span>
+          <input type="text" name="ship_street" value="<?= $pre('bill_street') ?>"></label>
+        <label class="field"><span>Numer</span>
+          <input type="text" name="ship_building" value="<?= $pre('bill_building') ?>"></label>
+        <label class="field"><span>Kod pocztowy</span>
+          <input type="text" name="ship_postcode" value="<?= $pre('bill_postcode') ?>" placeholder="50-078"></label>
+        <label class="field"><span>Miasto</span>
+          <input type="text" name="ship_city" value="<?= $pre('bill_city') ?>"></label>
+      </div>
+
+      <div class="actions">
+        <button class="primary" type="submit"<?= $isAdmin ? '' : ' disabled' ?>>Utwórz zamówienie do zatwierdzenia</button>
+      </div>
+    </form>
+    <?php endif; ?>
+
+    <?php if ($an['unknown']): ?>
+    <h3>Nie rozpoznano</h3>
+    <p class="muted small">Te linie wyglądają na prośbę, ale nie dało się ich przypisać.
+      Pokazujemy je, zamiast po cichu pominąć — inaczej gubiłoby się zamówienia.</p>
+    <ul class="small">
+      <?php foreach ($an['unknown'] as $u): ?>
+      <li>„<?= h($u['line']) ?>” — <span class="muted"><?= h($u['why']) ?></span></li>
+      <?php endforeach; ?>
+    </ul>
+    <?php endif; ?>
+    <?php endif; ?>
     <?php if ($isAdmin && $detail['direction'] === 'wyjscie' && $detail['status'] !== 'wyslana'): ?>
     <form method="post" class="actions">
       <button class="primary" type="submit" name="wyslij" value="<?= (int) $detail['id'] ?>">Wyślij teraz</button>
@@ -272,6 +408,26 @@ console_crumbs($detail
       <div class="actions">
         <button class="primary" type="submit"<?= $isAdmin ? '' : ' disabled' ?>>Zapisz i wyślij</button>
       </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Wiadomość przychodząca</h2>
+    <p class="muted small">
+      Wklej maila od klienta. System rozpozna produkty i zaproponuje zamówienie do zatwierdzenia.
+      Gdy podłączymy skrzynkę IMAP (Ustawienia), wiadomości będą tu trafiać same — mechanizm jest ten sam.
+    </p>
+    <form method="post">
+      <input type="hidden" name="przychodzaca" value="1">
+      <div class="grid2">
+        <label class="field"><span>Od (adres)</span>
+          <input type="text" name="from" placeholder="jan@cukiernia.pl" required></label>
+        <label class="field"><span>Temat</span>
+          <input type="text" name="subject" placeholder="Zamówienie"></label>
+      </div>
+      <label class="field"><span>Treść wiadomości</span>
+        <textarea name="body" rows="8" required placeholder="Dzień dobry, poproszę 3 x Czekolada ciemna 70%..."></textarea></label>
+      <div class="actions"><button class="primary" type="submit"<?= $isAdmin ? '' : ' disabled' ?>>Zapisz i rozpoznaj</button></div>
     </form>
   </div>
 

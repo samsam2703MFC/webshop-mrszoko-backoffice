@@ -49,6 +49,49 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $flash = 'Wystawiono korektę ' . $inv['number'] . '.';
             }
         }
+    } elseif (isset($_POST['proforma'])) {
+        // Proforma d'une facture existante : c'est le cas légitime de « refaire »
+        // un document — la proforma n'étant pas fiscale, on peut la réémettre.
+        $src = wsm_invoice_by_id($pdo, (int) $_POST['proforma']);
+        if (!$src) { $flash = 'Nie znaleziono dokumentu.'; $kind = 'err'; }
+        else {
+            [$pf, $err] = wsm_invoice_proforma($pdo, $src, (string) ($me['nom'] ?? ''), (string) ($_POST['note'] ?? ''));
+            if ($err) { $flash = $err; $kind = 'err'; }
+            else {
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Proforma', 'wsm_invoices ' . $pf['number'], 'Sieć');
+                $flash = 'Wystawiono proformę ' . $pf['number'] . '.';
+            }
+        }
+    } elseif (isset($_POST['proforma_zam'])) {
+        $order = wsm_order_by_id($pdo, (int) $_POST['proforma_zam']);
+        if (!$order) { $flash = 'Nie znaleziono zamówienia.'; $kind = 'err'; }
+        else {
+            [$pf, $err] = wsm_invoice_proforma($pdo, $order, (string) ($me['nom'] ?? ''), (string) ($_POST['note'] ?? ''));
+            if ($err) { $flash = $err; $kind = 'err'; }
+            else {
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Proforma', 'wsm_invoices ' . $pf['number'], 'Sieć');
+                $flash = 'Wystawiono proformę ' . $pf['number'] . '.';
+            }
+        }
+    } elseif (isset($_POST['monit'])) {
+        // Une seule mécanique pour les deux relances : le modèle décide du ton,
+        // la clé d'événement décide de la répétition (une par jour, pas plus).
+        $ev  = ($_POST['monit'] === 'przypomnienie') ? 'przypomnienie' : 'zadanie_zaplaty';
+        $inv = wsm_invoice_by_id($pdo, (int) ($_POST['dokument'] ?? 0));
+        if (!$inv) { $flash = 'Nie znaleziono dokumentu.'; $kind = 'err'; }
+        else {
+            $id = wsm_mail_for_invoice($pdo, $inv, $ev, (string) ($me['nom'] ?? ''));
+            if ($id === 0) {
+                $flash = $ev === 'przypomnienie'
+                    ? 'Przypomnienie do tego dokumentu już dziś wysłano.'
+                    : 'Nie wysłano — brak szablonu lub adresu odbiorcy.';
+                $kind = 'err';
+            } else {
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Monit', 'wsm_invoices ' . $inv['number'] . ' / ' . $ev, 'Sieć');
+                $flash = ($ev === 'przypomnienie' ? 'Wysłano przypomnienie do ' : 'Wysłano żądanie zapłaty do ')
+                       . $inv['buyer_email'] . '.';
+            }
+        }
     } elseif (isset($_POST['wyslij'])) {
         $inv = wsm_invoice_by_id($pdo, (int) $_POST['wyslij']);
         if (!$inv) { $flash = 'Nie znaleziono dokumentu.'; $kind = 'err'; }
@@ -79,13 +122,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
+// Faute de tâche planifiée sur le serveur, les relances partent à l'ouverture
+// de cet écran. La clé d'événement porte la date : une facture ne peut être
+// relancée qu'une fois par jour, quel que soit le nombre de rafraîchissements.
+$auto = wsm_invoice_reminders_run($pdo);
+
 $detail  = isset($_GET['id']) ? wsm_invoice_by_id($pdo, (int) $_GET['id']) : null;
 $kpis    = wsm_invoice_kpis($pdo);
 $pending = wsm_invoice_pending_orders($pdo, 25);
+$overdue = wsm_invoices_overdue($pdo, 0);
 $rows    = wsm_invoices_list($pdo, ['q' => (string) ($_GET['q'] ?? '')]);
 $missing = wsm_invoice_blockers();
 
-$kindLabel = ['faktura' => 'Faktura', 'korekta' => 'Korekta', 'paragon' => 'E-paragon'];
+$kindLabel = ['faktura' => 'Faktura', 'korekta' => 'Korekta', 'paragon' => 'E-paragon', 'proforma' => 'Proforma'];
 
 // Vue « document » : la page imprimable, sans le reste de la console.
 if ($detail && isset($_GET['druk'])) {
@@ -94,7 +143,7 @@ if ($detail && isset($_GET['druk'])) {
 }
 
 console_head('Faktury', $me, '', $kpis['to_issue'] ? $kpis['to_issue'] . ' do wystawienia' : '');
-console_flash($flash, $kind);
+console_flash($flash !== '' ? $flash : ($auto ? 'Wysłano automatycznie przypomnień: ' . $auto . '.' : ''), $kind);
 console_crumbs($detail
     ? ['Pulpit' => 'pulpit.php', 'Faktury' => 'faktury.php', $detail['number'] => null]
     : ['Pulpit' => 'pulpit.php', 'Faktury' => null]);
@@ -151,8 +200,25 @@ console_crumbs($detail
     <a class="code" href="faktury.php?id=<?= (int) $i['id'] ?>&amp;druk=1" target="_blank" rel="noopener">Otwórz do druku / PDF ↗</a>
     <?php if ($isAdmin): ?>
     <form method="post"><button type="submit" name="wyslij" value="<?= (int) $i['id'] ?>">Wyślij mailem</button></form>
+    <?php if ($i['kind'] !== 'proforma'): ?>
+    <form method="post"><button type="submit" name="proforma" value="<?= (int) $i['id'] ?>">Wystaw proformę</button></form>
+    <?php endif; ?>
+    <?php if (!$i['paid'] && $i['kind'] !== 'paragon'): ?>
+    <form method="post">
+      <input type="hidden" name="dokument" value="<?= (int) $i['id'] ?>">
+      <button type="submit" name="monit" value="zadanie_zaplaty">Prośba o płatność</button>
+    </form>
+    <form method="post">
+      <input type="hidden" name="dokument" value="<?= (int) $i['id'] ?>">
+      <button type="submit" name="monit" value="przypomnienie">Wyślij przypomnienie</button>
+    </form>
+    <?php endif; ?>
     <?php endif; ?>
   </div>
+  <?php if ($i['kind'] === 'proforma'): ?>
+  <p class="muted small">Proforma nie jest fakturą VAT: nie odlicza się z niej podatku i nie trafia do
+    ewidencji. Służy do zapłaty z góry — po wpłacie wystawia się właściwy dokument.</p>
+  <?php endif; ?>
 
   <?php if ($isAdmin && $i['kind'] === 'faktura'): ?>
   <h3>Korekta</h3>
@@ -188,7 +254,44 @@ console_crumbs($detail
       <td data-l="Brutto" class="num"><?= h(pln((int) $o['total_gross'])) ?></td>
       <td data-l="">
         <?php if ($isAdmin): ?>
-        <form method="post"><button class="primary" type="submit" name="wystaw" value="<?= (int) $o['id'] ?>">Wystaw</button></form>
+        <div class="actions">
+          <form method="post"><button class="primary" type="submit" name="wystaw" value="<?= (int) $o['id'] ?>">Wystaw</button></form>
+          <form method="post"><button type="submit" name="proforma_zam" value="<?= (int) $o['id'] ?>">Proforma</button></form>
+        </div>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($overdue): ?>
+<div class="panel">
+  <h2>Po terminie — <?= count($overdue) ?></h2>
+  <p class="muted small">Faktury niezapłacone, których termin minął. Przypomnienie wychodzi
+    automatycznie po <b><?= (int) wsm_invoice_cfg()['reminder_days'] ?></b> dniach zwłoki
+    (ustawienia → faktura); tutaj można je wysłać ręcznie, raz dziennie na dokument.</p>
+  <div class="tablewrap">
+  <table class="rwd">
+    <thead><tr><th>Numer</th><th>Nabywca</th><th>Termin</th><th class="num">Zwłoka</th><th class="num">Brutto</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($overdue as $i2):
+        $late = (int) floor((time() - (int) strtotime((string) $i2['due_at'])) / 86400); ?>
+    <tr>
+      <td data-l="Numer"><a class="code" href="faktury.php?id=<?= (int) $i2['id'] ?>"><?= h($i2['number']) ?></a></td>
+      <td data-l="Nabywca"><?= h($i2['buyer_name']) ?></td>
+      <td data-l="Termin" class="num"><?= h($i2['due_at']) ?></td>
+      <td data-l="Zwłoka" class="num"><?= $late > 0 ? $late . ' dni' : 'dziś' ?></td>
+      <td data-l="Brutto" class="num"><?= h(pln((int) $i2['total_gross'])) ?></td>
+      <td data-l="">
+        <?php if ($isAdmin): ?>
+        <form method="post">
+          <input type="hidden" name="dokument" value="<?= (int) $i2['id'] ?>">
+          <button type="submit" name="monit" value="przypomnienie">Przypomnij</button>
+        </form>
         <?php endif; ?>
       </td>
     </tr>
