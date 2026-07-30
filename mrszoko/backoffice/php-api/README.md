@@ -113,11 +113,25 @@ VAT is the *remainder*, so `net + VAT == gross` always holds, line by line.
 | `wsm_payment_events` | every notification received; `event_key` **UNIQUE** = no double capture |
 | `wsm_shipments` | InPost parcel: service, locker code, template, tracking |
 | `wsm_order_events` | audit trail per order |
-| `wsm_shipping_methods` | delivery options and prices — data, not code |
+| `wsm_shipping_methods` | delivery options, prices and the countries each one serves |
+| `wsm_discount_tiers` | volume discount: minimum weight → percentage |
+| `wsm_countries` | where we sell, and which countries are EU (drives reverse charge) |
 | `wsm_shop_i18n` | every shop string in pl / uk / en |
 
-Stock is decremented **inside the order transaction** (`UPDATE … WHERE stock >= ?`),
-so two simultaneous orders for the last bag cannot both succeed.
+**Stock never refuses a sale.** An order beyond stock goes through: we take
+what exists (floored at zero, guarded against a concurrent order), record the
+shortfall per line in `wsm_order_items.backorder`, flag the order, and tell the
+buyer we will confirm the date by e-mail. Turning a customer away because a
+shelf is empty loses the customer; giving them a date does not. The console
+tags those orders `do potwierdzenia` so somebody actually calls back.
+
+**Volume discount by weight.** `wsm_discount_tiers` holds `min_weight_g` →
+`percent`; the highest tier reached wins and tiers never stack. The percentage
+is applied to each line's gross price before the VAT split, so `net + VAT ==
+gross` still holds line by line and the shipping free-threshold is compared
+against the discounted total. The cart tells the buyer how much more weight
+unlocks the next tier. Managed at `/mrszoko/backoffice/rabaty.php`, which also
+shows what each tier costs on a real product.
 
 The parcel template (A/B/C) is computed from the **whole basket's volume**, not
 from the largest single item — two 6 cm bags each fit an 8 cm locker, together

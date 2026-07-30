@@ -140,6 +140,7 @@ $payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 
     <a href="produkty.php">Produkty i zdjęcia</a>
     <a href="kontrahenci.php">Kontrahenci i VAT UE</a>
     <a href="kraje.php">Kraje i VAT</a>
+    <a href="rabaty.php">Rabaty</a>
     <a href="../shop/" target="_blank" rel="noopener">Sklep</a>
     <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
   </div>
@@ -248,7 +249,9 @@ $payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 
       <td><?= h($o['client']) ?><br><small style="color:var(--text-muted)"><?= h($o['email']) ?></small></td>
       <td><?= h($o['delivery_method'] === 'inpost_locker' ? 'Paczkomat' : 'Kurier') ?>
         <?= $o['inpost_point'] !== '' ? '<br><small style="color:var(--text-muted)">' . h($o['inpost_point']) . '</small>' : '' ?></td>
-      <td><span class="tag"><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span></td>
+      <td><span class="tag"><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
+        <?php if (!empty($o['backorder'])): ?><br><span class="tag no">do potwierdzenia</span><?php endif; ?>
+        <?php if (($o['discount_percent'] ?? 0) > 0): ?><br><span class="tag">−<?= (int) $o['discount_percent'] ?> %</span><?php endif; ?></td>
       <td><span class="tag <?= h($payCls) ?>"><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span></td>
       <td class="num"><?= (int) $o['units'] ?></td>
       <td class="num"><?= h(pln($o['total_gross'])) ?></td>

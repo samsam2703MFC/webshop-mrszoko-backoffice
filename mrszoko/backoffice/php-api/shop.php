@@ -158,6 +158,37 @@ function wsm_shop_product(PDO $pdo, string $key, string $lang): ?array {
     return $r ? wsm_shop_row_to_product($r, $S) : null;
 }
 
+/** Paliers de remise au poids, du plus élevé au plus faible. */
+function wsm_discount_tiers(PDO $pdo): array {
+    try {
+        return $pdo->query("SELECT id, min_weight_g, percent, label FROM wsm_discount_tiers
+                             WHERE active = 1 ORDER BY min_weight_g DESC")->fetchAll();
+    } catch (Throwable $e) { return []; }
+}
+
+/**
+ * Remise applicable à un poids. Le premier palier atteint en partant du plus
+ * haut gagne — deux paliers ne se cumulent jamais.
+ *
+ * @return array [pourcentage, palier|null]
+ */
+function wsm_discount_for_weight(PDO $pdo, int $weightG): array {
+    foreach (wsm_discount_tiers($pdo) as $t) {
+        if ($weightG >= (int) $t['min_weight_g']) return [(float) $t['percent'], $t];
+    }
+    return [0.0, null];
+}
+
+/** Le palier suivant, pour dire à l'acheteur ce qu'il gagnerait à en ajouter. */
+function wsm_discount_next(PDO $pdo, int $weightG): ?array {
+    $next = null;
+    foreach (wsm_discount_tiers($pdo) as $t) {
+        if ($weightG < (int) $t['min_weight_g']) $next = $t;   // tri décroissant : le dernier vu est le plus proche
+    }
+    return $next ? ['min_weight_g' => (int) $next['min_weight_g'], 'percent' => (float) $next['percent'],
+                    'missing_g' => (int) $next['min_weight_g'] - $weightG, 'label' => (string) $next['label']] : null;
+}
+
 /** Pays ouverts à la commande, nommés dans la langue du visiteur. */
 function wsm_shop_countries(PDO $pdo, string $lang): array {
     $col = in_array($lang, ['uk', 'en'], true) ? 'name_' . $lang : 'name_pl';
@@ -277,18 +308,38 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
     if (!$wanted) $e['items'] = 'koszyk pusty';
 
     $S = wsm_shop_strings($pdo, $lang);
+
+    // ---- Première passe : lire les produits et PESER le panier -------------
+    // La remise dépend du poids total, donc rien ne peut être chiffré avant de
+    // connaître le panier entier.
+    $picked = [];
     foreach ($wanted as $id => $qty) {
         $st = $pdo->prepare("SELECT * FROM wsm_products WHERE id = ? AND shop_visible = 1 AND active = 1");
         $st->execute([$id]);
         $r = $st->fetch();
         if (!$r) { $e['items'] = 'produkt niedostępny: ' . $id; continue; }
-
         $p = wsm_shop_row_to_product($r, $S);
-        if ($p['stock'] < $qty) {
-            $e['stock'] = ($e['stock'] ?? '') . ($e['stock'] ?? '' ? ' · ' : '') . $p['name'] . ' — ' . $p['stock'];
-            continue;
-        }
+        $picked[] = ['p' => $p, 'qty' => $qty];
+        $weight += $p['weight_g'] * $qty;
+    }
+
+    [$discountPct, $tier] = wsm_discount_for_weight($pdo, $weight);
+    $backorder = false;
+
+    // ---- Deuxième passe : les montants -------------------------------------
+    foreach ($picked as $x) {
+        $p = $x['p']; $qty = $x['qty'];
+
+        // Le stock ne bloque plus la vente : ce qui manque est produit et
+        // l'acheteur est prévenu. Refuser une commande faute de stock, c'est
+        // perdre le client au lieu de lui donner une date.
+        $missing = max(0, $qty - max(0, $p['stock']));
+        if ($missing > 0) $backorder = true;
+
+        // La remise s'applique au prix TTC affiché, ligne par ligne : la somme
+        // des lignes reste égale au total, et la TVA se déduit ensuite.
         $lineGross = $p['price'] * $qty;
+        if ($discountPct > 0) $lineGross = (int) round($lineGross * (1 - $discountPct / 100));
         [$lineNet, $lineVat] = wsm_split_vat($lineGross, $p['vat_rate']);
         // Autoliquidation : l'acheteur paie le HT, la TVA est due chez lui.
         if ($reverseCharge) { $lineVat = 0; $lineGross = $lineNet; }
@@ -301,9 +352,23 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
             'vat_rate' => $p['vat_rate'],
             'line_net' => $lineNet, 'line_vat' => $lineVat, 'line_gross' => $lineGross,
             'weight_g' => $p['weight_g'] * $qty,
+            'stock' => max(0, $p['stock']), 'backorder' => $missing,
         ];
         $itemsGross += $lineGross; $itemsNet += $lineNet; $itemsVat += $lineVat;
-        $weight += $p['weight_g'] * $qty;
+    }
+
+    // Ce que la remise a fait économiser, sur la base des prix pleins.
+    $fullGross = 0;
+    foreach ($picked as $x) $fullGross += $x['p']['price'] * $x['qty'];
+    $discountAmount = $discountPct > 0 ? max(0, $fullGross - ($reverseCharge ? $fullGross : $itemsGross)) : 0;
+    if ($discountPct > 0 && $reverseCharge) {
+        // En autoliquidation on compare des HT : le TTC plein n'a plus cours.
+        $discountAmount = 0;
+        foreach ($picked as $x) {
+            [$n, ] = wsm_split_vat($x['p']['price'] * $x['qty'], $x['p']['vat_rate']);
+            $discountAmount += $n;
+        }
+        $discountAmount = max(0, $discountAmount - $itemsGross);
     }
 
     // --- Livraison ----------------------------------------------------------
@@ -337,6 +402,11 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
         'items_net' => $itemsNet, 'items_vat' => $itemsVat, 'items_gross' => $itemsGross,
         'shipping_net' => $shipNet, 'shipping_vat' => $shipVat, 'shipping_gross' => $shipGross,
         'shipping_free' => $freeShipping,
+        'discount_percent' => $discountPct,
+        'discount_amount'  => $discountAmount,
+        'discount_label'   => $tier['label'] ?? '',
+        'discount_next'    => wsm_discount_next($pdo, $weight),
+        'backorder'        => $backorder,
         'country'        => $country,
         'reverse_charge' => $reverseCharge,
         'vat_status'     => (string) ($vies['status'] ?? 'skipped'),
@@ -606,13 +676,15 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     try {
         // Stock : relu et décrémenté DANS la transaction. Deux commandes
         // simultanées sur le dernier article ne peuvent pas passer toutes deux.
+        // On prélève ce qui existe, jamais plus : le stock ne descend pas sous
+        // zéro et le reste est noté comme à produire. Le CASE protège de la
+        // course avec une commande simultanée sans faire échouer celle-ci.
+        $dec = $pdo->prepare("UPDATE wsm_products
+                                 SET stock = CASE WHEN stock >= ? THEN stock - ? ELSE 0 END
+                               WHERE id = ?");
         foreach ($quote['lines'] as $l) {
-            $st = $pdo->prepare("UPDATE wsm_products SET stock = stock - ? WHERE id = ? AND stock >= ?");
-            $st->execute([$l['qty'], $l['id'], $l['qty']]);
-            if ($st->rowCount() !== 1) {
-                $pdo->rollBack();
-                return [null, ['stock' => $l['name']]];
-            }
+            $take = max(0, (int) $l['qty'] - (int) ($l['backorder'] ?? 0));
+            if ($take > 0) $dec->execute([$take, $take, $l['id']]);
         }
 
         $code  = wsm_next_order_code($pdo);
@@ -639,6 +711,9 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
             'weight_g' => $quote['weight_g'], 'parcel_template' => $quote['parcel_template'],
             'note' => $buyer['note'],
             'reverse_charge' => $quote['reverse_charge'] ? 1 : 0,
+            'backorder' => !empty($quote['backorder']) ? 1 : 0,
+            'discount_percent' => $quote['discount_percent'],
+            'discount_amount'  => $quote['discount_amount'],
         ] + wsm_vies_columns($vies);
         $names = array_keys($cols);
         $sql = 'INSERT INTO wsm_orders (' . implode(',', $names) . ') VALUES (' .
@@ -649,13 +724,14 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
         $ins = $pdo->prepare(
             "INSERT INTO wsm_order_items
                (order_id, product_id, name, sku, ean, qty, unit_net, unit_gross, vat_rate,
-                line_net, line_vat, line_gross, weight_g)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                line_net, line_vat, line_gross, weight_g, backorder)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         foreach ($quote['lines'] as $l) {
             $ins->execute([$orderId, $l['id'], $l['name'], $l['sku'], $l['ean'], $l['qty'],
                 $l['unit_net'], $l['unit_gross'], $l['vat_rate'],
-                $l['line_net'], $l['line_vat'], $l['line_gross'], $l['weight_g']]);
+                $l['line_net'], $l['line_vat'], $l['line_gross'], $l['weight_g'],
+                (int) ($l['backorder'] ?? 0)]);
         }
 
         $pdo->prepare(
@@ -714,6 +790,7 @@ function wsm_order_hydrate(PDO $pdo, array $o): array {
         'qty' => (int) $r['qty'], 'unit_gross' => (int) $r['unit_gross'], 'unit_net' => (int) $r['unit_net'],
         'vat_rate' => (float) $r['vat_rate'], 'line_net' => (int) $r['line_net'],
         'line_vat' => (int) $r['line_vat'], 'line_gross' => (int) $r['line_gross'],
+        'backorder' => (int) ($r['backorder'] ?? 0),
     ], $st->fetchAll());
 
     $st = $pdo->prepare("SELECT * FROM wsm_shipments WHERE order_id = ? ORDER BY id DESC LIMIT 1");
@@ -746,6 +823,9 @@ function wsm_order_hydrate(PDO $pdo, array $o): array {
         'total_net' => (int) $o['total_net'], 'total_vat' => (int) $o['total_vat'], 'total_gross' => (int) $o['total_gross'],
         'weight_g' => (int) $o['weight_g'], 'parcel_template' => (string) $o['parcel_template'],
         'reverse_charge' => (int) ($o['reverse_charge'] ?? 0) === 1,
+        'backorder' => (int) ($o['backorder'] ?? 0) === 1,
+        'discount_percent' => (float) ($o['discount_percent'] ?? 0),
+        'discount_amount'  => (int) ($o['discount_amount'] ?? 0),
         'note' => (string) ($o['note'] ?? ''),
         'created_at' => (string) $o['created_at'], 'paid_at' => $o['paid_at'],
         'shipment' => $ship ? ['service' => $ship['service'], 'target_point' => $ship['target_point'],
@@ -786,6 +866,8 @@ function wsm_orders_list(PDO $pdo, int $limit = 200): array {
             'total_gross' => (int) $o['total_gross'], 'total_net' => (int) $o['total_net'],
             'weight_g' => (int) $o['weight_g'], 'parcel_template' => $o['parcel_template'],
             'invoice' => (int) $o['invoice'], 'nip' => $o['nip'],
+            'backorder' => (int) ($o['backorder'] ?? 0) === 1,
+            'discount_percent' => (float) ($o['discount_percent'] ?? 0),
         ];
     }, $rows);
 }

@@ -481,3 +481,12 @@ CREATE TABLE IF NOT EXISTS wsm_countries (
   active     INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0
 );
+
+-- --- Rabaty ilościowe (miroir SQLite) ---------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_discount_tiers (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  min_weight_g INTEGER NOT NULL DEFAULT 0,
+  percent      REAL NOT NULL DEFAULT 0,
+  label        TEXT NOT NULL DEFAULT '',
+  active       INTEGER NOT NULL DEFAULT 1
+);

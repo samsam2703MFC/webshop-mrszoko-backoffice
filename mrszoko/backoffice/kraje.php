@@ -140,6 +140,7 @@ catch (Throwable $e) {}
     <a href="zamowienia.php">Zamówienia</a>
     <a href="produkty.php">Produkty</a>
     <a href="kontrahenci.php">Kontrahenci</a>
+    <a href="rabaty.php">Rabaty</a>
     <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
   </div>
 </header>

@@ -185,16 +185,15 @@ if ($page === '') {
           <h3><a href="<?= e(u('p/' . $p['slug'])) ?>"><?= e($p['name']) ?></a></h3>
           <div class="card-buy">
             <span class="price"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></span>
-            <?php if ($p['stock'] > 0): ?>
+            <?php // Rupture : on prend la commande quand même et on prévient.
+                  // Refuser faute de stock, c'est perdre le client. ?>
+            <?php if ($p['stock'] <= 0): ?><span class="mono ondemand"><?= e($S['product.on_demand'] ?? '') ?></span><?php endif; ?>
             <form method="post" action="<?= e(u('koszyk')) ?>" data-add>
               <?= csrf_field() ?>
               <input type="hidden" name="add" value="<?= e($p['id']) ?>">
               <input type="hidden" name="qty" value="1">
               <button class="btn btn--brand btn--sm" type="submit"><?= e($S['product.add'] ?? '') ?></button>
             </form>
-            <?php else: ?>
-            <span class="mono out"><?= e($S['product.stock_out'] ?? '') ?></span>
-            <?php endif; ?>
           </div>
         </div>
       </article>
@@ -244,7 +243,7 @@ if ($page === 'p') {
     }
     $related = array_values(array_filter(wsm_shop_products($pdo, $lang), fn($x) => $x['id'] !== $p['id']));
     $related = array_slice($related, 0, 4);
-    $stockLabel = $p['stock'] <= 0 ? ($S['product.stock_out'] ?? '')
+    $stockLabel = $p['stock'] <= 0 ? ($S['product.on_demand'] ?? '')
         : ($p['stock'] <= 10 ? ($S['product.stock_low'] ?? '') : ($S['product.stock_in'] ?? ''));
 
     layout_head($S, $lang, $langs, $p['name'], $p['desc']);
@@ -262,20 +261,17 @@ if ($page === 'p') {
       <p class="mono muted"><?= e(zl($p['price_net'])) ?> <?= e($S['price.net'] ?? '') ?>
         · <?= e($S['product.' . ($p['stock'] <= 0 ? 'stock_out' : 'stock_in')] ?? '') ?></p>
 
-      <?php if ($p['stock'] > 0): ?>
+      <?php if ($p['stock'] <= 0) notice('warn', $S['product.on_demand_note'] ?? ''); ?>
       <form class="buy-form" method="post" action="<?= e(u('koszyk')) ?>" data-add>
         <?= csrf_field() ?>
         <input type="hidden" name="add" value="<?= e($p['id']) ?>">
         <label class="qty">
           <span class="sr-only"><?= e($S['product.qty'] ?? '') ?></span>
-          <input type="number" name="qty" value="1" min="1" max="<?= (int) min($p['stock'], WSM_SHOP_MAX_QTY) ?>" inputmode="numeric">
+          <input type="number" name="qty" value="1" min="1" max="<?= (int) WSM_SHOP_MAX_QTY ?>" inputmode="numeric">
         </label>
         <button class="btn btn--accent btn--lg" type="submit"><?= e($S['product.add'] ?? '') ?></button>
       </form>
       <p class="mono muted stock"><?= e($stockLabel) ?></p>
-      <?php else: ?>
-      <p class="notice notice--warn"><?= e($S['product.stock_out'] ?? '') ?></p>
-      <?php endif; ?>
 
       <dl class="specs">
         <?php if ($p['origin'] !== ''): ?><dt><?= e($S['product.origin'] ?? '') ?></dt><dd><?= e($p['origin']) ?></dd><?php endif; ?>
@@ -324,7 +320,7 @@ if ($page === 'koszyk') {
     <p class="muted"><?= e($S['cart.empty'] ?? '') ?></p>
     <p><a class="btn btn--brand" href="<?= e(u()) ?>"><?= e($S['cart.empty_cta'] ?? '') ?></a></p>
   <?php else: ?>
-  <?php if (isset($qErr['stock'])) notice('warn', ($S['product.stock_out'] ?? '') . ' — ' . $qErr['stock']); ?>
+  <?php if (!empty($q['backorder'])) notice('warn', $S['cart.backorder'] ?? ''); ?>
   <div class="cart">
     <form class="cart-lines" method="post" action="<?= e(u('koszyk')) ?>">
       <?= csrf_field() ?>
@@ -369,6 +365,11 @@ if ($page === 'koszyk') {
       </div>
       <?php endif; ?>
 
+      <?php if (!empty($q['discount_next'])):
+        $n = $q['discount_next'];
+        $kg = number_format($n['missing_g'] / 1000, 2, ',', ' ') . ' kg'; ?>
+      <p class="nudge mono"><?= e(str_replace(['{x}', '{p}'], [$kg, (int) $n['percent']], $S['cart.discount_next'] ?? '')) ?></p>
+      <?php endif; ?>
       <form class="ship-pick" method="get" action="<?= e(u('koszyk')) ?>">
         <?php foreach ($q['methods'] as $sm): ?>
         <label class="radio">
@@ -383,6 +384,10 @@ if ($page === 'koszyk') {
 
       <dl class="totals mono">
         <dt><?= e($S['cart.subtotal'] ?? '') ?></dt><dd><?= e(zl($q['items_gross'])) ?></dd>
+        <?php if (($q['discount_percent'] ?? 0) > 0): ?>
+        <dt class="disc"><?= e($S['cart.discount'] ?? '') ?> −<?= (int) $q['discount_percent'] ?> %</dt>
+        <dd class="disc">−<?= e(zl($q['discount_amount'])) ?></dd>
+        <?php endif; ?>
         <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
         <dd><?= $q['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($q['shipping_gross'])) ?></dd>
         <dt class="grand"><?= e($S['cart.total'] ?? '') ?></dt><dd class="grand"><?= e(zl($q['total_gross'])) ?></dd>
@@ -540,6 +545,7 @@ if ($page === 'kasa') {
 
     <aside class="summary">
       <h2><?= e($S['checkout.summary'] ?? '') ?></h2>
+      <?php if (!empty($q['backorder'])) notice('warn', $S['cart.backorder'] ?? ''); ?>
       <ul class="sum-lines">
         <?php foreach ($q['lines'] as $l): ?>
         <li><span><?= e($l['name']) ?> <em class="mono">×<?= (int) $l['qty'] ?></em></span><span class="mono"><?= e(zl($l['line_gross'])) ?></span></li>
@@ -547,6 +553,10 @@ if ($page === 'kasa') {
       </ul>
       <dl class="totals mono">
         <dt><?= e($S['cart.subtotal'] ?? '') ?></dt><dd><?= e(zl($q['items_gross'])) ?></dd>
+        <?php if (($q['discount_percent'] ?? 0) > 0): ?>
+        <dt class="disc"><?= e($S['cart.discount'] ?? '') ?> −<?= (int) $q['discount_percent'] ?> %</dt>
+        <dd class="disc">−<?= e(zl($q['discount_amount'])) ?></dd>
+        <?php endif; ?>
         <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
         <dd><?= $q['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($q['shipping_gross'])) ?></dd>
         <?php if (!empty($q['reverse_charge'])): ?>
@@ -585,6 +595,7 @@ if ($page === 'zamowienie') {
     <h1><?= e($S['order.thanks'] ?? '') ?></h1>
     <p class="mono order-code"><?= e($S['order.number'] ?? '') ?> · <strong><?= e($o['code']) ?></strong></p>
     <p class="muted"><?= e(str_replace('{email}', $o['email'], $S['order.confirm_mail'] ?? '')) ?></p>
+    <?php if (!empty($o['backorder'])) notice('warn', $S['order.backorder'] ?? ''); ?>
   </div>
 
   <div class="order-grid">
