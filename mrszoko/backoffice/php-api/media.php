@@ -46,8 +46,13 @@ function wsm_media_readers(): array {
  * Traite un fichier de $_FILES. Renvoie [url|null, erreur|null].
  *
  * @param array $file  une entrée de $_FILES
+ * @param bool  $alpha Conserver la transparence. Vrai pour un LOGO, faux pour
+ *   une photo de produit. Un logo aplati sur du crème ressort en rectangle
+ *   sale dès qu'on le pose ailleurs que sur cette couleur exacte — sur une
+ *   carte blanche, sur un bandeau sombre, à l'impression. Une photo, elle, n'a
+ *   aucune transparence à préserver et gagne à peser moins.
  */
-function wsm_media_store(array $file): array {
+function wsm_media_store(array $file, bool $alpha = false): array {
     $err = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($err === UPLOAD_ERR_NO_FILE)   return [null, 'nie wybrano pliku'];
     if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) return [null, 'plik za duży'];
@@ -77,9 +82,18 @@ function wsm_media_store(array $file): array {
     $nh = max(1, (int) round($h * $scale));
 
     $dst = imagecreatetruecolor($nw, $nh);
-    // Fond crème plutôt que noir : une PNG transparente posée sur du noir
-    // ressortirait en carré sombre au milieu de la boutique.
-    imagefill($dst, 0, 0, imagecolorallocate($dst, 0xFB, 0xF6, 0xEF));
+    if ($alpha) {
+        // On garde le canal alpha de bout en bout : sans alphablending à faux
+        // ET savealpha à vrai, GD recompose la transparence sur du noir au
+        // moment d'écrire, et le logo sort cerné.
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+    } else {
+        // Fond crème plutôt que noir : une PNG transparente posée sur du noir
+        // ressortirait en carré sombre au milieu de la boutique.
+        imagefill($dst, 0, 0, imagecolorallocate($dst, 0xFB, 0xF6, 0xEF));
+    }
     imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
     imagedestroy($src);
 
@@ -87,12 +101,16 @@ function wsm_media_store(array $file): array {
     if (!is_dir($dir) && !@mkdir($dir, 0775, true)) { imagedestroy($dst); return [null, 'brak katalogu media/']; }
     if (!is_writable($dir)) { imagedestroy($dst); return [null, 'katalog media/ nie jest zapisywalny']; }
 
+    // JPEG n'a pas de canal alpha : pour un logo, c'est WebP ou PNG, jamais
+    // JPEG — sinon la transparence qu'on vient de préserver serait perdue à
+    // l'écriture, sans erreur ni message.
     $webp = function_exists('imagewebp');
-    $name = bin2hex(random_bytes(12)) . ($webp ? '.webp' : '.jpg');
+    $ext  = $webp ? 'webp' : ($alpha ? 'png' : 'jpg');
+    $name = bin2hex(random_bytes(12)) . '.' . $ext;
     $path = $dir . '/' . $name;
     $written = $webp
         ? @imagewebp($dst, $path, WSM_MEDIA_QUALITY)
-        : @imagejpeg($dst, $path, WSM_MEDIA_QUALITY);
+        : ($alpha ? @imagepng($dst, $path, 6) : @imagejpeg($dst, $path, WSM_MEDIA_QUALITY));
     imagedestroy($dst);
     if (!$written) return [null, 'zapis nie powiódł się'];
     @chmod($path, 0644);
@@ -106,7 +124,7 @@ function wsm_media_store(array $file): array {
  * empêche « media/../../api/config.local.php » d'être effacé.
  */
 function wsm_media_delete(string $url): bool {
-    if (!preg_match('#^media/([a-f0-9]{24}\.(webp|jpg))$#', $url, $m)) return false;
+    if (!preg_match('#^media/([a-f0-9]{24}\.(webp|jpg|png))$#', $url, $m)) return false;
     $path = wsm_media_dir() . '/' . $m[1];
     return is_file($path) && @unlink($path);
 }
@@ -114,7 +132,7 @@ function wsm_media_delete(string $url): bool {
 /** Une URL d'image acceptable en base : notre média, ou une adresse https. */
 function wsm_media_valid_url(string $url): bool {
     if ($url === '') return true;                       // vider le champ est permis
-    if (preg_match('#^media/[a-f0-9]{24}\.(webp|jpg)$#', $url)) return true;
+    if (preg_match('#^media/[a-f0-9]{24}\.(webp|jpg|png)$#', $url)) return true;
     // Une image distante en http ferait basculer la page en contenu mixte et
     // le navigateur la bloquerait : https uniquement.
     return (bool) filter_var($url, FILTER_VALIDATE_URL) && str_starts_with($url, 'https://');

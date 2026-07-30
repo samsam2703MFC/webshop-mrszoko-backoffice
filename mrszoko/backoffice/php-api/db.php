@@ -116,6 +116,8 @@ function wsm_bootstrap(bool $seed = true): PDO {
     wsm_ensure_mail($pdo);
     wsm_ensure_invoices($pdo);
     wsm_ensure_stock($pdo);
+    require_once __DIR__ . '/brand.php';
+    wsm_ensure_brands($pdo);
     // En dernier : les réglages saisis en console entrent en vigueur une fois
     // que leur table existe, et seulement là où le fichier serveur se tait.
     require_once __DIR__ . '/settings.php';

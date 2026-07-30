@@ -181,6 +181,7 @@ if ($page === '') {
           <?php if ($p['badge'] !== ''): ?><span class="badge"><?= e($p['badge']) ?></span><?php endif; ?>
         </a>
         <div class="card-body">
+          <?php if ($p['brand']): ?><?= brand_mark($p['brand']) ?><?php endif; ?>
           <p class="card-meta mono"><?= e($p['subtitle']) ?></p>
           <h3><a href="<?= e(u('p/' . $p['slug'])) ?>"><?= e($p['name']) ?></a></h3>
           <div class="card-buy">
@@ -258,6 +259,19 @@ if ($page === 'p') {
   <div class="product">
     <div class="product-media"><?= product_visual($p, 'product-photo') ?></div>
     <div class="product-buy">
+      <?php if ($p['brand']): ?>
+      <div class="brand-line">
+        <?= brand_mark($p['brand'], 'brand-mark brand-mark--lg') ?>
+        <span class="brand-name">
+          <span class="mono eyebrow"><?= e($S['product.brand'] ?? '') ?></span>
+          <?php if (($p['brand']['site'] ?? '') !== ''): ?>
+            <a href="<?= e($p['brand']['site']) ?>" target="_blank" rel="noopener nofollow"><?= e($p['brand']['name']) ?></a>
+          <?php else: ?>
+            <b><?= e($p['brand']['name']) ?></b>
+          <?php endif; ?>
+        </span>
+      </div>
+      <?php endif; ?>
       <p class="mono eyebrow"><?= e($p['subtitle']) ?></p>
       <h1><?= e($p['name']) ?></h1>
       <p class="lead"><?= e($p['desc']) ?></p>

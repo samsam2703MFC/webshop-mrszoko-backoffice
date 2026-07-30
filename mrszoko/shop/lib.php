@@ -156,9 +156,24 @@ function redirect(string $path, int $code = 303): void {
  * plutôt qu'un cadre gris avec le mot « PHOTO » : c'est du décor assumé, pas
  * un trou dans la page. Dès qu'image_url est renseignée en base, elle gagne.
  */
+/**
+ * Adresse d'un média stocké par la console.
+ *
+ * La base garde « media/xxx.webp », un chemin RELATIF à la racine de la
+ * boutique. Tel quel dans une page servie sous /p/mon-produit, le navigateur
+ * le résout en /p/media/xxx.webp — et l'image est cassée sur toutes les fiches
+ * produit, alors qu'elle s'affiche parfaitement sur la page d'accueil. On le
+ * ramène donc toujours à la racine de la boutique.
+ */
+function media_src(string $url): string {
+    if ($url === '') return '';
+    if (preg_match('#^(https?:)?//#i', $url) || str_starts_with($url, '/')) return $url;
+    return u($url);
+}
+
 function product_visual(array $p, string $class, string $sizes = ''): string {
     if (($p['image'] ?? '') !== '') {
-        return '<img class="' . e($class) . '" src="' . e($p['image']) . '" alt="' . e($p['name'])
+        return '<img class="' . e($class) . '" src="' . e(media_src((string) $p['image'])) . '" alt="' . e($p['name'])
              . '" loading="lazy" decoding="async"' . ($sizes ? ' sizes="' . e($sizes) . '"' : '') . '>';
     }
     $style = 'background:radial-gradient(120% 120% at 30% 20%, var(' . e($p['from'] ?: '--choco-500')
@@ -166,4 +181,24 @@ function product_visual(array $p, string $class, string $sizes = ''): string {
     $mark = $p['cocoa'] !== '' ? $p['cocoa'] : ($p['unit'] ?? '');
     return '<div class="' . e($class) . ' visual" style="' . $style . '" role="img" aria-label="' . e($p['name']) . '">'
          . ($mark !== '' ? '<span class="visual-mark">' . e($mark) . '</span>' : '') . '</div>';
+}
+
+/**
+ * Le logo d'une marque, ou son nom si elle n'a pas de logo.
+ *
+ * On ne laisse jamais un emplacement vide : une marque sans image affiche son
+ * nom en toutes lettres. Un cadre vide sur une carte produit se lit comme une
+ * image cassée, et fait douter du reste de la page.
+ *
+ * Le logo n'est pas cliquable sur la carte : la carte entière mène déjà au
+ * produit, et deux cibles imbriquées font rater celle qu'on visait.
+ */
+function brand_mark(?array $b, string $class = 'brand-mark'): string {
+    if (!$b || ($b['name'] ?? '') === '') return '';
+    $name = (string) $b['name'];
+    if (($b['logo'] ?? '') !== '') {
+        return '<span class="' . e($class) . '"><img src="' . e(media_src((string) $b['logo'])) . '" alt="' . e($name)
+             . '" loading="lazy" decoding="async"></span>';
+    }
+    return '<span class="' . e($class) . ' ' . e($class) . '--text">' . e($name) . '</span>';
 }

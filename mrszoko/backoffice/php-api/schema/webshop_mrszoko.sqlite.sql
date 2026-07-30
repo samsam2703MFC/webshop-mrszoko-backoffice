@@ -620,3 +620,20 @@ CREATE TABLE IF NOT EXISTS wsm_stock_docs (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (number)
 );
+
+-- --- Marki (miroir SQLite) --------------------------------------------------
+--  Une marque est une entité à part entière, pas une chaîne recopiée sur
+--  chaque produit : le logo, l'adresse du site et l'orthographe du nom se
+--  corrigent une fois pour toutes. Le produit ne porte qu'une référence.
+CREATE TABLE IF NOT EXISTS wsm_brands (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  slug        TEXT NOT NULL,
+  logo_url    TEXT NOT NULL DEFAULT '',
+  site_url    TEXT NOT NULL DEFAULT '',
+  note        TEXT NOT NULL DEFAULT '',
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  active      INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (slug)
+);
