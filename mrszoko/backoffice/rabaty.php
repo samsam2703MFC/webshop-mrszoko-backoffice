@@ -103,6 +103,7 @@ console_head('Rabaty', $me, <<<'CSS'
   }
 CSS, '');
 console_flash($flash, $kind);
+console_crumbs(['Pulpit' => 'pulpit.php', 'Rabaty' => null]);
 ?>
 
   <p class="hint">

@@ -23,6 +23,8 @@ require_once $API . '/settings.php';
 require_once $API . '/tpay.php';
 require_once $API . '/inpost.php';
 require_once $API . '/mail.php';
+require_once $API . '/shop.php';
+require_once $API . '/invoice.php';
 
 $flash = ''; $flashKind = 'ok';
 
@@ -68,23 +70,27 @@ $groups = [
     'tpay'   => ['tpay.com — płatności', 'Bez client_id i client_secret nie powstanie żadna transakcja; bez kodu bezpieczeństwa żadne powiadomienie o płatności nie zostanie przyjęte.'],
     'inpost' => ['InPost ShipX — wysyłka', 'Token serwerowy służy do tworzenia etykiet. Token Geowidget trafia do strony sklepu — to token przeglądarkowy.'],
     'mail'   => ['Poczta — wiadomości do klientów', 'Bez adresu nadawcy wiadomości czekają w kolejce w zakładce Poczta i nic nie ginie.'],
+    'faktura' => ['Faktury', 'Te dane trafiają na każdy wystawiony dokument. Zmiana nie przepisuje faktur już wystawionych — każda z nich trzyma własną kopię.'],
     'sklep'  => ['Sklep', ''],
 ];
 
 $state = [
-    'tpay'   => wsm_tpay_enabled(),
-    'inpost' => wsm_inpost_enabled(),
-    'mail'   => wsm_mail_enabled(),
+    'tpay'    => wsm_tpay_enabled(),
+    'inpost'  => wsm_inpost_enabled(),
+    'mail'    => wsm_mail_enabled(),
+    'faktura' => wsm_invoice_blockers() === [],
 ];
 
 console_head('Ustawienia', $me);
 console_flash($flash, $flashKind);
+console_crumbs(['Pulpit' => 'pulpit.php', 'Ustawienia' => null]);
 ?>
 
 <div class="kpis">
   <div class="kpi"><b><?= $state['tpay'] ? 'TAK' : 'NIE' ?></b><span>tpay gotowy</span></div>
   <div class="kpi"><b><?= $state['inpost'] ? 'TAK' : 'NIE' ?></b><span>InPost gotowy</span></div>
   <div class="kpi"><b><?= $state['mail'] ? 'TAK' : 'NIE' ?></b><span>Poczta gotowa</span></div>
+  <div class="kpi"><b><?= $state['faktura'] ? 'TAK' : 'NIE' ?></b><span>Faktury gotowe</span></div>
 </div>
 
 <p class="warnbox">

@@ -36,6 +36,35 @@
   // ---- Ajout au panier sans quitter la page --------------------------------
   // On poste le MÊME formulaire, en arrière-plan. Le serveur reste seul juge
   // du contenu du panier ; on ne fait que lui éviter un rechargement.
+  /* Ce que le compteur de l'en-tête ne dit pas assez fort.
+     Un chiffre qui passe de 0 à 1 en haut à droite est invisible sur un
+     téléphone : le pouce est en bas, le regard sur le bouton. On confirme
+     donc à l'endroit où l'on a cliqué, et on offre le chemin vers le panier
+     — sans quoi il faut aller le chercher dans l'en-tête. */
+  function confirmAdded(form) {
+    var host = form.parentNode;
+    if (!host) return;
+    var note = host.querySelector('.added-note');
+    if (!note) {
+      var cart = document.querySelector('a.cart-btn');
+      note = document.createElement('p');
+      note.className = 'added-note';
+      note.setAttribute('role', 'status');
+      note.appendChild(document.createTextNode(document.body.getAttribute('data-added') || '✓'));
+      if (cart) {
+        var a = document.createElement('a');
+        a.href = cart.getAttribute('href');
+        var lbl = cart.querySelector('.cart-label');
+        a.textContent = (lbl ? lbl.textContent : '').trim() || 'Koszyk';
+        a.textContent += ' →';
+        note.appendChild(document.createTextNode(' '));
+        note.appendChild(a);
+      }
+      host.insertBefore(note, form.nextSibling);
+    }
+    note.hidden = false;
+  }
+
   document.querySelectorAll('form[data-add]').forEach(function (form) {
     form.addEventListener('submit', function (ev) {
       if (!window.fetch) return;                       // navigateur ancien : POST classique
@@ -56,6 +85,7 @@
           btn.textContent = done;
           setTimeout(function () { btn.textContent = label; btn.disabled = false; }, 1400);
         }
+        confirmAdded(form);
       }).catch(function () {
         // Réseau indisponible : on laisse le formulaire partir normalement.
         if (btn) btn.disabled = false;

@@ -57,6 +57,9 @@ $payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 
 
 console_head('Zamówienia', $me, '', $kpis['orders_pending'] ? $kpis['orders_pending'] . ' czeka na płatność' : '');
 console_flash($flash, $flashKind);
+console_crumbs($detail
+    ? ['Pulpit' => 'pulpit.php', 'Zamówienia' => 'zamowienia.php', $detail['code'] => null]
+    : ['Pulpit' => 'pulpit.php', 'Zamówienia' => null]);
 ?>
   <?php if (!$cfg['tpay'] || !$cfg['inpost']): ?>
   <p class="warnbox">

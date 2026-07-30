@@ -16,6 +16,7 @@ require_once __DIR__ . '/console.php';
 $API = console_api_dir();
 require_once $API . '/shop.php';
 require_once $API . '/media.php';
+require_once $API . '/stock.php';
 
 /** La table produits stocke des złotys, pas des grosze : conversion locale. */
 function zl($v): string { return number_format((float) $v, 2, ',', "\u{202F}") . "\u{202F}zł"; }
@@ -55,7 +56,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             foreach (['slug', 'origin', 'cocoa', 'unit_label', 'badge', 'vat_rate'] as $k) {
                 if (isset($_POST[$k])) $body[$k] = $_POST[$k];
             }
-            $body['stock'] = (int) ($_POST['stock'] ?? 0);
+            // Le stock ne se pose plus directement : il se corrige, et la
+            // correction laisse une trace dans le magasin (qui, quand, pourquoi).
+            $wantStock = isset($_POST['stock']) ? max(0, (int) $_POST['stock']) : null;
             $body['shop_visible'] = !empty($_POST['shop_visible']) ? 1 : 0;
 
             $old = (string) $cur['image_url'];
@@ -86,7 +89,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                         $set[] = 'prix = ?'; $vals[] = (float) str_replace(',', '.', (string) $_POST['prix']);
                     }
                     $vals[] = $id;
-                    $pdo->prepare("UPDATE wsm_products SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
+                    if ($set) {
+                        $pdo->prepare("UPDATE wsm_products SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
+                    }
+                    if ($wantStock !== null) {
+                        wsm_stock_set($pdo, $id, $wantStock, [
+                            'reason' => trim((string) ($_POST['stock_reason'] ?? '')) ?: 'korekta ręczna',
+                            'actor'  => (string) ($me['nom'] ?? ''),
+                        ]);
+                    }
                     wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zmiana', 'wsm_products ' . $id, 'Sieć');
                     // L'ancienne photo n'est effacée qu'une fois la nouvelle
                     // réellement enregistrée en base.
@@ -142,6 +153,7 @@ console_head('Produkty i zdjęcia', $me, <<<'CSS'
   a.view:hover { text-decoration: underline; }
 CSS, '');
 console_flash($flash, $kind);
+console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
 ?>
   <?php if (!$isAdmin): ?>
     <p class="warnbox">Twoja rola pozwala tylko przeglądać. Zmiany może zapisywać rola <b>Centrala</b>.</p>
@@ -258,6 +270,10 @@ console_flash($flash, $kind);
             <?php if (isset($fieldErrors['stock']) && $open): ?>
               <small class="err"><?= h($fieldErrors['stock']) ?></small>
             <?php else: ?><small>Zamówienie ponad stan przechodzi — klient dostaje mail „skontaktujemy się”.</small><?php endif; ?>
+          </label>
+          <label class="f">Powód zmiany stanu
+            <input type="text" name="stock_reason" placeholder="np. inwentaryzacja, stłuczka"<?= $isAdmin ? '' : ' disabled' ?>>
+            <small>Zapisywany w <a class="view" href="magazyn.php">Magazynie</a>. Zostaw puste, jeśli stanu nie zmieniasz.</small>
           </label>
           <label class="f">Gramatura
             <input type="text" name="unit_label" value="<?= h((string) $p['unit_label']) ?>" placeholder="1 kg"<?= $isAdmin ? '' : ' disabled' ?>>

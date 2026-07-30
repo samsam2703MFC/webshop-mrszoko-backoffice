@@ -35,8 +35,40 @@ function layout_head(array $S, string $lang, array $langs, string $title = '', s
 <link rel="alternate" hreflang="<?= e($l) ?>" href="<?= e($self . '?lang=' . $l) ?>">
 <?php endforeach; ?>
 </head>
-<body>
+<!-- La confirmation d'ajout est traduite en base (product.added) ; sans cet
+     attribut, shop.js retombait sur un simple « ✓ » et la traduction ne
+     servait à rien. -->
+<body data-added="<?= e($S['product.added'] ?? '') ?>">
 <?php
+}
+
+/**
+ * Fil d'Ariane. Deux raisons d'exister, aucune décorative :
+ *  • sur un téléphone, il donne le chemin du retour sans dépendre du bouton
+ *    « précédent » — celui-ci renvoie à la liste de résultats d'un moteur de
+ *    recherche, pas au catalogue ;
+ *  • balisé en schema.org, il est repris tel quel par Google sous le titre,
+ *    ce qui remplace une URL illisible par « Sklep › Katalog › Produit ».
+ *
+ * @param array $items  [libellé => href|null], le dernier étant la page courante
+ */
+function layout_crumbs(array $items): void {
+    if (!$items) return;
+    $last = array_key_last($items);
+    $pos = 0;
+    echo '<nav class="crumbs" aria-label="' . e('Ścieżka') . '" itemscope itemtype="https://schema.org/BreadcrumbList">';
+    foreach ($items as $label => $href) {
+        $pos++;
+        if ($pos > 1) echo '<span class="sepc" aria-hidden="true">›</span>';
+        echo '<span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">';
+        if ($href !== null && $label !== $last) {
+            echo '<a itemprop="item" href="' . e((string) $href) . '"><span itemprop="name">' . e((string) $label) . '</span></a>';
+        } else {
+            echo '<span itemprop="name" aria-current="page">' . e((string) $label) . '</span>';
+        }
+        echo '<meta itemprop="position" content="' . $pos . '"></span>';
+    }
+    echo '</nav>';
 }
 
 function layout_header(array $S, string $lang, array $langs, int $cartCount): void {

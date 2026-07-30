@@ -114,6 +114,11 @@ $statusLbl = ['wyslana' => 'Wysłana', 'kolejka' => 'W kolejce', 'blad' => 'Bł�
 
 console_head('Poczta', $me, '', $kpis['queued'] ? $kpis['queued'] . ' w kolejce' : '');
 console_flash($flash, $flashKind);
+console_crumbs($detail
+    ? ['Pulpit' => 'pulpit.php', 'Poczta' => 'poczta.php', $detail['subject'] => null]
+    : ($view === 'szablony'
+        ? ['Pulpit' => 'pulpit.php', 'Poczta' => 'poczta.php', 'Szablony' => null]
+        : ['Pulpit' => 'pulpit.php', 'Poczta' => null]));
 ?>
 
 <?php if ($blockers): ?>

@@ -115,6 +115,7 @@ function wsm_bootstrap(bool $seed = true): PDO {
     wsm_ensure_trade($pdo);
     wsm_ensure_mail($pdo);
     wsm_ensure_invoices($pdo);
+    wsm_ensure_stock($pdo);
     // En dernier : les réglages saisis en console entrent en vigueur une fois
     // que leur table existe, et seulement là où le fichier serveur se tait.
     require_once __DIR__ . '/settings.php';
@@ -302,6 +303,11 @@ function wsm_ensure_invoices(PDO $pdo): void {
     if (!wsm_table_exists($pdo, 'wsm_invoices') || !wsm_table_exists($pdo, 'wsm_invoice_items')) {
         wsm_apply_schema($pdo);
     }
+}
+
+/** Journal des mouvements de stock. Idempotent. */
+function wsm_ensure_stock(PDO $pdo): void {
+    if (!wsm_table_exists($pdo, 'wsm_stock_moves')) wsm_apply_schema($pdo);
 }
 
 /** Une table existe-t-elle ? (MySQL + SQLite) */

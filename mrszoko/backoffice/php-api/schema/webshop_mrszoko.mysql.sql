@@ -763,3 +763,26 @@ CREATE TABLE IF NOT EXISTS `wsm_invoice_items` (
   CONSTRAINT `fk_wsm_invoice_items`
     FOREIGN KEY (`invoice_id`) REFERENCES `wsm_invoices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Ruchy magazynowe -------------------------------------------------------
+-- wsm_products.stock reste la quantité qui décide de la vente ; cette table en
+-- est l'histoire. Chaque ligne dit ce qui a bougé, de combien, pourquoi, sur
+-- quel document et par qui — c'est ce qui permet d'expliquer un écart plutôt
+-- que de le constater.
+CREATE TABLE IF NOT EXISTS `wsm_stock_moves` (
+  `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `product_id`  VARCHAR(60)  NOT NULL,
+  `delta`       INT          NOT NULL DEFAULT 0,    -- + entrée, − sortie
+  `kind`        VARCHAR(12)  NOT NULL DEFAULT 'korekta',
+  `stock_after` INT          NOT NULL DEFAULT 0,
+  `reason`      VARCHAR(120) NOT NULL DEFAULT '',
+  `note`        VARCHAR(250) NOT NULL DEFAULT '',
+  `doc`         VARCHAR(40)  NOT NULL DEFAULT '',   -- numéro de commande ou de facture
+  `supplier`    VARCHAR(120) NOT NULL DEFAULT '',
+  `unit_cost`   INT          NOT NULL DEFAULT 0,    -- prix d'achat unitaire, en grosze
+  `actor`       VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_stock_moves` (`product_id`, `id`),
+  KEY `idx_wsm_stock_moves_date` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

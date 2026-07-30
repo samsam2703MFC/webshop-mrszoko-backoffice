@@ -74,6 +74,7 @@ console_head('Kontrahenci i VAT UE', $me, <<<'CSS'
   small.muted { color: var(--text-muted); }
 CSS, '');
 console_flash($flash, $kind);
+console_crumbs(['Pulpit' => 'pulpit.php', 'Kontrahenci' => null]);
 ?>
 
   <p class="hint">

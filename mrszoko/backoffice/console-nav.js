@@ -29,6 +29,7 @@
     ['faktury.php',     'Faktury'],
     ['poczta.php',      'Poczta'],
     ['produkty.php',    'Produkty'],
+    ['magazyn.php',     'Magazyn'],
     ['kontrahenci.php', 'Kontrahenci'],
     ['kraje.php',       'Kraje i VAT'],
     ['rabaty.php',      'Rabaty'],
