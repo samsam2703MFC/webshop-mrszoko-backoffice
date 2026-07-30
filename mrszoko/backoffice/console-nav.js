@@ -1,77 +1,162 @@
 /* =====================================================================
-   console-nav.js — le lanceur des écrans serveur de la console.
+   console-nav.js — une seule navigation pour toute la console.
 
-   La console principale est une application exportée par Claude Design ;
-   les écrans qui touchent à l'argent et aux données (Zamówienia, Poczta,
-   Produkty, Ustawienia…) sont des pages PHP rendues côté serveur, à côté.
-   Jusqu'ici on n'y accédait qu'en tapant l'URL — ce bouton les rend
-   simplement atteignables, sans toucher au fichier exporté.
+   La console est en deux moitiés : l'application exportée par Claude
+   Design (Pulpit, Sklepy, Katalog, Dostawy…) et les écrans PHP rendus
+   côté serveur (Zamówienia, Poczta, Produkty, Ustawienia…). Elles ne se
+   connaissaient pas : on n'atteignait les seconds qu'en tapant l'URL.
 
-   Rien d'autre : pas de mise en page, pas d'état, pas de dépendance.
+   Ce fichier fait deux choses, sans toucher au fichier exporté :
+
+    1. IL AJOUTE LES ÉCRANS PHP DANS LA BARRE DE NAVIGATION de la console,
+       dans son propre style, comme un groupe de plus. Un MutationObserver
+       les remet si React refait le rendu de la barre.
+
+    2. IL OUVRE UN ÉCRAN DE LA CONSOLE DEPUIS UNE URL. L'application
+       navigue par état interne, sans adresse : impossible d'y pointer
+       depuis une page PHP. On lit donc « #ekran=users » et on clique le
+       bouton correspondant — en dépliant d'abord le groupe s'il est
+       replié. C'est ce qui permet aux écrans PHP de renvoyer vers la
+       console, et pas seulement l'inverse.
    ===================================================================== */
 (function () {
   'use strict';
 
-  var SCREENS = [
-    ['zamowienia.php',  'Zamówienia',   'Płatności, wysyłka, historia'],
-    ['poczta.php',      'Poczta',       'Wiadomości i szablony'],
-    ['produkty.php',    'Produkty',     'Ceny, stany, zdjęcia'],
-    ['kontrahenci.php', 'Kontrahenci',  'NIP i VAT UE (VIES)'],
-    ['kraje.php',       'Kraje',        'Gdzie sprzedajemy, jaki VAT'],
-    ['rabaty.php',      'Rabaty',       'Procent według wagi'],
-    ['ustawienia.php',  'Ustawienia',   'tpay, InPost, poczta'],
-    ['../shop/',        'Sklep ↗',      'Strona publiczna']
+  /* Les écrans PHP, dans l'ordre du travail réel. */
+  var PHP_SCREENS = [
+    ['zamowienia.php',  'Zamówienia'],
+    ['poczta.php',      'Poczta'],
+    ['produkty.php',    'Produkty'],
+    ['kontrahenci.php', 'Kontrahenci'],
+    ['kraje.php',       'Kraje i VAT'],
+    ['rabaty.php',      'Rabaty'],
+    ['ustawienia.php',  'Ustawienia integracji'],
+    ['../shop/',        'Sklep ↗']
   ];
 
-  function build() {
-    if (document.getElementById('wsm-launcher')) return;
+  /* clé d'URL → libellé exact du bouton dans la barre exportée. */
+  var ERP_SCREENS = {
+    dash: 'Pulpit sieci', boutiques: 'Sklepy', catalogue: 'Katalog',
+    menus: 'Menu i zestawy', promos: 'Promocje sieci', livraisons: 'Dostawy',
+    geo: 'Analiza geograficzna', comms: 'Komunikacja', users: 'Użytkownicy i role',
+    zones: 'Strefy zasięgu', audit: 'Dziennik audytu'
+  };
 
-    var css = document.createElement('style');
-    css.textContent =
-      '#wsm-launcher{position:fixed;right:16px;bottom:16px;z-index:9999;font-family:var(--font-sans,system-ui)}' +
-      '#wsm-launcher>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;' +
-        'min-height:48px;padding:0 18px;border-radius:999px;background:var(--choco-800,#3a2418);' +
-        'color:var(--cream-50,#fff);font-size:14px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25)}' +
-      '#wsm-launcher>summary::-webkit-details-marker{display:none}' +
-      '#wsm-launcher[open]>summary{border-radius:14px}' +
-      '#wsm-launcher nav{position:absolute;right:0;bottom:56px;width:min(88vw,300px);padding:8px;' +
-        'background:var(--surface-card,#fff);border:1px solid var(--border-subtle,#e6ded6);border-radius:16px;' +
-        'box-shadow:0 18px 40px rgba(0,0,0,.22);max-height:70vh;overflow:auto}' +
-      '#wsm-launcher nav a{display:block;padding:11px 12px;border-radius:11px;text-decoration:none;' +
-        'color:var(--text-strong,#2d1c12)}' +
-      '#wsm-launcher nav a:hover{background:var(--surface-raised,#f6f1ec)}' +
-      '#wsm-launcher nav b{display:block;font-size:14.5px;font-weight:600}' +
-      '#wsm-launcher nav span{display:block;font-size:12px;color:var(--text-muted,#8a7768);margin-top:2px}';
-    document.head.appendChild(css);
+  var NAV_SELECTOR = 'nav.lz';
+  var BLOCK_ID = 'wsm-screens';
 
-    var d = document.createElement('details');
-    d.id = 'wsm-launcher';
-    var s = document.createElement('summary');
-    s.textContent = 'Ekrany ▾';
-    d.appendChild(s);
+  /* ---- 1. Le groupe « Sklep » dans la barre ------------------------- */
 
-    var nav = document.createElement('nav');
-    SCREENS.forEach(function (row) {
+  function buildBlock() {
+    var box = document.createElement('div');
+    box.id = BLOCK_ID;
+
+    var head = document.createElement('div');
+    head.textContent = 'Sklep online';
+    head.style.cssText = 'margin:14px 8px 6px;font:600 10px/1 var(--font-ui);' +
+      'letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-muted)';
+    box.appendChild(head);
+
+    PHP_SCREENS.forEach(function (row) {
       var a = document.createElement('a');
       a.href = row[0];
       if (row[0].charAt(0) === '.') { a.target = '_blank'; a.rel = 'noopener'; }
-      var b = document.createElement('b'); b.textContent = row[1];
-      var sp = document.createElement('span'); sp.textContent = row[2];
-      a.appendChild(b); a.appendChild(sp);
-      nav.appendChild(a);
+      a.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;' +
+        'padding:9px 12px;border-radius:8px;text-decoration:none;cursor:pointer;' +
+        'font:500 12.5px/1.2 var(--font-ui);color:var(--color-text)';
+      var dot = document.createElement('span');
+      dot.style.cssText = 'flex:none;width:7px;height:7px;border-radius:50%;background:var(--choco-500)';
+      var label = document.createElement('span');
+      label.style.cssText = 'flex:1;text-align:left';
+      label.textContent = row[1];
+      a.appendChild(dot);
+      a.appendChild(label);
+      a.addEventListener('mouseenter', function () { a.style.background = 'var(--color-background-secondary)'; });
+      a.addEventListener('mouseleave', function () { a.style.background = 'transparent'; });
+      box.appendChild(a);
     });
-    d.appendChild(nav);
-    document.body.appendChild(d);
+    return box;
+  }
 
-    // Un clic ailleurs referme le panneau : sur téléphone il couvre l'écran.
-    document.addEventListener('click', function (e) {
-      if (d.open && !d.contains(e.target)) d.open = false;
+  function mount() {
+    var nav = document.querySelector(NAV_SELECTOR);
+    if (!nav || document.getElementById(BLOCK_ID)) return !!nav;
+    nav.appendChild(buildBlock());
+    return true;
+  }
+
+  /* React refait le rendu de la barre à chaque changement d'écran et
+     emporte notre bloc avec lui. On le remet — c'est moins fragile que
+     de patcher l'application exportée, qui serait perdue au prochain
+     export. */
+  function watch() {
+    var obs = new MutationObserver(function () {
+      if (!document.getElementById(BLOCK_ID)) mount();
     });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+
+  /* ---- 2. Ouvrir un écran de la console depuis l'URL ---------------- */
+
+  function labelOf(node) {
+    return (node.textContent || '').trim();
+  }
+
+  /** Le bouton de la barre portant ce libellé, s'il est rendu. */
+  function findNavButton(label) {
+    var nav = document.querySelector(NAV_SELECTOR);
+    if (!nav) return null;
+    var buttons = nav.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) {
+      if (labelOf(buttons[i]) === label) return buttons[i];
+    }
+    return null;
+  }
+
+  /** Déplie les groupes repliés : leurs entrées ne sont pas rendues. */
+  function expandGroups() {
+    var nav = document.querySelector(NAV_SELECTOR);
+    if (!nav) return;
+    var buttons = nav.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) {
+      var t = labelOf(buttons[i]);
+      if (t === 'Ustawienia' || t === 'Parametry') buttons[i].click();
+    }
+  }
+
+  function openFromHash() {
+    var m = /(?:^|[#&])ekran=([a-z]+)/i.exec(location.hash || '');
+    if (!m) return;
+    var label = ERP_SCREENS[m[1].toLowerCase()];
+    if (!label) return;
+
+    var tries = 0;
+    (function attempt() {
+      var btn = findNavButton(label);
+      if (btn) {
+        btn.click();
+        // L'adresse a joué son rôle ; on l'efface pour qu'un rafraîchissement
+        // ne ramène pas l'utilisateur au même endroit malgré lui.
+        history.replaceState(null, '', location.pathname + location.search);
+        return;
+      }
+      if (tries === 3) expandGroups();      // l'entrée est peut-être dans un groupe replié
+      if (++tries < 25) setTimeout(attempt, 120);
+    })();
+  }
+
+  /* ---- Démarrage ---------------------------------------------------- */
+
+  function start() {
+    mount();
+    watch();
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', build);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    build();
+    start();
   }
 })();
