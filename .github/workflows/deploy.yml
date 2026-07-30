@@ -365,6 +365,20 @@ jobs:
           run "$SH/kasa" 3000
           run "$SH/shop.css" 5000
           run "$SH/tokens.css" 2000
+          # Les polices sont servies par NOUS. Une page qui les redemanderait à
+          # Google resterait blanche derrière un pare-feu d'entreprise ou un
+          # bloqueur — quatorze secondes mesurées quand la connexion est
+          # refusée. On vérifie donc les deux faces : plus aucune référence
+          # sortante dans la feuille, et un fichier réellement servi ici.
+          if curl -skL "$SH/tokens.css" | grep -q "@import url(.https://fonts"; then
+            echo "  ^ NOT OK : tokens.css réclame encore les polices à Google"; fail=1
+          else
+            echo "  polices : aucune dépendance sortante dans tokens.css"
+          fi
+          NF2=$(curl -skL "$SH/tokens.css" | grep -c "@font-face" || echo 0)
+          echo "  polices : $NF2 déclarations @font-face"
+          if [ "${NF2:-0}" -lt 10 ]; then echo "  ^ NOT OK : les @font-face locales manquent"; fail=1; fi
+          run "$SH/fonts/mulish-normal-300_800-latin.woff2" 20000
           run "$SH/shop.js" 1000
           # Le fil d'Ariane est aussi ce que Google affiche sous le titre : s'il
           # disparaît, on le voit ici plutôt que dans les résultats de recherche.

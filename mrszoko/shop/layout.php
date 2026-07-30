@@ -12,7 +12,6 @@
 //     déjà complète et cliquable sans lui.
 // ============================================================================
 
-const WSM_FONT_HREF = 'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400..800&family=Mulish:ital,wght@0,300..800;1,400&family=DM+Mono:wght@400;500&display=swap';
 
 function layout_head(array $S, string $lang, array $langs, string $title = '', string $desc = ''): void {
     $title = $title !== '' ? $title . ' — ' . ($S['brand'] ?? 'Mister Szoko') : ($S['meta.title'] ?? 'Mister Szoko');
@@ -26,9 +25,6 @@ function layout_head(array $S, string $lang, array $langs, string $title = '', s
 <title><?= e($title) ?></title>
 <meta name="description" content="<?= e($desc) ?>">
 <link rel="icon" type="image/png" href="<?= e(u('assets/logo.png')) ?>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="<?= e(WSM_FONT_HREF) ?>">
 <link rel="stylesheet" href="<?= e(asset('tokens.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset('shop.css')) ?>">
 <?php foreach ($langs as $l): ?>
