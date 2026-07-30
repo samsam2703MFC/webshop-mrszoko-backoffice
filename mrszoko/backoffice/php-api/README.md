@@ -18,17 +18,28 @@ php tests/e2e_delivery.php    # end-to-end delivery proof (create→assign→con
 
 ## Run it against MySQL (production)
 
+**On the server the API runs against the MySQL database `mrszoko`** (the one
+visible in phpMyAdmin). The deploy workflow provisions it automatically on
+first run: dedicated `mrszoko_app` user + `config.local.php` (engine mysql,
+db `mrszoko`, generated password and admin token). `config.local.php` is
+gitignored, web-denied and never overwritten by deploys — read the admin token
+from it over SSH. The schema is applied INTO the configured database (the
+canonical file's `CREATE DATABASE webshop_mrszoko`/`USE` header is skipped),
+so the DB name is free.
+
+Manual/env alternative:
+
 ```bash
 export WSM_DB_ENGINE=mysql
-export WSM_DB_HOST=127.0.0.1 WSM_DB_NAME=webshop_mrszoko
+export WSM_DB_HOST=127.0.0.1 WSM_DB_NAME=mrszoko
 export WSM_DB_USER=... WSM_DB_PASS=...
 export WSM_ADMIN_TOKEN=<shared admin token>
 php migrate.php              # applies schema/webshop_mrszoko.mysql.sql + seed
 ```
 
-The canonical MySQL DDL is `schema/webshop_mrszoko.mysql.sql`
-(`CREATE DATABASE webshop_mrszoko` + all `wsm_` tables). The SQLite mirror
-(`schema/webshop_mrszoko.sqlite.sql`) is kept structurally identical.
+The canonical MySQL DDL is `schema/webshop_mrszoko.mysql.sql`; the SQLite
+mirror (`schema/webshop_mrszoko.sqlite.sql`, dev/CI fallback) is kept
+structurally identical.
 
 ## Configuration
 
