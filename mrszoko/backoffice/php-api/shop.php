@@ -23,6 +23,7 @@ require_once __DIR__ . '/vies.php';
 const WSM_SHOP_LANGS       = ['pl', 'uk', 'en'];
 const WSM_SHOP_DEFAULT_LANG = 'pl';
 const WSM_SHOP_MAX_QTY     = 99;              // garde-fou : pas de panier à 10 000 unités
+const WSM_SHOP_HOME_COUNTRY = 'PL';   // marché intérieur : jamais d'autoliquidation
 const WSM_ORDER_STATUSES   = ['nowe', 'oplacone', 'w_realizacji', 'wyslane', 'dostarczone', 'anulowane'];
 
 /** Origine de la requête en cours (schéma + hôte), proxy TLS compris. */
@@ -157,10 +158,64 @@ function wsm_shop_product(PDO $pdo, string $key, string $lang): ?array {
     return $r ? wsm_shop_row_to_product($r, $S) : null;
 }
 
+/** Pays ouverts à la commande, nommés dans la langue du visiteur. */
+function wsm_shop_countries(PDO $pdo, string $lang): array {
+    $col = in_array($lang, ['uk', 'en'], true) ? 'name_' . $lang : 'name_pl';
+    try {
+        $rows = $pdo->query("SELECT code, is_eu, name_pl, $col AS label
+                               FROM wsm_countries WHERE active = 1
+                              ORDER BY sort_order, name_pl")->fetchAll();
+    } catch (Throwable $e) { return []; }
+    return array_map(fn($r) => [
+        'code'  => (string) $r['code'],
+        'label' => ((string) $r['label']) !== '' ? (string) $r['label'] : (string) $r['name_pl'],
+        'is_eu' => (int) $r['is_eu'] === 1,
+    ], $rows);
+}
+
+function wsm_shop_country(PDO $pdo, string $code): ?array {
+    $st = $pdo->prepare("SELECT code, is_eu, active FROM wsm_countries WHERE code = ?");
+    $st->execute([strtoupper($code)]);
+    $r = $st->fetch();
+    return $r ? ['code' => (string) $r['code'], 'is_eu' => (int) $r['is_eu'] === 1,
+                 'active' => (int) $r['active'] === 1] : null;
+}
+
+/**
+ * Autoliquidation : 0 % de TVA. Trois conditions, toutes nécessaires.
+ *   · la livraison part vers un AUTRE État membre (la Pologne est le marché
+ *     intérieur — jamais de 0 %) ;
+ *   · l'acheteur a donné un numéro de TVA que VIES a confirmé VALIDE — un
+ *     « service indisponible » ne suffit pas à exonérer ;
+ *   · le pays est ouvert à la commande.
+ *
+ * Un particulier d'un autre État membre paie donc la TVA polonaise. C'est
+ * correct sous le seuil OSS de 10 000 € de ventes à distance dans l'UE ;
+ * au-delà, il faudrait facturer le taux du pays de destination. Le jour où
+ * ce seuil approche, c'est ici qu'il faudra revenir.
+ */
+function wsm_shop_reverse_charge(PDO $pdo, string $country, array $vies): bool {
+    $country = strtoupper(trim($country));
+    if ($country === '' || $country === WSM_SHOP_HOME_COUNTRY) return false;
+    if (($vies['status'] ?? '') !== 'valid') return false;
+    $c = wsm_shop_country($pdo, $country);
+    return $c !== null && $c['active'] && $c['is_eu'];
+}
+
 /** Modes de livraison actifs, tarifs compris — pilotés par la base. */
-function wsm_shipping_methods(PDO $pdo, string $lang): array {
+function wsm_shipping_methods(PDO $pdo, string $lang, string $country = ''): array {
     $S = wsm_shop_strings($pdo, $lang);
     $rows = $pdo->query("SELECT * FROM wsm_shipping_methods WHERE active = 1 ORDER BY sort_order")->fetchAll();
+    // Un transporteur ne dessert que les pays qu'on lui a déclarés : proposer
+    // un Paczkomat pour une livraison en Allemagne serait promettre à faux.
+    if ($country !== '') {
+        $country = strtoupper($country);
+        $rows = array_values(array_filter($rows, function ($r) use ($country) {
+            $list = trim((string) ($r['countries'] ?? ''));
+            if ($list === '' || $list === '*') return true;
+            return in_array($country, array_map('trim', explode(',', strtoupper($list))), true);
+        }));
+    }
     return array_map(function ($r) use ($S) {
         $net   = (int) $r['price_net'];
         $vat   = (float) $r['vat_rate'];
@@ -191,10 +246,25 @@ function wsm_shipping_method(PDO $pdo, string $id, string $lang): ?array {
  * Renvoie [devis, erreurs]. Les erreurs sont indexées par champ pour que le
  * formulaire les affiche au bon endroit.
  */
-function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang): array {
+function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, array $opts = []): array {
     $e = [];
     $lines = [];
     $itemsGross = 0; $itemsNet = 0; $itemsVat = 0; $weight = 0;
+
+    // ---- Pays de livraison et régime de TVA --------------------------------
+    $country = strtoupper(trim((string) ($opts['country'] ?? WSM_SHOP_HOME_COUNTRY))) ?: WSM_SHOP_HOME_COUNTRY;
+    $cRow = wsm_shop_country($pdo, $country);
+    if ($cRow === null || !$cRow['active']) {
+        $e['ship_country'] = 'nie wysyłamy do tego kraju';
+        $country = WSM_SHOP_HOME_COUNTRY;
+    }
+    // Le numéro de TVA n'exonère que si VIES l'a CONFIRMÉ. Un service
+    // indisponible laisse passer la commande, mais avec la TVA polonaise :
+    // exonérer sur une réponse qu'on n'a pas eue serait s'exposer seul.
+    $vies = $opts['vies'] ?? (trim((string) ($opts['vat_eu'] ?? '')) !== ''
+        ? wsm_vies_check($pdo, (string) $opts['vat_eu'])
+        : ['status' => 'skipped']);
+    $reverseCharge = wsm_shop_reverse_charge($pdo, $country, $vies);
 
     $wanted = [];
     foreach ($items as $it) {
@@ -220,6 +290,8 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang):
         }
         $lineGross = $p['price'] * $qty;
         [$lineNet, $lineVat] = wsm_split_vat($lineGross, $p['vat_rate']);
+        // Autoliquidation : l'acheteur paie le HT, la TVA est due chez lui.
+        if ($reverseCharge) { $lineVat = 0; $lineGross = $lineNet; }
 
         $lines[] = [
             'id' => $p['id'], 'slug' => $p['slug'], 'name' => $p['name'], 'unit' => $p['unit'],
@@ -235,7 +307,8 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang):
     }
 
     // --- Livraison ----------------------------------------------------------
-    $methods = wsm_shipping_methods($pdo, $lang);
+    $methods = wsm_shipping_methods($pdo, $lang, $country);
+    if (!$methods) $e['delivery_method'] = 'brak dostawy do tego kraju';
     $method = null;
     foreach ($methods as $m) if ($m['id'] === $methodId) $method = $m;
     if ($methodId !== '' && !$method) $e['delivery_method'] = 'nieznana metoda dostawy';
@@ -251,6 +324,7 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang):
             $shipNet   = $method['price_net'];
             $shipGross = $shipNet + (int) round($shipNet * $method['vat_rate']);
             $shipVat   = $shipGross - $shipNet;
+            if ($reverseCharge) { $shipVat = 0; $shipGross = $shipNet; }
         }
     }
 
@@ -263,6 +337,10 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang):
         'items_net' => $itemsNet, 'items_vat' => $itemsVat, 'items_gross' => $itemsGross,
         'shipping_net' => $shipNet, 'shipping_vat' => $shipVat, 'shipping_gross' => $shipGross,
         'shipping_free' => $freeShipping,
+        'country'        => $country,
+        'reverse_charge' => $reverseCharge,
+        'vat_status'     => (string) ($vies['status'] ?? 'skipped'),
+        'countries'      => wsm_shop_countries($pdo, $lang),
         'total_net'   => $itemsNet + $shipNet,
         'total_vat'   => $itemsVat + $shipVat,
         'total_gross' => $itemsGross + $shipGross,
@@ -270,7 +348,7 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang):
         'parcel_template' => $tpl,
         'method'      => $method,
         'methods'     => $methods,
-        'vat_breakdown' => wsm_vat_breakdown($lines, $shipNet, $shipVat, $method['vat_rate'] ?? 0.23),
+        'vat_breakdown' => $reverseCharge ? [] : wsm_vat_breakdown($lines, $shipNet, $shipVat, $method['vat_rate'] ?? 0.23),
     ], $e];
 }
 
@@ -517,6 +595,13 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     $vies = wsm_vies_check($pdo, (string) $buyer['vat_eu']);
     if (wsm_vies_blocks($vies)) return [null, ['vat_eu' => $vies['reason'] ?: 'nieznany w VIES']];
 
+    // Le devis est REFAIT avec le pays et le régime de TVA : c'est lui qui fait
+    // foi, pas celui qu'a vu le navigateur.
+    $shipCountry = (string) ($buyer['ship_country'] ?: WSM_SHOP_HOME_COUNTRY);
+    [$quote, $qErr2] = wsm_shop_quote($pdo, (array) ($body['items'] ?? []), $method, $lang,
+        ['country' => $shipCountry, 'vies' => $vies]);
+    if ($qErr2) return [null, $qErr2];
+
     $pdo->beginTransaction();
     try {
         // Stock : relu et décrémenté DANS la transaction. Deux commandes
@@ -553,6 +638,7 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
             'total_net' => $quote['total_net'], 'total_vat' => $quote['total_vat'], 'total_gross' => $quote['total_gross'],
             'weight_g' => $quote['weight_g'], 'parcel_template' => $quote['parcel_template'],
             'note' => $buyer['note'],
+            'reverse_charge' => $quote['reverse_charge'] ? 1 : 0,
         ] + wsm_vies_columns($vies);
         $names = array_keys($cols);
         $sql = 'INSERT INTO wsm_orders (' . implode(',', $names) . ') VALUES (' .
@@ -659,6 +745,7 @@ function wsm_order_hydrate(PDO $pdo, array $o): array {
         'shipping_gross' => (int) $o['shipping_gross'],
         'total_net' => (int) $o['total_net'], 'total_vat' => (int) $o['total_vat'], 'total_gross' => (int) $o['total_gross'],
         'weight_g' => (int) $o['weight_g'], 'parcel_template' => (string) $o['parcel_template'],
+        'reverse_charge' => (int) ($o['reverse_charge'] ?? 0) === 1,
         'note' => (string) ($o['note'] ?? ''),
         'created_at' => (string) $o['created_at'], 'paid_at' => $o['paid_at'],
         'shipment' => $ship ? ['service' => $ship['service'], 'target_point' => $ship['target_point'],

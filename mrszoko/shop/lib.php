@@ -53,6 +53,23 @@ function u(string $path = '', array $q = []): string {
     return $q ? $url . '?' . http_build_query($q) : $url;
 }
 
+/**
+ * URL d'une ressource statique, suffixée d'une empreinte de son contenu.
+ *
+ * Le .htaccess garde css/js/images une semaine — c'est ce qu'on veut pour la
+ * vitesse. Mais un fichier au nom fixe et au cache long, c'est une correction
+ * de style invisible pendant sept jours pour qui a déjà visité le site. La
+ * signature change dès que le fichier change : le cache reste long ET juste.
+ */
+function asset(string $file): string {
+    static $v = [];
+    if (!isset($v[$file])) {
+        $path = __DIR__ . '/' . $file;
+        $v[$file] = is_file($path) ? substr(md5((string) filemtime($path) . filesize($path)), 0, 8) : '0';
+    }
+    return u($file) . '?v=' . $v[$file];
+}
+
 /** Segments de la route courante : /p/mon-produit → ['p','mon-produit']. */
 function route_segments(): array {
     $p = (string) ($_SERVER['PATH_INFO'] ?? '');

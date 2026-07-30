@@ -137,6 +137,7 @@ $cfg = wsm_vies_cfg();
     <a href="./">← Konsola</a>
     <a href="zamowienia.php">Zamówienia</a>
     <a href="produkty.php">Produkty</a>
+    <a href="kraje.php">Kraje i VAT</a>
     <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
   </div>
 </header>

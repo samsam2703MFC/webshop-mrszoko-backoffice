@@ -82,6 +82,18 @@
     inv.addEventListener('change', function () { invFields.hidden = !inv.checked; });
   }
 
+  // ---- Caisse : changer de pays change les transporteurs ET la TVA ---------
+  // On recharge la page avec le pays choisi plutôt que de recalculer côté
+  // client : le prix ne se décide pas dans le navigateur.
+  var country = document.querySelector('select[data-country]');
+  if (country) {
+    country.addEventListener('change', function () {
+      var q = new URLSearchParams(location.search);
+      q.set('kraj', country.value);
+      location.search = q.toString();
+    });
+  }
+
   // ---- Panier : appliquer une quantité dès qu'elle change ------------------
   document.querySelectorAll('.cart-line input[type="number"]').forEach(function (input) {
     var timer = null;

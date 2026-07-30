@@ -330,7 +330,15 @@
       "story.pro.cta": "Napisz do nas",
       "story.pro.mail_subject": "Konto B2B — Mister Szoko",
       "footer.tagline": "Czekolada kuwertura dla profesjonalistów",
-      "footer.email": "pro@misterszoko.com"
+      "footer.email": "pro@misterszoko.com",
+      "seller.legal": "Sprzedawca",
+      "seller.name": "ATELIER WRO01 sp. z o.o.",
+      "seller.address": "ul. Stanisława Leszczyńskiego 4/29, 50-078 Wrocław, Polska",
+      "seller.ids": "NIP 897-190-26-20 · KRS 0000955589 · REGON 521355777",
+      "checkout.country_hint": "Zmień kraj i odśwież, aby zobaczyć dostępne sposoby dostawy.",
+      "checkout.no_shipping": "Nie wysyłamy jeszcze do wybranego kraju.",
+      "checkout.reverse_charge": "VAT — odwrotne obciążenie",
+      "checkout.vat_eu_hint": "Firma z innego kraju UE: po potwierdzeniu numeru w VIES cena jest bez VAT."
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -484,7 +492,15 @@
       "story.pro.cta": "Напишіть нам",
       "story.pro.mail_subject": "Рахунок B2B — Mister Szoko",
       "footer.tagline": "Шоколад-кувертюр для професіоналів",
-      "footer.email": "pro@misterszoko.com"
+      "footer.email": "pro@misterszoko.com",
+      "seller.legal": "Продавець",
+      "seller.name": "ATELIER WRO01 sp. z o.o.",
+      "seller.address": "ul. Stanisława Leszczyńskiego 4/29, 50-078 Wrocław, Польща",
+      "seller.ids": "NIP 897-190-26-20 · KRS 0000955589 · REGON 521355777",
+      "checkout.country_hint": "Змініть країну та оновіть, щоб побачити доступні способи доставки.",
+      "checkout.no_shipping": "Ми ще не доставляємо у вибрану країну.",
+      "checkout.reverse_charge": "ПДВ — зворотне нарахування",
+      "checkout.vat_eu_hint": "Компанія з іншої країни ЄС: після підтвердження номера у VIES ціна без ПДВ."
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -638,7 +654,15 @@
       "story.pro.cta": "Write to us",
       "story.pro.mail_subject": "B2B account — Mister Szoko",
       "footer.tagline": "Couverture chocolate for professionals",
-      "footer.email": "pro@misterszoko.com"
+      "footer.email": "pro@misterszoko.com",
+      "seller.legal": "Seller",
+      "seller.name": "ATELIER WRO01 sp. z o.o.",
+      "seller.address": "ul. Stanisława Leszczyńskiego 4/29, 50-078 Wrocław, Poland",
+      "seller.ids": "NIP 897-190-26-20 · KRS 0000955589 · REGON 521355777",
+      "checkout.country_hint": "Change the country and refresh to see the available delivery methods.",
+      "checkout.no_shipping": "We do not ship to the selected country yet.",
+      "checkout.reverse_charge": "VAT — reverse charge",
+      "checkout.vat_eu_hint": "Business in another EU country: once VIES confirms the number, the price is net of VAT."
     }
   }
 }

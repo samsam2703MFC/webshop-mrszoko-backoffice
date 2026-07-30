@@ -404,8 +404,10 @@ if ($page === 'koszyk') {
 if ($page === 'kasa') {
     $errors = $formErrors ?? [];
     $v = $formValues ?? [];
-    $shipId = (string) ($v['delivery_method'] ?? ($_GET['dostawa'] ?? 'inpost_locker'));
-    [$q, ] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang);
+    $shipId  = (string) ($v['delivery_method'] ?? ($_GET['dostawa'] ?? 'inpost_locker'));
+    $shipCty = (string) ($v['ship_country'] ?? ($_GET['kraj'] ?? ''));
+    [$q, ] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang,
+        ['country' => $shipCty, 'vat_eu' => (string) ($v['vat_eu'] ?? '')]);
 
     /** Champ de formulaire : valeur réaffichée, erreur montrée sous le champ. */
     $field = function (string $name, string $label, array $opt = []) use ($v, $errors, $S) {
@@ -454,6 +456,21 @@ if ($page === 'kasa') {
 
       <fieldset>
         <legend><?= e($S['checkout.delivery'] ?? '') ?></legend>
+        <?php // Le pays commande tout : les transporteurs proposés et le régime
+              // de TVA. Il est donc demandé AVANT le mode de livraison. ?>
+        <p class="field<?= isset($errors['ship_country']) ? ' has-error' : '' ?>">
+          <label for="f-ship_country"><?= e($S['checkout.country'] ?? '') ?> <span aria-hidden="true">*</span></label>
+          <select id="f-ship_country" name="ship_country" data-country>
+            <?php foreach ($q['countries'] as $c): ?>
+            <option value="<?= e($c['code']) ?>"<?= $c['code'] === ($q['country'] ?? 'PL') ? ' selected' : '' ?>><?= e($c['label']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <?php if (isset($errors['ship_country'])) echo '<small class="err">' . e($errors['ship_country']) . '</small>'; ?>
+          <noscript><small class="hint"><?= e($S['checkout.country_hint'] ?? '') ?></small></noscript>
+        </p>
+        <?php if (!$q['methods']): ?>
+          <?php notice('warn', $S['checkout.no_shipping'] ?? ''); ?>
+        <?php endif; ?>
         <?php foreach ($q['methods'] as $sm): ?>
         <label class="radio">
           <input type="radio" name="delivery_method" value="<?= e($sm['id']) ?>"<?= $sm['id'] === $shipId ? ' checked' : '' ?> data-ship>
@@ -532,9 +549,11 @@ if ($page === 'kasa') {
         <dt><?= e($S['cart.subtotal'] ?? '') ?></dt><dd><?= e(zl($q['items_gross'])) ?></dd>
         <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
         <dd><?= $q['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($q['shipping_gross'])) ?></dd>
-        <?php foreach ($q['vat_breakdown'] as $vb): ?>
+        <?php if (!empty($q['reverse_charge'])): ?>
+        <dt class="small rc"><?= e($S['checkout.reverse_charge'] ?? '') ?></dt><dd class="small rc">0,00</dd>
+        <?php else: foreach ($q['vat_breakdown'] as $vb): ?>
         <dt class="small">VAT <?= (int) round($vb['rate'] * 100) ?> %</dt><dd class="small"><?= e(zl($vb['vat'])) ?></dd>
-        <?php endforeach; ?>
+        <?php endforeach; endif; ?>
         <dt class="grand"><?= e($S['cart.total'] ?? '') ?></dt><dd class="grand"><?= e(zl($q['total_gross'])) ?></dd>
       </dl>
     </aside>

@@ -199,10 +199,29 @@ an outage would freeze it. Country prefixes are checked against the real list of
 27 member states (Greece is `EL`, not `GR`) plus `XI`, so a non-EU prefix is
 refused without a pointless round-trip.
 
-**Reverse charge is reported, not applied.** A valid non-Polish EU number is
-flagged as eligible in the console, but the shop still charges Polish VAT — it
-only ships within Poland via InPost, so no intra-EU supply exists yet. Applying
-0 % is a tax decision that needs international shipping first.
+**Reverse charge is applied**, from `wsm_countries` and the VIES verdict:
+
+| Delivery country | EU VAT number | Rate |
+| --- | --- | --- |
+| Poland — home market | irrelevant | Polish VAT |
+| Another member state | VIES says **valid** | **0 %, reverse charge** |
+| Another member state | missing, invalid, or VIES silent | Polish VAT |
+
+An outage never exempts: we do not zero-rate on an answer we did not get. The
+buyer then pays the **net** price, not the gross one, and the VAT breakdown is
+empty.
+
+Countries and carrier coverage are managed in the console
+(`/mrszoko/backoffice/kraje.php`). Only Poland is open out of the box, and a
+country open for sale but served by no carrier refuses the order rather than
+promising a delivery nobody makes.
+
+**OSS threshold.** A private buyer in another member state pays Polish VAT.
+That is correct only below the €10,000 EU distance-selling threshold; above it,
+the destination country's rate is due under OSS. The console says so on the
+same screen — the day that threshold nears, this is where to come back.
+Zero-rating also requires proof the goods left Poland: the VAT number alone is
+not enough.
 
 Checked at both entry points: `POST /franchisor/client` (console) and the shop
 checkout. `POST /franchisor/vies` runs a check on demand without saving anything.
