@@ -528,3 +528,59 @@ CREATE TABLE IF NOT EXISTS wsm_settings (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by TEXT NOT NULL DEFAULT ''
 );
+
+-- --- Faktury (miroir SQLite) -------------------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_invoices (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id       INTEGER NULL REFERENCES wsm_orders(id) ON DELETE SET NULL,
+  kind           TEXT NOT NULL DEFAULT 'faktura',
+  kind_group     TEXT NOT NULL DEFAULT 'faktura',
+  corrects_id    INTEGER NULL,
+  number         TEXT NOT NULL,
+  series         TEXT NOT NULL DEFAULT '',
+  seq            INTEGER NOT NULL DEFAULT 0,
+  issued_at      TEXT NOT NULL,
+  sold_at        TEXT NOT NULL,
+  due_at         TEXT NOT NULL,
+  place          TEXT NOT NULL DEFAULT '',
+  seller_name    TEXT NOT NULL DEFAULT '',
+  seller_nip     TEXT NOT NULL DEFAULT '',
+  seller_address TEXT NOT NULL DEFAULT '',
+  iban           TEXT NOT NULL DEFAULT '',
+  bank           TEXT NOT NULL DEFAULT '',
+  buyer_name     TEXT NOT NULL DEFAULT '',
+  buyer_nip      TEXT NOT NULL DEFAULT '',
+  buyer_vat_eu   TEXT NOT NULL DEFAULT '',
+  buyer_address  TEXT NOT NULL DEFAULT '',
+  buyer_email    TEXT NOT NULL DEFAULT '',
+  currency       TEXT NOT NULL DEFAULT 'PLN',
+  total_net      INTEGER NOT NULL DEFAULT 0,
+  total_vat      INTEGER NOT NULL DEFAULT 0,
+  total_gross    INTEGER NOT NULL DEFAULT 0,
+  reverse_charge INTEGER NOT NULL DEFAULT 0,
+  paid           INTEGER NOT NULL DEFAULT 0,
+  note           TEXT NOT NULL DEFAULT '',
+  sent_at        TEXT DEFAULT NULL,
+  ksef_number    TEXT NOT NULL DEFAULT '',
+  ksef_status    TEXT NOT NULL DEFAULT '',
+  ksef_at        TEXT DEFAULT NULL,
+  created_by     TEXT NOT NULL DEFAULT '',
+  created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (number),
+  UNIQUE (kind_group, series, seq)
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_invoices_order ON wsm_invoices (order_id);
+
+CREATE TABLE IF NOT EXISTS wsm_invoice_items (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER NOT NULL REFERENCES wsm_invoices(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL DEFAULT '',
+  sku        TEXT NOT NULL DEFAULT '',
+  qty        INTEGER NOT NULL DEFAULT 1,
+  unit_net   INTEGER NOT NULL DEFAULT 0,
+  unit_gross INTEGER NOT NULL DEFAULT 0,
+  vat_rate   REAL NOT NULL DEFAULT 0.23,
+  line_net   INTEGER NOT NULL DEFAULT 0,
+  line_vat   INTEGER NOT NULL DEFAULT 0,
+  line_gross INTEGER NOT NULL DEFAULT 0
+);

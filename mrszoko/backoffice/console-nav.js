@@ -26,6 +26,7 @@
   var PHP_SCREENS = [
     ['pulpit.php',      'Pulpit'],
     ['zamowienia.php',  'Zamówienia'],
+    ['faktury.php',     'Faktury'],
     ['poczta.php',      'Poczta'],
     ['produkty.php',    'Produkty'],
     ['kontrahenci.php', 'Kontrahenci'],

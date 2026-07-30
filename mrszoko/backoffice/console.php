@@ -66,6 +66,7 @@ function console_menu(): array {
     return [
         'pulpit.php'      => 'Pulpit',
         'zamowienia.php'  => 'Zamówienia',
+        'faktury.php'     => 'Faktury',
         'poczta.php'      => 'Poczta',
         'produkty.php'    => 'Produkty',
         'kontrahenci.php' => 'Kontrahenci',
