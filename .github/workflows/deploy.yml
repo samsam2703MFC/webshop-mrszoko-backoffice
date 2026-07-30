@@ -315,7 +315,7 @@ jobs:
           fi
           REMOTE
 
-      - name: Verify backoffice + landing + shop on the server
+      - name: Verify web surfaces on the server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
@@ -515,6 +515,29 @@ jobs:
             esac
           fi
 
+          echo "== racine /mrszoko → redirection boutique =="
+          run "http://localhost/mrszoko/" 50
+          curl -skL "http://localhost/mrszoko/" | grep -q 'url=shop/' \
+            && echo "  la racine renvoie vers la boutique : confirmé" \
+            || { echo "  ^ NOT OK : la racine ne renvoie pas vers /shop/"; fail=1; }
+          if [ "$fail" = "0" ]; then echo "ALL WEB CHECKS OK"; else echo "WEB CHECK FAILED"; exit 1; fi
+          REMOTE
+
+      # Deuxième session SSH, et non la suite de la première : GitHub limite
+      # une expression de workflow à 21 000 caractères, et la vérification
+      # d'un seul tenant venait de passer ce seuil. Le run était alors tué
+      # avant le premier job, sans log, sur toutes les branches — un échec
+      # qui ne ressemble pas du tout à sa cause. Deux étapes valent mieux
+      # qu'une vérification qu'on raboterait pour tenir dans la limite.
+      - name: Verify database on the server
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' DIR_SHOP='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/shop' bash -s" << 'REMOTE'
+          fail=0
           echo "== moteur de données (preuve MySQL) =="
           Q="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name LIKE 'wsm_%'"
           if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
@@ -645,13 +668,9 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
-          echo "== racine /mrszoko → redirection boutique =="
-          run "http://localhost/mrszoko/" 50
-          curl -skL "http://localhost/mrszoko/" | grep -q 'url=shop/' \
-            && echo "  la racine renvoie vers la boutique : confirmé" \
-            || { echo "  ^ NOT OK : la racine ne renvoie pas vers /shop/"; fail=1; }
-          if [ "$fail" = "0" ]; then echo "ALL CHECKS OK"; else echo "CHECK FAILED"; exit 1; fi
+          if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
           REMOTE
+
 
       # Nettoyage transitoire : avant cette version, le back-office était servi À
       # PLAT sous /mrszoko/ (index.html, support.js, api/…). rsync tourne sans
