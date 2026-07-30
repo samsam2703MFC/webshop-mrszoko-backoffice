@@ -122,9 +122,16 @@ CREATE TABLE IF NOT EXISTS `wsm_users` (
   `id`     INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `nom`    VARCHAR(160) NOT NULL,
   `email`  VARCHAR(200) NOT NULL,
-  `role`   VARCHAR(40)  NOT NULL DEFAULT 'Franchise',
+  `role`   VARCHAR(40)  NOT NULL DEFAULT 'Franczyza',
   `portee` VARCHAR(200) NOT NULL DEFAULT '',
   `act`    TINYINT(1)   NOT NULL DEFAULT 1,
+  -- Authentification (voir auth.php). Un compte sans hachage ne peut pas se
+  -- connecter : les comptes de démonstration sont donc inertes tant qu'un
+  -- mot de passe n'a pas été posé (migrate.php --set-password).
+  `password_hash`   VARCHAR(255) NULL DEFAULT NULL,
+  `last_login`      DATETIME NULL DEFAULT NULL,
+  `failed_attempts` INT NOT NULL DEFAULT 0,
+  `locked_until`    DATETIME NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_users_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

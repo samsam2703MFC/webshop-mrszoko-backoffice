@@ -44,17 +44,17 @@ echo "webshop_mrszoko — end-to-end delivery test\n";
 echo "base: $BASE\n\n";
 
 // --- 0. sanity: API up ------------------------------------------------------
-[$c, $kpis] = http('GET', "$BASE/franchisor/kpis");
+[$c, $kpis] = http('GET', "$BASE/franchisor/kpis", null, $TOKEN);
 ok('API reachable (GET /franchisor/kpis → 200)', $c === 200 && is_array($kpis), $c);
 if ($c !== 200) { echo "\nAPI not reachable — start it with ./serve.sh\n"; exit(1); }
 
 // --- 1. baseline KPIs -------------------------------------------------------
-[, $k0] = http('GET', "$BASE/franchisor/delivery-kpis");
+[, $k0] = http('GET', "$BASE/franchisor/delivery-kpis", null, $TOKEN);
 $total0 = $k0['total']; $delivered0 = $k0['delivered'];
 echo "baseline: {$total0} deliveries, {$delivered0} delivered\n";
 
 // --- 2. pick a real delivery point -----------------------------------------
-[, $clients] = http('GET', "$BASE/franchisor/delivery-clients");
+[, $clients] = http('GET', "$BASE/franchisor/delivery-clients", null, $TOKEN);
 $point = null; $clientCode = null;
 foreach ($clients as $cl) {
     if (!empty($cl['points'])) { $point = $cl['points'][0]; $clientCode = $cl['code']; break; }
@@ -78,8 +78,8 @@ ok('marge computed (420-180=240)', (float) ($d['marge'] ?? 0) === 240.0, $d['mar
 $id = $d['id']; $code = $d['confirm_code'];
 
 // --- 5. assign a driver + round --------------------------------------------
-[, $drivers] = http('GET', "$BASE/franchisor/drivers");
-[, $rounds]  = http('GET', "$BASE/franchisor/rounds");
+[, $drivers] = http('GET', "$BASE/franchisor/drivers", null, $TOKEN);
+[, $rounds]  = http('GET', "$BASE/franchisor/rounds", null, $TOKEN);
 $driverId = $drivers[0]['id']; $roundId = $rounds[0]['id'];
 [$c, $d] = http('POST', "$BASE/franchisor/deliveries/$id/assign", ['driver_id' => $driverId, 'round_id' => $roundId], $TOKEN);
 ok('assign → 200', $c === 200, $c);
@@ -106,18 +106,18 @@ ok('confirmed_at stamped', !empty($d['confirmed_at']), $d['confirmed_at'] ?? nul
 ok('re-confirm → 409 already_confirmed', $c === 409 && ($b['error'] ?? '') === 'already_confirmed', [$c, $b]);
 
 // --- 10. event trail --------------------------------------------------------
-[, $events] = http('GET', "$BASE/franchisor/deliveries/$id/events");
+[, $events] = http('GET', "$BASE/franchisor/deliveries/$id/events", null, $TOKEN);
 $evNames = array_column($events, 'event');
 ok('event trail has créée→assignée→en_cours→livrée',
     $evNames === ['créée', 'assignée', 'en_cours', 'livrée'], $evNames);
 
 // --- 11. KPIs moved ---------------------------------------------------------
-[, $k1] = http('GET', "$BASE/franchisor/delivery-kpis");
+[, $k1] = http('GET', "$BASE/franchisor/delivery-kpis", null, $TOKEN);
 ok('total deliveries +1', $k1['total'] === $total0 + 1, [$total0, $k1['total']]);
 ok('delivered +1', $k1['delivered'] === $delivered0 + 1, [$delivered0, $k1['delivered']]);
 
 // --- 12. audit trail captured create + confirm ------------------------------
-[, $audit] = http('GET', "$BASE/franchisor/audit");
+[, $audit] = http('GET', "$BASE/franchisor/audit", null, $TOKEN);
 $auditEntities = array_column($audit, 'entity');
 $refSeen = array_filter($auditEntities, fn($e) => str_contains($e, $d['ref']));
 ok('audit log references the delivery ref', count($refSeen) >= 1, $d['ref']);

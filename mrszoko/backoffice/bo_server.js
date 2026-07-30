@@ -182,7 +182,7 @@
                   deliveries:'deliveries', drivers:'drivers', delivery_clients:'delivery-clients', incidents:'incidents' };
       var headers = fr.token ? { 'X-Admin-Token': fr.token } : {};
       var jobs = Object.keys(MAP).map(function(key){
-        return fetch(fr.base + '/franchisor/' + MAP[key], { headers: headers, credentials: 'omit' })
+        return fetch(fr.base + '/franchisor/' + MAP[key], { headers: headers, credentials: 'same-origin' })
           .then(function(r){ return r.ok ? r.json() : null; })
           .then(function(data){ if (Array.isArray(data)) DB[key] = data; })
           .catch(function(){ /* garde le seed pour cette table */ });

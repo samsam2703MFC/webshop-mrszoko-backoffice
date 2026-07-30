@@ -42,7 +42,7 @@ jobs:
           # -- Back-office → /mrszoko/backoffice --------------------------------
           BO=mrszoko/backoffice
           cp "$BO"/back_office_ws_franchisor.dc.html "$BO"/api-config.js "$BO"/support.js \
-             "$BO"/bo_server.js "$BO"/menu_api.js "$BO"/menu_seed.js site/backoffice/
+             "$BO"/bo_server.js "$BO"/menu_api.js "$BO"/menu_seed.js "$BO"/auth-gate.js site/backoffice/
           cp "$BO"/back_office_ws_franchisor.dc.html site/backoffice/index.html
           cp -r "$BO"/_ds site/backoffice/
           cp -r "$BO"/vendor site/backoffice/
@@ -54,6 +54,9 @@ jobs:
 
           # -- Landing → /mrszoko/landing ---------------------------------------
           cp -r mrszoko/landing/. site/landing/
+
+          # -- En-têtes de sécurité à la racine du site --------------------------
+          cp mrszoko/.htaccess site/.htaccess
 
           # -- /mrszoko/ → redirect to the landing ------------------------------
           cat > site/index.html <<'HTML'
@@ -144,6 +147,61 @@ jobs:
             -e "ssh -p ${{ vars.SSH_PORT || '22' }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             site/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/"
 
+      # Amorçage du compte de connexion + HTTPS. Après le rsync : migrate.php et
+      # config.local.php doivent être en place.
+      - name: Bootstrap admin account + enforce HTTPS (if TLS works)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' ADM_EMAIL='${{ secrets.WSM_ADMIN_EMAIL }}' ADM_PASS='${{ secrets.WSM_ADMIN_PASSWORD }}' bash -s" << 'REMOTE'
+          set -e
+          DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
+          API="$DIR/backoffice/api"
+
+          # ── Compte administrateur : créé UNE SEULE FOIS. --ensure-admin ne fait
+          # rien si un compte capable de se connecter existe déjà, donc les
+          # mots de passe changés par la suite ne sont jamais réécrasés.
+          EMAIL="${ADM_EMAIL:-admin@misterszoko.com}"
+          PASS="${ADM_PASS:-$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)}"
+          OUT=$(cd "$API" && php migrate.php --ensure-admin "$EMAIL" "$PASS" 2>&1) || { echo "$OUT"; exit 1; }
+          echo "$OUT"
+          case "$OUT" in
+            *"compte créé"*)
+              # Identifiants déposés hors racine web, lisibles par root seul.
+              printf 'Mister Szoko — konsola marki\nURL   : /mrszoko/backoffice\nE-mail: %s\nHasło : %s\n' "$EMAIL" "$PASS" > /root/mrszoko-admin.txt
+              chmod 600 /root/mrszoko-admin.txt
+              echo "identifiants écrits dans /root/mrszoko-admin.txt (chmod 600) — e-mail : $EMAIL"
+              ;;
+          esac
+
+          # ── HTTPS : on ne l'impose QUE s'il répond réellement. Sinon une
+          # redirection rendrait le site inaccessible.
+          HTTPS_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 8 "https://localhost/mrszoko/landing/" || echo 000)
+          if [ "$HTTPS_CODE" = "200" ]; then
+            if ! grep -q 'WSM_HTTPS_REDIRECT' "$DIR/.htaccess" 2>/dev/null; then
+              {
+                echo ''
+                echo '# WSM_HTTPS_REDIRECT — ajouté par le déploiement, TLS vérifié au préalable.'
+                echo '<IfModule mod_rewrite.c>'
+                echo '  RewriteEngine On'
+                echo '  RewriteCond %{HTTPS} !=on'
+                echo '  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]'
+                echo '</IfModule>'
+                echo '<IfModule mod_headers.c>'
+                echo '  Header always set Strict-Transport-Security "max-age=15768000"'
+                echo '</IfModule>'
+              } >> "$DIR/.htaccess"
+            fi
+            echo "HTTPS opérationnel (200) → redirection http→https + HSTS activées"
+          else
+            echo "HTTPS ne répond pas (code $HTTPS_CODE) → redirection NON activée (le site resterait inaccessible)."
+            echo "Installez un certificat (certbot) puis relancez le déploiement pour l'activer."
+          fi
+          REMOTE
+
       - name: Verify backoffice + landing on the server
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -151,7 +209,7 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
           fail=0
           run() { URL="$1"; MIN="${2:-1}"
             out=$(curl -s -o /dev/null -w "%{http_code}|%{size_download}|%{content_type}" "$URL")
@@ -184,6 +242,27 @@ jobs:
           run "$LP/assets/logo.png" 1000
           echo "== API landing : contenu servi en 3 langues depuis la base =="
           for lg in pl uk en; do run "$BO/api/landing/content?lang=$lg" 2000; done
+          echo "== authentification (preuve de cloisonnement) =="
+          API="$BO/api"
+          TOK=$(php -r '$c=@include "'"$DIR_API"'/config.local.php"; echo is_array($c)?($c["admin_token"]??""):"";' 2>/dev/null || echo "")
+          codeOf() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          for r in kpis users audit delivery-clients; do
+            c=$(codeOf "$API/franchisor/$r")
+            echo "  $c  GET /franchisor/$r  (sans identité — attendu 401)"
+            [ "$c" = "401" ] || { echo "  ^ FUITE : lecture accessible sans authentification"; fail=1; }
+          done
+          c=$(codeOf "$API/auth/me"); echo "  $c  GET /auth/me  (sans identité — attendu 401)"
+          [ "$c" = "401" ] || { echo "  ^ NOT OK"; fail=1; }
+          c=$(codeOf -H "X-Admin-Token: wrong-token" "$API/franchisor/kpis")
+          echo "  $c  GET /franchisor/kpis  (jeton faux — attendu 401)"
+          [ "$c" = "401" ] || { echo "  ^ NOT OK"; fail=1; }
+          if [ -n "$TOK" ]; then
+            c=$(codeOf -H "X-Admin-Token: $TOK" "$API/franchisor/kpis")
+            echo "  $c  GET /franchisor/kpis  (jeton de service — attendu 200)"
+            [ "$c" = "200" ] || { echo "  ^ NOT OK : l'API ne répond pas au jeton configuré"; fail=1; }
+          else
+            echo "  (jeton de service illisible depuis ce compte — contrôle authentifié sauté)"
+          fi
           echo "== moteur de données (preuve MySQL) =="
           Q="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name LIKE 'wsm_%'"
           if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then

@@ -9,37 +9,74 @@ declare(strict_types=1);
 
 require __DIR__ . '/db.php';
 require __DIR__ . '/delivery.php';
+require __DIR__ . '/auth.php';
 
 $cfg = wsm_config();
 
-// ---- CORS + preflight ------------------------------------------------------
+// ---- En-têtes ---------------------------------------------------------------
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: ' . $cfg['cors_origin']);
-header('Access-Control-Allow-Headers: Content-Type, X-Admin-Token');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('X-Content-Type-Options: nosniff');
+header('Cache-Control: no-store');                 // réponses authentifiées : jamais en cache
+// CORS : émis UNIQUEMENT si une origine précise est configurée. Par défaut le
+// front est same-origin (…/backoffice → ./api) et aucun en-tête n'est requis.
+// Jamais '*' : les requêtes portent un cookie de session.
+$corsOrigin = (string) ($cfg['cors_origin'] ?? '');
+if ($corsOrigin !== '' && $corsOrigin !== '*') {
+    $sent = (string) ($_SERVER['HTTP_ORIGIN'] ?? '');
+    $allowed = array_map('trim', explode(',', $corsOrigin));
+    if ($sent !== '' && in_array($sent, $allowed, true)) {
+        header('Access-Control-Allow-Origin: ' . $sent);
+        header('Vary: Origin');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Headers: Content-Type, X-Admin-Token');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    }
+}
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(204); exit; }
 
 function wsm_send($data, int $code = 200): void { http_response_code($code); echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
 function wsm_fail(string $msg, int $code = 400): void { wsm_send(['error' => $msg], $code); }
 function wsm_body(): array { $raw = file_get_contents('php://input'); $j = json_decode($raw ?: 'null', true); return is_array($j) ? $j : []; }
-function wsm_require_admin(): void {
-    $cfg = wsm_config();
-    $tok = $_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '';
-    if (!hash_equals($cfg['admin_token'], $tok)) wsm_fail('unauthorized', 401);
-}
 
-// ---- Resolve the route after /franchisor/ (admin) or /landing/ (public) ----
+// ---- Routes : /franchisor/* (protégé), /landing/* (public), /auth/* --------
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $route = '';
 $lroute = '';
+$aroute = '';
 if (preg_match('#/franchisor/(.*)$#', $path, $m)) $route = rtrim($m[1], '/');
 elseif (preg_match('#/landing/(.*)$#', $path, $m)) $lroute = rtrim($m[1], '/');
+elseif (preg_match('#/auth/(.*)$#', $path, $m)) $aroute = rtrim($m[1], '/');
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 try {
     $pdo = wsm_bootstrap();  // ensure schema + seed on first hit
 } catch (Throwable $e) {
     wsm_fail('db_unavailable: ' . $e->getMessage(), 500);
+}
+
+// ============================ AUTHENTIFICATION ==============================
+// POST /auth/login {email, password} · POST /auth/logout · GET /auth/me
+if ($aroute !== '') {
+    if ($aroute === 'login' && $method === 'POST') {
+        $b = wsm_body();
+        $email = (string) ($b['email'] ?? '');
+        $pass  = (string) ($b['password'] ?? '');
+        if ($email === '' || $pass === '') wsm_fail('email_and_password_required', 422);
+        wsm_send(['ok' => true, 'user' => wsm_login($pdo, $email, $pass)]);
+    }
+    if ($aroute === 'logout' && $method === 'POST') {
+        wsm_logout();
+        wsm_send(['ok' => true]);
+    }
+    if ($aroute === 'me' && $method === 'GET') {
+        if (wsm_service_token_ok()) {
+            wsm_send(['user' => wsm_public_user(['nom' => 'Konsola marki', 'role' => WSM_ROLE_ADMIN, 'service' => true])]);
+        }
+        $u = wsm_current_user($pdo);
+        if (!$u) wsm_fail('unauthenticated', 401);
+        wsm_send(['user' => wsm_public_user($u)]);
+    }
+    wsm_fail('unknown_route: auth/' . $aroute, 404);
 }
 
 // ======================= LANDING (public, read-only) ========================
@@ -77,7 +114,10 @@ if ($method === 'GET' && $lroute === 'content') {
 }
 
 // ============================ READ ENDPOINTS ================================
+// Toute lecture /franchisor/* exige une identité : session utilisateur active
+// ou jeton de service. Seul /landing/content (traité plus haut) est public.
 if ($method === 'GET') {
+    wsm_require_read($pdo);
     switch ($route) {
         case 'kpis':
             wsm_send(array_map(fn($r) => [
@@ -152,7 +192,10 @@ if ($method === 'GET') {
 
 // ============================ WRITE ENDPOINTS ===============================
 if ($method === 'POST') {
-    wsm_require_admin();
+    // Écriture : rôle siège (Centrala) ou jeton de service. L'acteur réel est
+    // journalisé dans l'audit — plus de « Konsola marki » générique.
+    $actor = wsm_require_write($pdo);
+    $actorName = (string) ($actor['nom'] ?: 'Konsola marki');
     $body = wsm_body();
 
     switch ($route) {
@@ -172,7 +215,7 @@ if ($method === 'POST') {
                     $pdo->prepare("INSERT INTO wsm_landing_i18n (lang,k,v) VALUES (?,?,?)")->execute([$body['lang'], $body['k'], (string) $body['v']]);
                 }
             }
-            wsm_audit($pdo, 'Konsola marki', 'Zmiana', 'wsm_landing_i18n ' . $body['lang'] . ':' . $body['k'], 'Landing');
+            wsm_audit($pdo, $actorName, 'Zmiana', 'wsm_landing_i18n ' . $body['lang'] . ':' . $body['k'], 'Landing');
             wsm_send(['ok' => true]);
         }
 
@@ -207,7 +250,7 @@ if ($method === 'POST') {
                 $pdo->prepare("INSERT INTO wsm_landing_products ($cols) VALUES ($ph)")
                     ->execute([(string) $body['id'], ...array_values($row)]);
             }
-            wsm_audit($pdo, 'Konsola marki', 'Zmiana', 'wsm_landing_products ' . $body['id'], 'Landing');
+            wsm_audit($pdo, $actorName, 'Zmiana', 'wsm_landing_products ' . $body['id'], 'Landing');
             wsm_send(['ok' => true]);
         }
 
@@ -219,7 +262,7 @@ if ($method === 'POST') {
             } else {
                 $pdo->prepare("INSERT INTO wsm_params (cle,type,val) VALUES (?,?,?)")->execute([$body['cle'], $body['type'] ?? 'text', (string) ($body['val'] ?? '')]);
             }
-            wsm_audit($pdo, 'Konsola marki', 'Zmiana', 'wsm_params ' . $body['cle'], 'Sieć');
+            wsm_audit($pdo, $actorName, 'Zmiana', 'wsm_params ' . $body['cle'], 'Sieć');
             wsm_send(['ok' => true]);
         }
 
@@ -254,7 +297,7 @@ if ($method === 'POST') {
 
         // ---- delivery mutations ----
         case 'deliveries': {
-            try { wsm_send(wsm_delivery_create($pdo, $body), 201); }
+            try { wsm_send(wsm_delivery_create($pdo, $body, $actorName), 201); }
             catch (InvalidArgumentException $e) { wsm_fail($e->getMessage(), 422); }
         }
     }
@@ -266,13 +309,13 @@ if ($method === 'POST') {
             if ($action === 'assign') {
                 wsm_send(wsm_delivery_assign($pdo, $id,
                     isset($body['driver_id']) ? (int) $body['driver_id'] : null,
-                    isset($body['round_id']) ? (int) $body['round_id'] : null));
+                    isset($body['round_id']) ? (int) $body['round_id'] : null, $actorName));
             }
             if ($action === 'confirm') {
-                wsm_send(wsm_delivery_confirm($pdo, $id, (string) ($body['code'] ?? '')));
+                wsm_send(wsm_delivery_confirm($pdo, $id, (string) ($body['code'] ?? ''), $actorName));
             }
             if ($action === 'status') {
-                wsm_send(wsm_delivery_status($pdo, $id, (string) ($body['status'] ?? '')));
+                wsm_send(wsm_delivery_status($pdo, $id, (string) ($body['status'] ?? ''), $actorName));
             }
         } catch (InvalidArgumentException $e) { wsm_fail($e->getMessage(), 422); }
         catch (RuntimeException $e) { wsm_fail($e->getMessage(), 409); }
