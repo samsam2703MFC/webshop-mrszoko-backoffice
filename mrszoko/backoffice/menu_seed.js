@@ -13,7 +13,7 @@ export const SEED = {
     'Czekolada': { menu_default: 0 },
     'Lody': { menu_default: 0 }
   },
-  'p-midi': { productName: 'Menu lunchowe — L\'Atelier', category: 'Menu i zestawy', menuOverride: 'on', basePrice: 8.50, baseCost: 2.40, bundles: [
+  'p-midi': { productName: 'Menu lunchowe — Mister Szoko', category: 'Menu i zestawy', menuOverride: 'on', basePrice: 8.50, baseCost: 2.40, bundles: [
     { id:'b1', name:'Zestaw pełny', description:'Danie + napój + deser do wyboru', price_modifier:4.50, sort_order:0, active:true, slots:[
       { id:'s1', label:'Danie', required:true, kind:'single', min_select:1, max_select:1, sort_order:0, active:true, choices:[
         { id:'c1', label:'Quiche lorraine', img:'a', delta:0, cost:1.10, sort_order:0, active:true },
@@ -34,7 +34,7 @@ export const SEED = {
       { id:'s5', label:'Napój', required:true, kind:'single', min_select:1, max_select:1, sort_order:1, active:true, choices:[
         { id:'c12', label:'Syrop z wodą', img:'', delta:0, cost:0.20, sort_order:0, active:true },
         { id:'c13', label:'Sok jabłkowy', img:'c', delta:0, cost:0.40, sort_order:1, active:true } ] } ] } ] },
-  'p-gouter': { productName: 'Zestaw podwieczorkowy — L\'Atelier', category: 'Menu i zestawy', menuOverride: 'on', basePrice: 3.20, baseCost: 0.90, bundles: [
+  'p-gouter': { productName: 'Zestaw podwieczorkowy — Mister Szoko', category: 'Menu i zestawy', menuOverride: 'on', basePrice: 3.20, baseCost: 0.90, bundles: [
     { id:'gb1', name:'Duet podwieczorkowy', description:'Wypiek + gorący napój', price_modifier:1.20, sort_order:0, active:true, slots:[
       { id:'gs1', label:'Wypiek', required:true, kind:'single', min_select:1, max_select:1, sort_order:0, active:true, choices:[
         { id:'gc1', label:'Czekoladowa drożdżówka', img:'b', delta:0, cost:0.50, sort_order:0, active:true },
@@ -42,6 +42,6 @@ export const SEED = {
       { id:'gs2', label:'Gorący napój', required:true, kind:'single', min_select:1, max_select:1, sort_order:1, active:true, choices:[
         { id:'gc3', label:'Kawa', img:'', delta:0, cost:0.35, sort_order:0, active:true },
         { id:'gc4', label:'Gorąca czekolada', img:'d', delta:0.50, cost:0.55, sort_order:1, active:true } ] } ] } ] },
-  'p-cafe': { productName: 'Café Gourmand — L\'Atelier', category: 'Menu i zestawy', menuOverride: 'off', basePrice: 6.50, baseCost: 2.10, bundles: [] },
-  'p-brunch': { productName: 'Brunch weekendowy — L\'Atelier', category: 'Menu i zestawy', menuOverride: null, basePrice: 18.00, baseCost: 5.50, bundles: [] }
+  'p-cafe': { productName: 'Café Gourmand — Mister Szoko', category: 'Menu i zestawy', menuOverride: 'off', basePrice: 6.50, baseCost: 2.10, bundles: [] },
+  'p-brunch': { productName: 'Brunch weekendowy — Mister Szoko', category: 'Menu i zestawy', menuOverride: null, basePrice: 18.00, baseCost: 5.50, bundles: [] }
 };

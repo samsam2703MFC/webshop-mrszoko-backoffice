@@ -1,0 +1,63 @@
+/* =====================================================================
+   Mister Szoko — habillage de la console.
+   =====================================================================
+   Chargé APRÈS global.css : celui-ci reste l'export structurel d'origine
+   (mise en page, composants) et n'est pas modifié ; cette couche redéfinit
+   uniquement les jetons de marque, avec les valeurs du design system
+   Mister Szoko (../../design-system/tokens/).
+
+   Palette : chocolat #41281A (cœur de marque, échantillonné sur le logo),
+   crème #FBF6EF, caramel #C68A3C. Ombres et bordures teintées brun, jamais
+   grises. Polices : Plus Jakarta Sans (titres) + Mulish (interface) +
+   DM Mono (chiffres) — substituts Google Fonts assumés par le design system,
+   à remplacer par les fontes sous licence si la marque en fournit.
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Mulish:ital,wght@0,300..800;1,400&family=Plus+Jakarta+Sans:wght@400..800&display=swap');
+
+:root {
+  /* ---- Marque ---- */
+  --color-primary:              #41281A;  /* chocolat : navigation active, actions */
+  --color-secondary:            #C68A3C;  /* caramel : second canal (livraison bureau) */
+  --color-collect:              #41281A;  /* retrait en boutique */
+  --color-linked:               #C68A3C;
+
+  /* ---- Surfaces ---- */
+  --color-bg:                   #F5ECDE;  /* crème 100 */
+  --color-surface:              #FFFFFF;
+  --color-background-secondary: #FBF6EF;  /* crème 50 */
+
+  /* ---- Texte ---- */
+  --color-text:                 #211712;
+  --color-text-muted:           #7C6A5D;
+  --color-ink:                  #211712;
+
+  /* ---- Bordures : teintées cacao, jamais grises ---- */
+  --color-border-secondary:     rgba(46, 22, 12, 0.18);
+  --color-border-tertiary:      rgba(46, 22, 12, 0.10);
+
+  /* ---- Accents secondaires ---- */
+  --color-on-abricot:           #5A3826;
+  --color-collection-border:    #A96A2C;
+  --color-collection-fill:      #E0B24A;
+  --color-collection-icon:      #6B3D0A;
+  --color-popup:                #5A3826;
+
+  /* ---- Typographie ---- */
+  --font-display: 'Plus Jakarta Sans', 'Mulish', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-ui:      'Mulish', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-accent:  'Plus Jakarta Sans', 'Mulish', system-ui, sans-serif;
+  --font-mono:    'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* Le logo Mister Szoko est un galet quasi carré (197 × 185), non un
+   wordmark allongé : on le cadre par la hauteur pour qu'il ne dévore pas
+   la barre latérale. */
+img[alt="Mister Szoko"] {
+  width: auto !important;
+  max-width: 100% !important;
+  height: 56px;
+}
+
+/* Les liens héritaient du bordeaux L'Atelier. */
+a { color: var(--color-primary); }
+a:hover { color: #2E160C; }

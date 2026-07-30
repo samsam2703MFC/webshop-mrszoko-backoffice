@@ -161,6 +161,10 @@ jobs:
           DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
           API="$DIR/backoffice/api"
 
+          # ── Libellés de démonstration : L'Atelier → Mister Szoko dans la base
+          # déjà seedée. Idempotent (plus rien à remplacer une fois passé).
+          (cd "$API" && php migrate.php --rebrand) || echo 'rebranding ignoré'
+
           # ── Compte administrateur : créé UNE SEULE FOIS. --ensure-admin ne fait
           # rien si un compte capable de se connecter existe déjà, donc les
           # mots de passe changés par la suite ne sont jamais réécrasés.
@@ -244,14 +248,13 @@ jobs:
           }
           BO="http://localhost/mrszoko/backoffice"
           LP="http://localhost/mrszoko/landing"
-          DS="_ds/l-atelier-by-8504a4e3-7796-44da-b087-3fbd9dcb8dcd"
+          DS="_ds/mister-szoko"
           echo "== backoffice =="
           for f in / /api-config.js /support.js /bo_server.js /menu_api.js /menu_seed.js \
                    /vendor/react.js /vendor/react-dom.js \
-                   "/$DS/global.css" "/$DS/_ds_bundle.js" \
-                   "/$DS/fonts/Gotham_Book.otf" "/$DS/fonts/Gotham_Medium.otf" \
-                   "/$DS/fonts/Gotham_Light.otf" "/$DS/fonts/GC_Vank.ttf"; do
-            case "$f" in *fonts/*) run "$BO$f" 1000 ;; *) run "$BO$f" 1 ;; esac
+                   "/$DS/global.css" "/$DS/brand.css" "/$DS/_ds_bundle.js" \
+                   /img/logo.png; do
+            run "$BO$f" 1
           done
           echo "== landing =="
           run "$LP/" 1000
