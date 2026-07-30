@@ -85,7 +85,8 @@ jobs:
           cp mrszoko/backoffice/zamowienia.php mrszoko/backoffice/produkty.php \
              mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php mrszoko/backoffice/rabaty.php \
              mrszoko/backoffice/poczta.php mrszoko/backoffice/ustawienia.php \
-             mrszoko/backoffice/pulpit.php \
+             mrszoko/backoffice/pulpit.php mrszoko/backoffice/faktury.php \
+             mrszoko/backoffice/faktura_druk.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -391,7 +392,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php produkty.php kontrahenci.php kraje.php rabaty.php poczta.php ustawienia.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php kontrahenci.php kraje.php rabaty.php poczta.php ustawienia.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -561,6 +562,21 @@ jobs:
               NMT=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE active=1" 2>/dev/null || echo 0)
               NMA=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE event<>'' AND active=1" 2>/dev/null || echo 0)
             fi
+            # Facturation : les deux index UNIQUE SONT la numérotation. Sans eux,
+            # deux factures pourraient porter le même numéro — ce qu'un contrôle
+            # fiscal relève immédiatement.
+            QF="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_invoices','wsm_invoice_items')"
+            QFU="SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema='mrszoko' AND table_name='wsm_invoices' AND non_unique=0 AND index_name <> 'PRIMARY'"
+            if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+              NF=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QF" 2>/dev/null || echo 0)
+              NFU=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QFU" 2>/dev/null || echo 0)
+            else
+              NF=$(mysql -N -e "$QF" 2>/dev/null || echo 0)
+              NFU=$(mysql -N -e "$QFU" 2>/dev/null || echo 0)
+            fi
+            echo "  tables faktur : $NF / 2 · indeksy UNIQUE numeracji : $NFU / 2"
+            if [ "${NF:-0}" -lt 2 ]; then echo "  ^ ATTENTION : pas de quoi écrire une facture"; fail=1; fi
+            if [ "${NFU:-0}" -lt 2 ]; then echo "  ^ ATTENTION : sans ces index, deux factures pourraient porter le même numéro"; fail=1; fi
             echo "  tables poczta + ustawienia : $NM / 3 · modèles actifs : $NMT (dont $NMA automatiques)"
             echo "  index UNIQUE anti-doublon (wsm_messages.event_key) : $NMU"
             if [ "${NM:-0}" -lt 3 ]; then echo "  ^ ATTENTION : la messagerie n'a pas de quoi écrire au client"; fail=1; fi

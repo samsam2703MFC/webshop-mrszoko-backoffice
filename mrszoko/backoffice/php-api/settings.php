@@ -65,6 +65,19 @@ function wsm_settings_fields(): array {
         'mail.smtp_secure' => ['mail', 'Szyfrowanie',    ['mail', 'smtp_secure'], 'WSM_MAIL_SMTP_SECURE', 'select:tls|ssl|brak', 'tls dla portu 587, ssl dla 465.'],
 
         'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z tpay.'],
+
+        // ---- Faktury : ce qui figure sur le document ----------------------
+        // Rien n'est en dur dans le code. Le vendeur change d'adresse ou de
+        // banque sans redéploiement, et une facture déjà émise garde SA copie
+        // (voir invoice.php) : modifier ces champs ne réécrit pas le passé.
+        'invoice.seller_name'    => ['faktura', 'Sprzedawca — nazwa',     ['invoice', 'seller_name'],    'WSM_INV_SELLER_NAME',    'text',   'Pełna nazwa z KRS.'],
+        'invoice.seller_nip'     => ['faktura', 'Sprzedawca — NIP',       ['invoice', 'seller_nip'],     'WSM_INV_SELLER_NIP',     'text',   'Bez prefiksu PL na fakturze krajowej.'],
+        'invoice.seller_address' => ['faktura', 'Sprzedawca — adres',     ['invoice', 'seller_address'], 'WSM_INV_SELLER_ADDRESS', 'text',   'Ulica, kod, miasto, kraj.'],
+        'invoice.place'          => ['faktura', 'Miejsce wystawienia',    ['invoice', 'place'],          'WSM_INV_PLACE',          'text',   'Zwykle siedziba firmy.'],
+        'invoice.iban'           => ['faktura', 'Numer rachunku (IBAN)',  ['invoice', 'iban'],           'WSM_INV_IBAN',           'text',   'Trafia na każdą fakturę z przelewem.'],
+        'invoice.bank'           => ['faktura', 'Nazwa banku',            ['invoice', 'bank'],           'WSM_INV_BANK',           'text',   'Obok numeru rachunku.'],
+        'invoice.payment_days'   => ['faktura', 'Termin płatności (dni)', ['invoice', 'payment_days'],   'WSM_INV_PAYMENT_DAYS',   'text',   '0 = płatne przy zamówieniu (tpay pobiera od razu).'],
+        'invoice.number_format'  => ['faktura', 'Format numeru',          ['invoice', 'number_format'],  'WSM_INV_NUMBER_FORMAT',  'text',   'xxx = kolejny numer, mm = miesiąc, yy = rok. Numeracja zeruje się wraz z tym, co jest w formacie.'],
     ];
 }
 

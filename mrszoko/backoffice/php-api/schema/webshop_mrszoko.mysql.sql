@@ -693,3 +693,73 @@ CREATE TABLE IF NOT EXISTS `wsm_settings` (
   `updated_by` VARCHAR(120) NOT NULL DEFAULT '',
   PRIMARY KEY (`cle`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Faktury i e-paragony ---------------------------------------------------
+-- Le document est AUTONOME : vendeur, acheteur et lignes y sont recopiés, pas
+-- lus par jointure. Une facture doit se relire à l'identique dans dix ans,
+-- même si le produit a changé de nom et le siège d'adresse.
+--
+-- Deux index UNIQUE portent la numérotation : `number` interdit le doublon,
+-- et (kind_group, series, seq) interdit deux fois le même rang dans la même
+-- série. C'est la base qui tranche entre deux émissions simultanées.
+CREATE TABLE IF NOT EXISTS `wsm_invoices` (
+  `id`             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`       INT UNSIGNED NULL DEFAULT NULL,
+  `kind`           VARCHAR(10)  NOT NULL DEFAULT 'faktura',   -- faktura | korekta | paragon
+  `kind_group`     VARCHAR(10)  NOT NULL DEFAULT 'faktura',   -- suite de numérotation
+  `corrects_id`    INT UNSIGNED NULL DEFAULT NULL,
+  `number`         VARCHAR(40)  NOT NULL,
+  `series`         VARCHAR(10)  NOT NULL DEFAULT '',
+  `seq`            INT UNSIGNED NOT NULL DEFAULT 0,
+  `issued_at`      DATE NOT NULL,
+  `sold_at`        DATE NOT NULL,
+  `due_at`         DATE NOT NULL,
+  `place`          VARCHAR(80)  NOT NULL DEFAULT '',
+  `seller_name`    VARCHAR(200) NOT NULL DEFAULT '',
+  `seller_nip`     VARCHAR(20)  NOT NULL DEFAULT '',
+  `seller_address` VARCHAR(250) NOT NULL DEFAULT '',
+  `iban`           VARCHAR(40)  NOT NULL DEFAULT '',
+  `bank`           VARCHAR(120) NOT NULL DEFAULT '',
+  `buyer_name`     VARCHAR(200) NOT NULL DEFAULT '',
+  `buyer_nip`      VARCHAR(20)  NOT NULL DEFAULT '',
+  `buyer_vat_eu`   VARCHAR(20)  NOT NULL DEFAULT '',
+  `buyer_address`  VARCHAR(250) NOT NULL DEFAULT '',
+  `buyer_email`    VARCHAR(200) NOT NULL DEFAULT '',
+  `currency`       CHAR(3)      NOT NULL DEFAULT 'PLN',
+  `total_net`      INT NOT NULL DEFAULT 0,
+  `total_vat`      INT NOT NULL DEFAULT 0,
+  `total_gross`    INT NOT NULL DEFAULT 0,
+  `reverse_charge` TINYINT(1)   NOT NULL DEFAULT 0,
+  `paid`           TINYINT(1)   NOT NULL DEFAULT 0,
+  `note`           VARCHAR(250) NOT NULL DEFAULT '',
+  `sent_at`        DATETIME NULL DEFAULT NULL,
+  `ksef_number`    VARCHAR(64)  NOT NULL DEFAULT '',
+  `ksef_status`    VARCHAR(20)  NOT NULL DEFAULT '',
+  `ksef_at`        DATETIME NULL DEFAULT NULL,
+  `created_by`     VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_invoices_number` (`number`),
+  UNIQUE KEY `uq_wsm_invoices_seq` (`kind_group`, `series`, `seq`),
+  KEY `idx_wsm_invoices_order` (`order_id`),
+  CONSTRAINT `fk_wsm_invoices_order`
+    FOREIGN KEY (`order_id`) REFERENCES `wsm_orders` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_invoice_items` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `invoice_id` INT UNSIGNED NOT NULL,
+  `name`       VARCHAR(250) NOT NULL DEFAULT '',
+  `sku`        VARCHAR(60)  NOT NULL DEFAULT '',
+  `qty`        INT NOT NULL DEFAULT 1,
+  `unit_net`   INT NOT NULL DEFAULT 0,
+  `unit_gross` INT NOT NULL DEFAULT 0,
+  `vat_rate`   DECIMAL(4,2) NOT NULL DEFAULT 0.23,
+  `line_net`   INT NOT NULL DEFAULT 0,
+  `line_vat`   INT NOT NULL DEFAULT 0,
+  `line_gross` INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_invoice_items` (`invoice_id`),
+  CONSTRAINT `fk_wsm_invoice_items`
+    FOREIGN KEY (`invoice_id`) REFERENCES `wsm_invoices` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

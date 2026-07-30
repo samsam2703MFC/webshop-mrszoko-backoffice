@@ -94,6 +94,22 @@ $cfg = [
         'smtp_secure' => getenv('WSM_MAIL_SMTP_SECURE') ?: '',
     ],
 
+    // ---- Faktury : les mentions du document --------------------------------
+    // Le NIP et l'adresse figurent au registre public KRS : ce ne sont pas des
+    // secrets. Le numéro de compte non plus — il est destiné à être imprimé.
+    // Ils vivent néanmoins en base (écran Ustawienia) pour se corriger sans
+    // redéploiement ; ce qui est posé ici l'emporte.
+    'invoice' => [
+        'seller_name'    => getenv('WSM_INV_SELLER_NAME') ?: 'ATELIER WRO01 sp. z o.o.',
+        'seller_nip'     => getenv('WSM_INV_SELLER_NIP') ?: '8971902620',
+        'seller_address' => getenv('WSM_INV_SELLER_ADDRESS') ?: 'ul. Stanisława Leszczyńskiego 4/29, 50-078 Wrocław, Polska',
+        'place'          => getenv('WSM_INV_PLACE') ?: 'Wrocław',
+        'iban'           => getenv('WSM_INV_IBAN') ?: '',
+        'bank'           => getenv('WSM_INV_BANK') ?: '',
+        'payment_days'   => getenv('WSM_INV_PAYMENT_DAYS') ?: '',
+        'number_format'  => getenv('WSM_INV_NUMBER_FORMAT') ?: '',
+    ],
+
     // ---- InPost ShipX : expédition ----------------------------------------
     // geowidget_token est le jeton PUBLIC du sélecteur de Paczkomat (il part
     // dans la page) ; token est le jeton SERVEUR ShipX (il n'en sort jamais).
