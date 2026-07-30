@@ -454,3 +454,19 @@ CREATE TABLE IF NOT EXISTS wsm_shop_i18n (
   v    TEXT NOT NULL,
   PRIMARY KEY (lang, k)
 );
+
+-- --- Contrôles VIES (miroir SQLite) -----------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_vies_checks (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  vat_eu       TEXT NOT NULL,
+  country      TEXT NOT NULL DEFAULT '',
+  number       TEXT NOT NULL DEFAULT '',
+  status       TEXT NOT NULL DEFAULT '',
+  reason       TEXT NOT NULL DEFAULT '',
+  name         TEXT NOT NULL DEFAULT '',
+  address      TEXT NOT NULL DEFAULT '',
+  consultation TEXT NOT NULL DEFAULT '',
+  raw          TEXT,
+  checked_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_vies_vat ON wsm_vies_checks (vat_eu, id);

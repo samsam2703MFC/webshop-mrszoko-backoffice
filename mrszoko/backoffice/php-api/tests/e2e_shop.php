@@ -76,8 +76,7 @@ foreach (['pl', 'uk', 'en'] as $L) {
     [, $r] = http('GET', "$BASE/shop/catalog?lang=$L");
     $S = $r['strings'] ?? [];
     $missing = [];
-    foreach (['story.formats.title', 'story.atelier.title', 'story.pro.title',
-              'story.pro.cta', 'story.strip.1', 'footer.email'] as $k) {
+    foreach (['story.pro.title', 'story.pro.cta', 'story.strip.1', 'footer.email'] as $k) {
         if (($S[$k] ?? '') === '') $missing[] = $k;
     }
     ok("treść strony marki dostępna w « $L »", !$missing, $missing);

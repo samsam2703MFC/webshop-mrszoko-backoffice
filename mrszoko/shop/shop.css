@@ -295,14 +295,6 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .eyebrow.accent { color: var(--caramel-600); margin-bottom: var(--space-2); }
 .tagline { margin-top: var(--space-4); }
 
-.formats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); }
-.format { background: var(--surface-raised); border: 1px solid var(--border-subtle);
-          border-radius: var(--radius-lg); padding: var(--space-5); }
-.format .fk { color: var(--caramel-600); text-transform: uppercase; letter-spacing: var(--tracking-caps); }
-.format .fs { font-family: var(--font-display); font-size: var(--text-xl); color: var(--text-strong);
-              font-weight: var(--weight-semibold); margin: var(--space-2) 0 var(--space-1); }
-.format p:last-child { font-size: var(--text-sm); color: var(--text-muted); }
-
 .pro { background: var(--choco-800); color: var(--cream-50); border-radius: var(--radius-2xl); overflow: hidden; }
 .pro-in { padding: var(--space-8); display: flex; align-items: center; justify-content: space-between;
           gap: var(--space-6); flex-wrap: wrap; }

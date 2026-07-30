@@ -168,6 +168,45 @@ the browser as mixed content.
 Replacing a photo deletes the old file. `media/` is not versioned and `rsync`
 runs without `--delete`, so deploys never carry the photos away.
 
+## VIES — is that VAT number real?
+
+Format was never proof. `PL5252248481` *looks* like a VAT number; only VIES (the
+Commission's VAT Information Exchange System) knows whether it exists and whose
+it is. `vies.php` asks.
+
+**The rule that matters.** VIES queries each national tax administration live,
+and those administrations go down — routinely. So two things that nothing forces
+us to conflate are kept apart:
+
+| VIES says | We record | Consequence |
+| --- | --- | --- |
+| `INVALID`, `INVALID_INPUT` | `invalid` | the entry is **refused** (`422` on `vat_eu`) |
+| `MS_UNAVAILABLE`, `TIMEOUT`, `*_BLOCKED`, `*_MAX_CONCURRENT_REQ`, network error | `unavailable` | **nothing is blocked** — saved, flagged for re-check |
+| `isValid` | `valid` | company name, address and consultation number stored |
+
+Refusing a sale because a Commission service is down would be a bigger loss than
+the one being prevented. `tests/e2e_vies.php` asserts precisely this asymmetry.
+
+**Proof.** With our own VAT number set (`WSM_VIES_REQUESTER`), VIES returns a
+consultation number — that is what stands up to a tax audit, not a screenshot.
+Every consultation is appended to `wsm_vies_checks`, including the ones that
+answered nothing; the client and the order carry `vat_status`, `vat_checked_at`,
+`vat_name`, `vat_consultation`.
+
+**Cost control.** `valid` and `invalid` verdicts are cached for 30 days —
+VIES is slow and must not be hammered. `unavailable` is **never** cached: caching
+an outage would freeze it. Country prefixes are checked against the real list of
+27 member states (Greece is `EL`, not `GR`) plus `XI`, so a non-EU prefix is
+refused without a pointless round-trip.
+
+**Reverse charge is reported, not applied.** A valid non-Polish EU number is
+flagged as eligible in the console, but the shop still charges Polish VAT — it
+only ships within Poland via InPost, so no intra-EU supply exists yet. Applying
+0 % is a tax decision that needs international shipping first.
+
+Checked at both entry points: `POST /franchisor/client` (console) and the shop
+checkout. `POST /franchisor/vies` runs a check on demand without saving anything.
+
 ## Configuration
 
 All in `config.php`, entirely env-driven (see the header there).
@@ -176,6 +215,11 @@ Payment and shipping credentials have **no defaults** and never belong in this
 repository (it is public). Set them in `config.local.php` on the server, or as
 `WSM_TPAY_CLIENT_ID`, `WSM_TPAY_CLIENT_SECRET`, `WSM_TPAY_SECURITY_CODE`,
 `WSM_INPOST_TOKEN`, `WSM_INPOST_ORG_ID`, `WSM_INPOST_GEOWIDGET_TOKEN`.
+
+VIES needs no credentials (it is a public service), but set
+`WSM_VIES_REQUESTER` to our own VAT number so consultations come back with a
+provable reference. `WSM_VIES_ENABLED=0` turns the network call off entirely —
+numbers are then checked for shape only.
 Both integrations default to **sandbox**; set `WSM_TPAY_SANDBOX=0` /
 `WSM_INPOST_SANDBOX=0` to go live.
 
@@ -210,6 +254,7 @@ from the console.
 | POST | `/franchisor/orders/{id}/status` | status transition (admin) |
 | POST | `/franchisor/orders/{id}/ship` | create the InPost shipment (admin, paid orders only) |
 | POST | `/franchisor/product-photo` | multipart upload — decoded and **re-encoded** server-side |
+| POST | `/franchisor/vies` | check an EU VAT number against VIES (no write) |
 | **Commerce (tpay + InPost)** | | |
 | POST | `/franchisor/client` | upsert/delete `wsm_clients` — validated payer + invoice data |
 | POST | `/franchisor/client-point` | upsert/delete `wsm_client_points` — locker code or courier address |

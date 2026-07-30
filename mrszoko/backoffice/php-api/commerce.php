@@ -72,10 +72,27 @@ function wsm_normalize_nip(string $raw): string {
     return preg_replace('/\D+/', '', $raw) ?? '';
 }
 
-/** Numéro de TVA intracommunautaire (VIES) : 2 lettres pays + 2 à 12 caractères. */
+/**
+ * Préfixes pays reconnus par VIES : les 27 États membres — la Grèce s'écrit EL
+ * et non GR — plus XI pour l'Irlande du Nord depuis le Brexit.
+ */
+const WSM_VAT_EU_COUNTRIES = [
+    'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'ES', 'FI', 'FR', 'HR', 'HU',
+    'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'XI',
+];
+
+/**
+ * Numéro de TVA intracommunautaire : 2 lettres pays + 2 à 12 caractères.
+ *
+ * Le code pays est vérifié contre la vraie liste, pas contre « deux lettres » :
+ * « PASUNNUMERO » a beau ressembler à un numéro, PA n'est pas un État membre —
+ * et une interrogation VIES pour un pays qui n'y participe pas ne peut rien
+ * donner d'autre qu'une erreur.
+ */
 function wsm_valid_vat_eu(string $raw): bool {
     $v = strtoupper(preg_replace('/[\s.-]+/', '', $raw) ?? '');
-    return preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', $v) === 1;
+    if (preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', $v) !== 1) return false;
+    return in_array(substr($v, 0, 2), WSM_VAT_EU_COUNTRIES, true);
 }
 
 /** Code de Paczkomat : 3 lettres + chiffres/lettres (ex. KRA010, WAW01M). */

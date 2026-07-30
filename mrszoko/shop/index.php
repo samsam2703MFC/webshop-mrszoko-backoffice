@@ -203,40 +203,6 @@ if ($page === '') {
     <?php endif; ?>
   </section>
 
-  <?php // ---- Formats et prix dégressifs ---------------------------------- ?>
-  <?php if (isset($S['story.formats.title'])): ?>
-  <section class="block band" id="formaty">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="eyebrow accent"><?= e($S['story.formats.eyebrow'] ?? '') ?></p>
-        <h2><?= e($S['story.formats.title']) ?></h2>
-        <p class="sub"><?= e($S['story.formats.sub'] ?? '') ?></p>
-      </div>
-      <div class="formats">
-        <?php for ($i = 1; isset($S["story.format.$i.size"]); $i++): ?>
-        <div class="format">
-          <p class="mono fk"><?= e($S["story.format.$i.kind"] ?? '') ?></p>
-          <p class="fs"><?= e($S["story.format.$i.size"]) ?></p>
-          <p><?= e($S["story.format.$i.note"] ?? '') ?></p>
-        </div>
-        <?php endfor; ?>
-      </div>
-    </div>
-  </section>
-  <?php endif; ?>
-
-  <?php // ---- La pracownia (ce que la landing racontait) -------------------- ?>
-  <?php if (isset($S['story.atelier.title'])): ?>
-  <section class="block" id="pracownia">
-    <div class="wrap section-head">
-      <p class="eyebrow accent"><?= e($S['story.atelier.eyebrow'] ?? '') ?></p>
-      <h2><?= e($S['story.atelier.title']) ?></h2>
-      <p class="sub"><?= e($S['story.atelier.sub'] ?? '') ?></p>
-      <p class="mono muted tagline"><?= e($S['story.atelier.tagline'] ?? '') ?></p>
-    </div>
-  </section>
-  <?php endif; ?>
-
   <?php // ---- Panneau pro : compte B2B ------------------------------------- ?>
   <?php if (isset($S['story.pro.title'])):
     $mail = (string) ($S['footer.email'] ?? ''); ?>

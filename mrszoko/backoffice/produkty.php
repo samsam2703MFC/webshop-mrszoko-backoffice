@@ -200,6 +200,7 @@ $nPhoto   = count(array_filter($rows, fn($r) => (int) $r['shop_visible'] === 1 &
     <h1>Produkty i zdjęcia</h1>
     <a href="./">← Konsola</a>
     <a href="zamowienia.php">Zamówienia</a>
+    <a href="kontrahenci.php">Kontrahenci i VAT UE</a>
     <a href="../shop/" target="_blank" rel="noopener">Sklep</a>
     <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
   </div>

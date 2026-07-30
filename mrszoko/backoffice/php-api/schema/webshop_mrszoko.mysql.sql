@@ -591,3 +591,23 @@ CREATE TABLE IF NOT EXISTS `wsm_shop_i18n` (
   `v`    TEXT        NOT NULL,
   PRIMARY KEY (`lang`, `k`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Contrôles VIES (TVA intracommunautaire) --------------------------------
+-- Un contrôle par ligne, JAMAIS écrasé : c'est l'historique qui prouve, en cas
+-- de contrôle fiscal, qu'on a vérifié tel numéro à telle date. Le numéro de
+-- consultation délivré par VIES est la pièce opposable.
+CREATE TABLE IF NOT EXISTS `wsm_vies_checks` (
+  `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `vat_eu`       VARCHAR(20)  NOT NULL,
+  `country`      CHAR(2)      NOT NULL DEFAULT '',
+  `number`       VARCHAR(20)  NOT NULL DEFAULT '',
+  `status`       VARCHAR(16)  NOT NULL DEFAULT '',   -- valid | invalid | unavailable | skipped
+  `reason`       VARCHAR(160) NOT NULL DEFAULT '',
+  `name`         VARCHAR(250) NOT NULL DEFAULT '',
+  `address`      VARCHAR(500) NOT NULL DEFAULT '',
+  `consultation` VARCHAR(64)  NOT NULL DEFAULT '',
+  `raw`          TEXT,
+  `checked_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_vies_vat` (`vat_eu`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

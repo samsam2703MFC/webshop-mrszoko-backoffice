@@ -138,6 +138,7 @@ $payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 
     <h1>Zamówienia</h1>
     <a href="./">← Konsola</a>
     <a href="produkty.php">Produkty i zdjęcia</a>
+    <a href="kontrahenci.php">Kontrahenci i VAT UE</a>
     <a href="../shop/" target="_blank" rel="noopener">Sklep</a>
     <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
   </div>
