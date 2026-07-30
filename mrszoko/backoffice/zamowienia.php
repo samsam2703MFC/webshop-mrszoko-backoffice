@@ -18,6 +18,7 @@ require_once $API . '/shop.php';
 require_once $API . '/tpay.php';
 require_once $API . '/inpost.php';
 require_once $API . '/mail.php';
+require_once $API . '/stock.php';
 
 $flash = ''; $flashKind = 'ok';
 
@@ -37,6 +38,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 wsm_order_event($pdo, $id, 'status', $new, (string) ($me['nom'] ?? ''));
                 $flash = $order['code'] . ' → ' . $new;
             }
+        } elseif (isset($_POST['wz'])) {
+            [$d, $err] = wsm_stock_issue_wz($pdo, $order, (string) ($me['nom'] ?? ''));
+            if ($err !== null) { $flash = $err; $flashKind = 'err'; }
+            else $flash = 'Wystawiono ' . $d['number'] . ' — dokument wydania.';
         } elseif (isset($_POST['ship'])) {
             [$sh, $err] = wsm_inpost_create($pdo, $order);
             if ($err !== null) { $flash = 'InPost: ' . $err; $flashKind = 'err'; }
@@ -119,6 +124,16 @@ console_crumbs($detail
           <?php endforeach; ?>
         </select>
         <button type="submit">Zmień status</button>
+      </form>
+      <form method="post">
+        <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+        <?php $wzq = $pdo->prepare("SELECT id, number FROM wsm_stock_docs WHERE kind='WZ' AND order_id = ?");
+              $wzq->execute([(int) $o['id']]); $wzRow = $wzq->fetch(); ?>
+        <?php if ($wzRow): ?>
+        <a class="code" href="magazyn.php?dok=<?= (int) $wzRow['id'] ?>">WZ <?= h((string) $wzRow['number']) ?> →</a>
+        <?php else: ?>
+        <button type="submit" name="wz" value="1">Utwórz WZ (wydanie)</button>
+        <?php endif; ?>
       </form>
       <form method="post">
         <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">

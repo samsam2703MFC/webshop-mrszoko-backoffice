@@ -601,3 +601,22 @@ CREATE TABLE IF NOT EXISTS wsm_stock_moves (
   created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_wsm_stock_moves ON wsm_stock_moves (product_id, id);
+
+-- --- Dokumenty magazynowe (miroir SQLite) -----------------------------------
+CREATE TABLE IF NOT EXISTS wsm_stock_docs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind       TEXT NOT NULL DEFAULT 'PZ',
+  number     TEXT NOT NULL,
+  series     TEXT NOT NULL DEFAULT '',
+  seq        INTEGER NOT NULL DEFAULT 0,
+  order_id   INTEGER NULL,
+  partner    TEXT NOT NULL DEFAULT '',
+  ref        TEXT NOT NULL DEFAULT '',
+  issued_at  TEXT NOT NULL,
+  note       TEXT NOT NULL DEFAULT '',
+  units      INTEGER NOT NULL DEFAULT 0,
+  value      INTEGER NOT NULL DEFAULT 0,
+  actor      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (number)
+);
