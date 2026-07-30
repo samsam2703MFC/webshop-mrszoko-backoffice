@@ -34,11 +34,11 @@ function wsm_seed(PDO $pdo): void {
 
     // ---- Shops --------------------------------------------------------------
     $shops = [
-        ['bxl', "L'Atelier — Bruxelles-Centre", 'Bruxelles 1000', 1, 'Oddział', 1, 29800, 8400, 96, 'var(--color-primary)'],
-        ['and', "L'Atelier — Anderlecht", 'Anderlecht 1070', 1, 'Franczyza', 1, 18600, 6200, 88, '#E8A15C'],
-        ['ucc', "L'Atelier — Uccle", 'Uccle 1180', 1, 'Franczyza', 1, 22100, 9400, 79, '#8C4A2F'],
-        ['sch', "L'Atelier — Schaerbeek", 'Schaerbeek 1030', 0, 'Franczyza', 1, 0, 0, 0, '#E8A15C'],
-        ['lv', "L'Atelier — Louvain", 'Louvain 3000', 1, 'Master', 0, 14200, 5200, 71, '#8C4A2F'],
+        ['bxl', "Mister Szoko — Bruxelles-Centre", 'Bruxelles 1000', 1, 'Oddział', 1, 29800, 8400, 96, 'var(--color-primary)'],
+        ['and', "Mister Szoko — Anderlecht", 'Anderlecht 1070', 1, 'Franczyza', 1, 18600, 6200, 88, '#E8A15C'],
+        ['ucc', "Mister Szoko — Uccle", 'Uccle 1180', 1, 'Franczyza', 1, 22100, 9400, 79, '#8C4A2F'],
+        ['sch', "Mister Szoko — Schaerbeek", 'Schaerbeek 1030', 0, 'Franczyza', 1, 0, 0, 0, '#E8A15C'],
+        ['lv', "Mister Szoko — Louvain", 'Louvain 3000', 1, 'Master', 0, 14200, 5200, 71, '#8C4A2F'],
     ];
     foreach ($shops as $i => $s) {
         $ins('wsm_shops', ['id' => $s[0], 'nom' => $s[1], 'ville' => $s[2], 'web' => $s[3],
@@ -69,10 +69,10 @@ function wsm_seed(PDO $pdo): void {
         ['p-foiegras', 'Katering', 'Foie gras mi-cuit', 28.00, 12.00, 'Opublikowany', '', 1, 0, 41, null],
         ['p-glace', 'Lody', 'Lody rzemieślnicze', 6.50, 2.10, 'Opublikowany', 'Lato', 0, 0, 30, null],
         // menu products (menu builder)
-        ['p-midi', 'Menu i zestawy', "Menu lunchowe — L'Atelier", 8.50, 2.40, 'Opublikowany', '', 0, 0, 0, 'on'],
-        ['p-gouter', 'Menu i zestawy', "Zestaw podwieczorkowy — L'Atelier", 3.20, 0.90, 'Opublikowany', '', 0, 0, 0, 'on'],
-        ['p-cafe', 'Menu i zestawy', "Café Gourmand — L'Atelier", 6.50, 2.10, 'Opublikowany', '', 0, 0, 0, 'off'],
-        ['p-brunch', 'Menu i zestawy', "Brunch weekendowy — L'Atelier", 18.00, 5.50, 'Opublikowany', '', 0, 0, 0, null],
+        ['p-midi', 'Menu i zestawy', "Menu lunchowe — Mister Szoko", 8.50, 2.40, 'Opublikowany', '', 0, 0, 0, 'on'],
+        ['p-gouter', 'Menu i zestawy', "Zestaw podwieczorkowy — Mister Szoko", 3.20, 0.90, 'Opublikowany', '', 0, 0, 0, 'on'],
+        ['p-cafe', 'Menu i zestawy', "Café Gourmand — Mister Szoko", 6.50, 2.10, 'Opublikowany', '', 0, 0, 0, 'off'],
+        ['p-brunch', 'Menu i zestawy', "Brunch weekendowy — Mister Szoko", 18.00, 5.50, 'Opublikowany', '', 0, 0, 0, null],
     ];
     foreach ($products as $i => $p) {
         $ins('wsm_products', ['id' => $p[0], 'category_id' => $catId[$p[1]], 'nom' => $p[2],
@@ -126,7 +126,7 @@ function wsm_seed(PDO $pdo): void {
         ['nav.icon_back', 'text', 'arrow-left'],
         ['delivery.enabled', 'bool', '1'],
         ['order.cutoff_default', 'text', '17:00'],
-        ['brand.support_url', 'text', 'https://aide.latelierby.be'],
+        ['brand.support_url', 'text', 'https://pomoc.misterszoko.com'],
     ] as $p) $ins('wsm_params', ['cle' => $p[0], 'type' => $p[1], 'val' => $p[2]]);
 
     // ---- Email templates ----------------------------------------------------
@@ -141,10 +141,10 @@ function wsm_seed(PDO $pdo): void {
 
     // ---- Users + user↔shop scopes -------------------------------------------
     $users = [
-        ['Sophie Renard', 'sophie.renard@latelierby.be', 'Centrala', 'Cała sieć', 1, []],
-        ['Thomas Legrand', 'thomas.legrand@latelierby.be', 'Franczyza', 'Bruxelles-Centre', 1, ['bxl']],
-        ['Marek Kowalski', 'm.kowalski@latelierby.be', 'Franczyza', 'Anderlecht, Uccle', 1, ['and', 'ucc']],
-        ['Julie Peeters', 'j.peeters@latelierby.be', 'Franczyza', 'Louvain', 0, ['lv']],
+        ['Sophie Renard', 'sophie.renard@misterszoko.com', 'Centrala', 'Cała sieć', 1, []],
+        ['Thomas Legrand', 'thomas.legrand@misterszoko.com', 'Franczyza', 'Bruxelles-Centre', 1, ['bxl']],
+        ['Marek Kowalski', 'm.kowalski@misterszoko.com', 'Franczyza', 'Anderlecht, Uccle', 1, ['and', 'ucc']],
+        ['Julie Peeters', 'j.peeters@misterszoko.com', 'Franczyza', 'Louvain', 0, ['lv']],
     ];
     foreach ($users as $u) {
         $uid = $ins('wsm_users', ['nom' => $u[0], 'email' => $u[1], 'role' => $u[2], 'portee' => $u[3], 'act' => $u[4]]);

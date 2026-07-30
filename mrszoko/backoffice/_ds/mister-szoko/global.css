@@ -1,5 +1,5 @@
 /* ==========================================================================
-   L'Atelier By — Webshop
+   Mister Szoko — console (export structurel ; marque dans brand.css)
    global.css — Design System & CSS Reference
    Source: LAtelier_Design_System.docx (09/04/2026)
    ==========================================================================
@@ -17,7 +17,9 @@
 
 
 /* --------------------------------------------------------------------------
-   Brand fonts — Gotham (UI) + Vank (display) + Playwrite DEVA (accent)
+   Polices historiques (Gotham/Vank) — REMPLACÉES par brand.css :
+   les @font-face ci-dessous ne sont plus référencées et les fichiers ont
+   été retirés du dépôt
    Self-hosted from /fonts.
    --------------------------------------------------------------------------
 

@@ -17,11 +17,11 @@
       {id:2,name:'Brabant flamand — peryferie',postcodes:'1600 · 1700 · 1800 · 3000',exclusive:true,active:true,shop_id:null,shop_name:''},
     ],
     "shops": [
-      {id:'bxl',nom:'L\'Atelier — Bruxelles-Centre',ville:'Bruxelles 1000',web:true,contrat:'Oddział',act:true,caShop:29800,caOffice:8400,adoption:96,accent:'var(--color-primary)'},
-      {id:'and',nom:'L\'Atelier — Anderlecht',ville:'Anderlecht 1070',web:true,contrat:'Franczyza',act:true,caShop:18600,caOffice:6200,adoption:88,accent:'#E8A15C'},
-      {id:'ucc',nom:'L\'Atelier — Uccle',ville:'Uccle 1180',web:true,contrat:'Franczyza',act:true,caShop:22100,caOffice:9400,adoption:79,accent:'#8C4A2F'},
-      {id:'sch',nom:'L\'Atelier — Schaerbeek',ville:'Schaerbeek 1030',web:false,contrat:'Franczyza',act:true,caShop:0,caOffice:0,adoption:0,accent:'#E8A15C'},
-      {id:'lv',nom:'L\'Atelier — Louvain',ville:'Louvain 3000',web:true,contrat:'Master',act:false,caShop:14200,caOffice:5200,adoption:71,accent:'#8C4A2F'},
+      {id:'bxl',nom:'Mister Szoko — Bruxelles-Centre',ville:'Bruxelles 1000',web:true,contrat:'Oddział',act:true,caShop:29800,caOffice:8400,adoption:96,accent:'var(--color-primary)'},
+      {id:'and',nom:'Mister Szoko — Anderlecht',ville:'Anderlecht 1070',web:true,contrat:'Franczyza',act:true,caShop:18600,caOffice:6200,adoption:88,accent:'#E8A15C'},
+      {id:'ucc',nom:'Mister Szoko — Uccle',ville:'Uccle 1180',web:true,contrat:'Franczyza',act:true,caShop:22100,caOffice:9400,adoption:79,accent:'#8C4A2F'},
+      {id:'sch',nom:'Mister Szoko — Schaerbeek',ville:'Schaerbeek 1030',web:false,contrat:'Franczyza',act:true,caShop:0,caOffice:0,adoption:0,accent:'#E8A15C'},
+      {id:'lv',nom:'Mister Szoko — Louvain',ville:'Louvain 3000',web:true,contrat:'Master',act:false,caShop:14200,caOffice:5200,adoption:71,accent:'#8C4A2F'},
     ],
     "catalog": [
       {cat:'Pieczywo',prods:[
@@ -60,7 +60,7 @@
       {cle:'nav.icon_back',type:'text',val:'arrow-left'},
       {cle:'delivery.enabled',type:'bool',def:true},
       {cle:'order.cutoff_default',type:'text',val:'17:00'},
-      {cle:'brand.support_url',type:'text',val:'https://aide.latelierby.be'},
+      {cle:'brand.support_url',type:'text',val:'https://pomoc.misterszoko.com'},
     ],
     "email_templates": [
       {cle:'order_confirm',langue:'PL',sujet:'Twoje zamówienie {{commande_ref}} jest potwierdzone'},
@@ -70,10 +70,10 @@
       {cle:'office_reject',langue:'PL',sujet:'Twój wniosek o przyłączenie'},
     ],
     "users": [
-      {nom:'Sophie Renard',email:'sophie.renard@latelierby.be',role:'Centrala',portee:'Cała sieć',act:true},
-      {nom:'Thomas Legrand',email:'thomas.legrand@latelierby.be',role:'Franczyza',portee:'Bruxelles-Centre',act:true},
-      {nom:'Marek Kowalski',email:'m.kowalski@latelierby.be',role:'Franczyza',portee:'Anderlecht, Uccle',act:true},
-      {nom:'Julie Peeters',email:'j.peeters@latelierby.be',role:'Franczyza',portee:'Louvain',act:false},
+      {nom:'Sophie Renard',email:'sophie.renard@misterszoko.com',role:'Centrala',portee:'Cała sieć',act:true},
+      {nom:'Thomas Legrand',email:'thomas.legrand@misterszoko.com',role:'Franczyza',portee:'Bruxelles-Centre',act:true},
+      {nom:'Marek Kowalski',email:'m.kowalski@misterszoko.com',role:'Franczyza',portee:'Anderlecht, Uccle',act:true},
+      {nom:'Julie Peeters',email:'j.peeters@misterszoko.com',role:'Franczyza',portee:'Louvain',act:false},
     ],
     "audit": [
       {ts:'17/07 14:22',user:'Sophie Renard',verb:'Zmiana',entity:'ws_products #128 (brand_mandatory)',shop:'Sieć'},

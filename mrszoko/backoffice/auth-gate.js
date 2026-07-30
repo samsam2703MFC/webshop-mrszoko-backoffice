@@ -90,7 +90,7 @@
 
     var logo = document.createElement('img');
     logo.src = 'img/logo.png';
-    logo.alt = 'L\'Atelier';
+    logo.alt = 'Mister Szoko';
     logo.style.cssText = 'height:34px;width:auto;display:block;margin-bottom:22px';
     logo.onerror = function () { logo.style.display = 'none'; };
     card.appendChild(logo);

@@ -25,6 +25,35 @@ $seed = !in_array('--no-seed', $args, true);
 $cfg = wsm_config();
 $pdo = wsm_pdo();
 
+// ---- Rebranding L'Atelier → Mister Szoko (sortie immédiate) ----------------
+// Les bases déjà seedées portent les libellés de démonstration L'Atelier. Ce
+// passage les réécrit en place. Idempotent : une fois exécuté, REPLACE() ne
+// trouve plus rien à remplacer. Ne touche qu'à des libellés d'affichage —
+// aucun identifiant, aucune clé technique.
+if (in_array('--rebrand', $args, true)) {
+    $pdo = wsm_bootstrap();
+    $ops = [
+        ["wsm_shops",    "nom",   "L'Atelier — ", "Mister Szoko — "],
+        ["wsm_products", "nom",   "— L'Atelier",  "— Mister Szoko"],
+        ["wsm_users",    "email", "@latelierby.be", "@misterszoko.com"],
+        ["wsm_params",   "val",   "aide.latelierby.be", "pomoc.misterszoko.com"],
+    ];
+    $total = 0;
+    foreach ($ops as [$t, $c, $from, $to]) {
+        try {
+            $st = $pdo->prepare("UPDATE $t SET $c = REPLACE($c, ?, ?) WHERE $c LIKE ?");
+            $st->execute([$from, $to, '%' . $from . '%']);
+            $n = $st->rowCount();
+            $total += $n;
+            if ($n) echo "  $t.$c : $n ligne(s)\n";
+        } catch (Throwable $e) {
+            echo "  $t.$c : ignoré (" . $e->getMessage() . ")\n";
+        }
+    }
+    echo $total ? "rebranding appliqué ($total lignes)\n" : "rien à rebrander — déjà Mister Szoko\n";
+    exit(0);
+}
+
 // ---- Gestion des comptes (sortie immédiate) --------------------------------
 $idx = array_search('--set-password', $args, true);
 $ensure = array_search('--ensure-admin', $args, true);

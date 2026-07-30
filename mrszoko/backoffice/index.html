@@ -40,8 +40,9 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="_ds/l-atelier-by-8504a4e3-7796-44da-b087-3fbd9dcb8dcd/global.css">
-<script src="_ds/l-atelier-by-8504a4e3-7796-44da-b087-3fbd9dcb8dcd/_ds_bundle.js"></script>
+<link rel="stylesheet" href="_ds/mister-szoko/global.css">
+<link rel="stylesheet" href="_ds/mister-szoko/brand.css">
+<script src="_ds/mister-szoko/_ds_bundle.js"></script>
 <style>
   html,body{height:100%}
   a{color:var(--color-primary);text-decoration:none}
@@ -61,7 +62,7 @@
   <!-- SIDEBAR -->
   <aside style="background:var(--color-surface);border-right:.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;overflow:hidden">
     <div style="padding:18px 20px 15px;border-bottom:.5px solid var(--color-border-tertiary)">
-      <img src="img/logo.png" alt="L'Atelier" style="width:100%;max-width:206px;height:auto;display:block"/>
+      <img src="img/logo.png" alt="Mister Szoko" style="width:100%;max-width:206px;height:auto;display:block"/>
       <div style="display:flex;align-items:center;gap:7px;margin-top:9px"><span style="width:7px;height:7px;border-radius:50%;background:var(--color-primary)"></span><span style="font:600 10px/1 var(--font-ui);letter-spacing:.09em;text-transform:uppercase;color:var(--color-primary)">Konsola marki · Centrala</span></div>
     </div>
     <nav class="lz" style="flex:1;overflow-y:auto;padding:10px 12px 20px;display:flex;flex-direction:column;gap:3px">
@@ -1063,7 +1064,7 @@ class Component extends DCLogic {
     const sel=a=>a.map(x=>({value:x,label:x}));
     return {
       shop:{ title:'Sklep', table:'shops (+ ws_shops)', save:'Zapisz', fields:[
-        {k:'nom',label:'Szyld',type:'text',ph:'L\'Atelier — …'},
+        {k:'nom',label:'Szyld',type:'text',ph:'Mister Szoko — …'},
         {k:'ville',label:'Miasto',type:'select',options:sel(villes),def:villes[0]},
         {k:'contrat',label:'Umowa',type:'select',options:sel(['Franczyza','Oddział','Master']),def:'Franczyza'},
         {k:'accent',label:'Akcent (branding)',type:'select',options:sel(['Ruby Red','Morela','Old Copper']),def:'Ruby Red'},
@@ -1090,7 +1091,7 @@ class Component extends DCLogic {
       ]},
       user:{ title:'Użytkownik', table:'bo_users (+ bo_user_shops)', save:'Zapisz', fields:[
         {k:'nom',label:'Nazwa',type:'text',ph:'Imię Nazwisko'},
-        {k:'email',label:'E-mail',type:'text',ph:'imie@latelier.be'},
+        {k:'email',label:'E-mail',type:'text',ph:'imie@misterszoko.com'},
         {k:'role',label:'Rola',type:'select',options:sel(['Centrala','Franczyza']),def:'Franczyza'},
         {k:'portee',label:'Zakres (sklepy)',type:'text',ph:'np. Bruxelles-Centre, Uccle'},
       ]},
@@ -1148,7 +1149,7 @@ class Component extends DCLogic {
       items:b.items.map(([s,label,c])=>({label,go:this.go(s),style:this.navStyle(s),dot:dot(this.state.screen===s?'#fff':c),badge:'',badgeStyle:'display:none'}))}));
 
     const titles={dash:'Pulpit sieci',boutiques:'Sklepy',audit:'Dziennik audytu',catalogue:'Katalog',gouvernance:'Zarządzanie produktem',prix:'Cena referencyjna',menus:'Menu i zestawy',promos:'Promocje sieci',livraisons:'Dostawy',config:'Konfiguracja marki',comms:'Komunikacja',users:'Użytkownicy i role',zones:'Strefy zasięgu',geo:'Analiza geograficzna'};
-    const subs={dash:'Widok skonsolidowany sieci · L\'Atelier By',boutiques:'Tożsamość · branding · webshop',audit:'Śledzenie działań wrażliwych',catalogue:'Produkty · kategorie · i18n',gouvernance:'Whitelista i obowiązki sieci',prix:'Ceny sugerowane marki',menus:'Edytor zestawów produktu · ws_bundles',promos:'Kupony i reguły w zasięgu sieci',livraisons:'Dostawy biurowe · trasy · potwierdzenie QR/PIN · wsm_deliveries',config:'Ustawienia ogólne (whitelista)',comms:'Szablony e-maili transakcyjnych',users:'Konta back-office i zakres (RBAC)',zones:'Strefy pierwotne per punkt sprzedaży · kody pocztowe · ws_franchisor_catchment',geo:'Mapa klientów · rozkład wokół sklepów sieci'};
+    const subs={dash:'Widok skonsolidowany sieci · Mister Szoko',boutiques:'Tożsamość · branding · webshop',audit:'Śledzenie działań wrażliwych',catalogue:'Produkty · kategorie · i18n',gouvernance:'Whitelista i obowiązki sieci',prix:'Ceny sugerowane marki',menus:'Edytor zestawów produktu · ws_bundles',promos:'Kupony i reguły w zasięgu sieci',livraisons:'Dostawy biurowe · trasy · potwierdzenie QR/PIN · wsm_deliveries',config:'Ustawienia ogólne (whitelista)',comms:'Szablony e-maili transakcyjnych',users:'Konta back-office i zakres (RBAC)',zones:'Strefy pierwotne per punkt sprzedaży · kody pocztowe · ws_franchisor_catchment',geo:'Mapa klientów · rozkład wokół sklepów sieci'};
 
     const scopeOpts=[{value:'__all',label:'Sieć (14 sklepów)'},{value:'bxl',label:'Bruxelles-Centre'},{value:'and',label:'Anderlecht'},{value:'ucc',label:'Uccle'}];
     // Valeur d'un paramètre ws_param : override local (modale profil, réactif) sinon
