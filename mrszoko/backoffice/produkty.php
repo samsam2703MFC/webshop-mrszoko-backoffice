@@ -52,7 +52,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $flash = 'Nie znaleziono produktu.'; $kind = 'err';
         } else {
             $body = [];
-            foreach (['slug', 'origin', 'cocoa', 'unit_label', 'badge'] as $k) {
+            foreach (['slug', 'origin', 'cocoa', 'unit_label', 'badge', 'vat_rate'] as $k) {
                 if (isset($_POST[$k])) $body[$k] = $_POST[$k];
             }
             $body['stock'] = (int) ($_POST['stock'] ?? 0);
@@ -177,7 +177,8 @@ console_flash($flash, $kind);
       <?php endif; ?>
       <div>
         <div class="sum-name"><?= h((string) $p['nom']) ?></div>
-        <div class="sum-meta"><?= h($id) ?> · <?= h((string) ($p['cat'] ?? '')) ?> · <?= h(zl($p['prix'])) ?></div>
+        <div class="sum-meta"><?= h($id) ?> · <?= h((string) ($p['cat'] ?? '')) ?> · <?= h(zl($p['prix'])) ?>
+          · VAT <?= h(wsm_vat_percent((float) ($p['vat_rate'] ?? 0.23))) ?> %</div>
       </div>
       <div class="sum-right">
         <?php if ($vis && $img === ''): ?><span class="tag no">bez zdjęcia</span><?php endif; ?>
@@ -233,11 +234,30 @@ console_flash($flash, $kind);
             <small>Cena widoczna dla klienta, z VAT.</small>
           </label>
 
+          <?php $rate = (float) ($p['vat_rate'] ?? 0.23);
+                [$netG, $vatG] = wsm_split_vat(wsm_grosze($p['prix']), $rate); ?>
+          <label class="f">Stawka VAT
+            <select name="vat_rate"<?= $isAdmin ? '' : ' disabled' ?>>
+              <?php foreach (WSM_VAT_RATES as $r): ?>
+              <option value="<?= h((string) $r) ?>"<?= abs($r - $rate) < 0.0005 ? ' selected' : '' ?>><?= h(wsm_vat_percent($r)) ?> %</option>
+              <?php endforeach; ?>
+              <?php if (!array_filter(WSM_VAT_RATES, fn($r) => abs($r - $rate) < 0.0005)): ?>
+              <option value="<?= h((string) $rate) ?>" selected><?= h(wsm_vat_percent($rate)) ?> % (nietypowa)</option>
+              <?php endif; ?>
+            </select>
+            <?php if (isset($fieldErrors['vat_rate']) && $open): ?>
+              <small class="err"><?= h($fieldErrors['vat_rate']) ?></small>
+            <?php else: ?>
+              <small>Z ceny brutto: <b><?= h(number_format($netG / 100, 2, ',', ' ')) ?> zł netto</b>
+                + <?= h(number_format($vatG / 100, 2, ',', ' ')) ?> zł VAT. Tak trafi na fakturę.</small>
+            <?php endif; ?>
+          </label>
+
           <label class="f">Stan magazynowy
             <input type="number" name="stock" min="0" value="<?= (int) $p['stock'] ?>"<?= $isAdmin ? '' : ' disabled' ?>>
             <?php if (isset($fieldErrors['stock']) && $open): ?>
               <small class="err"><?= h($fieldErrors['stock']) ?></small>
-            <?php else: ?><small>Zamówienie ponad stan jest odrzucane.</small><?php endif; ?>
+            <?php else: ?><small>Zamówienie ponad stan przechodzi — klient dostaje mail „skontaktujemy się”.</small><?php endif; ?>
           </label>
           <label class="f">Gramatura
             <input type="text" name="unit_label" value="<?= h((string) $p['unit_label']) ?>" placeholder="1 kg"<?= $isAdmin ? '' : ' disabled' ?>>

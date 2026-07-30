@@ -24,6 +24,7 @@
 
   /* Les écrans PHP, dans l'ordre du travail réel. */
   var PHP_SCREENS = [
+    ['pulpit.php',      'Pulpit'],
     ['zamowienia.php',  'Zamówienia'],
     ['poczta.php',      'Poczta'],
     ['produkty.php',    'Produkty'],
@@ -36,11 +37,17 @@
 
   /* clé d'URL → libellé exact du bouton dans la barre exportée. */
   var ERP_SCREENS = {
-    dash: 'Pulpit sieci', boutiques: 'Sklepy', catalogue: 'Katalog',
-    menus: 'Menu i zestawy', promos: 'Promocje sieci', livraisons: 'Dostawy',
-    geo: 'Analiza geograficzna', comms: 'Komunikacja', users: 'Użytkownicy i role',
-    zones: 'Strefy zasięgu', audit: 'Dziennik audytu'
+    comms: 'Komunikacja', users: 'Użytkownicy i role', audit: 'Dziennik audytu',
+    catalogue: 'Katalog', dash: 'Pulpit sieci'
   };
+
+  /* Ce qui décrit un RÉSEAU DE BOUTIQUES, pas une boutique en ligne. Ces
+     écrans viennent de la démonstration franchise d'origine : ils affichent
+     des magasins bruxellois, des zones de chalandise et une adoption de
+     whitelist qui n'existent pas ici. On ne les efface pas — ce serait
+     toucher à l'export — on cesse de les proposer. */
+  var HIDDEN = ['Pulpit sieci', 'Sklepy', 'Promocje sieci', 'Strefy zasięgu',
+                'Analiza geograficzna', 'Menu i zestawy', 'Dostawy'];
 
   var NAV_SELECTOR = 'nav.lz';
   var BLOCK_ID = 'wsm-screens';
@@ -52,7 +59,7 @@
     box.id = BLOCK_ID;
 
     var head = document.createElement('div');
-    head.textContent = 'Sklep online';
+    head.textContent = 'Webshop';
     head.style.cssText = 'margin:14px 8px 6px;font:600 10px/1 var(--font-ui);' +
       'letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-muted)';
     box.appendChild(head);
@@ -78,10 +85,25 @@
     return box;
   }
 
+  /** Retire de la barre les entrées qui décrivent un réseau de boutiques. */
+  function hideNetworkScreens() {
+    var nav = document.querySelector(NAV_SELECTOR);
+    if (!nav) return;
+    var buttons = nav.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) {
+      if (HIDDEN.indexOf((buttons[i].textContent || '').trim()) !== -1) {
+        buttons[i].style.display = 'none';
+      }
+    }
+  }
+
   function mount() {
     var nav = document.querySelector(NAV_SELECTOR);
-    if (!nav || document.getElementById(BLOCK_ID)) return !!nav;
-    nav.appendChild(buildBlock());
+    if (!nav) return false;
+    hideNetworkScreens();
+    if (document.getElementById(BLOCK_ID)) return true;
+    // En tête de barre : c'est ici qu'on travaille, pas dans l'ERC hérité.
+    nav.insertBefore(buildBlock(), nav.firstChild ? nav.firstChild.nextSibling : null);
     return true;
   }
 
@@ -91,7 +113,7 @@
      export. */
   function watch() {
     var obs = new MutationObserver(function () {
-      if (!document.getElementById(BLOCK_ID)) mount();
+      mount();                                   // remet le bloc ET le masquage
     });
     obs.observe(document.body, { childList: true, subtree: true });
   }
@@ -135,9 +157,9 @@
       var btn = findNavButton(label);
       if (btn) {
         btn.click();
-        // L'adresse a joué son rôle ; on l'efface pour qu'un rafraîchissement
-        // ne ramène pas l'utilisateur au même endroit malgré lui.
-        history.replaceState(null, '', location.pathname + location.search);
+        // On GARDE « #ekran=… » dans l'adresse : sans elle, un simple
+        // rafraîchissement renverrait l'utilisateur au tableau de bord du
+        // webshop, alors qu'il travaille dans cet écran-ci.
         return;
       }
       if (tries === 3) expandGroups();      // l'entrée est peut-être dans un groupe replié

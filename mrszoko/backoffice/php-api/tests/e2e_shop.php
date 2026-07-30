@@ -356,6 +356,56 @@ $pdoT->prepare("UPDATE wsm_products SET stock = ? WHERE id = ?")->execute([$stoc
 // Un fichier n'est pas une image parce qu'il s'appelle .jpg : le serveur le
 // décode et le RÉ-ENCODE. Ce qui ressort est une image fabriquée par nous.
 echo "-- zdjęcia produktów --\n";
+
+// ---- Stawki VAT per produkt -------------------------------------------------
+// Le taux vit sur le produit, pas dans le code : un chocolat à 23 % et une
+// denrée à 5 % doivent être facturés chacun au sien, et le total doit rester
+// exact au grosz près.
+echo "\n-- stawka VAT per produkt --\n";
+require_once dirname(__DIR__) . '/shop.php';
+$pdoV = wsm_pdo();
+
+ok('taux légaux polonais seulement', WSM_VAT_RATES === [0.23, 0.08, 0.05, 0.0], WSM_VAT_RATES);
+[, $bad] = wsm_validate_product_shop($pdoV, ['vat_rate' => 0.17], 'x');
+ok('un taux inventé est refusé', isset($bad['vat_rate']), $bad);
+[$colsA] = wsm_validate_product_shop($pdoV, ['vat_rate' => '5'], 'x');
+[$colsB] = wsm_validate_product_shop($pdoV, ['vat_rate' => '0,05'], 'x');
+ok('« 5 » et « 0,05 » désignent le même taux',
+    ($colsA['vat_rate'] ?? null) === 0.05 && ($colsB['vat_rate'] ?? null) === 0.05, [$colsA, $colsB]);
+ok('affichage sans décimale inutile', wsm_vat_percent(0.23) === '23' && wsm_vat_percent(0.05) === '5');
+
+// Un produit réel passé de 23 % à 5 % : le montant facturé doit suivre.
+$vid = 'test-vat-' . bin2hex(random_bytes(3));
+$pdoV->prepare("INSERT INTO wsm_products (id, category_id, nom, prix, statut, active, shop_visible, slug,
+                                          stock, vat_rate, weight_g, length_mm, width_mm, height_mm, sku)
+                VALUES (?, (SELECT id FROM wsm_categories LIMIT 1), ?, ?, 'Opublikowany', 1, 1, ?, 50, 0.23, 250, 120, 80, 40, ?)")
+     ->execute([$vid, 'Test VAT', 123.00, $vid, strtoupper($vid)]);
+
+[$q23] = wsm_shop_quote($pdoV, [['id' => $vid, 'qty' => 1]], 'inpost_locker', 'pl');
+ok('à 23 % : netto + VAT == brutto', $q23['items_net'] + $q23['items_vat'] === $q23['items_gross'], $q23['items_gross'] ?? null);
+ok('à 23 % : 12300 gr → 10000 netto', $q23['items_net'] === 10000 && $q23['items_vat'] === 2300,
+    [$q23['items_net'], $q23['items_vat']]);
+
+$pdoV->prepare("UPDATE wsm_products SET vat_rate = 0.05 WHERE id = ?")->execute([$vid]);
+[$q05] = wsm_shop_quote($pdoV, [['id' => $vid, 'qty' => 1]], 'inpost_locker', 'pl');
+ok('le taux du produit est réellement appliqué', $q05['items_vat'] < $q23['items_vat'],
+    [$q23['items_vat'], $q05['items_vat']]);
+ok('à 5 % : netto + VAT == brutto', $q05['items_net'] + $q05['items_vat'] === $q05['items_gross']);
+ok('le prix affiché ne bouge pas — c\'est la répartition qui change',
+    $q05['items_gross'] === $q23['items_gross'], [$q23['items_gross'], $q05['items_gross']]);
+
+// Deux taux dans le même panier : la ventilation doit les distinguer.
+$other = $pdoV->query("SELECT id FROM wsm_products WHERE shop_visible = 1 AND vat_rate = 0.23 AND id <> " . $pdoV->quote($vid) . " LIMIT 1")->fetchColumn();
+if ($other) {
+    [$qm] = wsm_shop_quote($pdoV, [['id' => $vid, 'qty' => 1], ['id' => (string) $other, 'qty' => 1]], 'inpost_locker', 'pl');
+    $rates = array_map(fn($b) => (float) $b['rate'], $qm['vat_breakdown'] ?? []);
+    sort($rates);
+    ok('deux taux dans un panier donnent deux lignes de TVA', count($rates) >= 2, $rates);
+    ok('la somme des lignes de TVA fait le total', array_sum(array_map(fn($b) => (int) $b['vat'], $qm['vat_breakdown'])) === $qm['total_vat'],
+        $qm['vat_breakdown'] ?? null);
+}
+$pdoV->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$vid]);
+
 require_once dirname(__DIR__) . '/media.php';
 
 $tmpDir = sys_get_temp_dir();

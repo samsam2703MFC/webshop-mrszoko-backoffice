@@ -259,6 +259,7 @@ if ($page === 'p') {
       <p class="lead"><?= e($p['desc']) ?></p>
       <p class="price price--lg"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></p>
       <p class="mono muted"><?= e(zl($p['price_net'])) ?> <?= e($S['price.net'] ?? '') ?>
+        · VAT <?= e(wsm_vat_percent((float) $p['vat_rate'])) ?> %
         · <?= e($S['product.' . ($p['stock'] <= 0 ? 'stock_out' : 'stock_in')] ?? '') ?></p>
 
       <?php if ($p['stock'] <= 0) notice('warn', $S['product.on_demand_note'] ?? ''); ?>

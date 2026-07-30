@@ -150,6 +150,10 @@
       call('/auth/login', { method: 'POST', body: { email: inEmail.value, password: inPass.value } })
         .then(function (r) {
           if (r.ok) {
+            // Après une connexion, on arrive sur le tableau de bord DU
+            // WEBSHOP, pas sur celui du réseau de franchise hérité. Sauf si
+            // l'adresse demandait explicitement un écran de la console.
+            if (!wantsErpScreen()) { toWebshop(); return; }
             document.body.removeChild(wrap);
             onDone();
             return;
@@ -183,6 +187,18 @@
     document.body.appendChild(b);
   }
 
+  /* La console héritée s'ouvre sur son « Pulpit sieci » : chiffre d'affaires
+     réseau, boutiques bruxelloises, zones de chalandise. Ici on tient une
+     boutique en ligne, pas une franchise. Une identité établie mène donc au
+     tableau de bord du webshop — sauf si l'adresse demande explicitement un
+     écran de la console (#ekran=users), auquel cas on la laisse s'ouvrir. */
+  function wantsErpScreen() {
+    return /(?:^|[#&])ekran=/.test(location.hash || '');
+  }
+  function toWebshop() {
+    location.replace('pulpit.php');
+  }
+
   /* ---- Porte ---------------------------------------------------------- */
   window.WSMAuth = {
     gate: function (start) {
@@ -194,7 +210,10 @@
       // totale de serveur (mode démonstration hors ligne).
       call('/auth/me').then(
         function (r) {
-          if (r.ok) { domReady(addLogout); start(); return; }
+          if (r.ok) {
+            if (!wantsErpScreen()) { toWebshop(); return; }
+            domReady(addLogout); start(); return;
+          }
           if (r.status === 401) {
             domReady(function () { showLogin(function () { domReady(addLogout); start(); }); });
             return;
