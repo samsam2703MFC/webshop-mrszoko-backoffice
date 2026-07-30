@@ -52,7 +52,7 @@ function h(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTES
 /** Grosze → « 129,90 zł » avec espaces insécables : un prix ne se coupe pas. */
 function pln(int $g): string { return number_format($g / 100, 2, ',', "\u{202F}") . "\u{202F}zł"; }
 
-/** Les écrans de la console, dans l'ordre du travail réel. */
+/** Les écrans PHP, dans l'ordre du travail réel. */
 function console_menu(): array {
     return [
         'zamowienia.php'  => 'Zamówienia',
@@ -62,6 +62,28 @@ function console_menu(): array {
         'kraje.php'       => 'Kraje',
         'rabaty.php'      => 'Rabaty',
         'ustawienia.php'  => 'Ustawienia',
+    ];
+}
+
+/**
+ * Les écrans de la console exportée. Elle navigue par état interne, sans
+ * adresse : impossible d'y pointer directement. console-nav.js lit
+ * « #ekran=… » à l'arrivée et clique l'entrée correspondante — c'est ce qui
+ * rend ces écrans atteignables d'ici, et pas seulement l'inverse.
+ */
+function console_erp_menu(): array {
+    return [
+        'dash'       => 'Pulpit sieci',
+        'boutiques'  => 'Sklepy',
+        'catalogue'  => 'Katalog',
+        'menus'      => 'Menu i zestawy',
+        'promos'     => 'Promocje sieci',
+        'livraisons' => 'Dostawy',
+        'geo'        => 'Analiza geograficzna',
+        'comms'      => 'Komunikacja',
+        'users'      => 'Użytkownicy i role',
+        'zones'      => 'Strefy zasięgu',
+        'audit'      => 'Dziennik audytu',
     ];
 }
 
@@ -93,10 +115,14 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
     <label class="menu-btn" for="wsm-menu">Menu</label>
     <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
     <nav class="menu">
-      <a href="./">← Konsola</a>
       <?php foreach (console_menu() as $f => $label): ?>
       <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
+      <span class="sep">ERP</span>
+      <?php foreach (console_erp_menu() as $k => $label): ?>
+      <a href="./#ekran=<?= h($k) ?>"><?= h($label) ?></a>
+      <?php endforeach; ?>
+      <span class="sep">Publiczne</span>
       <a href="../shop/" target="_blank" rel="noopener">Sklep ↗</a>
     </nav>
   </div>

@@ -403,8 +403,16 @@ jobs:
           run "$BO/console.css" 4000
           run "$BO/console-nav.js" 1000
           curl -skL "$BO/" | grep -q 'console-nav.js' \
-            && echo "  la console porte le lanceur des écrans : confirmé" \
+            && echo "  la console porte la navigation des écrans : confirmé" \
             || { echo "  ^ NOT OK : aucun accès aux écrans depuis la console"; fail=1; }
+          # Les libellés de la barre exportée sont la CLÉ des liens profonds
+          # (#ekran=…) : s'ils changent, les renvois depuis les écrans PHP
+          # retombent sur l'accueil sans rien dire. On le voit ici.
+          NAVOK=1
+          for lbl in 'Pulpit sieci' 'Sklepy' 'Katalog' 'Użytkownicy i role' 'Dziennik audytu'; do
+            curl -skL "$BO/" | grep -qF "$lbl" || { echo "  ^ ATTENTION : libellé « $lbl » absent de la console — le lien profond ne mènera nulle part"; NAVOK=0; }
+          done
+          [ "$NAVOK" = "1" ] && echo "  libellés visés par les liens profonds : tous présents"
 
           # Le dossier des photos doit être inscriptible par le serveur web,
           # sinon l'envoi échoue au moment où le client en a besoin.
