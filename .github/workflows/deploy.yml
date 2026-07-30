@@ -297,6 +297,17 @@ jobs:
           fi
           if [ -n "$N" ]; then
             echo "  tables wsm_ dans MySQL mrszoko : $N"
+            # Les colonnes tpay/InPost sont ajoutées par wsm_ensure_commerce_columns()
+            # au premier accès. On vérifie qu'elles existent VRAIMENT sous MySQL :
+            # une migration silencieusement ratée ferait perdre les saisies.
+            QC="SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='mrszoko' AND ((table_name='wsm_clients' AND column_name IN ('client_type','email','phone','nip','vat_eu','bill_postcode')) OR (table_name='wsm_client_points' AND column_name IN ('delivery_method','inpost_point','postcode')) OR (table_name='wsm_products' AND column_name IN ('sku','ean','vat_rate','weight_g','parcel_template')))"
+            if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+              NC=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QC" 2>/dev/null || echo 0)
+            else
+              NC=$(mysql -N -e "$QC" 2>/dev/null || echo 0)
+            fi
+            echo "  colonnes tpay/InPost migrées : $NC / 14"
+            if [ "${NC:-0}" -lt 14 ]; then echo "  ^ ATTENTION : migration incomplète — les formulaires perdraient des données"; fail=1; fi
             if [ "${N:-0}" -lt 15 ]; then echo "  ^ ATTENTION : l'API ne semble pas servir depuis MySQL mrszoko"; fi
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
