@@ -92,31 +92,31 @@
    ========================================================================== */
 :root {
   /* --- Brand palette ----------------------------------------------------- */
-  --color-primary:            #8D1D2C;   /* Ruby Red — primary actions, badges, borders */
-  --color-secondary:          #F2C9A0;   /* Abricot — linked state, delivery mode ON */
-  --color-bg:                 #EAE4DC;   /* Beige — page background */
+  --color-primary:            var(--brand);   /* Ruby Red — primary actions, badges, borders */
+  --color-secondary:          var(--accent);   /* Abricot — linked state, delivery mode ON */
+  --color-bg:                 var(--bg-page-alt);   /* Beige — page background */
   --color-surface:            #FFFFFF;   /* Blanc — cards, panels */
-  --color-text:               #222222;   /* Noir — body text */
-  --color-text-muted:         #666666;   /* Muted grey — secondary text, placeholders */
+  --color-text:               var(--ink-900);   /* Noir — body text */
+  --color-text-muted:         var(--ink-500);   /* Muted grey — secondary text, placeholders */
 
   /* Semantic aliases used by components */
   --color-text-primary:       var(--color-text);
   --color-text-secondary:     var(--color-text-muted);
-  --color-background-secondary: #F4EFE8;         /* faint beige — input / secondary surfaces */
-  --color-border-secondary:   rgba(34, 34, 34, 0.18);
-  --color-border-tertiary:    rgba(34, 34, 34, 0.10);
+  --color-background-secondary: var(--bg-page);         /* faint beige — input / secondary surfaces */
+  --color-border-secondary:   rgba(46, 22, 12, 0.18);
+  --color-border-tertiary:    rgba(46, 22, 12, 0.10);
 
   /* State + accent colors */
-  --color-linked:             #F2C9A0;   /* Office client linked (Abricot) */
-  --color-collect:            #8D1D2C;   /* Not linked / collect mode */
-  --color-on-abricot:         #6b4420;   /* Dark amber — text on Abricot backgrounds */
-  --color-collection-border:  #c17a2a;   /* Deep amber */
-  --color-collection-fill:    #FAC775;   /* Collection badge background */
-  --color-collection-icon:    #6b3d0a;   /* Collection badge icon/label */
+  --color-linked:             var(--accent);   /* Office client linked (Abricot) */
+  --color-collect:            var(--brand);   /* Not linked / collect mode */
+  --color-on-abricot:         var(--choco-600);   /* Dark amber — text on Abricot backgrounds */
+  --color-collection-border:  var(--caramel-600);   /* Deep amber */
+  --color-collection-fill:    var(--gold-500);   /* Collection badge background */
+  --color-collection-icon:    var(--choco-800);   /* Collection badge icon/label */
 
   /* Website / marketing accents */
-  --color-popup:              #78554B;   /* Third color — Pop-Up markers & badges */
-  --color-ink:                #222222;   /* Illustration stroke ink */
+  --color-popup:              var(--choco-600);   /* Third color — Pop-Up markers & badges */
+  --color-ink:                var(--ink-900);   /* Illustration stroke ink */
 
   /* --- Typography -------------------------------------------------------- */
   /* Brand typography — strict. No system fallback allowed.
@@ -178,7 +178,7 @@
      surface. Fond d'étiquette : toujours blanc (--color-surface). @kind color
      -------------------------------------------------------------------- */
   /* Confitures — fruits rouges */
-  --pkg-fraise:               #8D1D2C;   /* Ruby Red maison */
+  --pkg-fraise:               var(--brand);   /* Ruby Red maison */
   --pkg-framboise:            #A61E4D;   /* Rosé magenta profond */
   --pkg-groseille:            #C41E3A;   /* Rouge vif éclatant */
   --pkg-cerise:               #7B1424;   /* Rouge griotte profond */
