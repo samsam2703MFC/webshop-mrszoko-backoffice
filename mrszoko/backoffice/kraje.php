@@ -87,12 +87,22 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Kraje i VAT' => null]);
   <div class="rule">
     <h2>Jak liczony jest VAT</h2>
     <p>Stawka nie jest ustawiana ręcznie — wynika z kraju dostawy i z numeru VAT UE potwierdzonego w VIES.</p>
-    <table>
-      <tr><th>Kraj dostawy</th><th>Numer VAT UE</th><th>Stawka</th></tr>
-      <tr><td><b>Polska</b> — rynek krajowy</td><td>obojętne</td><td><b>polski VAT (23 %)</b></td></tr>
-      <tr><td>Inny kraj UE</td><td>potwierdzony w VIES jako <b>ważny</b></td><td><b>0 % — odwrotne obciążenie</b></td></tr>
-      <tr><td>Inny kraj UE</td><td>brak, błędny lub VIES nie odpowiedział</td><td>polski VAT</td></tr>
+    <div class="tablewrap">
+    <table class="rwd">
+      <thead><tr><th>Kraj dostawy</th><th>Numer VAT UE</th><th>Stawka</th></tr></thead>
+      <tbody>
+      <tr><td data-l="Kraj dostawy"><b>Polska</b> — rynek krajowy</td>
+          <td data-l="Numer VAT UE">obojętne</td>
+          <td data-l="Stawka"><b>polski VAT (23 %)</b></td></tr>
+      <tr><td data-l="Kraj dostawy">Inny kraj UE</td>
+          <td data-l="Numer VAT UE">potwierdzony w VIES jako <b>ważny</b></td>
+          <td data-l="Stawka"><b>0 % — odwrotne obciążenie</b></td></tr>
+      <tr><td data-l="Kraj dostawy">Inny kraj UE</td>
+          <td data-l="Numer VAT UE">brak, błędny lub VIES nie odpowiedział</td>
+          <td data-l="Stawka">polski VAT</td></tr>
+      </tbody>
     </table>
+    </div>
     <div class="warnbox">
       <b>Uwaga na próg OSS.</b> Klient prywatny z innego kraju UE płaci u nas polski VAT. Jest to poprawne
       dopiero do progu 10 000 € rocznej sprzedaży wysyłkowej do UE. Po jego przekroczeniu trzeba naliczać
