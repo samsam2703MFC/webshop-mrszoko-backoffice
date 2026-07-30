@@ -29,8 +29,8 @@ function layout_head(array $S, string $lang, array $langs, string $title = '', s
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="<?= e(WSM_FONT_HREF) ?>">
-<link rel="stylesheet" href="<?= e(u('tokens.css')) ?>">
-<link rel="stylesheet" href="<?= e(u('shop.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset('tokens.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset('shop.css')) ?>">
 <?php foreach ($langs as $l): ?>
 <link rel="alternate" hreflang="<?= e($l) ?>" href="<?= e($self . '?lang=' . $l) ?>">
 <?php endforeach; ?>
@@ -76,6 +76,16 @@ function layout_footer(array $S): void {
     <div>
       <img class="foot-logo" src="<?= e(u('assets/logo.png')) ?>" alt="<?= e($S['brand'] ?? '') ?>" width="120" height="36" loading="lazy">
       <p class="mono"><?= e($S['footer.tagline'] ?? '') ?></p>
+      <?php // Vente à distance en Pologne : raison sociale, adresse du siège et
+            // numéros d'immatriculation doivent figurer sur le site. ?>
+      <?php if (($S['seller.name'] ?? '') !== ''): ?>
+      <p class="mono seller">
+        <span class="seller-label"><?= e($S['seller.legal'] ?? '') ?></span>
+        <?= e($S['seller.name']) ?><br>
+        <?= e($S['seller.address'] ?? '') ?><br>
+        <?= e($S['seller.ids'] ?? '') ?>
+      </p>
+      <?php endif; ?>
       <p class="mono"><?= e(date('Y')) ?> · <?= e($S['brand'] ?? '') ?> · <?= e($S['footer.rights'] ?? '') ?></p>
     </div>
     <nav class="foot-links mono" aria-label="<?= e($S['footer.contact'] ?? '') ?>">
@@ -86,7 +96,7 @@ function layout_footer(array $S): void {
     </nav>
   </div>
 </footer>
-<script src="<?= e(u('shop.js')) ?>" defer></script>
+<script src="<?= e(asset('shop.js')) ?>" defer></script>
 </body>
 </html>
 <?php

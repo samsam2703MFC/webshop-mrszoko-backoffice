@@ -67,7 +67,10 @@ $cfg = [
     // numéros ne sont alors validés que sur la forme.
     'vies' => [
         'enabled'   => (getenv('WSM_VIES_ENABLED') ?: '1') !== '0',
-        'requester' => getenv('WSM_VIES_REQUESTER') ?: '',
+        // Notre numéro de TVA. Ce n'est PAS un secret — il figure au registre
+        // public KRS — et il doit être présent pour que VIES délivre un numéro
+        // de consultation opposable. Surchargeable par l'environnement.
+        'requester' => getenv('WSM_VIES_REQUESTER') ?: 'PL8971902620',
         'timeout'   => (int) (getenv('WSM_VIES_TIMEOUT') ?: 6),
         'ttl'       => (int) (getenv('WSM_VIES_TTL') ?: 2592000),
     ],

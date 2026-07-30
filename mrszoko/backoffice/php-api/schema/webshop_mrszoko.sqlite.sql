@@ -470,3 +470,14 @@ CREATE TABLE IF NOT EXISTS wsm_vies_checks (
   checked_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_wsm_vies_vat ON wsm_vies_checks (vat_eu, id);
+
+-- --- Pays servis (miroir SQLite) --------------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_countries (
+  code       TEXT PRIMARY KEY,
+  name_pl    TEXT NOT NULL,
+  name_uk    TEXT NOT NULL DEFAULT '',
+  name_en    TEXT NOT NULL DEFAULT '',
+  is_eu      INTEGER NOT NULL DEFAULT 1,
+  active     INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);

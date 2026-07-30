@@ -611,3 +611,18 @@ CREATE TABLE IF NOT EXISTS `wsm_vies_checks` (
   PRIMARY KEY (`id`),
   KEY `idx_wsm_vies_vat` (`vat_eu`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Pays servis ------------------------------------------------------------
+-- Qui peut commander, et à quel régime de TVA. `is_eu` n'est pas décoratif :
+-- c'est lui qui autorise l'autoliquidation (0 %) pour un acheteur professionnel
+-- d'un autre État membre. La Pologne est le marché intérieur : jamais 0 %.
+CREATE TABLE IF NOT EXISTS `wsm_countries` (
+  `code`       CHAR(2)      NOT NULL,
+  `name_pl`    VARCHAR(80)  NOT NULL,
+  `name_uk`    VARCHAR(80)  NOT NULL DEFAULT '',
+  `name_en`    VARCHAR(80)  NOT NULL DEFAULT '',
+  `is_eu`      TINYINT(1)   NOT NULL DEFAULT 1,
+  `active`     TINYINT(1)   NOT NULL DEFAULT 0,   -- ouvert à la commande
+  `sort_order` INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -147,6 +147,7 @@ if ($sroute !== '') {
             'strings'  => wsm_shop_strings($pdo, $lang),
             'products' => wsm_shop_products($pdo, $lang),
             'shipping' => wsm_shipping_methods($pdo, $lang),
+            'countries' => wsm_shop_countries($pdo, $lang),
         ]);
     }
 
@@ -161,7 +162,8 @@ if ($sroute !== '') {
     if ($method === 'POST' && $sroute === 'quote') {
         $b = wsm_body();
         [$q, $e] = wsm_shop_quote($pdo, (array) ($b['items'] ?? []),
-            (string) ($b['delivery_method'] ?? ''), $lang);
+            (string) ($b['delivery_method'] ?? ''), $lang,
+            ['country' => (string) ($b['country'] ?? ''), 'vat_eu' => (string) ($b['vat_eu'] ?? '')]);
         if ($e) wsm_send(['error' => 'validation', 'fields' => $e, 'quote' => $q], 422);
         wsm_send($q);
     }

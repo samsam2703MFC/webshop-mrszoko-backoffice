@@ -303,3 +303,15 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .pro p { color: var(--cream-200); max-width: 56ch; }
 
 .site-foot .foot-links a { color: var(--choco-300); }
+
+/* Mentions légales du vendeur : lisibles, jamais mises en avant. */
+.site-foot .seller { margin: var(--space-4) 0; line-height: 1.7; color: var(--choco-300); }
+.site-foot .seller-label { display: block; color: var(--choco-400); text-transform: uppercase;
+                           letter-spacing: var(--tracking-caps); font-size: var(--text-2xs); margin-bottom: 3px; }
+
+/* Sélecteur de pays : même traitement que les champs texte. */
+.field select { font-family: var(--font-sans); font-size: var(--text-md); color: var(--text-strong);
+                padding: 11px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md);
+                background: var(--bg-page); width: 100%; }
+.field select:hover { border-color: var(--border-strong); }
+.totals .rc { color: var(--berry-600); font-weight: var(--weight-semibold); }

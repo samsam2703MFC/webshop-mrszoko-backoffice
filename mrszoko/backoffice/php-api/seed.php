@@ -487,3 +487,53 @@ function wsm_sync_content(PDO $pdo): array {
     }
     return [$added, $ship];
 }
+
+/**
+ * Pays de l'Union servis par la boutique. Seule la Pologne est ouverte au
+ * départ : c'est le marché réel (InPost livre en Pologne). Le back-office
+ * ouvre les autres quand l'expédition suit.
+ *
+ * `is_eu` n'est pas une étiquette : c'est lui qui autorise l'autoliquidation.
+ */
+function wsm_seed_countries(PDO $pdo): void {
+    // code, pl, uk, en
+    $eu = [
+        ['PL', 'Polska', 'Польща', 'Poland'],
+        ['AT', 'Austria', 'Австрія', 'Austria'],
+        ['BE', 'Belgia', 'Бельгія', 'Belgium'],
+        ['BG', 'Bułgaria', 'Болгарія', 'Bulgaria'],
+        ['HR', 'Chorwacja', 'Хорватія', 'Croatia'],
+        ['CY', 'Cypr', 'Кіпр', 'Cyprus'],
+        ['CZ', 'Czechy', 'Чехія', 'Czechia'],
+        ['DK', 'Dania', 'Данія', 'Denmark'],
+        ['EE', 'Estonia', 'Естонія', 'Estonia'],
+        ['FI', 'Finlandia', 'Фінляндія', 'Finland'],
+        ['FR', 'Francja', 'Франція', 'France'],
+        ['EL', 'Grecja', 'Греція', 'Greece'],
+        ['ES', 'Hiszpania', 'Іспанія', 'Spain'],
+        ['NL', 'Holandia', 'Нідерланди', 'Netherlands'],
+        ['IE', 'Irlandia', 'Ірландія', 'Ireland'],
+        ['LT', 'Litwa', 'Литва', 'Lithuania'],
+        ['LU', 'Luksemburg', 'Люксембург', 'Luxembourg'],
+        ['LV', 'Łotwa', 'Латвія', 'Latvia'],
+        ['MT', 'Malta', 'Мальта', 'Malta'],
+        ['DE', 'Niemcy', 'Німеччина', 'Germany'],
+        ['PT', 'Portugalia', 'Португалія', 'Portugal'],
+        ['RO', 'Rumunia', 'Румунія', 'Romania'],
+        ['SK', 'Słowacja', 'Словаччина', 'Slovakia'],
+        ['SI', 'Słowenia', 'Словенія', 'Slovenia'],
+        ['SE', 'Szwecja', 'Швеція', 'Sweden'],
+        ['HU', 'Węgry', 'Угорщина', 'Hungary'],
+        ['IT', 'Włochy', 'Італія', 'Italy'],
+    ];
+    $ins = $pdo->prepare('INSERT INTO wsm_countries (code, name_pl, name_uk, name_en, is_eu, active, sort_order)
+                          VALUES (?,?,?,?,1,?,?)');
+    foreach ($eu as $i => [$c, $pl, $uk, $en]) {
+        // La Pologne d'abord, et seule ouverte : on ne prétend pas livrer
+        // ailleurs tant qu'aucun transporteur ne le fait.
+        $ins->execute([$c, $pl, $uk, $en, $c === 'PL' ? 1 : 0, $c === 'PL' ? 0 : $i + 10]);
+    }
+    // Périmètre des transporteurs : InPost, c'est la Pologne.
+    try { $pdo->exec("UPDATE wsm_shipping_methods SET countries = 'PL' WHERE countries = ''"); }
+    catch (Throwable $e) { /* colonne pas encore migrée */ }
+}

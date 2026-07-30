@@ -97,6 +97,7 @@ function wsm_bootstrap(bool $seed = true): PDO {
     wsm_ensure_commerce_columns($pdo);
     wsm_ensure_shop($pdo);
     wsm_ensure_vies($pdo);
+    wsm_ensure_countries($pdo);
     return $pdo;
 }
 
@@ -207,6 +208,29 @@ function wsm_ensure_vies(PDO $pdo): void {
     ];
     wsm_ensure_columns($pdo, 'wsm_clients', $cols);
     wsm_ensure_columns($pdo, 'wsm_orders',  $cols);
+}
+
+/**
+ * Pays servis + périmètre de chaque mode de livraison. La liste est seedée une
+ * seule fois : ensuite c'est le back-office qui décide où l'on vend.
+ */
+function wsm_ensure_countries(PDO $pdo): void {
+    if (!wsm_table_exists($pdo, 'wsm_countries')) wsm_apply_schema($pdo);
+    // Un mode de livraison ne dessert pas forcément toute l'Europe : InPost
+    // Paczkomat, par exemple, est polonais.
+    wsm_ensure_columns($pdo, 'wsm_shipping_methods', [
+        'countries' => ["VARCHAR(255) NOT NULL DEFAULT 'PL'", "TEXT NOT NULL DEFAULT 'PL'"],
+    ]);
+    // La commande retient le pays de livraison et le régime appliqué.
+    wsm_ensure_columns($pdo, 'wsm_orders', [
+        'reverse_charge' => ['TINYINT(1) NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
+    ]);
+    try {
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_countries")->fetchColumn()) {
+            require_once __DIR__ . '/seed.php';
+            wsm_seed_countries($pdo);
+        }
+    } catch (Throwable $e) { /* table absente : le schéma vient d'échouer */ }
 }
 
 /** Une table existe-t-elle ? (MySQL + SQLite) */

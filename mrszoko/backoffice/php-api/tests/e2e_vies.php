@@ -158,6 +158,73 @@ ok('l\'état porté sur le client contient statut, date, nom et preuve',
     $cols['vat_status'] === 'valid' && $cols['vat_checked_at'] !== null
     && $cols['vat_name'] === 'FIRMA TESTOWA' && $cols['vat_consultation'] === 'REF-1', $cols);
 
+// ---- 3bis. La conséquence : 0 % de TVA, ou pas ----------------------------
+// C'est ici que VIES coûte ou rapporte de l'argent. On garde le transport
+// simulé : il faut pouvoir provoquer un « valid » à volonté.
+echo "-- TVA : autoliquidation appliquée, pas seulement signalée --\n";
+require_once dirname(__DIR__) . '/shop.php';
+
+$answer = ['isValid' => true, 'name' => 'FIRMA DE', 'address' => 'Berlin', 'requestIdentifier' => 'REF-DE'];
+$prodId = ($pdo->query("SELECT id FROM wsm_products WHERE shop_visible = 1 ORDER BY sort_order LIMIT 1")
+             ->fetchColumn()) ?: '';
+$items  = [['id' => $prodId, 'qty' => 2]];
+$deVat  = 'DE' . random_int(100000000, 999999999);
+
+// La Pologne d'abord : marché intérieur, TVA polonaise, quoi qu'il arrive.
+[$qPl] = wsm_shop_quote($pdo, $items, 'inpost_locker', 'pl', ['country' => 'PL', 'vat_eu' => $deVat]);
+ok('Pologne → TVA polonaise même avec un numéro UE valide',
+    empty($qPl['reverse_charge']) && $qPl['items_vat'] > 0, [$qPl['reverse_charge'] ?? null, $qPl['items_vat']]);
+
+// Un pays fermé ne peut pas être choisi.
+[$qShut, $eShut] = wsm_shop_quote($pdo, $items, 'inpost_locker', 'pl', ['country' => 'DE', 'vat_eu' => $deVat]);
+ok('pays non ouvert à la vente → refusé', isset($eShut['ship_country']), $eShut);
+
+// On ouvre l'Allemagne et on étend le coursier, comme le ferait la console.
+$pdo->prepare("UPDATE wsm_countries SET active = 1 WHERE code = 'DE'")->execute();
+$pdo->prepare("UPDATE wsm_shipping_methods SET countries = 'PL,DE' WHERE id = 'inpost_courier'")->execute();
+
+[$qDe, $eDe] = wsm_shop_quote($pdo, $items, 'inpost_courier', 'pl', ['country' => 'DE', 'vat_eu' => $deVat]);
+ok('autre État membre + numéro confirmé → autoliquidation', !empty($qDe['reverse_charge']), $eDe ?: $qDe['reverse_charge']);
+ok('la TVA tombe à zéro', $qDe['total_vat'] === 0 && $qDe['items_vat'] === 0, [$qDe['items_vat'], $qDe['total_vat']]);
+ok('l\'acheteur paie le HT, pas le TTC', $qDe['items_gross'] === $qDe['items_net'], [$qDe['items_gross'], $qDe['items_net']]);
+ok('le total reste cohérent', ($qDe['total_net'] + $qDe['total_vat']) === $qDe['total_gross'], $qDe);
+ok('la facture est moins chère qu\'en Pologne', $qDe['total_gross'] < $qPl['total_gross'],
+    [$qDe['total_gross'], $qPl['total_gross']]);
+ok('la ventilation de TVA est vide en autoliquidation', $qDe['vat_breakdown'] === [], $qDe['vat_breakdown']);
+
+// Sans numéro : c'est un particulier, il paie la TVA polonaise.
+[$qDeB2C] = wsm_shop_quote($pdo, $items, 'inpost_courier', 'pl', ['country' => 'DE']);
+ok('particulier d\'un autre État membre → TVA polonaise (sous le seuil OSS)',
+    empty($qDeB2C['reverse_charge']) && $qDeB2C['items_vat'] > 0, $qDeB2C['items_vat']);
+
+// VIES muet : on n'exonère pas sur une réponse qu'on n'a pas eue.
+$answer = ['isValid' => false, 'userError' => 'MS_UNAVAILABLE'];
+$deVat2 = 'DE' . random_int(100000000, 999999999);
+[$qDown] = wsm_shop_quote($pdo, $items, 'inpost_courier', 'pl', ['country' => 'DE', 'vat_eu' => $deVat2]);
+ok('VIES indisponible → PAS d\'exonération, la commande passe quand même',
+    empty($qDown['reverse_charge']) && $qDown['items_vat'] > 0, $qDown['items_vat']);
+
+// Un transporteur qui ne dessert pas le pays ne doit pas être proposé.
+$pdo->prepare("UPDATE wsm_shipping_methods SET countries = 'PL' WHERE id = 'inpost_courier'")->execute();
+[$qNoShip, $eNoShip] = wsm_shop_quote($pdo, $items, 'inpost_courier', 'pl', ['country' => 'DE']);
+ok('aucun transporteur pour le pays → refusé, pas une promesse en l\'air',
+    isset($eNoShip['delivery_method']), $eNoShip);
+$pdo->prepare("UPDATE wsm_shipping_methods SET countries = 'PL,DE' WHERE id = 'inpost_courier'")->execute();
+
+$plMethods = wsm_shipping_methods($pdo, 'pl', 'PL');
+$deMethods = wsm_shipping_methods($pdo, 'pl', 'DE');
+ok('le Paczkomat n\'est pas proposé à l\'étranger',
+    count($plMethods) === 2 && count($deMethods) === 1
+    && $deMethods[0]['id'] === 'inpost_courier', [count($plMethods), count($deMethods)]);
+
+// On referme l'Allemagne : l'état de départ est la Pologne seule.
+$pdo->prepare("UPDATE wsm_countries SET active = 0 WHERE code = 'DE'")->execute();
+$pdo->prepare("UPDATE wsm_shipping_methods SET countries = 'PL' WHERE id = 'inpost_courier'")->execute();
+
+ok('27 pays de l\'UE sont en base', (int) $pdo->query("SELECT COUNT(*) FROM wsm_countries")->fetchColumn() === 27);
+ok('seule la Pologne est ouverte par défaut',
+    (int) $pdo->query("SELECT COUNT(*) FROM wsm_countries WHERE active = 1")->fetchColumn() === 1);
+
 wsm_vies_transport('wsm_vies_http');   // on rend le vrai transport à la suite
 
 // ---- 4. À travers l'API ----------------------------------------------------
