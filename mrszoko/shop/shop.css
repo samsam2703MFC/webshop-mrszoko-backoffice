@@ -315,3 +315,12 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
                 background: var(--bg-page); width: 100%; }
 .field select:hover { border-color: var(--border-strong); }
 .totals .rc { color: var(--berry-600); font-weight: var(--weight-semibold); }
+
+/* Rupture assumée et remise au poids : deux informations qui doivent se voir
+   sans crier — l'une rassure, l'autre récompense. */
+.ondemand { color: var(--caramel-600); text-transform: uppercase; font-size: var(--text-2xs);
+            letter-spacing: var(--tracking-wide); }
+.totals .disc { color: var(--success); font-weight: var(--weight-semibold); }
+.nudge { background: var(--surface-raised); border: 1px dashed var(--border-default);
+         border-radius: var(--radius-md); padding: 10px 13px; margin-bottom: var(--space-4);
+         color: var(--caramel-600); }

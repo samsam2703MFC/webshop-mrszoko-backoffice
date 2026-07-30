@@ -83,7 +83,7 @@ jobs:
           # n'est pas touché — un patch à la main le rendrait irrécupérable au
           # prochain export.
           cp mrszoko/backoffice/zamowienia.php mrszoko/backoffice/produkty.php \
-             mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php site/backoffice/
+             mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php mrszoko/backoffice/rabaty.php site/backoffice/
 
           # Dossier des photos envoyées depuis la console. Il ne contient que
           # son .htaccess : rsync tourne sans --delete, donc les photos déjà
@@ -354,7 +354,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in zamowienia.php produkty.php kontrahenci.php kraje.php; do
+          for pg in zamowienia.php produkty.php kontrahenci.php kraje.php rabaty.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in

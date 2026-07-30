@@ -338,7 +338,13 @@
       "checkout.country_hint": "Zmień kraj i odśwież, aby zobaczyć dostępne sposoby dostawy.",
       "checkout.no_shipping": "Nie wysyłamy jeszcze do wybranego kraju.",
       "checkout.reverse_charge": "VAT — odwrotne obciążenie",
-      "checkout.vat_eu_hint": "Firma z innego kraju UE: po potwierdzeniu numeru w VIES cena jest bez VAT."
+      "checkout.vat_eu_hint": "Firma z innego kraju UE: po potwierdzeniu numeru w VIES cena jest bez VAT.",
+      "product.on_demand": "Na zamówienie",
+      "product.on_demand_note": "Nie mamy tego na stanie — przyjmiemy zamówienie i potwierdzimy termin e-mailem.",
+      "cart.discount": "Rabat ilościowy",
+      "cart.discount_next": "Dodaj jeszcze {x}, aby uzyskać rabat {p} %.",
+      "cart.backorder": "Część produktów przygotujemy na zamówienie — potwierdzimy termin e-mailem.",
+      "order.backorder": "Część zamówienia przygotujemy na zamówienie. Skontaktujemy się z Tobą e-mailem w sprawie terminu wysyłki."
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -500,7 +506,13 @@
       "checkout.country_hint": "Змініть країну та оновіть, щоб побачити доступні способи доставки.",
       "checkout.no_shipping": "Ми ще не доставляємо у вибрану країну.",
       "checkout.reverse_charge": "ПДВ — зворотне нарахування",
-      "checkout.vat_eu_hint": "Компанія з іншої країни ЄС: після підтвердження номера у VIES ціна без ПДВ."
+      "checkout.vat_eu_hint": "Компанія з іншої країни ЄС: після підтвердження номера у VIES ціна без ПДВ.",
+      "product.on_demand": "Під замовлення",
+      "product.on_demand_note": "Немає в наявності — приймемо замовлення та підтвердимо термін електронною поштою.",
+      "cart.discount": "Знижка за обсяг",
+      "cart.discount_next": "Додайте ще {x}, щоб отримати знижку {p} %.",
+      "cart.backorder": "Частину товарів виготовимо на замовлення — підтвердимо термін електронною поштою.",
+      "order.backorder": "Частину замовлення виготовимо на замовлення. Ми напишемо вам щодо терміну відправлення."
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -662,7 +674,13 @@
       "checkout.country_hint": "Change the country and refresh to see the available delivery methods.",
       "checkout.no_shipping": "We do not ship to the selected country yet.",
       "checkout.reverse_charge": "VAT — reverse charge",
-      "checkout.vat_eu_hint": "Business in another EU country: once VIES confirms the number, the price is net of VAT."
+      "checkout.vat_eu_hint": "Business in another EU country: once VIES confirms the number, the price is net of VAT.",
+      "product.on_demand": "Made to order",
+      "product.on_demand_note": "Not in stock — we take the order and confirm the date by e-mail.",
+      "cart.discount": "Volume discount",
+      "cart.discount_next": "Add {x} more to get {p} % off.",
+      "cart.backorder": "Some items will be made to order — we will confirm the date by e-mail.",
+      "order.backorder": "Part of this order will be made to order. We will e-mail you about the shipping date."
     }
   }
 }

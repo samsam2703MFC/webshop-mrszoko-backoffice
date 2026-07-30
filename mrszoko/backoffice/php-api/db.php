@@ -98,6 +98,7 @@ function wsm_bootstrap(bool $seed = true): PDO {
     wsm_ensure_shop($pdo);
     wsm_ensure_vies($pdo);
     wsm_ensure_countries($pdo);
+    wsm_ensure_trade($pdo);
     return $pdo;
 }
 
@@ -229,6 +230,31 @@ function wsm_ensure_countries(PDO $pdo): void {
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_countries")->fetchColumn()) {
             require_once __DIR__ . '/seed.php';
             wsm_seed_countries($pdo);
+        }
+    } catch (Throwable $e) { /* table absente : le schéma vient d'échouer */ }
+}
+
+/**
+ * Deux règles commerciales : la remise au poids, et le fait qu'une commande
+ * passe même si le stock ne suit pas (on recontacte l'acheteur). Idempotent.
+ */
+function wsm_ensure_trade(PDO $pdo): void {
+    if (!wsm_table_exists($pdo, 'wsm_discount_tiers')) wsm_apply_schema($pdo);
+    $int = ['INT NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'];
+    wsm_ensure_columns($pdo, 'wsm_orders', [
+        // Une commande peut dépasser le stock : on l'accepte et on prévient.
+        'backorder'        => ['TINYINT(1) NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
+        'discount_percent' => ['DECIMAL(5,2) NOT NULL DEFAULT 0', 'REAL NOT NULL DEFAULT 0'],
+        'discount_amount'  => $int,
+    ]);
+    wsm_ensure_columns($pdo, 'wsm_order_items', [
+        // Combien de cette ligne reste à produire : ce que l'atelier doit savoir.
+        'backorder' => $int,
+    ]);
+    try {
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_discount_tiers")->fetchColumn()) {
+            require_once __DIR__ . '/seed.php';
+            wsm_seed_discounts($pdo);
         }
     } catch (Throwable $e) { /* table absente : le schéma vient d'échouer */ }
 }

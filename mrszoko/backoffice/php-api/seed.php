@@ -537,3 +537,14 @@ function wsm_seed_countries(PDO $pdo): void {
     try { $pdo->exec("UPDATE wsm_shipping_methods SET countries = 'PL' WHERE countries = ''"); }
     catch (Throwable $e) { /* colonne pas encore migrée */ }
 }
+
+/**
+ * Paliers de remise au poids. Reprennent la logique annoncée depuis le début :
+ * le kilogramme baisse avec le format. Réglables ensuite en console.
+ */
+function wsm_seed_discounts(PDO $pdo): void {
+    $ins = $pdo->prepare('INSERT INTO wsm_discount_tiers (min_weight_g, percent, label, active) VALUES (?,?,?,1)');
+    foreach ([[3000, 5.0, 'od 3 kg'], [10000, 12.0, 'od 10 kg'], [20000, 20.0, 'od 20 kg']] as [$g, $p, $l]) {
+        $ins->execute([$g, $p, $l]);
+    }
+}

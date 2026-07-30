@@ -626,3 +626,16 @@ CREATE TABLE IF NOT EXISTS `wsm_countries` (
   `sort_order` INT NOT NULL DEFAULT 0,
   PRIMARY KEY (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --- Rabaty ilościowe : remise en % selon le POIDS total du panier ----------
+-- Le kilogramme baisse avec le volume. Les paliers sont de la donnée, pas du
+-- code : le back-office les règle sans redéploiement.
+CREATE TABLE IF NOT EXISTS `wsm_discount_tiers` (
+  `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `min_weight_g` INT NOT NULL DEFAULT 0,          -- à partir de ce poids
+  `percent`      DECIMAL(5,2) NOT NULL DEFAULT 0, -- remise appliquée aux produits
+  `label`        VARCHAR(80)  NOT NULL DEFAULT '',
+  `active`       TINYINT(1)   NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_discount_weight` (`min_weight_g`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

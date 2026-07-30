@@ -273,6 +273,85 @@ for ($i = 0; $i < 7; $i++) {
 }
 ok('powtarzane zamówienia z tego samego adresu → 429', $last === 429, $last);
 
+// ---- 5bis. Rabat au poids et rupture de stock -------------------------------
+// Deux règles commerciales : le kilogramme baisse avec le volume, et une
+// commande qui dépasse le stock passe quand même — on rappelle le client.
+echo "-- rabat ilościowy i brak w magazynie --\n";
+require_once dirname(__DIR__) . '/db.php';
+require_once dirname(__DIR__) . '/shop.php';
+$pdoT = wsm_bootstrap();
+
+$heavy = null;
+foreach ($products as $p) if ($p['weight_g'] >= 3000) $heavy = $p;
+
+if ($heavy) {
+    // 1 sac de 3,1 kg franchit déjà le premier palier (3 kg).
+    [$q1] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $heavy['id'], 'qty' => 1]]]) + [1 => null];
+    [, $qa] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $heavy['id'], 'qty' => 1]]]);
+    ok('premier palier atteint dès 3 kg', ($qa['discount_percent'] ?? 0) > 0, $qa['discount_percent'] ?? null);
+    ok('le montant remisé est chiffré', ($qa['discount_amount'] ?? 0) > 0, $qa['discount_amount'] ?? null);
+    ok('le prix payé est inférieur au prix plein',
+        $qa['items_gross'] < $heavy['price'], [$qa['items_gross'], $heavy['price']]);
+    ok('net + TVA == brut malgré la remise',
+        ($qa['items_net'] + $qa['items_vat']) === $qa['items_gross'], $qa);
+
+    [, $qb] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $heavy['id'], 'qty' => 4]]]);
+    ok('le rabat augmente avec le poids (4 × 3,1 kg → palier supérieur)',
+        ($qb['discount_percent'] ?? 0) > ($qa['discount_percent'] ?? 0),
+        [$qa['discount_percent'] ?? null, $qb['discount_percent'] ?? null]);
+    ok('les paliers ne se cumulent pas (un seul taux appliqué)',
+        ($qb['discount_percent'] ?? 0) <= 100, $qb['discount_percent'] ?? null);
+}
+
+// Sous le premier palier : aucun rabat, mais on annonce le suivant.
+$light = $products[0];
+[, $qLow] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $light['id'], 'qty' => 1]]]);
+ok('petit panier → pas de rabat', ($qLow['discount_percent'] ?? -1) == 0, $qLow['discount_percent'] ?? null);
+ok('le palier suivant est annoncé au client',
+    !empty($qLow['discount_next']['missing_g']), $qLow['discount_next'] ?? null);
+
+// --- Rupture : la commande passe, elle n'est plus refusée -------------------
+$st = $pdoT->prepare("SELECT stock FROM wsm_products WHERE id = ?");
+$st->execute([$light['id']]);
+$stockBefore = (int) $st->fetchColumn();
+$st->closeCursor();
+
+// On abaisse volontairement le stock : commander 118 sacs dépasserait la limite
+// de poids d'InPost et testerait autre chose que la rupture.
+$pdoT->prepare("UPDATE wsm_products SET stock = 2 WHERE id = ?")->execute([$light['id']]);
+$over = 5;   // 2 en stock, 3 à produire
+[, $qOver] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $light['id'], 'qty' => $over]]]);
+ok('commande au-delà du stock → devis accepté, pas d\'erreur', !empty($qOver['lines']), $qOver);
+ok('le manque est chiffré ligne par ligne',
+    ($qOver['lines'][0]['backorder'] ?? 0) === 3, $qOver['lines'][0]['backorder'] ?? null);
+ok('le panier est marqué « à confirmer »', !empty($qOver['backorder']), $qOver['backorder'] ?? null);
+
+$buyerOver = ['first_name' => 'Rupture', 'last_name' => 'Test',
+    'email' => 'rupture-' . bin2hex(random_bytes(4)) . '@example.pl', 'phone' => '512340066',
+    'delivery_method' => 'inpost_locker', 'inpost_point' => 'KRA010', 'consent_terms' => true,
+    'items' => [['id' => $light['id'], 'qty' => $over]]];
+[$co2, $ordOver] = http('POST', "$BASE/shop/order", $buyerOver);
+ok('la commande hors stock est ACCEPTÉE (201), plus refusée', $co2 === 201, [$co2, $ordOver]);
+
+$st = $pdoT->prepare("SELECT stock FROM wsm_products WHERE id = ?");
+$st->execute([$light['id']]);
+$stockAfter = (int) $st->fetchColumn();
+$st->closeCursor();
+ok('le stock tombe à zéro et jamais en négatif', $stockAfter === 0, [$stockBefore, $stockAfter]);
+
+[, $readOver] = http('GET', "$BASE/shop/order/" . rawurlencode((string) $ordOver['code']) . '?t=' . $ordOver['token']);
+ok('la commande porte la marque « à confirmer »', !empty($readOver['backorder']), $readOver['backorder'] ?? null);
+ok('la ligne dit combien reste à produire',
+    ($readOver['items'][0]['backorder'] ?? 0) === 3, $readOver['items'][0]['backorder'] ?? null);
+
+[, $ordersList] = http('GET', "$BASE/franchisor/orders", null, $TOKEN);
+$found = null;
+foreach ($ordersList ?: [] as $o) if ($o['code'] === $ordOver['code']) $found = $o;
+ok('la console voit tout de suite qui rappeler', !empty($found['backorder']), $found);
+
+// On rend son stock au produit pour les tests suivants.
+$pdoT->prepare("UPDATE wsm_products SET stock = ? WHERE id = ?")->execute([$stockBefore, $light['id']]);
+
 // ---- 6. Photos produit -----------------------------------------------------
 // Un fichier n'est pas une image parce qu'il s'appelle .jpg : le serveur le
 // décode et le RÉ-ENCODE. Ce qui ressort est une image fabriquée par nous.
