@@ -88,6 +88,19 @@ function top_produits(PDO $pdo, int $limit = 6): array {
 //  Tracés — du SVG, rien d'autre
 // ---------------------------------------------------------------------------
 
+/**
+ * Un graphique « dense » : trop de points pour afficher toutes les etiquettes
+ * sur un telephone. La feuille de style n'en garde alors qu'une sur cinq.
+ */
+function chart_dense(int $n): string { return $n > 14 ? ' dense' : ''; }
+
+/**
+ * Un graphique trop long ne se partage pas une rangee : il la prend entiere.
+ * Huit points est la limite au-dela de laquelle une demi-largeur rend l'axe
+ * illisible — douze mois serres dans 470 px se chevauchent.
+ */
+function chart_wide(int $n): string { return $n > 8 ? ' wide' : ''; }
+
 /** Histogramme. $vals : [['label'=>…, 'v'=>int], …]. $fmt met en forme la valeur. */
 function graph_bars(array $vals, callable $fmt, string $color = 'var(--brand)'): string {
     if (!$vals) return '<p class="muted small">Brak danych.</p>';
@@ -95,7 +108,7 @@ function graph_bars(array $vals, callable $fmt, string $color = 'var(--brand)'):
     $max = max(1, max(array_map(fn($r) => $r['v'], $vals)));
     $n = count($vals);
     $w = 100 / $n;                                     // largeur d'une colonne, en %
-    $out = '<div class="chart"><div class="bars">';
+    $out = '<div class="chart' . chart_dense($n) . '"><div class="bars">';
     foreach ($vals as $r) {
         $h = $max > 0 ? round($r['v'] / $max * 100, 1) : 0;
         $out .= '<div class="bar" style="width:' . round($w, 3) . '%" title="' . h($r['label'] . ' — ' . $fmt($r['v'])) . '">'
@@ -120,7 +133,7 @@ function graph_line(array $vals, callable $fmt): string {
     }
     $poly = implode(' ', $pts);
     $area = '0,100 ' . $poly . ' 100,100';
-    $out  = '<div class="chart"><svg viewBox="0 0 100 100" preserveAspectRatio="none" class="line" aria-hidden="true">'
+    $out  = '<div class="chart' . chart_dense($n) . '"><svg viewBox="0 0 100 100" preserveAspectRatio="none" class="line" aria-hidden="true">'
           . '<polygon points="' . h($area) . '" fill="var(--brand-quiet, rgba(120,70,40,.12))"></polygon>'
           . '<polyline points="' . h($poly) . '" fill="none" stroke="var(--brand)" stroke-width="1.5"'
           . ' vector-effect="non-scaling-stroke" stroke-linejoin="round"></polyline></svg>';
@@ -148,7 +161,7 @@ function graph_paire(array $vals, callable $fmt): string {
     $span = max(1, $hi - $lo);
     $zero = round(($hi / $span) * 100, 2);            // position du zéro, en % depuis le haut
     $n = count($vals);
-    $out = '<div class="chart"><div class="bars pair">';
+    $out = '<div class="chart' . chart_dense($n) . '"><div class="bars pair">';
     foreach ($vals as $r) {
         $out .= '<div class="bar" style="width:' . round(100 / $n, 3) . '%" title="'
               . h($r['label'] . ' — marża ' . $fmt($r['a']) . ' · po dostawie ' . $fmt($r['b'])) . '">'
@@ -176,7 +189,7 @@ function graph_pourcent(array $vals): string {
     $hi = max(120, (float) max(array_map(fn($r) => (float) $r['v'], $vals)) + 10);
     $n = count($vals);
     $cent = round(100 - (100 / $hi * 100), 2);
-    $out = '<div class="chart"><div class="bars pct">';
+    $out = '<div class="chart' . chart_dense($n) . '"><div class="bars pct">';
     $out .= '<div class="cent" style="top:' . $cent . '%"><span>100 %</span></div>';
     foreach ($vals as $r) {
         $v = (float) $r['v'];
@@ -213,15 +226,33 @@ $audit = $pdo->query("SELECT * FROM wsm_audit ORDER BY id DESC LIMIT 150")->fetc
 
 console_head('Audyt', $me, <<<'CSS'
   .why { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0 0 14px; }
-  .charts { display: grid; grid-template-columns: 1fr; gap: 20px; }
-  @media (min-width: 900px) { .charts { grid-template-columns: 1fr 1fr; } }
-  .chart { position: relative; padding-right: 54px; }
-  .chart .bars { display: flex; align-items: flex-end; gap: 2px; height: 160px; }
+  /* minmax(0, 1fr) et non 1fr : « 1fr » vaut « minmax(auto, 1fr) », dont le
+     minimum est le min-content de la colonne. Douze étiquettes de mois en
+     nowrap suffisaient donc à imposer 761 px au panneau — à TOUTES les
+     largeurs, y compris 390. Le zéro autorise la colonne à descendre sous la
+     taille de son contenu, et la chaîne de min-width: 0 fait le reste. */
+  .charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  @media (min-width: 900px) { .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  /* Un graphique trop long ne se partage pas une rangée : il la prend entière.
+     Au-delà de huit points, serrer douze mois dans une demi-largeur rend l'axe
+     illisible — autant lui donner toute la place. */
+  .charts .wide { grid-column: 1 / -1; }
+  .chart { position: relative; padding-right: 54px; min-width: 0; }
+  .chart .bars { display: flex; align-items: flex-end; gap: 2px; height: 160px; min-width: 0; }
   .chart .bar { display: flex; flex-direction: column; justify-content: flex-end;
                 align-items: center; height: 100%; min-width: 0; }
   .chart .fill { display: block; width: 72%; min-height: 2px; border-radius: 3px 3px 0 0; }
   .chart .lbl { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted);
-                margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+                margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: clip;
+                min-width: 0; max-width: 100%; }
+  /* Trente jours ne tiennent pas côte à côte sur un téléphone. Plutôt que de
+     rogner les étiquettes jusqu'à l'illisible, on n'en garde qu'une sur cinq :
+     l'axe reste lisible et les barres gardent leur largeur. */
+  @media (max-width: 700px) {
+    .chart.dense .lbl { display: none; }
+    .chart.dense .bar:nth-child(5n+1) .lbl { display: block; }
+    .chart .bars { gap: 1px; }
+  }
   .chart .ticks { height: auto; align-items: flex-start; }
   .chart .scale { position: absolute; right: 0; top: 0; height: 160px;
                   display: flex; flex-direction: column; justify-content: space-between;
@@ -364,7 +395,7 @@ $fiable = $mtot['cost_known_pct'] >= 50.0;
 </div>
 
 <div class="charts">
-  <div class="panel">
+  <div class="panel<?= chart_wide(count($marge)) ?>">
     <h2>Marża po kosztach dostawy — 12 miesięcy</h2>
     <p class="why">Jasny słupek to <b>marża brutto</b>: sprzedaż netto minus koszt własny towaru,
       zamrożony w chwili sprzedaży. Ciemny to ta sama marża <b>po dopłacie do przesyłek</b>.
@@ -377,7 +408,7 @@ $fiable = $mtot['cost_known_pct'] >= 50.0;
     </p>
   </div>
 
-  <div class="panel">
+  <div class="panel<?= chart_wide(count($marge)) ?>">
     <h2>Koszt dostawy pokryty przez klienta — 12 miesięcy</h2>
     <p class="why">Ile procent rachunku od przewoźnika płaci klient. <b>100 %</b> znaczy, że wysyłka
       jest neutralna. Poniżej — każda paczka zjada marżę, a próg darmowej dostawy jest za nisko.
@@ -393,7 +424,7 @@ $fiable = $mtot['cost_known_pct'] >= 50.0;
 </div>
 
 <div class="charts">
-  <div class="panel">
+  <div class="panel<?= chart_wide(count($mois)) ?>">
     <h2>Obrót — 12 miesięcy</h2>
     <p class="why">Liczy się tylko to, co <b>zapłacone</b>. Zamówienie oczekujące na płatność
       nie jest obrotem — dopóki pieniądze nie wpłynęły, to obietnica.</p>
@@ -401,7 +432,7 @@ $fiable = $mtot['cost_known_pct'] >= 50.0;
                    fn($v) => pln((int) $v)) ?>
   </div>
 
-  <div class="panel">
+  <div class="panel<?= chart_wide(count($mois)) ?>">
     <h2>Zamówienia — 12 miesięcy</h2>
     <p class="why">Wszystkie zamówienia poza anulowanymi, także te czekające na płatność:
       tu mierzymy zainteresowanie, nie kasę.</p>
@@ -409,7 +440,7 @@ $fiable = $mtot['cost_known_pct'] >= 50.0;
                    fn($v) => (int) $v . ' szt.', 'var(--caramel-400)') ?>
   </div>
 
-  <div class="panel">
+  <div class="panel<?= chart_wide(count($clients)) ?>">
     <h2>Klienci — narastająco</h2>
     <p class="why">Każdy adres liczony raz, w miesiącu pierwszego zamówienia. Krzywa, która
       się wypłaszcza, znaczy, że nowi klienci przestali przychodzić — nawet jeśli obrót rośnie.</p>
@@ -417,7 +448,7 @@ $fiable = $mtot['cost_known_pct'] >= 50.0;
                    fn($v) => (int) $v) ?>
   </div>
 
-  <div class="panel">
+  <div class="panel<?= chart_wide(count($jours)) ?>">
     <h2>Zamówienia dzień po dniu — 30 dni</h2>
     <p class="why">Rytm bieżący. Dziura w tym wykresie to dzień, w którym nikt nie kupił.</p>
     <?= graph_bars(array_map(fn($d) => ['label' => $d['label'], 'v' => $d['n']], $jours),
