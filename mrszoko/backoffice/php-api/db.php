@@ -57,13 +57,15 @@ function wsm_apply_schema(PDO $pdo): void {
     $file = __DIR__ . '/schema/webshop_mrszoko.' . ($cfg['engine'] === 'mysql' ? 'mysql' : 'sqlite') . '.sql';
     $sql = file_get_contents($file);
     if ($cfg['engine'] === 'mysql') {
-        // The MySQL file contains CREATE DATABASE / USE — run it as one script.
-        $pdo->exec($sql);
-    } else {
-        // SQLite: split on ';' at statement boundaries and run each.
-        foreach (wsm_split_sql($sql) as $stmt) {
-            if (trim($stmt) !== '') $pdo->exec($stmt);
-        }
+        // Target the CONFIGURED database (the connection's dbname — e.g. the
+        // server's `mrszoko`), which may differ from the canonical file's
+        // webshop_mrszoko: drop the file's CREATE DATABASE / USE statements and
+        // run everything else in the connected schema, statement by statement
+        // (PDO multi-statement exec is unreliable across drivers).
+        $sql = preg_replace('/^(CREATE DATABASE|USE)\b[^;]*;/mi', '', $sql);
+    }
+    foreach (wsm_split_sql($sql) as $stmt) {
+        if (trim($stmt) !== '') $pdo->exec($stmt);
     }
 }
 

@@ -70,38 +70,57 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Prepare remote directory + PHP pdo_sqlite (validates SSH login)
+      - name: Prepare remote dir + provision MySQL `mrszoko` (validates SSH login)
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' bash -s" << 'REMOTE'
+            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' WSM_TOKEN='${{ secrets.WSM_ADMIN_TOKEN }}' bash -s" << 'REMOTE'
           set -e
           DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
-          mkdir -p "$DIR/backoffice/api/data"
-          chown -R www-data:www-data "$DIR/backoffice/api/data" 2>/dev/null \
-            || chmod -R 777 "$DIR/backoffice/api/data"
+          API="$DIR/backoffice/api"
+          mkdir -p "$API/data"
+          chown -R www-data:www-data "$API/data" 2>/dev/null || chmod -R 777 "$API/data"
           command -v rsync >/dev/null || { echo 'rsync manquant sur le serveur — apt-get install -y rsync'; exit 1; }
-          # TRANSITOIRE (retirer après un déploiement réussi) : la base SQLite du
-          # serveur a été seedée avec les données de démo françaises ; le seed est
-          # désormais polonais. On supprime le fichier pour que le premier hit
-          # re-bootstrape (schéma + seed PL + contenu landing re-seedé depuis
-          # content_seed.json). Uniquement des données de démo/seed.
-          rm -f "$DIR/backoffice/api/data/"*.sqlite && echo 'base SQLite purgée (re-seed au 1er hit)'
-          # L'API tourne par défaut sur SQLite (aucun config.local.php MySQL) :
-          # le driver PDO sqlite doit exister côté Apache. Constaté manquant au
-          # run #9 (500 «could not find driver») — on l'installe si absent.
-          if ! php -m 2>/dev/null | grep -qi '^pdo_sqlite'; then
-            echo 'pdo_sqlite manquant — installation de php-sqlite3…'
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update -qq && apt-get install -y -qq php-sqlite3
-            systemctl reload apache2 2>/dev/null || systemctl restart apache2 2>/dev/null || service apache2 restart 2>/dev/null || true
-            systemctl restart 'php*-fpm' 2>/dev/null || true
-            php -m | grep -qi '^pdo_sqlite' && echo 'pdo_sqlite OK'
+          # pdo_sqlite = repli dev/CI ; installé au run #10, on vérifie sans réinstaller.
+          php -m 2>/dev/null | grep -qi '^pdo_sqlite' && echo 'pdo_sqlite présent (repli)' || echo 'pdo_sqlite absent (repli indisponible)'
+          # ── MySQL : la base du serveur est `mrszoko` (cf. phpMyAdmin). On
+          # provisionne UNE FOIS : utilisateur applicatif dédié + config.local.php
+          # (engine mysql, base mrszoko, jeton admin). config.local.php est
+          # gitignoré, web-denied (.htaccess) et JAMAIS écrasé par rsync — s'il
+          # existe déjà, on ne touche à rien.
+          if [ -f "$API/config.local.php" ]; then
+            echo 'config.local.php présent — conservé tel quel'
+          elif command -v mysql >/dev/null && mysql -e 'SELECT 1' >/dev/null 2>&1; then
+            PASS=$(openssl rand -hex 16)
+            TOKEN="${WSM_TOKEN:-$(openssl rand -hex 24)}"
+            mysql -e "CREATE DATABASE IF NOT EXISTS \`mrszoko\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+            mysql -e "CREATE USER IF NOT EXISTS 'mrszoko_app'@'localhost' IDENTIFIED BY '$PASS';"
+            mysql -e "ALTER USER 'mrszoko_app'@'localhost' IDENTIFIED BY '$PASS';"
+            mysql -e "GRANT ALL PRIVILEGES ON \`mrszoko\`.* TO 'mrszoko_app'@'localhost'; FLUSH PRIVILEGES;"
+            cat > "$API/config.local.php" <<PHPCONF
+          <?php
+          // Généré par le déploiement — base MySQL du serveur (phpMyAdmin: mrszoko).
+          // Jeton admin : requis en X-Admin-Token pour toute écriture.
+          return [
+              'engine' => 'mysql',
+              'mysql'  => [
+                  'host' => '127.0.0.1',
+                  'port' => '3306',
+                  'name' => 'mrszoko',
+                  'user' => 'mrszoko_app',
+                  'pass' => '$PASS',
+              ],
+              'admin_token' => '$TOKEN',
+          ];
+          PHPCONF
+            chown www-data:www-data "$API/config.local.php" 2>/dev/null || true
+            chmod 640 "$API/config.local.php" || true
+            echo 'config.local.php créé — API branchée sur MySQL mrszoko (utilisateur mrszoko_app)'
           else
-            echo 'pdo_sqlite déjà présent'
+            echo 'MySQL non joignable en root (socket) — API laissée sur SQLite. Créez config.local.php à la main (cf. config.local.sample.php).'
           fi
           REMOTE
 
@@ -152,6 +171,14 @@ jobs:
           run "$LP/assets/logo.png" 1000
           echo "== API landing : contenu servi en 3 langues depuis la base =="
           for lg in pl uk en; do run "$BO/api/landing/content?lang=$lg" 2000; done
+          echo "== moteur de données (preuve MySQL) =="
+          if command -v mysql >/dev/null && mysql -e 'SELECT 1' >/dev/null 2>&1; then
+            N=$(mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name LIKE 'wsm_%'" 2>/dev/null || echo 0)
+            echo "  tables wsm_ dans MySQL mrszoko : $N"
+            if [ "${N:-0}" -lt 15 ]; then echo "  ^ ATTENTION : l'API ne semble pas servir depuis MySQL mrszoko"; fi
+          else
+            echo "  mysql non joignable depuis root — pas de preuve directe"
+          fi
           echo "== racine /mrszoko → redirection landing =="
           run "http://localhost/mrszoko/" 50
           if [ "$fail" = "0" ]; then echo "ALL CHECKS OK"; else echo "CHECK FAILED"; exit 1; fi
