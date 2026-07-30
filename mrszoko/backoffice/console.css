@@ -5,6 +5,11 @@
 
 * { box-sizing: border-box; }
 
+/* La hauteur du bandeau supérieur. Le bloc marque de la colonne et l'en-tête
+   de page la partagent : sans cela les deux zones sombres se décalent et la
+   barre du haut se lit comme deux morceaux au lieu d'une seule ligne. */
+:root { --wsm-bar-h: 56px; }
+
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -34,14 +39,14 @@ body {
 .menu-toggle:checked ~ .shell .side { transform: none; }
 
 .side .brand {
-  display: flex; align-items: center; gap: 12px;
-  padding: 16px 18px; text-decoration: none; color: var(--cream-50);
-  border-bottom: 1px solid var(--choco-600); flex: none;
+  display: flex; align-items: center; gap: 10px;
+  height: var(--wsm-bar-h); padding: 0 16px; text-decoration: none; color: var(--cream-50);
+  border-bottom: 1px solid var(--choco-600); flex: none; overflow: hidden;
 }
-.side .brand img { height: 34px !important; width: auto; max-width: none; display: block; }
-.side .brand span { font-size: 11px; line-height: 1.35; color: var(--choco-200);
+.side .brand img { height: 30px !important; width: auto; max-width: none; display: block; }
+.side .brand span { font-size: 9.5px; line-height: 1.3; color: var(--choco-200);
                     text-transform: uppercase; letter-spacing: .09em; }
-.side .brand b { font-family: var(--font-display); font-size: 15px; letter-spacing: 0;
+.side .brand b { font-family: var(--font-display); font-size: 14px; letter-spacing: 0;
                  text-transform: none; color: var(--cream-50); }
 
 .side-close {
@@ -90,7 +95,11 @@ body {
 header.bar {
   position: sticky; top: 0; z-index: 20;
   background: var(--choco-800); color: var(--cream-50);
-  display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+  display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  height: var(--wsm-bar-h);
+  /* Le même filet que sous le bloc marque : la ligne traverse alors tout
+     l'écran d'un bord à l'autre, au lieu de s'arrêter à la colonne. */
+  border-bottom: 1px solid var(--choco-600);
 }
 header.bar h1 {
   font-family: var(--font-display); font-size: 18px; margin: 0; font-weight: 600;
@@ -111,11 +120,13 @@ header.bar h1 .badge {
 .menu-toggle:focus-visible ~ .shell .menu-btn { outline: 2px solid var(--cream-100); outline-offset: 2px; }
 
 /* --- À partir d'un écran de portable : la colonne est là, tout le temps ---- */
+@media (max-width: 979px) { :root { --wsm-bar-h: 52px; } }
+
 @media (min-width: 980px) {
   .shell { display: grid; grid-template-columns: 268px 1fr; }
   .side { position: sticky; top: 0; height: 100vh; transform: none; width: auto; }
   .scrim, .menu-btn, .side-close { display: none !important; }
-  header.bar { padding: 12px 24px; }
+  header.bar { padding: 0 24px; }
   header.bar h1 { font-size: 20px; }
   .wrap { padding: 24px 24px 72px; }
 }
