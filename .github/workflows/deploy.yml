@@ -86,7 +86,7 @@ jobs:
              mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php mrszoko/backoffice/rabaty.php \
              mrszoko/backoffice/poczta.php mrszoko/backoffice/ustawienia.php \
              mrszoko/backoffice/pulpit.php mrszoko/backoffice/faktury.php \
-             mrszoko/backoffice/faktura_druk.php \
+             mrszoko/backoffice/faktura_druk.php mrszoko/backoffice/magazyn.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -362,6 +362,14 @@ jobs:
           run "$SH/shop.css" 5000
           run "$SH/tokens.css" 2000
           run "$SH/shop.js" 1000
+          # Le fil d'Ariane est aussi ce que Google affiche sous le titre : s'il
+          # disparaît, on le voit ici plutôt que dans les résultats de recherche.
+          SLUG0=$(curl -skL "$SH/" | grep -o 'href="[^"]*/shop/p/[^"]*"' | head -1 | sed 's/.*\/p\///;s/"$//')
+          if [ -n "$SLUG0" ]; then
+            curl -skL "$SH/p/$SLUG0" | grep -q 'BreadcrumbList' \
+              && echo "  fil d'Ariane balisé sur la fiche produit : confirmé" \
+              || { echo "  ^ NOT OK : plus de fil d'Ariane sur la fiche produit"; fail=1; }
+          fi
           # Une boutique « rapide » se prouve ici : le catalogue doit être DANS
           # la première réponse HTML, pas récupéré ensuite par du JavaScript.
           HOME_HTML=$(curl -skL "$SH/")
@@ -392,7 +400,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php faktury.php produkty.php kontrahenci.php kraje.php rabaty.php poczta.php ustawienia.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php kontrahenci.php kraje.php rabaty.php poczta.php ustawienia.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -574,6 +582,14 @@ jobs:
               NF=$(mysql -N -e "$QF" 2>/dev/null || echo 0)
               NFU=$(mysql -N -e "$QFU" 2>/dev/null || echo 0)
             fi
+            QS="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name='wsm_stock_moves'"
+            if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+              NS=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QS" 2>/dev/null || echo 0)
+            else
+              NS=$(mysql -N -e "$QS" 2>/dev/null || echo 0)
+            fi
+            echo "  journal magazynu : $NS / 1"
+            if [ "${NS:-0}" -lt 1 ]; then echo "  ^ ATTENTION : les mouvements de stock n'ont nulle part où s'écrire"; fail=1; fi
             echo "  tables faktur : $NF / 2 · indeksy UNIQUE numeracji : $NFU / 2"
             if [ "${NF:-0}" -lt 2 ]; then echo "  ^ ATTENTION : pas de quoi écrire une facture"; fail=1; fi
             if [ "${NFU:-0}" -lt 2 ]; then echo "  ^ ATTENTION : sans ces index, deux factures pourraient porter le même numéro"; fail=1; fi

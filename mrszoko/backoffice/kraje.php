@@ -81,6 +81,7 @@ console_head('Kraje i VAT', $me, <<<'CSS'
   .ship input { font-family: var(--font-mono); width: 100%; }
 CSS, '');
 console_flash($flash, $kind);
+console_crumbs(['Pulpit' => 'pulpit.php', 'Kraje i VAT' => null]);
 ?>
 
   <div class="rule">

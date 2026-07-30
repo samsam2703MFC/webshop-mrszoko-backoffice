@@ -584,3 +584,20 @@ CREATE TABLE IF NOT EXISTS wsm_invoice_items (
   line_vat   INTEGER NOT NULL DEFAULT 0,
   line_gross INTEGER NOT NULL DEFAULT 0
 );
+
+-- --- Ruchy magazynowe (miroir SQLite) ---------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_stock_moves (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id  TEXT NOT NULL,
+  delta       INTEGER NOT NULL DEFAULT 0,
+  kind        TEXT NOT NULL DEFAULT 'korekta',
+  stock_after INTEGER NOT NULL DEFAULT 0,
+  reason      TEXT NOT NULL DEFAULT '',
+  note        TEXT NOT NULL DEFAULT '',
+  doc         TEXT NOT NULL DEFAULT '',
+  supplier    TEXT NOT NULL DEFAULT '',
+  unit_cost   INTEGER NOT NULL DEFAULT 0,
+  actor       TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_stock_moves ON wsm_stock_moves (product_id, id);

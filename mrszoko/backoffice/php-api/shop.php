@@ -20,6 +20,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/commerce.php';
 require_once __DIR__ . '/vies.php';
 require_once __DIR__ . '/mail.php';
+require_once __DIR__ . '/stock.php';
 
 const WSM_SHOP_LANGS       = ['pl', 'uk', 'en'];
 const WSM_SHOP_DEFAULT_LANG = 'pl';
@@ -700,9 +701,15 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
         $dec = $pdo->prepare("UPDATE wsm_products
                                  SET stock = CASE WHEN stock >= ? THEN stock - ? ELSE 0 END
                                WHERE id = ?");
+        $read = $pdo->prepare("SELECT stock FROM wsm_products WHERE id = ?");
+        $taken = [];
         foreach ($quote['lines'] as $l) {
             $take = max(0, (int) $l['qty'] - (int) ($l['backorder'] ?? 0));
-            if ($take > 0) $dec->execute([$take, $take, $l['id']]);
+            if ($take > 0) {
+                $dec->execute([$take, $take, $l['id']]);
+                $read->execute([$l['id']]);
+                $taken[] = [$l['id'], $take, (int) $read->fetchColumn(), (int) ($l['backorder'] ?? 0)];
+            }
         }
 
         $code  = wsm_next_order_code($pdo);
@@ -757,6 +764,15 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
              VALUES (?,?,?,?,?,?,?)"
         )->execute([$orderId, 'inpost', $method, $buyer['inpost_point'],
                     $quote['parcel_template'], $quote['weight_g'], 'do_utworzenia']);
+
+        // Le magasin garde la trace de chaque sortie : un stock qui baisse
+        // sans mouvement est un stock qu'on ne saura pas expliquer.
+        foreach ($taken as [$prodId, $take, $after, $missing]) {
+            wsm_stock_log($pdo, (string) $prodId, -$take, 'sprzedaz', $after, [
+                'doc' => $code, 'actor' => 'sklep',
+                'note' => $missing > 0 ? 'do wykonania: ' . $missing : '',
+            ]);
+        }
 
         wsm_order_event($pdo, $orderId, 'utworzone', $code . ' · ' . wsm_money($quote['total_gross']) . ' PLN', 'sklep');
 

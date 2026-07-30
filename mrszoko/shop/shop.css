@@ -324,3 +324,29 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .nudge { background: var(--surface-raised); border: 1px dashed var(--border-default);
          border-radius: var(--radius-md); padding: 10px 13px; margin-bottom: var(--space-4);
          color: var(--caramel-600); }
+
+
+/* --- Fil d'Ariane ---------------------------------------------------------
+   Le chemin du retour, et ce que Google affiche sous le titre à la place de
+   l'URL. Il se replie sur une seule ligne défilante sur téléphone plutôt que
+   d'occuper trois lignes de hauteur. */
+.crumbs {
+  display: flex; align-items: center; gap: 6px 8px; flex-wrap: nowrap;
+  overflow-x: auto; scrollbar-width: none;
+  font-size: 13px; color: var(--text-muted);
+  margin: 0 0 18px; padding-bottom: 2px;
+}
+.crumbs::-webkit-scrollbar { display: none; }
+.crumbs a { color: var(--brand); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.crumbs a:hover { text-decoration: underline; }
+.crumbs .sepc { color: var(--border-default); }
+.crumbs [aria-current] { color: var(--text-strong); font-weight: 600; white-space: nowrap; }
+@media (min-width: 700px) { .crumbs { flex-wrap: wrap; overflow: visible; } }
+
+/* Confirmation d'ajout, à l'endroit où l'on a cliqué. */
+.added-note {
+  margin: 10px 0 0; padding: 9px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  color: var(--success); font-size: 13.5px; font-weight: 600;
+}
+.added-note a { color: inherit; text-decoration: underline; }

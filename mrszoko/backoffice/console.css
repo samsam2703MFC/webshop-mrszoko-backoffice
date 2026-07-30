@@ -120,6 +120,14 @@ header.bar h1 .badge {
   .wrap { padding: 24px 24px 72px; }
 }
 
+/* Fil d'Ariane : le chemin, et le retour. */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+          font-size: 13px; margin: 0 0 16px; color: var(--text-muted); }
+.crumbs a { color: var(--brand); text-decoration: none; font-weight: 600; }
+.crumbs a:hover { text-decoration: underline; }
+.crumbs .sepc { color: var(--border-default); }
+.crumbs [aria-current] { color: var(--text-strong); font-weight: 600; }
+
 /* --- Blocs ---------------------------------------------------------------- */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .kpi {

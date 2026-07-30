@@ -69,6 +69,7 @@ function console_menu(): array {
         'faktury.php'     => 'Faktury',
         'poczta.php'      => 'Poczta',
         'produkty.php'    => 'Produkty',
+        'magazyn.php'     => 'Magazyn',
         'kontrahenci.php' => 'Kontrahenci',
         'kraje.php'       => 'Kraje',
         'rabaty.php'      => 'Rabaty',
@@ -98,6 +99,29 @@ function console_erp_menu(): array {
  * Ouvre la page : en-tête HTML, barre, navigation.
  * $extraCss : le peu de style propre à un écran, quand il y en a.
  */
+/**
+ * Le fil d'Ariane. Il ne décore pas : sur un écran qui a une vue « détail »
+ * (une commande, une facture, un modèle), il dit où l'on est ET donne le
+ * chemin du retour. Sans lui, on ne sort d'un détail qu'avec le bouton
+ * « précédent » du navigateur.
+ *
+ * @param array $crumbs  [libellé => href|null], le dernier étant la page courante
+ */
+function console_crumbs(array $crumbs): void {
+    if (!$crumbs) return;
+    echo '<nav class="crumbs" aria-label="Ścieżka">';
+    $last = array_key_last($crumbs);
+    foreach ($crumbs as $label => $href) {
+        if ($label !== array_key_first($crumbs)) echo '<span class="sepc" aria-hidden="true">›</span>';
+        if ($href !== null && $label !== $last) {
+            echo '<a href="' . h((string) $href) . '">' . h((string) $label) . '</a>';
+        } else {
+            echo '<span aria-current="page">' . h((string) $label) . '</span>';
+        }
+    }
+    echo '</nav>';
+}
+
 function console_head(string $title, array $me, string $extraCss = '', string $badge = ''): void {
     $file = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
     ?><!DOCTYPE html>

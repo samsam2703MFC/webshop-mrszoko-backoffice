@@ -250,7 +250,11 @@ if ($page === 'p') {
     layout_header($S, $lang, $langs, $cartCount);
     ?>
 <main class="wrap block">
-  <p><a class="back" href="<?= e(u()) ?>">← <?= e($S['product.back'] ?? '') ?></a></p>
+  <?php layout_crumbs([
+      ($S['nav.shop'] ?? 'Sklep') => u(),
+      ($S['catalog.title'] ?? $S['nav.shop'] ?? 'Katalog') => u() . '#katalog',
+      $p['name'] => null,
+  ]); ?>
   <div class="product">
     <div class="product-media"><?= product_visual($p, 'product-photo') ?></div>
     <div class="product-buy">
@@ -316,6 +320,10 @@ if ($page === 'koszyk') {
     layout_header($S, $lang, $langs, $cartCount);
     ?>
 <main class="wrap block">
+  <?php layout_crumbs([
+      ($S['nav.shop'] ?? 'Sklep') => u(),
+      ($S['cart.title'] ?? 'Koszyk') => null,
+  ]); ?>
   <h1><?= e($S['cart.title'] ?? '') ?></h1>
   <?php if (!$q['lines']): ?>
     <p class="muted"><?= e($S['cart.empty'] ?? '') ?></p>
@@ -438,6 +446,11 @@ if ($page === 'kasa') {
     layout_header($S, $lang, $langs, $cartCount);
     ?>
 <main class="wrap block">
+  <?php layout_crumbs([
+      ($S['nav.shop'] ?? 'Sklep') => u(),
+      ($S['cart.title'] ?? 'Koszyk') => u('koszyk'),
+      ($S['checkout.title'] ?? 'Kasa') => null,
+  ]); ?>
   <h1><?= e($S['checkout.title'] ?? '') ?></h1>
   <?php if (!$q['lines']): ?>
     <p class="muted"><?= e($S['checkout.empty'] ?? '') ?></p>
@@ -592,6 +605,10 @@ if ($page === 'zamowienie') {
     $payUrl = $o['payment']['redirect_url'] ?? '';
     ?>
 <main class="wrap block">
+  <?php layout_crumbs([
+      ($S['nav.shop'] ?? 'Sklep') => u(),
+      ($S['order.title'] ?? 'Zamówienie') => null,
+  ]); ?>
   <div class="thanks">
     <h1><?= e($S['order.thanks'] ?? '') ?></h1>
     <p class="mono order-code"><?= e($S['order.number'] ?? '') ?> · <strong><?= e($o['code']) ?></strong></p>

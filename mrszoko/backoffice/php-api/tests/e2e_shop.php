@@ -406,6 +406,56 @@ if ($other) {
 }
 $pdoV->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$vid]);
 
+
+// ---- Magazyn : une vente laisse une trace ----------------------------------
+// Un stock qui baisse sans mouvement est un stock qu'on ne saura pas
+// expliquer. C'est le point de départ de tout inventaire qui ne tombe pas
+// juste, et c'est invérifiable après coup.
+echo "\n-- ruchy magazynowe --\n";
+require_once dirname(__DIR__) . '/stock.php';
+
+$sid = 'test-mag-' . bin2hex(random_bytes(3));
+$pdoV->prepare("INSERT INTO wsm_products (id, category_id, nom, prix, statut, active, shop_visible, slug,
+                                          stock, vat_rate, weight_g, length_mm, width_mm, height_mm, sku)
+                VALUES (?, (SELECT id FROM wsm_categories LIMIT 1), ?, ?, 'Opublikowany', 1, 1, ?, 3, 0.23, 200, 120, 80, 40, ?)")
+     ->execute([$sid, 'Test magazynu', 50.00, $sid, strtoupper($sid)]);
+
+$before = (int) $pdoV->query("SELECT stock FROM wsm_products WHERE id = " . $pdoV->quote($sid))->fetchColumn();
+$cmd = [
+    'lang' => 'pl', 'delivery_method' => 'inpost_locker', 'inpost_point' => 'WRO01A',
+    'items' => [['id' => $sid, 'qty' => 2]],
+    'client_type' => 'osoba', 'email' => 'mag.test@example.com', 'phone' => '600100200',
+    'first_name' => 'Anna', 'last_name' => 'Nowak', 'consent_terms' => 1,
+    'ship_street' => 'Leszczyńskiego', 'ship_building' => '4', 'ship_postcode' => '50-078',
+    'ship_city' => 'Wrocław', 'ship_country' => 'PL',
+];
+[$ordM, $errM] = wsm_shop_create_order($pdoV, $cmd);
+ok('commande passée', $ordM !== null, $errM);
+$mv = wsm_stock_moves($pdoV, ['product_id' => $sid, 'limit' => 10]);
+ok('la vente a écrit un mouvement', count($mv) >= 1, count($mv));
+ok('le mouvement est une sortie de 2', (int) ($mv[0]['delta'] ?? 0) === -2, $mv[0]['delta'] ?? null);
+ok('il porte le numéro de commande', ($mv[0]['doc'] ?? '') === $ordM['code'], $mv[0]['doc'] ?? null);
+ok('il note le stock résultant', (int) ($mv[0]['stock_after'] ?? -1) === $before - 2, $mv[0]['stock_after'] ?? null);
+
+// Une entrée fournisseur, puis une correction motivée.
+$after = wsm_stock_apply($pdoV, $sid, 10, 'przyjecie', ['supplier' => 'Dostawca Test', 'unit_cost' => 1850]);
+ok('une entrée augmente le stock', $after === $before - 2 + 10, $after);
+$after = wsm_stock_apply($pdoV, $sid, -3, 'korekta', ['reason' => 'stłuczka']);
+ok('une correction le diminue', $after === $before - 2 + 10 - 3, $after);
+$after = wsm_stock_apply($pdoV, $sid, -9999, 'korekta', ['reason' => 'test']);
+ok('le stock ne descend jamais sous zéro', $after === 0, $after);
+$mv = wsm_stock_moves($pdoV, ['product_id' => $sid, 'limit' => 10]);
+ok('chaque mouvement est daté et signé', ($mv[0]['created_at'] ?? '') !== '');
+ok('la somme des mouvements égale le stock',
+    array_sum(array_map(fn($m) => (int) $m['delta'], $mv)) + $before === 0,
+    [array_sum(array_map(fn($m) => (int) $m['delta'], $mv)), $before]);
+
+// La couverture, pas la quantité : c'est elle qui dit s'il faut commander.
+$ovv = array_values(array_filter(wsm_stock_overview($pdoV), fn($r) => $r['id'] === $sid));
+ok('le magasin voit ce produit', count($ovv) === 1);
+ok('rupture signalée quand le stock est à zéro', ($ovv[0]['status'] ?? '') === 'brak', $ovv[0]['status'] ?? null);
+$pdoV->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$sid]);
+
 require_once dirname(__DIR__) . '/media.php';
 
 $tmpDir = sys_get_temp_dir();

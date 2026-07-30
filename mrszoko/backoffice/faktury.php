@@ -95,6 +95,9 @@ if ($detail && isset($_GET['druk'])) {
 
 console_head('Faktury', $me, '', $kpis['to_issue'] ? $kpis['to_issue'] . ' do wystawienia' : '');
 console_flash($flash, $kind);
+console_crumbs($detail
+    ? ['Pulpit' => 'pulpit.php', 'Faktury' => 'faktury.php', $detail['number'] => null]
+    : ['Pulpit' => 'pulpit.php', 'Faktury' => null]);
 ?>
 
 <?php if ($missing): ?>
