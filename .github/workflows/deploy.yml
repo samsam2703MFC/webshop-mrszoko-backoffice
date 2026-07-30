@@ -85,6 +85,7 @@ jobs:
           cp mrszoko/backoffice/zamowienia.php mrszoko/backoffice/produkty.php \
              mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php mrszoko/backoffice/rabaty.php \
              mrszoko/backoffice/poczta.php mrszoko/backoffice/ustawienia.php \
+             mrszoko/backoffice/pulpit.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -390,7 +391,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in zamowienia.php produkty.php kontrahenci.php kraje.php rabaty.php poczta.php ustawienia.php; do
+          for pg in pulpit.php zamowienia.php produkty.php kontrahenci.php kraje.php rabaty.php poczta.php ustawienia.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -409,7 +410,7 @@ jobs:
           # (#ekran=…) : s'ils changent, les renvois depuis les écrans PHP
           # retombent sur l'accueil sans rien dire. On le voit ici.
           NAVOK=1
-          for lbl in 'Pulpit sieci' 'Sklepy' 'Katalog' 'Użytkownicy i role' 'Dziennik audytu'; do
+          for lbl in 'Użytkownicy i role' 'Dziennik audytu'; do
             curl -skL "$BO/" | grep -qF "$lbl" || { echo "  ^ ATTENTION : libellé « $lbl » absent de la console — le lien profond ne mènera nulle part"; NAVOK=0; }
           done
           [ "$NAVOK" = "1" ] && echo "  libellés visés par les liens profonds : tous présents"

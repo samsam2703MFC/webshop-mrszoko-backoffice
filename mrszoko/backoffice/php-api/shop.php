@@ -26,6 +26,12 @@ const WSM_SHOP_DEFAULT_LANG = 'pl';
 const WSM_SHOP_MAX_QTY     = 99;              // garde-fou : pas de panier à 10 000 unités
 const WSM_SHOP_HOME_COUNTRY = 'PL';   // marché intérieur : jamais d'autoliquidation
 const WSM_ORDER_STATUSES   = ['nowe', 'oplacone', 'w_realizacji', 'wyslane', 'dostarczone', 'anulowane'];
+// Les taux de TVA polonais. Ce n'est pas un réglage de confort : une stawka
+// inventée passerait sur la facture et se réglerait à l'inspection. On
+// n'accepte donc que les taux légaux — 23 % (standard), 8 %, 5 % (denrées),
+// 0 %. Le taux vit sur le produit : un chocolat et un livre de recettes ne
+// sont pas taxés pareil.
+const WSM_VAT_RATES = [0.23, 0.08, 0.05, 0.0];
 
 /** Origine de la requête en cours (schéma + hôte), proxy TLS compris. */
 function wsm_request_origin(): string {
@@ -531,6 +537,17 @@ function wsm_validate_product_shop(PDO $pdo, array $in, string $id): array {
 
     if (array_key_exists('shop_visible', $in)) $out['shop_visible'] = !empty($in['shop_visible']) ? 1 : 0;
 
+    // TVA du produit. « 23 » et « 0,23 » désignent la même chose — l'écran
+    // envoie l'un, un import pourrait envoyer l'autre.
+    if (array_key_exists('vat_rate', $in)) {
+        $r = (float) str_replace(',', '.', (string) $in['vat_rate']);
+        if ($r > 1) $r /= 100;
+        $match = null;
+        foreach (WSM_VAT_RATES as $legal) if (abs($legal - $r) < 0.0005) $match = $legal;
+        if ($match === null) $e['vat_rate'] = 'dozwolone stawki: ' . wsm_vat_rates_label();
+        else $out['vat_rate'] = $match;
+    }
+
     foreach (['origin' => 80, 'cocoa' => 16, 'unit_label' => 40, 'badge' => 40,
               'swatch_from' => 32, 'swatch_to' => 32] as $k => $max) {
         if (!array_key_exists($k, $in)) continue;
@@ -766,6 +783,16 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
 function wsm_order_event(PDO $pdo, int $orderId, string $event, string $detail = '', string $actor = ''): void {
     $pdo->prepare("INSERT INTO wsm_order_events (order_id, event, detail, actor) VALUES (?,?,?,?)")
         ->execute([$orderId, $event, mb_substr($detail, 0, 255), mb_substr($actor, 0, 120)]);
+}
+
+/** « 23, 8, 5, 0 % » — les taux autorisés, pour un message d'erreur lisible. */
+function wsm_vat_rates_label(): string {
+    return implode(', ', array_map(fn($r) => wsm_vat_percent($r), WSM_VAT_RATES)) . ' %';
+}
+
+/** 0.23 → « 23 », 0.08 → « 8 ». Pas de décimale inutile à l'écran. */
+function wsm_vat_percent(float $rate): string {
+    return rtrim(rtrim(number_format($rate * 100, 2, ',', ''), '0'), ',');
 }
 
 /** Montant en grosze → chaîne « 129,90 ». */

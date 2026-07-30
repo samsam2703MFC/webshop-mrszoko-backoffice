@@ -55,6 +55,7 @@ function pln(int $g): string { return number_format($g / 100, 2, ',', "\u{202F}"
 /** Les écrans PHP, dans l'ordre du travail réel. */
 function console_menu(): array {
     return [
+        'pulpit.php'      => 'Pulpit',
         'zamowienia.php'  => 'Zamówienia',
         'poczta.php'      => 'Poczta',
         'produkty.php'    => 'Produkty',
@@ -72,18 +73,14 @@ function console_menu(): array {
  * rend ces écrans atteignables d'ici, et pas seulement l'inverse.
  */
 function console_erp_menu(): array {
+    // Volontairement court. La console héritée porte encore l'attirail d'un
+    // réseau de franchise — Sklepy sieci, Promocje sieci, Strefy zasięgu,
+    // Analiza geograficzna. Ici on vend en ligne : ces écrans ne décrivent
+    // rien de réel et n'ont pas à être proposés. Ne restent que ceux qui
+    // servent à une boutique : les comptes et la piste d'audit.
     return [
-        'dash'       => 'Pulpit sieci',
-        'boutiques'  => 'Sklepy',
-        'catalogue'  => 'Katalog',
-        'menus'      => 'Menu i zestawy',
-        'promos'     => 'Promocje sieci',
-        'livraisons' => 'Dostawy',
-        'geo'        => 'Analiza geograficzna',
-        'comms'      => 'Komunikacja',
-        'users'      => 'Użytkownicy i role',
-        'zones'      => 'Strefy zasięgu',
-        'audit'      => 'Dziennik audytu',
+        'users' => 'Użytkownicy i role',
+        'audit' => 'Dziennik audytu',
     ];
 }
 
@@ -118,7 +115,7 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
       <?php foreach (console_menu() as $f => $label): ?>
       <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
-      <span class="sep">ERP</span>
+      <span class="sep">Konto</span>
       <?php foreach (console_erp_menu() as $k => $label): ?>
       <a href="./#ekran=<?= h($k) ?>"><?= h($label) ?></a>
       <?php endforeach; ?>
