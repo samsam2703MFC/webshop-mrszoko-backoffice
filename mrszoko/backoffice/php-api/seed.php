@@ -548,3 +548,159 @@ function wsm_seed_discounts(PDO $pdo): void {
         $ins->execute([$g, $p, $l]);
     }
 }
+
+/**
+ * Modèles de courrier. Semés une seule fois : dès que la console en modifie un,
+ * c'est la base qui fait foi et un déploiement ne le réécrit plus.
+ *
+ * Le modèle « na_zamowienie » est celui qui tient la promesse commerciale :
+ * une commande dépassant le stock passe quand même, et l'acheteur reçoit
+ * immédiatement un mot disant qu'on le recontacte avec la date.
+ */
+function wsm_seed_mail_templates(PDO $pdo): void {
+    $ins = $pdo->prepare('INSERT INTO wsm_mail_templates (code, lang, name, subject, body, event, active)
+                          VALUES (?,?,?,?,?,?,1)');
+
+    $t = [];
+
+    // ---- Commande reçue ----------------------------------------------------
+    $t[] = ['zamowienie', 'pl', 'Potwierdzenie zamówienia', 'Zamówienie {{numer}} przyjęte',
+"Dzień dobry {{imie}},
+
+dziękujemy za zamówienie {{numer}} na kwotę {{kwota}}.
+
+{{pozycje}}
+
+Podgląd zamówienia: {{link}}
+
+Odezwiemy się, gdy paczka ruszy w drogę.
+
+Mister Szoko", 'zamowienie'];
+
+    $t[] = ['zamowienie', 'uk', 'Підтвердження замовлення', 'Замовлення {{numer}} прийнято',
+"Доброго дня, {{imie}}!
+
+Дякуємо за замовлення {{numer}} на суму {{kwota}}.
+
+{{pozycje}}
+
+Перегляд замовлення: {{link}}
+
+Ми напишемо, щойно посилка вирушить.
+
+Mister Szoko", 'zamowienie'];
+
+    $t[] = ['zamowienie', 'en', 'Order confirmation', 'Order {{numer}} received',
+"Hello {{imie}},
+
+thank you for order {{numer}}, total {{kwota}}.
+
+{{pozycje}}
+
+Order details: {{link}}
+
+We will write again as soon as the parcel is on its way.
+
+Mister Szoko", 'zamowienie'];
+
+    // ---- Commande au-delà du stock ----------------------------------------
+    $t[] = ['na_zamowienie', 'pl', 'Zamówienie ponad stan — kontakt', 'Zamówienie {{numer}} — skontaktujemy się mailowo',
+"Dzień dobry {{imie}},
+
+zamówienie {{numer}} zostało przyjęte. Część pozycji robimy dla Państwa
+na świeżo, dlatego skontaktujemy się mailowo z terminem wysyłki:
+
+{{brakujace}}
+
+Reszta zamówienia czeka spakowana. Podgląd: {{link}}
+
+Mister Szoko", 'na_zamowienie'];
+
+    $t[] = ['na_zamowienie', 'uk', 'Замовлення понад запас — контакт', 'Замовлення {{numer}} — ми напишемо вам',
+"Доброго дня, {{imie}}!
+
+Замовлення {{numer}} прийнято. Частину позицій ми виготовляємо свіжими,
+тож напишемо вам електронною поштою про строк відправлення:
+
+{{brakujace}}
+
+Решта замовлення вже спакована. Перегляд: {{link}}
+
+Mister Szoko", 'na_zamowienie'];
+
+    $t[] = ['na_zamowienie', 'en', 'Order beyond stock — contact', 'Order {{numer}} — we will contact you by e-mail',
+"Hello {{imie}},
+
+order {{numer}} has been accepted. Some items are made fresh for you,
+so we will contact you by e-mail with the shipping date:
+
+{{brakujace}}
+
+The rest of your order is already packed. Details: {{link}}
+
+Mister Szoko", 'na_zamowienie'];
+
+    // ---- Paiement reçu -----------------------------------------------------
+    $t[] = ['platnosc', 'pl', 'Płatność otrzymana', 'Płatność za {{numer}} zaksięgowana',
+"Dzień dobry {{imie}},
+
+potwierdzamy wpłatę {{kwota}} za zamówienie {{numer}}.
+Zabieramy się do pakowania.
+
+Mister Szoko", 'platnosc'];
+
+    $t[] = ['platnosc', 'uk', 'Оплату отримано', 'Оплату за {{numer}} зараховано',
+"Доброго дня, {{imie}}!
+
+Підтверджуємо оплату {{kwota}} за замовлення {{numer}}.
+Беремося пакувати.
+
+Mister Szoko", 'platnosc'];
+
+    $t[] = ['platnosc', 'en', 'Payment received', 'Payment for {{numer}} confirmed',
+"Hello {{imie}},
+
+we confirm your payment of {{kwota}} for order {{numer}}.
+We are getting it packed.
+
+Mister Szoko", 'platnosc'];
+
+    // ---- Expédition --------------------------------------------------------
+    $t[] = ['wysylka', 'pl', 'Przesyłka nadana', 'Zamówienie {{numer}} wysłane',
+"Dzień dobry {{imie}},
+
+paczka z zamówieniem {{numer}} jest w drodze.
+Punkt odbioru: {{paczkomat}}
+
+Śledzenie: {{link}}
+
+Mister Szoko", 'wysylka'];
+
+    $t[] = ['wysylka', 'uk', 'Посилку відправлено', 'Замовлення {{numer}} відправлено',
+"Доброго дня, {{imie}}!
+
+Посилка із замовленням {{numer}} у дорозі.
+Пункт видачі: {{paczkomat}}
+
+Відстеження: {{link}}
+
+Mister Szoko", 'wysylka'];
+
+    $t[] = ['wysylka', 'en', 'Parcel dispatched', 'Order {{numer}} dispatched',
+"Hello {{imie}},
+
+the parcel with order {{numer}} is on its way.
+Pick-up point: {{paczkomat}}
+
+Tracking: {{link}}
+
+Mister Szoko", 'wysylka'];
+
+    // ---- Modèle libre, sans événement : la réponse écrite à la main --------
+    $t[] = ['kontakt', 'pl', 'Odpowiedź do klienta (pusty)', 'W sprawie zamówienia {{numer}}',
+"Dzień dobry {{imie}},
+
+Mister Szoko", ''];
+
+    foreach ($t as $row) $ins->execute($row);
+}

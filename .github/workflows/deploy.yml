@@ -83,7 +83,20 @@ jobs:
           # n'est pas touché — un patch à la main le rendrait irrécupérable au
           # prochain export.
           cp mrszoko/backoffice/zamowienia.php mrszoko/backoffice/produkty.php \
-             mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php mrszoko/backoffice/rabaty.php site/backoffice/
+             mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php mrszoko/backoffice/rabaty.php \
+             mrszoko/backoffice/poczta.php mrszoko/backoffice/ustawienia.php \
+             mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
+
+          # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
+          # on n'édite pas l'export à la main. On INJECTE une ligne de <script>
+          # dans la copie déployée — l'export du dépôt reste intact.
+          cp mrszoko/backoffice/console-nav.js site/backoffice/
+          if ! grep -q 'console-nav.js' site/backoffice/index.html; then
+            sed -i 's#<script src="auth-gate.js"></script>#&\n<script src="console-nav.js" defer></script>#' \
+                site/backoffice/index.html
+          fi
+          grep -q 'console-nav.js' site/backoffice/index.html \
+            || { echo "le lanceur n'a pas pu être injecté dans index.html"; exit 1; }
 
           # Dossier des photos envoyées depuis la console. Il ne contient que
           # son .htaccess : rsync tourne sans --delete, donc les photos déjà
@@ -217,7 +230,15 @@ jobs:
           # mots de passe changés par la suite ne sont jamais réécrasés.
           EMAIL="${ADM_EMAIL:-admin@misterszoko.com}"
           PASS="${ADM_PASS:-$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)}"
-          OUT=$(cd "$API" && php migrate.php --ensure-admin "$EMAIL" "$PASS" 2>&1) || { echo "$OUT"; exit 1; }
+          # Si le secret WSM_ADMIN_PASSWORD est renseigné, il FAIT FOI : chaque
+          # déploiement repose ce mot de passe. C'est ainsi qu'on reprend la main
+          # sur le compte sans accès SSH — on change le secret, on redéploie.
+          # Sans secret, --ensure-admin ne touche à rien si un compte existe.
+          if [ -n "${ADM_PASS:-}" ]; then
+            OUT=$(cd "$API" && php migrate.php --set-password "$EMAIL" "$PASS" 2>&1) || { echo "$OUT"; exit 1; }
+          else
+            OUT=$(cd "$API" && php migrate.php --ensure-admin "$EMAIL" "$PASS" 2>&1) || { echo "$OUT"; exit 1; }
+          fi
           echo "$OUT"
           case "$OUT" in
             *"compte créé"*)
@@ -354,7 +375,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in zamowienia.php produkty.php kontrahenci.php kraje.php rabaty.php; do
+          for pg in zamowienia.php produkty.php kontrahenci.php kraje.php rabaty.php poczta.php ustawienia.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -362,6 +383,14 @@ jobs:
               *) ;;
             esac
           done
+          # Le châssis commun et le lanceur : sans eux, les écrans s'affichent nus
+          # et la console n'offre aucun chemin vers eux.
+          run "$BO/console.css" 4000
+          run "$BO/console-nav.js" 1000
+          curl -skL "$BO/" | grep -q 'console-nav.js' \
+            && echo "  la console porte le lanceur des écrans : confirmé" \
+            || { echo "  ^ NOT OK : aucun accès aux écrans depuis la console"; fail=1; }
+
           # Le dossier des photos doit être inscriptible par le serveur web,
           # sinon l'envoi échoue au moment où le client en a besoin.
           if sudo -n -u www-data test -w "$DIR_SHOP/media" 2>/dev/null || [ -w "$DIR_SHOP/media" ]; then
@@ -484,9 +513,29 @@ jobs:
               NK=$(mysql -N -e "$QK" 2>/dev/null || echo 0)
               NKA=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_countries WHERE active=1" 2>/dev/null || echo 0)
             fi
-            echo "  table des pays : $NK · pays ouverts à la vente : $NKA"
+            echo "  table des pays présente : $NK/1 · pays ouverts à la vente : $NKA"
             if [ "${NK:-0}" -lt 1 ]; then echo "  ^ ATTENTION : la liste des pays n'existe pas"; fail=1; fi
             if [ "${NKA:-0}" -lt 1 ]; then echo "  ^ ATTENTION : aucun pays ouvert — la caisse serait bloquée"; fail=1; fi
+            # Messagerie : sans ces tables, la promesse « on vous recontacte »
+            # faite à une commande hors stock n'a nulle part où s'écrire.
+            QM="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_mail_templates','wsm_messages','wsm_settings')"
+            QMU="SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='mrszoko' AND table_name='wsm_messages' AND column_name='event_key' AND non_unique=0"
+            if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+              NM=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QM" 2>/dev/null || echo 0)
+              NMU=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QMU" 2>/dev/null || echo 0)
+              NMT=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE active=1" 2>/dev/null || echo 0)
+              NMA=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE event<>'' AND active=1" 2>/dev/null || echo 0)
+            else
+              NM=$(mysql -N -e "$QM" 2>/dev/null || echo 0)
+              NMU=$(mysql -N -e "$QMU" 2>/dev/null || echo 0)
+              NMT=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE active=1" 2>/dev/null || echo 0)
+              NMA=$(mysql -N -e "SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE event<>'' AND active=1" 2>/dev/null || echo 0)
+            fi
+            echo "  tables poczta + ustawienia : $NM / 3 · modèles actifs : $NMT (dont $NMA automatiques)"
+            echo "  index UNIQUE anti-doublon (wsm_messages.event_key) : $NMU"
+            if [ "${NM:-0}" -lt 3 ]; then echo "  ^ ATTENTION : la messagerie n'a pas de quoi écrire au client"; fail=1; fi
+            if [ "${NMU:-0}" -lt 1 ]; then echo "  ^ ATTENTION : sans cet index, un client recevrait deux fois le même message"; fail=1; fi
+            if [ "${NMA:-0}" -lt 4 ]; then echo "  ^ ATTENTION : aucune réponse automatique attachée aux événements"; fail=1; fi
             echo "  tables boutique créées : $NO / 8"
             echo "  index UNIQUE anti-double-paiement (wsm_payment_events.event_key) : $NU"
             if [ "${NO:-0}" -lt 8 ]; then echo "  ^ ATTENTION : la boutique n'a pas de quoi enregistrer une commande"; fail=1; fi

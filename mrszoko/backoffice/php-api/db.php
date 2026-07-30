@@ -7,7 +7,21 @@
 function wsm_config(): array {
     static $cfg = null;
     if ($cfg === null) $cfg = require __DIR__ . '/config.php';
-    return $cfg;
+    $over = wsm_config_overlay();
+    return $over ? array_replace_recursive($cfg, $over) : $cfg;
+}
+
+/**
+ * Surcouche de configuration posée à l'exécution — c'est par là que les
+ * réglages saisis dans le back-office (settings.php) entrent en vigueur.
+ * Séparée de wsm_config() pour une raison mécanique : lire la base exige une
+ * connexion, et ouvrir la connexion exige la configuration. La surcouche est
+ * donc appliquée APRÈS, depuis wsm_bootstrap(), sans jamais rappeler la base.
+ */
+function wsm_config_overlay(?array $patch = null): array {
+    static $over = [];
+    if ($patch !== null) $over = array_replace_recursive($over, $patch);
+    return $over;
 }
 
 /** Open a PDO connection to the configured engine. */
@@ -99,6 +113,11 @@ function wsm_bootstrap(bool $seed = true): PDO {
     wsm_ensure_vies($pdo);
     wsm_ensure_countries($pdo);
     wsm_ensure_trade($pdo);
+    wsm_ensure_mail($pdo);
+    // En dernier : les réglages saisis en console entrent en vigueur une fois
+    // que leur table existe, et seulement là où le fichier serveur se tait.
+    require_once __DIR__ . '/settings.php';
+    wsm_settings_apply($pdo);
     return $pdo;
 }
 
@@ -255,6 +274,24 @@ function wsm_ensure_trade(PDO $pdo): void {
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_discount_tiers")->fetchColumn()) {
             require_once __DIR__ . '/seed.php';
             wsm_seed_discounts($pdo);
+        }
+    } catch (Throwable $e) { /* table absente : le schéma vient d'échouer */ }
+}
+
+/**
+ * Messagerie : modèles, file des messages, réglages d'intégration. Les modèles
+ * ne sont semés qu'une fois — ensuite c'est la console qui les écrit, et un
+ * déploiement ne doit jamais réécrire un texte que quelqu'un a corrigé.
+ */
+function wsm_ensure_mail(PDO $pdo): void {
+    if (!wsm_table_exists($pdo, 'wsm_messages') || !wsm_table_exists($pdo, 'wsm_settings')
+        || !wsm_table_exists($pdo, 'wsm_mail_templates')) {
+        wsm_apply_schema($pdo);
+    }
+    try {
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_mail_templates")->fetchColumn()) {
+            require_once __DIR__ . '/seed.php';
+            wsm_seed_mail_templates($pdo);
         }
     } catch (Throwable $e) { /* table absente : le schéma vient d'échouer */ }
 }

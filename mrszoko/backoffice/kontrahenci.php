@@ -11,23 +11,10 @@
 // ============================================================================
 declare(strict_types=1);
 
-$API = is_dir(__DIR__ . '/api') ? __DIR__ . '/api' : __DIR__ . '/php-api';
-require_once $API . '/db.php';
-require_once $API . '/auth.php';
+require_once __DIR__ . '/console.php';
+[$pdo, $me, $isAdmin] = console_boot();
+$API = console_api_dir();
 require_once $API . '/vies.php';
-require_once $API . '/delivery.php';   // wsm_audit()
-
-header('Content-Type: text/html; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('Cache-Control: private, no-store');
-
-$pdo = wsm_bootstrap();
-wsm_session_start();
-$me = wsm_current_user($pdo);
-if (!$me) { header('Location: ./', true, 302); exit; }
-$isAdmin = ($me['role'] ?? '') === WSM_ROLE_ADMIN;
-
-function h(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 $csrf = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
 if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {
@@ -72,79 +59,22 @@ $withVat  = array_values(array_filter($rows, fn($r) => (string) $r['vat_eu'] !==
 $nValid   = count(array_filter($withVat, fn($r) => $r['vat_status'] === 'valid'));
 $nUnknown = count(array_filter($withVat, fn($r) => in_array((string) $r['vat_status'], ['unavailable', ''], true)));
 $cfg = wsm_vies_cfg();
-?><!DOCTYPE html>
-<html lang="pl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kontrahenci i VAT UE — Mister Szoko</title>
-<link rel="icon" type="image/png" href="img/logo.png">
-<link rel="stylesheet" href="_ds/mister-szoko/global.css">
-<link rel="stylesheet" href="_ds/mister-szoko/brand.css">
-<style>
-  body { margin: 0; font-family: var(--font-sans); background: var(--bg-page-alt); color: var(--text-body); }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px; }
-  header.bar { background: var(--choco-800); color: var(--cream-50); }
-  .bar-in { max-width: 1240px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-  .bar-in img.logo { height: 40px; width: auto; }
-  .bar-in h1 { font-family: var(--font-display); font-size: 20px; margin: 0; font-weight: 600; }
-  .bar-in a { color: var(--cream-100); font-size: 13px; font-weight: 600; text-decoration: none;
-              border-bottom: 1px solid var(--choco-600); }
-  .bar-in .who { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--choco-200); }
+
+console_head('Kontrahenci i VAT UE', $me, <<<'CSS'
   .hint { color: var(--text-muted); font-size: 13.5px; margin: 0 0 20px; max-width: 82ch; line-height: 1.55; }
-  .flash { border-radius: 10px; padding: 11px 15px; margin-bottom: 18px; font-size: 14px; }
-  .flash.ok   { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
-  .flash.err  { background: color-mix(in srgb, var(--danger) 13%, transparent); color: var(--danger); }
   .flash.warn { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--caramel-600); }
-  .kpis { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
-  .kpi { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
-         padding: 14px 18px; box-shadow: var(--shadow-xs); }
-  .kpi b { display: block; font-family: var(--font-mono); font-size: 22px; color: var(--text-strong); }
-  .kpi span { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
-  .panel { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
-           padding: 18px 20px; margin-bottom: 22px; box-shadow: var(--shadow-xs); }
-  .panel h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 12px; color: var(--text-strong); }
   .adhoc { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
   .adhoc label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--text-strong); }
-  .adhoc input { font-family: var(--font-mono); font-size: 14px; font-weight: 400; padding: 9px 12px; min-width: 240px;
-                 border: 1px solid var(--border-default); border-radius: 9px; background: var(--bg-page); color: var(--text-strong); }
-  table { width: 100%; border-collapse: collapse; background: var(--surface-card);
-          border: 1px solid var(--border-subtle); border-radius: 14px; overflow: hidden; }
-  th, td { text-align: left; padding: 11px 14px; font-size: 13.5px; border-bottom: 1px solid var(--border-subtle);
-           vertical-align: top; }
-  th { background: var(--surface-raised); font-size: 11.5px; text-transform: uppercase;
-       letter-spacing: .08em; color: var(--text-muted); }
-  tr:last-child td { border-bottom: 0; }
+  .adhoc input { font-family: var(--font-mono); min-width: 220px; }
+  th, td { vertical-align: top; }
   .mono { font-family: var(--font-mono); font-size: 12.5px; }
-  .tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; padding: 3px 9px;
-         border-radius: 999px; background: var(--cream-200); color: var(--choco-700); white-space: nowrap; }
-  .tag.ok   { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
   .tag.err  { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
   .tag.warn { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--caramel-600); }
   .tag.rc   { background: color-mix(in srgb, var(--berry-500) 16%, transparent); color: var(--berry-600); }
-  button { font-family: var(--font-sans); font-size: 13px; font-weight: 600; border-radius: 9px;
-           border: 1px solid var(--border-default); padding: 8px 14px; background: var(--surface-card);
-           color: var(--text-strong); cursor: pointer; }
-  button.primary { background: var(--brand); color: var(--cream-50); border-color: var(--brand); }
   small.muted { color: var(--text-muted); }
-</style>
-</head>
-<body>
-<header class="bar">
-  <div class="bar-in">
-    <img class="logo" src="img/logo.png" alt="Mister Szoko">
-    <h1>Kontrahenci i VAT UE</h1>
-    <a href="./">← Konsola</a>
-    <a href="zamowienia.php">Zamówienia</a>
-    <a href="produkty.php">Produkty</a>
-    <a href="kraje.php">Kraje i VAT</a>
-    <a href="rabaty.php">Rabaty</a>
-    <span class="who"><?= h((string) ($me['nom'] ?? '')) ?> · <?= h((string) ($me['role'] ?? '')) ?></span>
-  </div>
-</header>
-
-<div class="wrap">
-  <?php if ($flash !== ''): ?><p class="flash <?= h($kind) ?>"><?= h($flash) ?></p><?php endif; ?>
+CSS, '');
+console_flash($flash, $kind);
+?>
 
   <p class="hint">
     Numery VAT UE są sprawdzane w <b>VIES</b> (Komisja Europejska) przy zapisie kontrahenta i w kasie sklepu.
@@ -228,6 +158,4 @@ $cfg = wsm_vies_cfg();
     </tr>
     <?php endforeach; ?>
   </table>
-</div>
-</body>
-</html>
+<?php console_foot();

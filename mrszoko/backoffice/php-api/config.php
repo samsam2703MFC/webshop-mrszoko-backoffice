@@ -75,6 +75,25 @@ $cfg = [
         'ttl'       => (int) (getenv('WSM_VIES_TTL') ?: 2592000),
     ],
 
+    // ---- Poczta : les messages envoyés aux clients -------------------------
+    // Tout est vide par défaut : sans adresse d'expéditeur, la messagerie
+    // n'envoie rien et garde les messages en file, visibles dans la console.
+    // Ces réglages se saisissent aussi depuis le back-office (écran
+    // Ustawienia) — mais ce qui est posé ici l'emporte. Le mot de passe SMTP
+    // n'a rien à faire dans ce fichier : ce dépôt est public.
+    'mail' => [
+        'transport'   => getenv('WSM_MAIL_TRANSPORT') ?: '',   // mail | smtp
+        'from'        => getenv('WSM_MAIL_FROM') ?: '',
+        'from_name'   => getenv('WSM_MAIL_FROM_NAME') ?: '',
+        'reply_to'    => getenv('WSM_MAIL_REPLY_TO') ?: '',
+        'bcc'         => getenv('WSM_MAIL_BCC') ?: '',
+        'smtp_host'   => getenv('WSM_MAIL_SMTP_HOST') ?: '',
+        'smtp_port'   => (int) (getenv('WSM_MAIL_SMTP_PORT') ?: 0),
+        'smtp_user'   => getenv('WSM_MAIL_SMTP_USER') ?: '',
+        'smtp_pass'   => getenv('WSM_MAIL_SMTP_PASS') ?: '',
+        'smtp_secure' => getenv('WSM_MAIL_SMTP_SECURE') ?: '',
+    ],
+
     // ---- InPost ShipX : expédition ----------------------------------------
     // geowidget_token est le jeton PUBLIC du sélecteur de Paczkomat (il part
     // dans la page) ; token est le jeton SERVEUR ShipX (il n'en sort jamais).
