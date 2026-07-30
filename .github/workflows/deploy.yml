@@ -349,10 +349,17 @@ jobs:
           case "$c" in 403|404) ;; *) echo "  ^ FUITE : la source du contenu est publique"; fail=1;; esac
 
           echo "== console : écrans PHP autonomes (session exigée) =="
+          # On ne peut pas lire le code de statut brut : la redirection HTTPS du
+          # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
+          # 301 pour la réponse de l'écran. On suit donc les redirections et on
+          # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
           for pg in zamowienia.php produkty.php; do
-            c=$(curl -sk -o /dev/null -w '%{http_code}' "$BO/$pg")
-            echo "  $c  GET /backoffice/$pg  (sans session — attendu 302 vers la console)"
-            [ "$c" = "302" ] || { echo "  ^ NOT OK : écran accessible sans authentification"; fail=1; }
+            eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
+            echo "  GET /backoffice/$pg  →  $eff"
+            case "$eff" in
+              *"$pg"*) echo "  ^ FUITE : écran servi sans authentification"; fail=1;;
+              *) ;;
+            esac
           done
           # Le dossier des photos doit être inscriptible par le serveur web,
           # sinon l'envoi échoue au moment où le client en a besoin.
