@@ -326,7 +326,7 @@ CREATE TABLE IF NOT EXISTS `wsm_incidents` (
   `delivery_id` INT UNSIGNED NULL DEFAULT NULL,
   `type`        VARCHAR(80)  NOT NULL,
   `point`       VARCHAR(200) NOT NULL DEFAULT '',
-  `statut`      VARCHAR(40)  NOT NULL DEFAULT 'À traiter',
+  `statut`      VARCHAR(40)  NOT NULL DEFAULT 'Do obsłużenia',
   `impact`      VARCHAR(40)  NOT NULL DEFAULT '',
   `description` TEXT NULL,
   `geo`         VARCHAR(60)  NOT NULL DEFAULT '',

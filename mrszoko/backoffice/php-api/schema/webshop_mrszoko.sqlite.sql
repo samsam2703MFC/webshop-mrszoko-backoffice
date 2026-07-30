@@ -236,7 +236,7 @@ CREATE TABLE IF NOT EXISTS wsm_incidents (
   delivery_id INTEGER REFERENCES wsm_deliveries(id) ON DELETE SET NULL,
   type        TEXT NOT NULL,
   point       TEXT NOT NULL DEFAULT '',
-  statut      TEXT NOT NULL DEFAULT 'À traiter',
+  statut      TEXT NOT NULL DEFAULT 'Do obsłużenia',
   impact      TEXT NOT NULL DEFAULT '',
   description TEXT,
   geo         TEXT NOT NULL DEFAULT '',
