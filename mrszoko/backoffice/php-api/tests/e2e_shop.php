@@ -17,6 +17,14 @@ $BASE  = rtrim($argv[1] ?? getenv('WSM_API_BASE') ?: 'http://localhost:8090', '/
 $TOKEN = $argv[2] ?? getenv('WSM_ADMIN_TOKEN') ?: 'dev-admin-token';
 
 $pass = 0; $fail = 0;
+// La configuration n'est lue qu'une fois, au premier chargement de config.php.
+// Ces deux variables doivent donc être posées AVANT le moindre require — sinon
+// le code de sécurité tpay arrive trop tard et la signature ne se vérifie plus.
+// (Le serveur de dev, lui, tourne dans un autre processus sans ces variables :
+// le test « sans code configuré → 503 » reste donc valable.)
+putenv('WSM_TPAY_SECURITY_CODE=e2e-secret-code');
+putenv('WSM_TPAY_CLIENT_ID=');
+
 function ok(string $label, bool $cond, $got = null) {
     global $pass, $fail;
     if ($cond) { $pass++; echo "  ✓ $label\n"; }
@@ -160,6 +168,15 @@ $r = http('POST', "$BASE/shop/order", array_merge($buyer, ['delivery_method' => 
 ok('kurier bez adresu → 422', badField($r, 'ship_street') && badField($r, 'ship_postcode'), $r);
 $r = http('POST', "$BASE/shop/order", array_merge($buyer, ['invoice' => true, 'nip' => '5252248482', 'company' => 'X']));
 ok('faktura z błędnym NIP → 422', badField($r, 'nip'), $r);
+
+// On remet du stock avant de mesurer : à force de tourner, la suite finissait
+// par commander un article épuisé — et un décrément plancherait à zéro, ce qui
+// faisait échouer l'assertion sans qu'aucun code soit en cause.
+(function () {
+    require_once dirname(__DIR__) . '/db.php';
+    $p = wsm_bootstrap();
+    $p->exec("UPDATE wsm_products SET stock = 500 WHERE stock < 50 AND active = 1");
+})();
 
 $stockBefore = null;
 foreach (http('GET', "$BASE/shop/catalog")[1]['products'] as $p) if ($p['id'] === $prod['id']) $stockBefore = $p['stock'];

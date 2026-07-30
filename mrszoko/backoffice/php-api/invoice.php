@@ -32,7 +32,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/shop.php';
 
-const WSM_INVOICE_KINDS = ['faktura', 'korekta', 'paragon'];
+const WSM_INVOICE_KINDS = ['faktura', 'korekta', 'paragon', 'proforma'];
 
 /** Format par défaut si personne n'en a réglé : numéro, mois, année. */
 const WSM_INVOICE_FORMAT_DEFAULT = 'xxx/mm/yy';
@@ -40,11 +40,13 @@ const WSM_INVOICE_FORMAT_DEFAULT = 'xxx/mm/yy';
 function wsm_invoice_cfg(): array {
     $c = (array) (wsm_config()['invoice'] ?? []);
     $c += ['seller_name' => '', 'seller_nip' => '', 'seller_address' => '', 'place' => '',
-           'iban' => '', 'bank' => '', 'payment_days' => '', 'number_format' => ''];
+           'iban' => '', 'bank' => '', 'payment_days' => '', 'number_format' => '',
+           'reminder_days' => ''];
     $fmt = trim((string) $c['number_format']);
     if ($fmt === '' || !preg_match('/x{2,6}/i', $fmt)) $fmt = WSM_INVOICE_FORMAT_DEFAULT;
     $c['number_format'] = $fmt;
     $c['payment_days'] = is_numeric($c['payment_days']) ? max(0, (int) $c['payment_days']) : 0;
+    $c['reminder_days'] = is_numeric($c['reminder_days'] ?? '') ? max(0, (int) $c['reminder_days']) : 0;
     return $c;
 }
 
@@ -107,7 +109,126 @@ function wsm_invoice_next_seq(PDO $pdo, string $series, string $kind): int {
  * dans la numérotation des factures, ce qu'un contrôle fiscal remarque.
  */
 function wsm_invoice_kind_group(string $kind): string {
-    return $kind === 'paragon' ? 'paragon' : 'faktura';
+    if ($kind === 'paragon')  return 'paragon';
+    // La proforma n'est pas un document fiscal : elle ne consomme aucun numéro
+    // de la suite des factures. Mélanger les deux ferait des trous dans une
+    // numérotation qui doit être continue.
+    if ($kind === 'proforma') return 'proforma';
+    return 'faktura';
+}
+
+/**
+ * Facture proforma. Ce n'est PAS une facture : c'est une demande de paiement,
+ * qui n'ouvre aucun droit à déduction de TVA et n'entre dans aucune
+ * déclaration. Elle se refait autant de fois qu'il le faut — d'où la
+ * possibilité d'en émettre une nouvelle à partir d'une facture existante,
+ * ce qu'on ne s'autoriserait jamais sur un document fiscal.
+ *
+ * @param array $order  la commande, ou la facture dont on repart
+ * @return array [proforma|null, erreur|null]
+ */
+function wsm_invoice_proforma(PDO $pdo, array $src, string $actor = '', string $note = ''): array {
+    $fromInvoice = isset($src['number']);          // on repart d'une facture
+    $orderId = (int) ($src['order_id'] ?? $src['id'] ?? 0);
+    if ($fromInvoice) {
+        $lines = array_map(fn($l) => [
+            'name' => (string) $l['name'], 'sku' => (string) $l['sku'], 'qty' => (int) $l['qty'],
+            'unit_net' => (int) $l['unit_net'], 'unit_gross' => (int) $l['unit_gross'],
+            'vat_rate' => (float) $l['vat_rate'], 'line_net' => (int) $l['line_net'],
+            'line_vat' => (int) $l['line_vat'], 'line_gross' => (int) $l['line_gross'],
+        ], (array) ($src['items'] ?? []));
+        $buyer = ['name' => (string) $src['buyer_name'], 'nip' => (string) $src['buyer_nip'],
+                  'vat_eu' => (string) $src['buyer_vat_eu'], 'address' => (string) $src['buyer_address'],
+                  'email' => (string) $src['buyer_email']];
+        $tot = [(int) $src['total_net'], (int) $src['total_vat'], (int) $src['total_gross']];
+        $rc  = (int) $src['reverse_charge'];
+    } else {
+        $lines = array_map(fn($l) => [
+            'name' => (string) $l['name'], 'sku' => (string) ($l['sku'] ?? ''), 'qty' => (int) $l['qty'],
+            'unit_net' => (int) $l['unit_net'], 'unit_gross' => (int) $l['unit_gross'],
+            'vat_rate' => (float) $l['vat_rate'], 'line_net' => (int) $l['line_net'],
+            'line_vat' => (int) $l['line_vat'], 'line_gross' => (int) $l['line_gross'],
+        ], (array) ($src['items'] ?? []));
+        if ((int) ($src['shipping_gross'] ?? 0) > 0) {
+            $lines[] = ['name' => 'Dostawa — ' . (string) ($src['delivery_method'] ?? ''), 'sku' => '', 'qty' => 1,
+                'unit_net' => (int) $src['shipping_net'], 'unit_gross' => (int) $src['shipping_gross'],
+                'vat_rate' => (int) $src['shipping_net'] > 0 ? round((int) $src['shipping_vat'] / (int) $src['shipping_net'], 2) : 0.0,
+                'line_net' => (int) $src['shipping_net'], 'line_vat' => (int) $src['shipping_vat'],
+                'line_gross' => (int) $src['shipping_gross']];
+        }
+        $b = $src['bill'] ?? [];
+        $addr = trim(trim(($b['street'] ?? '') . ' ' . ($b['building'] ?? '') . ', ' .
+                          ($b['postcode'] ?? '') . ' ' . ($b['city'] ?? '') . ', ' . ($b['country'] ?? '')), ' ,');
+        $buyer = [
+            'name' => trim((string) ($src['company'] ?? '')) !== '' ? (string) $src['company']
+                      : trim(($src['first_name'] ?? '') . ' ' . ($src['last_name'] ?? '')),
+            'nip' => (string) ($src['nip'] ?? ''), 'vat_eu' => (string) ($src['vat_eu'] ?? ''),
+            'address' => $addr, 'email' => (string) ($src['email'] ?? ''),
+        ];
+        $tot = [(int) $src['total_net'], (int) $src['total_vat'], (int) $src['total_gross']];
+        $rc  = !empty($src['reverse_charge']) ? 1 : 0;
+    }
+    if (!$lines) return [null, 'dokument bez pozycji'];
+
+    $c = wsm_invoice_cfg();
+    $date = date('Y-m-d');
+    $due  = date('Y-m-d', strtotime($date . ' +' . (int) $c['payment_days'] . ' days'));
+
+    $pdo->beginTransaction();
+    try {
+        $series = wsm_invoice_series($c['number_format'], $date);
+        $seq    = wsm_invoice_next_seq($pdo, $series, 'proforma');
+        $number = 'PRO/' . wsm_invoice_format_number($c['number_format'], $seq, $date);
+
+        $cols = [
+            'order_id' => $orderId ?: null, 'kind' => 'proforma', 'kind_group' => 'proforma',
+            'corrects_id' => $fromInvoice ? (int) $src['id'] : null,
+            'number' => $number, 'series' => $series, 'seq' => $seq,
+            'issued_at' => $date, 'sold_at' => $date, 'due_at' => $due, 'place' => (string) $c['place'],
+            'seller_name' => (string) $c['seller_name'], 'seller_nip' => (string) $c['seller_nip'],
+            'seller_address' => (string) $c['seller_address'],
+            'iban' => (string) $c['iban'], 'bank' => (string) $c['bank'],
+            'buyer_name' => $buyer['name'], 'buyer_nip' => $buyer['nip'],
+            'buyer_vat_eu' => $buyer['vat_eu'], 'buyer_address' => $buyer['address'],
+            'buyer_email' => $buyer['email'], 'currency' => 'PLN',
+            'total_net' => $tot[0], 'total_vat' => $tot[1], 'total_gross' => $tot[2],
+            'reverse_charge' => $rc, 'paid' => 0,
+            'note' => mb_substr($note, 0, 250), 'created_by' => mb_substr($actor, 0, 120),
+        ];
+        $names = array_keys($cols);
+        $pdo->prepare('INSERT INTO wsm_invoices (' . implode(',', $names) . ') VALUES (' .
+                      implode(',', array_fill(0, count($names), '?')) . ')')
+            ->execute(array_values($cols));
+        $id = (int) $pdo->lastInsertId();
+
+        $ins = $pdo->prepare("INSERT INTO wsm_invoice_items
+              (invoice_id, name, sku, qty, unit_net, unit_gross, vat_rate, line_net, line_vat, line_gross)
+              VALUES (?,?,?,?,?,?,?,?,?,?)");
+        foreach ($lines as $l) {
+            $ins->execute([$id, $l['name'], $l['sku'], $l['qty'], $l['unit_net'], $l['unit_gross'],
+                           $l['vat_rate'], $l['line_net'], $l['line_vat'], $l['line_gross']]);
+        }
+        if ($orderId) wsm_order_event($pdo, $orderId, 'proforma', $number, $actor ?: 'system');
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return [null, 'nie udało się wystawić proformy: ' . $e->getMessage()];
+    }
+    return [wsm_invoice_by_id($pdo, $id), null];
+}
+
+/**
+ * Les factures impayées dont l'échéance est dépassée d'au moins $days jours.
+ * Sert aux relances — et rien d'autre : on ne relance jamais un document
+ * déjà payé, ni une proforma (qui EST déjà une demande de paiement).
+ */
+function wsm_invoices_overdue(PDO $pdo, int $days = 0): array {
+    $limit = date('Y-m-d', time() - $days * 86400);
+    $st = $pdo->prepare("SELECT * FROM wsm_invoices
+                          WHERE kind = 'faktura' AND paid = 0 AND due_at <= ?
+                          ORDER BY due_at LIMIT 100");
+    $st->execute([$limit]);
+    return array_map(fn($i) => wsm_invoice_hydrate($pdo, $i), $st->fetchAll() ?: []);
 }
 
 // ---------------------------------------------------------------------------
@@ -359,4 +480,26 @@ function wsm_invoice_pending_orders(PDO $pdo, int $limit = 50): array {
         if ($o) $out[] = $o;
     }
     return $out;
+}
+
+/**
+ * Les relances, sans tâche planifiée. Le serveur n'a pas de cron à nous : on
+ * profite donc de l'ouverture d'un écran de la console pour regarder si des
+ * factures ont dépassé leur échéance du nombre de jours réglé.
+ *
+ * C'est sans danger parce que la clé d'événement contient la date : une
+ * facture ne peut recevoir qu'UNE relance par jour, quel que soit le nombre
+ * de fois où quelqu'un ouvre la page.
+ *
+ * @return int nombre de relances mises en file
+ */
+function wsm_invoice_reminders_run(PDO $pdo): int {
+    $days = wsm_invoice_cfg()['reminder_days'];
+    if ($days <= 0) return 0;
+    require_once __DIR__ . '/mail.php';
+    $n = 0;
+    foreach (wsm_invoices_overdue($pdo, $days) as $inv) {
+        if (wsm_mail_for_invoice($pdo, $inv, 'przypomnienie', 'automat')) $n++;
+    }
+    return $n;
 }

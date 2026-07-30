@@ -291,9 +291,14 @@ function wsm_ensure_mail(PDO $pdo): void {
         wsm_apply_schema($pdo);
     }
     try {
+        require_once __DIR__ . '/seed.php';
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_mail_templates")->fetchColumn()) {
-            require_once __DIR__ . '/seed.php';
             wsm_seed_mail_templates($pdo);
+        } else {
+            // Une base déjà en service : on n'ajoute QUE les modèles nouveaux.
+            // Sans ça, une fonctionnalité livrée après la mise en route reste
+            // muette pour toujours, faute du modèle qu'elle utilise.
+            wsm_seed_mail_templates_topup($pdo);
         }
     } catch (Throwable $e) { /* table absente : le schéma vient d'échouer */ }
 }

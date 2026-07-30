@@ -696,6 +696,91 @@ Tracking: {{link}}
 
 Mister Szoko", 'wysylka'];
 
+    // ---- Demande de paiement (proforma) ------------------------------------
+    $t[] = ['zadanie_zaplaty', 'pl', 'Prośba o płatność', 'Prośba o płatność — {{numer}}',
+"Dzień dobry {{imie}},
+
+w załączeniu prośba o płatność za zamówienie {{numer}} na kwotę {{kwota}}.
+
+{{pozycje}}
+
+Prosimy o przelew do {{termin}} na rachunek:
+{{rachunek}}
+W tytule prosimy podać {{numer}}.
+
+Po zaksięgowaniu wpłaty wystawimy fakturę i ruszamy z realizacją.
+
+Mister Szoko", 'zadanie_zaplaty'];
+
+    $t[] = ['zadanie_zaplaty', 'en', 'Payment request', 'Payment request — {{numer}}',
+"Hello {{imie}},
+
+please find our payment request for order {{numer}}, total {{kwota}}.
+
+{{pozycje}}
+
+Bank transfer by {{termin}} to:
+{{rachunek}}
+Please quote {{numer}} as the reference.
+
+We issue the invoice and start production as soon as the payment clears.
+
+Mister Szoko", 'zadanie_zaplaty'];
+
+    $t[] = ['zadanie_zaplaty', 'uk', 'Запит на оплату', 'Запит на оплату — {{numer}}',
+"Доброго дня, {{imie}}!
+
+Надсилаємо запит на оплату замовлення {{numer}} на суму {{kwota}}.
+
+{{pozycje}}
+
+Просимо переказати кошти до {{termin}} на рахунок:
+{{rachunek}}
+У призначенні платежу вкажіть {{numer}}.
+
+Після зарахування оплати виставимо рахунок і почнемо виконання.
+
+Mister Szoko", 'zadanie_zaplaty'];
+
+    // ---- Relance ------------------------------------------------------------
+    $t[] = ['przypomnienie', 'pl', 'Przypomnienie o płatności', 'Przypomnienie — {{numer}} po terminie',
+"Dzień dobry {{imie}},
+
+przypominamy o niezapłaconej fakturze {{numer}} na kwotę {{kwota}},
+z terminem płatności {{termin}}.
+
+Jeśli przelew został już wykonany, prosimy potraktować tę wiadomość jako
+bezprzedmiotową i dać nam znać — sprawdzimy księgowanie.
+
+Rachunek: {{rachunek}}
+
+Mister Szoko", 'przypomnienie'];
+
+    $t[] = ['przypomnienie', 'en', 'Payment reminder', 'Reminder — {{numer}} overdue',
+"Hello {{imie}},
+
+a reminder about unpaid invoice {{numer}}, total {{kwota}}, due {{termin}}.
+
+If the transfer has already been made, please disregard this message and let
+us know — we will check our records.
+
+Account: {{rachunek}}
+
+Mister Szoko", 'przypomnienie'];
+
+    $t[] = ['przypomnienie', 'uk', 'Нагадування про оплату', 'Нагадування — {{numer}} прострочено',
+"Доброго дня, {{imie}}!
+
+Нагадуємо про несплачений рахунок {{numer}} на суму {{kwota}},
+термін оплати — {{termin}}.
+
+Якщо переказ уже здійснено, просимо вважати це повідомлення неактуальним
+і повідомити нас — ми перевіримо зарахування.
+
+Рахунок: {{rachunek}}
+
+Mister Szoko", 'przypomnienie'];
+
     // ---- Modèle libre, sans événement : la réponse écrite à la main --------
     $t[] = ['kontakt', 'pl', 'Odpowiedź do klienta (pusty)', 'W sprawie zamówienia {{numer}}',
 "Dzień dobry {{imie}},
@@ -703,4 +788,41 @@ Mister Szoko", 'wysylka'];
 Mister Szoko", ''];
 
     foreach ($t as $row) $ins->execute($row);
+}
+
+/**
+ * Les modèles ajoutés APRÈS la mise en service.
+ *
+ * Le semis complet ne tourne qu'une fois, sur une base vide — c'est voulu :
+ * un déploiement ne doit jamais réécrire un texte que quelqu'un a corrigé à la
+ * main. Mais un modèle entièrement NOUVEAU n'écrase rien, et sans lui la
+ * fonction qui l'utilise reste muette. On n'insère donc que les couples
+ * (code, langue) absents, et on ne touche jamais à ce qui existe.
+ *
+ * @return int nombre de modèles ajoutés
+ */
+function wsm_seed_mail_templates_topup(PDO $pdo): int {
+    $have = [];
+    foreach ($pdo->query("SELECT code, lang FROM wsm_mail_templates")->fetchAll() ?: [] as $r) {
+        $have[$r['code'] . '|' . $r['lang']] = true;
+    }
+    if (!$have) { wsm_seed_mail_templates($pdo); return -1; }   // base vide : semis complet
+
+    // On rejoue le semis dans une base jetable pour en extraire la liste
+    // courante : une seule source de vérité pour les textes.
+    $tmp = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                                                   PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+    $tmp->exec("CREATE TABLE wsm_mail_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, lang TEXT,
+                 name TEXT, subject TEXT, body TEXT, event TEXT, active INTEGER)");
+    wsm_seed_mail_templates($tmp);
+
+    $ins = $pdo->prepare('INSERT INTO wsm_mail_templates (code, lang, name, subject, body, event, active)
+                          VALUES (?,?,?,?,?,?,1)');
+    $n = 0;
+    foreach ($tmp->query("SELECT code, lang, name, subject, body, event FROM wsm_mail_templates ORDER BY id")->fetchAll() ?: [] as $r) {
+        if (isset($have[$r['code'] . '|' . $r['lang']])) continue;
+        $ins->execute([$r['code'], $r['lang'], $r['name'], $r['subject'], $r['body'], $r['event']]);
+        $n++;
+    }
+    return $n;
 }

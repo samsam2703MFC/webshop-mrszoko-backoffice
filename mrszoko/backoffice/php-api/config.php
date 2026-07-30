@@ -108,6 +108,7 @@ $cfg = [
         'bank'           => getenv('WSM_INV_BANK') ?: '',
         'payment_days'   => getenv('WSM_INV_PAYMENT_DAYS') ?: '',
         'number_format'  => getenv('WSM_INV_NUMBER_FORMAT') ?: '',
+        'reminder_days'  => getenv('WSM_INV_REMINDER_DAYS') ?: '',
     ],
 
     // ---- InPost ShipX : expédition ----------------------------------------

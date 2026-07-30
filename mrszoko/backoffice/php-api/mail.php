@@ -35,6 +35,8 @@ const WSM_MAIL_EVENTS = [
     'na_zamowienie'    => 'Zamówienie ponad stan magazynu',
     'platnosc'         => 'Płatność otrzymana',
     'wysylka'          => 'Przesyłka nadana',
+    'zadanie_zaplaty'  => 'Prośba o płatność (proforma)',
+    'przypomnienie'    => 'Przypomnienie o płatności',
 ];
 
 const WSM_MAIL_STATUSES = ['kolejka', 'wyslana', 'blad'];
@@ -174,6 +176,72 @@ function wsm_mail_render(string $text, array $vars): string {
     return (string) preg_replace_callback('/\{\{\s*([a-z_]+)\s*\}\}/i', function ($m) use ($vars) {
         return (string) ($vars[strtolower($m[1])] ?? '');
     }, $text);
+}
+
+/**
+ * Les variables d'un DOCUMENT (facture, proforma). Le document est autonome —
+ * on lit ce qu'il porte, jamais la commande derrière : c'est ce qui garantit
+ * qu'une relance cite exactement ce que le client a reçu.
+ */
+function wsm_mail_vars_invoice(array $inv): array {
+    $lines = [];
+    foreach ((array) ($inv['items'] ?? []) as $l) {
+        $lines[] = '· ' . $l['name'] . ' × ' . (int) $l['qty'] . ' — '
+                 . wsm_mail_money((int) $l['line_gross']) . ' zł';
+    }
+    $who = trim((string) ($inv['buyer_name'] ?? ''));
+    $first = $who !== '' ? explode(' ', $who)[0] : '';
+    $bank = trim((string) ($inv['iban'] ?? '') . ' ' . (string) ($inv['bank'] ?? ''));
+    return [
+        'numer'     => (string) ($inv['number'] ?? ''),
+        'imie'      => $first,
+        'firma'     => $who,
+        'email'     => (string) ($inv['buyer_email'] ?? ''),
+        'kwota'     => wsm_mail_money((int) ($inv['total_gross'] ?? 0)) . ' zł',
+        'termin'    => (string) ($inv['due_at'] ?? ''),
+        'rachunek'  => $bank,
+        'pozycje'   => implode("\n", $lines),
+        'brakujace' => '',
+        'dostawa'   => '',
+        'paczkomat' => '',
+        'link'      => '',
+        'status'    => (int) ($inv['paid'] ?? 0) ? 'oplacona' : 'do zapłaty',
+        'data'      => (string) ($inv['issued_at'] ?? date('Y-m-d')),
+    ];
+}
+
+/**
+ * Écrit au client à propos d'un document. La clé d'événement contient la date
+ * du jour pour les relances : on peut relancer une facture plusieurs fois,
+ * mais jamais deux fois le même jour.
+ *
+ * @return int identifiant du message, 0 si déjà envoyé aujourd'hui
+ */
+function wsm_mail_for_invoice(PDO $pdo, array $inv, string $event, string $actor = ''): int {
+    try {
+        $tpl = wsm_mail_template_for_event($pdo, $event, 'pl');
+        if (!$tpl) return 0;
+        $to = (string) ($inv['buyer_email'] ?? '');
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return 0;
+        $vars = wsm_mail_vars_invoice($inv);
+        $key = $event === 'przypomnienie'
+            ? 'przypomnienie:' . (int) $inv['id'] . ':' . date('Y-m-d')
+            : $event . ':inv:' . (int) $inv['id'];
+        $id = wsm_mail_queue($pdo, [
+            'order_id'      => $inv['order_id'] ?: null,
+            'email'         => $to,
+            'direction'     => 'wyjscie',
+            'subject'       => wsm_mail_render((string) $tpl['subject'], $vars),
+            'body'          => wsm_mail_render((string) $tpl['body'], $vars),
+            'template_code' => (string) $tpl['code'],
+            'event_key'     => $key,
+            'actor'         => $actor ?: 'automat',
+        ]);
+        if ($id && wsm_mail_enabled()) wsm_mail_send($pdo, $id);
+        return $id;
+    } catch (Throwable $e) {
+        return 0;
+    }
 }
 
 // ---------------------------------------------------------------------------
