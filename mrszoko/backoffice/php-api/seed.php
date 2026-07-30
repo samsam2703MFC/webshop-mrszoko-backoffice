@@ -20,11 +20,11 @@ function wsm_seed(PDO $pdo): void {
 
     // ---- KPIs (dashboard snapshot) -----------------------------------------
     $kpis = [
-        ['Obrót sieci (miesiąc)', '428 k€', 'var(--color-text)', '▲ +6,4 %', '#2d7a3e'],
-        ['Obrót sklepów', '306 k€', 'var(--color-primary)', '▲ +4,8 %', '#2d7a3e'],
-        ['Obrót dostaw biurowych', '122 k€', '#C87A3F', '▲ +11 %', '#2d7a3e'],
-        ['Aktywne sklepy', '14 / 15', 'var(--color-text)', '▲ +1 w tym kw.', '#2d7a3e'],
-        ['Zamówienia dnia', '512', 'var(--color-text)', '▲ +38 vs wczoraj', '#2d7a3e'],
+        ['Obrót sieci (miesiąc)', '428 k€', 'var(--color-text)', '▲ +6,4 %', 'var(--success)'],
+        ['Obrót sklepów', '306 k€', 'var(--color-primary)', '▲ +4,8 %', 'var(--success)'],
+        ['Obrót dostaw biurowych', '122 k€', 'var(--accent)', '▲ +11 %', 'var(--success)'],
+        ['Aktywne sklepy', '14 / 15', 'var(--color-text)', '▲ +1 w tym kw.', 'var(--success)'],
+        ['Zamówienia dnia', '512', 'var(--color-text)', '▲ +38 vs wczoraj', 'var(--success)'],
         ['Adopcja whitelisty', '82 %', 'var(--color-text)', '▼ −3 pkt', 'var(--color-primary)'],
     ];
     foreach ($kpis as $i => $k) {
@@ -35,10 +35,10 @@ function wsm_seed(PDO $pdo): void {
     // ---- Shops --------------------------------------------------------------
     $shops = [
         ['bxl', "Mister Szoko — Bruxelles-Centre", 'Bruxelles 1000', 1, 'Oddział', 1, 29800, 8400, 96, 'var(--color-primary)'],
-        ['and', "Mister Szoko — Anderlecht", 'Anderlecht 1070', 1, 'Franczyza', 1, 18600, 6200, 88, '#E8A15C'],
-        ['ucc', "Mister Szoko — Uccle", 'Uccle 1180', 1, 'Franczyza', 1, 22100, 9400, 79, '#8C4A2F'],
-        ['sch', "Mister Szoko — Schaerbeek", 'Schaerbeek 1030', 0, 'Franczyza', 1, 0, 0, 0, '#E8A15C'],
-        ['lv', "Mister Szoko — Louvain", 'Louvain 3000', 1, 'Master', 0, 14200, 5200, 71, '#8C4A2F'],
+        ['and', "Mister Szoko — Anderlecht", 'Anderlecht 1070', 1, 'Franczyza', 1, 18600, 6200, 88, 'var(--caramel-400)'],
+        ['ucc', "Mister Szoko — Uccle", 'Uccle 1180', 1, 'Franczyza', 1, 22100, 9400, 79, 'var(--choco-500)'],
+        ['sch', "Mister Szoko — Schaerbeek", 'Schaerbeek 1030', 0, 'Franczyza', 1, 0, 0, 0, 'var(--caramel-400)'],
+        ['lv', "Mister Szoko — Louvain", 'Louvain 3000', 1, 'Master', 0, 14200, 5200, 71, 'var(--choco-500)'],
     ];
     foreach ($shops as $i => $s) {
         $ins('wsm_shops', ['id' => $s[0], 'nom' => $s[1], 'ville' => $s[2], 'web' => $s[3],
@@ -197,9 +197,9 @@ function wsm_seed(PDO $pdo): void {
     // Drivers
     $driverId = [];
     foreach ([
-        ['Marek Kowalski', 'BXL-Centre · Renault chłodnia', '#8D1D2C', 'Renault Master chłodnia', 'Bruxelles-Centre'],
-        ['Julien Dubois', 'Południe · Iveco Daily', '#3B3468', 'Iveco Daily', 'Południe'],
-        ['Sofie Peeters', 'Wschód · Renault Kangoo', '#2d7a3e', 'Renault Kangoo', 'Wschód'],
+        ['Marek Kowalski', 'BXL-Centre · Renault chłodnia', 'var(--brand)', 'Renault Master chłodnia', 'Bruxelles-Centre'],
+        ['Julien Dubois', 'Południe · Iveco Daily', 'var(--berry-600)', 'Iveco Daily', 'Południe'],
+        ['Sofie Peeters', 'Wschód · Renault Kangoo', 'var(--success)', 'Renault Kangoo', 'Wschód'],
     ] as $d) {
         $driverId[$d[0]] = $ins('wsm_drivers', ['nom' => $d[0], 'info' => $d[1], 'color' => $d[2],
             'vehicule' => $d[3], 'zone' => $d[4], 'active' => 1]);

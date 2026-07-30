@@ -1,63 +1,86 @@
 /* =====================================================================
-   Mister Szoko — habillage de la console.
+   Mister Szoko — couche de marque de la console.
    =====================================================================
-   Chargé APRÈS global.css : celui-ci reste l'export structurel d'origine
-   (mise en page, composants) et n'est pas modifié ; cette couche redéfinit
-   uniquement les jetons de marque, avec les valeurs du design system
-   Mister Szoko (../../design-system/tokens/).
+   Chargée APRÈS global.css, qui reste l'export structurel d'origine
+   (mise en page, composants) et n'est pas dupliqué ici.
 
-   Palette : chocolat #41281A (cœur de marque, échantillonné sur le logo),
-   crème #FBF6EF, caramel #C68A3C. Ombres et bordures teintées brun, jamais
-   grises. Polices : Plus Jakarta Sans (titres) + Mulish (interface) +
-   DM Mono (chiffres) — substituts Google Fonts assumés par le design system,
-   à remplacer par les fontes sous licence si la marque en fournit.
+   SOURCE UNIQUE : tokens/ est la copie conforme du design system
+   (mrszoko/design-system/tokens/). Aucune valeur de marque n'est
+   réécrite en dur ici — ce fichier ne fait que faire correspondre les
+   jetons de la console (--color-*, --font-ui…) à ceux du design system
+   (--brand, --accent, --cream-*…). Pour faire évoluer la marque :
+   modifier le design system, recopier tokens/, la console suit.
+
+   Note : les jetons homonymes (--font-display, --radius-sm/md/lg,
+   --shadow-*) sont volontairement écrasés par ceux du design system —
+   les rayons deviennent plus doux (6→8, 8→12, 12→18 px) et les ombres
+   passent du gris au brun cacao, ce qui est précisément l'intention.
    ===================================================================== */
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Mulish:ital,wght@0,300..800;1,400&family=Plus+Jakarta+Sans:wght@400..800&display=swap');
+@import url('tokens/fonts.css');
+@import url('tokens/colors.css');
+@import url('tokens/typography.css');
+@import url('tokens/spacing.css');
+@import url('tokens/radius.css');
+@import url('tokens/shadow.css');
+@import url('tokens/motion.css');
 
 :root {
-  /* ---- Marque ---- */
-  --color-primary:              #41281A;  /* chocolat : navigation active, actions */
-  --color-secondary:            #C68A3C;  /* caramel : second canal (livraison bureau) */
-  --color-collect:              #41281A;  /* retrait en boutique */
-  --color-linked:               #C68A3C;
+  /* ---- Couleurs : jetons console → jetons design system -------------- */
+  --color-primary:              var(--brand);        /* chocolat #41281A */
+  --color-secondary:            var(--accent);       /* caramel  #C68A3C */
+  --color-collect:              var(--brand);        /* retrait boutique   */
+  --color-linked:               var(--accent);
 
-  /* ---- Surfaces ---- */
-  --color-bg:                   #F5ECDE;  /* crème 100 */
-  --color-surface:              #FFFFFF;
-  --color-background-secondary: #FBF6EF;  /* crème 50 */
+  --color-bg:                   var(--bg-page-alt);  /* crème 100 */
+  --color-surface:              var(--surface-card);
+  --color-background-secondary: var(--bg-page);      /* crème 50  */
 
-  /* ---- Texte ---- */
-  --color-text:                 #211712;
-  --color-text-muted:           #7C6A5D;
-  --color-ink:                  #211712;
+  --color-text:                 var(--text-strong);
+  --color-text-muted:           var(--text-muted);
+  --color-text-primary:         var(--text-strong);
+  --color-text-secondary:       var(--text-muted);
+  --color-ink:                  var(--ink-900);
 
-  /* ---- Bordures : teintées cacao, jamais grises ---- */
-  --color-border-secondary:     rgba(46, 22, 12, 0.18);
-  --color-border-tertiary:      rgba(46, 22, 12, 0.10);
+  --color-border-secondary:     var(--border-default);
+  --color-border-tertiary:      var(--border-subtle);
 
-  /* ---- Accents secondaires ---- */
-  --color-on-abricot:           #5A3826;
-  --color-collection-border:    #A96A2C;
-  --color-collection-fill:      #E0B24A;
-  --color-collection-icon:      #6B3D0A;
-  --color-popup:                #5A3826;
+  --color-on-abricot:           var(--choco-600);
+  --color-collection-border:    var(--caramel-600);
+  --color-collection-fill:      var(--gold-500);
+  --color-collection-icon:      var(--choco-800);
+  --color-popup:                var(--choco-600);
 
-  /* ---- Typographie ---- */
-  --font-display: 'Plus Jakarta Sans', 'Mulish', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-ui:      'Mulish', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-accent:  'Plus Jakarta Sans', 'Mulish', system-ui, sans-serif;
-  --font-mono:    'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Sémantiques réchauffées (aucun bleu ni rouge pur), exposées à la page */
+  --color-success:      var(--success);
+  --color-success-bg:   #E9F0E4;
+  --color-danger:       var(--danger);
+  --color-danger-bg:    #FBEAE5;
+  --color-warning:      var(--warning);
+  --color-warning-bg:   var(--cream-100);
+  --color-info:         var(--info);
+  --color-info-bg:      #E8EBEF;
+
+  /* ---- Typographie --------------------------------------------------- */
+  --font-ui:     var(--font-sans);      /* Mulish            */
+  --font-accent: var(--font-display);   /* Plus Jakarta Sans */
 }
 
-/* Le logo Mister Szoko est un galet quasi carré (197 × 185), non un
-   wordmark allongé : on le cadre par la hauteur pour qu'il ne dévore pas
-   la barre latérale. */
+/* ---- Mouvement « melt » du design system ---------------------------- */
+button, a, input, select, [role="button"] {
+  transition-timing-function: var(--ease-out);
+  transition-duration: var(--dur-base);
+}
+@media (prefers-reduced-motion: reduce) {
+  button, a, input, select, [role="button"] { transition: none; }
+}
+
+/* ---- Liens ---------------------------------------------------------- */
+a { color: var(--brand); }
+a:hover { color: var(--brand-hover); }
+
+/* ---- Logo : galet quasi carré (197 × 185), cadré par la hauteur ----- */
 img[alt="Mister Szoko"] {
   width: auto !important;
   max-width: 100% !important;
   height: 56px;
 }
-
-/* Les liens héritaient du bordeaux L'Atelier. */
-a { color: var(--color-primary); }
-a:hover { color: #2E160C; }

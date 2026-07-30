@@ -5,11 +5,11 @@
   var LS = 'ws_bo_store_v2';
   var SEED = {
     "kpis": [
-      {label:'Obrót sieci (miesiąc)',value:'428 k€',valColor:'var(--color-text)',delta:'▲ +6,4 %',deltaColor:'#2d7a3e'},
-      {label:'Obrót sklepów',value:'306 k€',valColor:'var(--color-primary)',delta:'▲ +4,8 %',deltaColor:'#2d7a3e'},
-      {label:'Obrót dostaw biurowych',value:'122 k€',valColor:'#C87A3F',delta:'▲ +11 %',deltaColor:'#2d7a3e'},
-      {label:'Aktywne sklepy',value:'14 / 15',valColor:'var(--color-text)',delta:'▲ +1 w tym kw.',deltaColor:'#2d7a3e'},
-      {label:'Zamówienia dnia',value:'512',valColor:'var(--color-text)',delta:'▲ +38 vs wczoraj',deltaColor:'#2d7a3e'},
+      {label:'Obrót sieci (miesiąc)',value:'428 k€',valColor:'var(--color-text)',delta:'▲ +6,4 %',deltaColor:'var(--success)'},
+      {label:'Obrót sklepów',value:'306 k€',valColor:'var(--color-primary)',delta:'▲ +4,8 %',deltaColor:'var(--success)'},
+      {label:'Obrót dostaw biurowych',value:'122 k€',valColor:'var(--accent)',delta:'▲ +11 %',deltaColor:'var(--success)'},
+      {label:'Aktywne sklepy',value:'14 / 15',valColor:'var(--color-text)',delta:'▲ +1 w tym kw.',deltaColor:'var(--success)'},
+      {label:'Zamówienia dnia',value:'512',valColor:'var(--color-text)',delta:'▲ +38 vs wczoraj',deltaColor:'var(--success)'},
       {label:'Adopcja whitelisty',value:'82 %',valColor:'var(--color-text)',delta:'▼ −3 pkt',deltaColor:'var(--color-primary)'},
     ],
     "catchment": [
@@ -18,10 +18,10 @@
     ],
     "shops": [
       {id:'bxl',nom:'Mister Szoko — Bruxelles-Centre',ville:'Bruxelles 1000',web:true,contrat:'Oddział',act:true,caShop:29800,caOffice:8400,adoption:96,accent:'var(--color-primary)'},
-      {id:'and',nom:'Mister Szoko — Anderlecht',ville:'Anderlecht 1070',web:true,contrat:'Franczyza',act:true,caShop:18600,caOffice:6200,adoption:88,accent:'#E8A15C'},
-      {id:'ucc',nom:'Mister Szoko — Uccle',ville:'Uccle 1180',web:true,contrat:'Franczyza',act:true,caShop:22100,caOffice:9400,adoption:79,accent:'#8C4A2F'},
-      {id:'sch',nom:'Mister Szoko — Schaerbeek',ville:'Schaerbeek 1030',web:false,contrat:'Franczyza',act:true,caShop:0,caOffice:0,adoption:0,accent:'#E8A15C'},
-      {id:'lv',nom:'Mister Szoko — Louvain',ville:'Louvain 3000',web:true,contrat:'Master',act:false,caShop:14200,caOffice:5200,adoption:71,accent:'#8C4A2F'},
+      {id:'and',nom:'Mister Szoko — Anderlecht',ville:'Anderlecht 1070',web:true,contrat:'Franczyza',act:true,caShop:18600,caOffice:6200,adoption:88,accent:'var(--caramel-400)'},
+      {id:'ucc',nom:'Mister Szoko — Uccle',ville:'Uccle 1180',web:true,contrat:'Franczyza',act:true,caShop:22100,caOffice:9400,adoption:79,accent:'var(--choco-500)'},
+      {id:'sch',nom:'Mister Szoko — Schaerbeek',ville:'Schaerbeek 1030',web:false,contrat:'Franczyza',act:true,caShop:0,caOffice:0,adoption:0,accent:'var(--caramel-400)'},
+      {id:'lv',nom:'Mister Szoko — Louvain',ville:'Louvain 3000',web:true,contrat:'Master',act:false,caShop:14200,caOffice:5200,adoption:71,accent:'var(--choco-500)'},
     ],
     "catalog": [
       {cat:'Pieczywo',prods:[
@@ -85,12 +85,12 @@
     "fr_alertes": [
       {color:'var(--color-primary)',titre:'Przekroczony limit — Belga SPRL',detail:'4 120 € / limit 4 000 € · zamówienie zablokowane'},
       {color:'var(--color-primary)',titre:'Incydent — Café Belga',detail:'Uszkodzona paczka · nota 24 € czeka na decyzję'},
-      {color:'#c9a24b',titre:'Limit w 92 % — Delcourt',detail:'2 760 € / 3 000 € · do obserwacji'},
-      {color:'#c9a24b',titre:'Odchylenie km — Trasa Uccle / Waterloo',detail:'+24 % vs plan · objazd Waterloo nieplanowany'},
+      {color:'var(--gold-500)',titre:'Limit w 92 % — Delcourt',detail:'2 760 € / 3 000 € · do obserwacji'},
+      {color:'var(--gold-500)',titre:'Odchylenie km — Trasa Uccle / Waterloo',detail:'+24 % vs plan · objazd Waterloo nieplanowany'},
     ],
     "fr_live_drivers": [
-      {color:'#8D1D2C',nom:'Marek Kowalski',info:'BXL-Centre · Renault chłodnia',avancement:'3/4'},
-      {color:'#3B3468',nom:'Julien Dubois',info:'Południe · Iveco Daily',avancement:'1/3'},
+      {color:'var(--brand)',nom:'Marek Kowalski',info:'BXL-Centre · Renault chłodnia',avancement:'3/4'},
+      {color:'var(--berry-600)',nom:'Julien Dubois',info:'Południe · Iveco Daily',avancement:'1/3'},
     ],
     "fr_clients": [
       {raison:'Le Cirio SA',code:'CL-0021',seg:'horeca',statut:'aktywny',tva:'BE 0421.111.222',paiement:'30 dni koniec mies.',plafond:6000,encours:3200,franco:'250 €',remise:'8 %',fact:'Miesięczna',points:[
@@ -113,10 +113,10 @@
       ]},
     ],
     "fr_incidents": [
-      {type:'Uszkodzona paczka',point:'Café Belga · Ixelles',heure:'dziś 09:12',statut:'Do obsłużenia',icon:'!',iconBg:'#fbe9eb',iconColor:'var(--color-primary)',ref:'INC-2026-0412',geo:'50.8275, 4.3705',horodatage:'17 lip 2026 09:12',chauffeur:'Marek Kowalski',impact:'24 €',impactRef:'szacowana nota',description:'Pojemnik izotermiczny uderzony przy rozładunku. 2 słoiki konfitur stłuczone. Zdjęcie na miejscu, odbiór odrzucił pozycję.',statutColor:'var(--color-primary)'},
+      {type:'Uszkodzona paczka',point:'Café Belga · Ixelles',heure:'dziś 09:12',statut:'Do obsłużenia',icon:'!',iconBg:'var(--color-danger-bg)',iconColor:'var(--color-primary)',ref:'INC-2026-0412',geo:'50.8275, 4.3705',horodatage:'17 lip 2026 09:12',chauffeur:'Marek Kowalski',impact:'24 €',impactRef:'szacowana nota',description:'Pojemnik izotermiczny uderzony przy rozładunku. 2 słoiki konfitur stłuczone. Zdjęcie na miejscu, odbiór odrzucił pozycję.',statutColor:'var(--color-primary)'},
       {type:'Brakująca paczka',point:'Hôtel Amigo · Sablon',heure:'dziś 08:40',statut:'Do obsłużenia',icon:'?',iconBg:'var(--color-background-secondary)',iconColor:'var(--color-text-muted)',ref:'INC-2026-0411',geo:'50.8451, 4.3520',horodatage:'17 lip 2026 08:40',chauffeur:'Marek Kowalski',impact:'46 €',impactRef:'ponowna dostawa',description:'1 oczekiwana paczka nieobecna przy skanie zdawczym. Rozbieżność na liście załadunku.',statutColor:'var(--color-text-muted)'},
-      {type:'Dostawa odrzucona',point:'Event Château · Waterloo',heure:'wczoraj 12:58',statut:'W trakcie',icon:'✕',iconBg:'#fbe9eb',iconColor:'var(--color-primary)',ref:'INC-2026-0407',geo:'50.7147, 4.3990',horodatage:'16 lip 2026 12:58',chauffeur:'Julien Dubois',impact:'40 €',impactRef:'utracony towar',description:'Przyjazd poza oknem czasowym (13:12 vs 11:00–13:00). Klient nieobecny, zostawienie odrzucone.',statutColor:'var(--color-primary)'},
-      {type:'Zwrot kaucji',point:'Maison Dandoy · Sablon',heure:'wczoraj 11:20',statut:'Rozwiązany',icon:'↩',iconBg:'#eaf5ec',iconColor:'#2d7a3e',ref:'INC-2026-0403',geo:'50.8410, 4.3560',horodatage:'16 lip 2026 11:20',chauffeur:'Sofie Peeters',impact:'0 €',impactRef:'bez wpływu',description:'3 pojemniki kaucyjne odebrane w punkcie. Uzgodnienie OK.',statutColor:'#2d7a3e'},
+      {type:'Dostawa odrzucona',point:'Event Château · Waterloo',heure:'wczoraj 12:58',statut:'W trakcie',icon:'✕',iconBg:'var(--color-danger-bg)',iconColor:'var(--color-primary)',ref:'INC-2026-0407',geo:'50.7147, 4.3990',horodatage:'16 lip 2026 12:58',chauffeur:'Julien Dubois',impact:'40 €',impactRef:'utracony towar',description:'Przyjazd poza oknem czasowym (13:12 vs 11:00–13:00). Klient nieobecny, zostawienie odrzucone.',statutColor:'var(--color-primary)'},
+      {type:'Zwrot kaucji',point:'Maison Dandoy · Sablon',heure:'wczoraj 11:20',statut:'Rozwiązany',icon:'↩',iconBg:'var(--color-success-bg)',iconColor:'var(--success)',ref:'INC-2026-0403',geo:'50.8410, 4.3560',horodatage:'16 lip 2026 11:20',chauffeur:'Sofie Peeters',impact:'0 €',impactRef:'bez wpływu',description:'3 pojemniki kaucyjne odebrane w punkcie. Uzgodnienie OK.',statutColor:'var(--success)'},
     ],
     "fr_rentabilite": [
       {nom:'Trasa Bruxelles-Centre',sites:[
@@ -134,15 +134,15 @@
     // --- Delivery module (mirror of the API shape: SRV('deliveries') etc.) ---
     // Dev fallback only — when the API is live these come from wsm_deliveries.
     "deliveries": [
-      {id:1,ref:'LIV-2026-0001',client:'Le Cirio SA',point:'Brasserie — wejście od tyłu',driver:'Marek Kowalski',driver_color:'#8D1D2C',round:'Trasa Bruxelles-Centre',status:'livrée',window:'08:00–11:00',validation:'QR',confirm_code:'QR-8842',confirmed:1,ca:520,couts:210,marge:310},
-      {id:2,ref:'LIV-2026-0002',client:'Rocco Forte',point:'Kuchnia — rampa serwisowa',driver:'Marek Kowalski',driver_color:'#8D1D2C',round:'Trasa Bruxelles-Centre',status:'en_cours',window:'07:30–10:00',validation:'PIN',confirm_code:'',confirmed:0,ca:300,couts:150,marge:150},
-      {id:3,ref:'LIV-2026-0003',client:'Dandoy',point:'Sklep Sablon — tył',driver:'Julien Dubois',driver_color:'#3B3468',round:'Trasa Południe',status:'assignée',window:'08:00–10:30',validation:'QR',confirm_code:'',confirmed:0,ca:415,couts:260,marge:155},
-      {id:4,ref:'LIV-2026-0004',client:'KBC Group',point:'Kafeteria HQ — hala dostaw',driver:'',driver_color:'#8D1D2C',round:'',status:'planifiée',window:'07:00–09:00',validation:'PIN',confirm_code:'',confirmed:0,ca:580,couts:312,marge:268},
+      {id:1,ref:'LIV-2026-0001',client:'Le Cirio SA',point:'Brasserie — wejście od tyłu',driver:'Marek Kowalski',driver_color:'var(--brand)',round:'Trasa Bruxelles-Centre',status:'livrée',window:'08:00–11:00',validation:'QR',confirm_code:'QR-8842',confirmed:1,ca:520,couts:210,marge:310},
+      {id:2,ref:'LIV-2026-0002',client:'Rocco Forte',point:'Kuchnia — rampa serwisowa',driver:'Marek Kowalski',driver_color:'var(--brand)',round:'Trasa Bruxelles-Centre',status:'en_cours',window:'07:30–10:00',validation:'PIN',confirm_code:'',confirmed:0,ca:300,couts:150,marge:150},
+      {id:3,ref:'LIV-2026-0003',client:'Dandoy',point:'Sklep Sablon — tył',driver:'Julien Dubois',driver_color:'var(--berry-600)',round:'Trasa Południe',status:'assignée',window:'08:00–10:30',validation:'QR',confirm_code:'',confirmed:0,ca:415,couts:260,marge:155},
+      {id:4,ref:'LIV-2026-0004',client:'KBC Group',point:'Kafeteria HQ — hala dostaw',driver:'',driver_color:'var(--brand)',round:'',status:'planifiée',window:'07:00–09:00',validation:'PIN',confirm_code:'',confirmed:0,ca:580,couts:312,marge:268},
     ],
     "drivers": [
-      {id:1,nom:'Marek Kowalski',info:'BXL-Centre · Renault chłodnia',color:'#8D1D2C'},
-      {id:2,nom:'Julien Dubois',info:'Południe · Iveco Daily',color:'#3B3468'},
-      {id:3,nom:'Sofie Peeters',info:'Wschód · Renault Kangoo',color:'#2d7a3e'},
+      {id:1,nom:'Marek Kowalski',info:'BXL-Centre · Renault chłodnia',color:'var(--brand)'},
+      {id:2,nom:'Julien Dubois',info:'Południe · Iveco Daily',color:'var(--berry-600)'},
+      {id:3,nom:'Sofie Peeters',info:'Wschód · Renault Kangoo',color:'var(--success)'},
     ],
     "delivery_clients": [
       {id:1,code:'CL-0021',raison:'Le Cirio SA',seg:'horeca',statut:'aktywny',points:[{id:1,libelle:'Brasserie — wejście od tyłu',adresse:'Rue de la Bourse 18, 1000 Bruxelles',fenetre:'08:00–11:00',validation:'QR'}]},

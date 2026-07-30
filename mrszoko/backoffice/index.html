@@ -46,9 +46,9 @@
 <style>
   html,body{height:100%}
   a{color:var(--color-primary);text-decoration:none}
-  a:hover{color:#6d1622}
+  a:hover{color:var(--brand-hover)}
   ::-webkit-scrollbar{width:12px;height:12px}
-  ::-webkit-scrollbar-thumb{background:rgba(34,34,34,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb{background:rgba(46, 22, 12,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
   ::-webkit-scrollbar-track{background:transparent}
   .lz{scrollbar-width:thin}
   button,select,input,textarea,a,[onclick]{touch-action:manipulation}
@@ -116,7 +116,7 @@
               <span style="font:400 12px var(--font-ui);color:var(--color-text-muted)">{{ s.ville }}</span>
               <div style="display:flex;justify-content:center"><span style="{{ s.webPill }}">{{ s.webTxt }}</span></div>
               <span style="font:600 12px var(--font-ui);color:var(--color-primary);text-align:right">{{ s.caShopTxt }}</span>
-              <span style="font:600 12px var(--font-ui);color:#C87A3F;text-align:right">{{ s.caOfficeTxt }}</span>
+              <span style="font:600 12px var(--font-ui);color:var(--accent);text-align:right">{{ s.caOfficeTxt }}</span>
               <span style="font:600 12px var(--font-ui);color:{{ s.adColor }};text-align:right">{{ s.adoption }}</span>
             </div>
           </sc-for>
@@ -187,7 +187,7 @@
             </sc-if>
             <sc-if value="{{ r.isProd }}" hint-placeholder-val="{{ false }}">
               <div style="display:grid;grid-template-columns:2.2fr .85fr 1.5fr .8fr .8fr .95fr 40px;align-items:center;padding:10px 6px;border-bottom:.5px solid var(--color-border-tertiary)">
-                <div style="display:flex;align-items:center;gap:8px;min-width:0;padding-left:24px"><span style="font:500 11px var(--font-ui);color:var(--color-text)">{{ r.nom }}</span><sc-if value="{{ r.photoMissing }}" hint-placeholder-val="{{ false }}"><span title="Aucune photo produit — déposer {id}.png|jpg dans assets/product_pictures/" style="display:inline-flex;align-items:center;gap:4px;font:600 8.5px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:#b26a00;background:#fdf3e3;border-radius:10px;padding:2px 7px;flex:none"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/><path d="M1 1l22 22"/></svg>Bez zdjęcia</span></sc-if><sc-if value="{{ r.hasSaison }}" hint-placeholder-val="{{ false }}"><span style="{{ r.saisonPill }};display:inline-flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5L19 19M19 5l-2.5 2.5M7.5 16.5L5 19"/><circle cx="12" cy="12" r="3.5"/></svg>{{ r.saison }}</span></sc-if></div>
+                <div style="display:flex;align-items:center;gap:8px;min-width:0;padding-left:24px"><span style="font:500 11px var(--font-ui);color:var(--color-text)">{{ r.nom }}</span><sc-if value="{{ r.photoMissing }}" hint-placeholder-val="{{ false }}"><span title="Aucune photo produit — déposer {id}.png|jpg dans assets/product_pictures/" style="display:inline-flex;align-items:center;gap:4px;font:600 8.5px var(--font-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--caramel-600);background:var(--cream-100);border-radius:10px;padding:2px 7px;flex:none"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/><path d="M1 1l22 22"/></svg>Bez zdjęcia</span></sc-if><sc-if value="{{ r.hasSaison }}" hint-placeholder-val="{{ false }}"><span style="{{ r.saisonPill }};display:inline-flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5L19 19M19 5l-2.5 2.5M7.5 16.5L5 19"/><circle cx="12" cy="12" r="3.5"/></svg>{{ r.saison }}</span></sc-if></div>
                 <div style="display:flex;justify-content:flex-end"><input type="number" step="0.01" value="{{ r.prix }}" onChange="{{ r.setPrix }}" style="width:70px;text-align:right;border:.5px solid var(--color-border-secondary);border-radius:7px;padding:6px 7px;font:600 12px var(--font-ui);color:var(--color-text);background:var(--color-surface)"/></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;background:var(--color-background-secondary);border-radius:16px;padding:4px 6px;margin:0 6px"><div style="display:flex;justify-content:center"><button onClick="{{ r.toggleBw }}" style="{{ r.bwStyle }}"><span style="{{ r.bwKnob }}"></span></button></div><div style="display:flex;justify-content:center"><button onClick="{{ r.toggleOd }}" style="{{ r.odStyle }}"><span style="{{ r.odKnob }}"></span></button></div></div>
                 <div style="display:flex;justify-content:center"><button onClick="{{ r.toggleBm }}" style="{{ r.bmStyle }}"><span style="{{ r.bmKnob }}"></span></button></div>
@@ -252,7 +252,7 @@
               <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
                 <sc-if value="{{ d.canAssign }}" hint-placeholder-val="{{ true }}"><button onClick="{{ d.assign }}" style="{{ d.assignStyle }}">Przypisz</button></sc-if>
                 <sc-if value="{{ d.canConfirm }}" hint-placeholder-val="{{ false }}"><button onClick="{{ d.confirm }}" style="{{ d.confirmStyle }}">Potwierdź</button></sc-if>
-                <sc-if value="{{ d.done }}" hint-placeholder-val="{{ false }}"><span style="font:600 11px var(--font-ui);color:#2d7a3e">✓ Dostarczona</span></sc-if>
+                <sc-if value="{{ d.done }}" hint-placeholder-val="{{ false }}"><span style="font:600 11px var(--font-ui);color:var(--success)">✓ Dostarczona</span></sc-if>
               </div>
             </div>
           </sc-for>
@@ -292,12 +292,12 @@
           </div>
           <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:0;overflow:hidden;position:relative">
             <div id="map-geo" style="width:100%;height:520px;background:var(--color-background-secondary)"></div>
-            <div style="position:absolute;top:12px;right:12px;z-index:500;background:rgba(255,255,255,.96);border:.5px solid var(--color-border-tertiary);border-radius:10px;padding:10px 14px;font:11.5px var(--font-ui);display:flex;flex-direction:column;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.10)">
+            <div style="position:absolute;top:12px;right:12px;z-index:500;background:rgba(255,255,255,.96);border:.5px solid var(--color-border-tertiary);border-radius:10px;padding:10px 14px;font:11.5px var(--font-ui);display:flex;flex-direction:column;gap:6px;box-shadow:0 2px 8px rgba(46, 22, 12,.10)">
               <div style="font:700 11.5px var(--font-ui);padding-bottom:2px;border-bottom:.5px solid var(--color-border-tertiary)">{{ geoLegTot }}</div>
-              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#E8B84B;border:1.5px solid #b28a1f;flex:none"></span>Klienci biurowi (B2B)<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegOff }}</span></div>
-              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#3B6BC9;border:1.5px solid #24488f;flex:none"></span>Klienci indywidualni<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegPriv }}</span></div>
-              <div style="display:flex;align-items:center;gap:7px"><span style="width:14px;height:14px;border-radius:50%;background:conic-gradient(#E8B84B 0 140deg,#3B6BC9 0 360deg);border:1.5px solid #fff;box-shadow:0 0 0 1px #ccc;flex:none;display:flex;align-items:center;justify-content:center"><span style="background:#fff;border-radius:999px;font:700 7px sans-serif;padding:0 2px">n</span></span>Strefa n klientów (klik = szczegóły + %)</div>
-              <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-primary);border:1.5px solid #5e1220;flex:none"></span>Sklep (klik = izoluj jego klientów)</div>
+              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:var(--gold-500);border:1.5px solid var(--caramel-600);flex:none"></span>Klienci biurowi (B2B)<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegOff }}</span></div>
+              <div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:var(--info);border:1.5px solid var(--info);flex:none"></span>Klienci indywidualni<span style="margin-left:auto;padding-left:10px;font-weight:700">{{ geoLegPriv }}</span></div>
+              <div style="display:flex;align-items:center;gap:7px"><span style="width:14px;height:14px;border-radius:50%;background:conic-gradient(var(--gold-500) 0 140deg,var(--info) 0 360deg);border:1.5px solid #fff;box-shadow:0 0 0 1px #ccc;flex:none;display:flex;align-items:center;justify-content:center"><span style="background:#fff;border-radius:999px;font:700 7px sans-serif;padding:0 2px">n</span></span>Strefa n klientów (klik = szczegóły + %)</div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-primary);border:1.5px solid var(--brand-hover);flex:none"></span>Sklep (klik = izoluj jego klientów)</div>
             </div>
             <sc-if value="{{ geoHlTxt }}" hint-placeholder-val="{{ false }}">
               <div style="position:absolute;bottom:12px;left:12px;z-index:500;background:rgba(255,255,255,.96);border:.5px solid var(--color-border-tertiary);border-radius:8px;padding:7px 12px;font:600 11.5px var(--font-ui);color:var(--color-primary)">{{ geoHlTxt }}</div>
@@ -321,7 +321,7 @@
       </sc-if>
       <sc-if value="{{ isZones }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:14px">
-          <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:#fdf9f3;border-color:#eadfce">
+          <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:var(--cream-50);border-color:var(--cream-300)">
             <div style="font:12.5px/1.55 var(--font-ui);color:var(--color-text-muted);max-width:640px"><strong style="color:var(--color-text)">Podziel terytorium marki na strefy pierwotne</strong> i przypisz każdą do punktu sprzedaży. Kod pocztowy może należeć tylko do jednej strefy pierwotnej — franczyzobiorca buduje potem swoje strefy wtórne w tych ramach.</div>
             <button onClick="{{ czNew }}" style="flex:none;background:var(--color-primary);color:#fff;border:none;border-radius:9px;padding:11px 18px;font:600 12.5px var(--font-ui);cursor:pointer;box-shadow:0 1px 3px rgba(141,29,44,.25)">+ Nowa strefa</button>
           </div>
@@ -333,7 +333,7 @@
               <div style="display:flex;align-items:center;gap:12px">
                 <div class="t-section-title" style="font-size:17px;flex:none">{{ z.name }}</div>
                 <span style="{{ z.shopPill }}">{{ z.shopLabel }}</span>
-                <sc-if value="{{ z.isExcl }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);background:#fbe9eb;color:var(--color-primary);border:.5px solid #f0cdd2">Terytorium wyłączne</span></sc-if>
+                <sc-if value="{{ z.isExcl }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);background:var(--color-danger-bg);color:var(--color-primary);border:.5px solid var(--color-danger-bg)">Terytorium wyłączne</span></sc-if>
                 <span style="margin-left:auto;flex:none;color:var(--color-text-muted);font:11.5px var(--font-ui)">{{ z.cpCount }}</span>
                 <button onClick="{{ z.edit }}" style="flex:none;background:transparent;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:6px 13px;font:600 11.5px var(--font-ui);cursor:pointer">Edytuj</button>
                 <button onClick="{{ z.del }}" title="Usuń" style="flex:none;background:transparent;border:.5px solid var(--color-border-secondary);border-radius:8px;padding:6px 10px;font:600 11.5px var(--font-ui);cursor:pointer;color:var(--color-primary)">✕</button>
@@ -350,8 +350,8 @@
             <div id="map-zones" style="width:100%;height:380px;background:var(--color-background-secondary)"></div>
           </div>
           <sc-if value="{{ czOpen }}" hint-placeholder-val="{{ false }}">
-            <div style="position:fixed;inset:0;background:rgba(34,34,34,.45);display:flex;align-items:center;justify-content:center;z-index:300">
-              <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;width:640px;max-width:92vw;max-height:86vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.28)">
+            <div style="position:fixed;inset:0;background:rgba(46, 22, 12,.45);display:flex;align-items:center;justify-content:center;z-index:300">
+              <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:12px;padding:18px;width:640px;max-width:92vw;max-height:86vh;overflow:auto;box-shadow:0 18px 50px rgba(46, 22, 12,.28)">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div class="t-section-title" style="font-size:18px">{{ czFormTitle }}</div><button onClick="{{ czClose }}" style="background:transparent;border:none;font:600 16px var(--font-ui);cursor:pointer;color:var(--color-text-muted)">✕</button></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
                   <label style="display:flex;flex-direction:column;gap:6px"><span class="t-admin-label">Nazwa strefy</span><input value="{{ czF.name }}" onInput="{{ czSetName }}" placeholder="Bruxelles Capitale" style="border:.5px solid var(--color-border-secondary);border-radius:9px;padding:10px 12px;font:13px var(--font-ui)"></label>
@@ -372,7 +372,7 @@
                   </sc-if>
                   <div style="display:flex;flex-wrap:wrap;gap:6px;min-height:30px">
                     <sc-for list="{{ czChips }}" as="c" hint-placeholder-count="4">
-                      <span style="display:inline-flex;align-items:center;gap:6px;border-radius:7px;padding:4px 6px 4px 10px;font:600 11.5px var(--font-mono,monospace);background:#fdf3e7;color:#6b4420;border:.5px solid #ead9c3">{{ c.cp }}<button onClick="{{ c.remove }}" style="background:transparent;border:none;cursor:pointer;font:700 11px var(--font-ui);color:#8C4A2F;padding:0 2px">✕</button></span>
+                      <span style="display:inline-flex;align-items:center;gap:6px;border-radius:7px;padding:4px 6px 4px 10px;font:600 11.5px var(--font-mono,monospace);background:var(--cream-100);color:var(--choco-600);border:.5px solid var(--cream-300)">{{ c.cp }}<button onClick="{{ c.remove }}" style="background:transparent;border:none;cursor:pointer;font:700 11px var(--font-ui);color:var(--choco-500);padding:0 2px">✕</button></span>
                     </sc-for>
                   </div>
                   <div style="font:11px var(--font-ui);color:var(--color-text-muted)">Każdy kod jest sprawdzany przy dodaniu: jeśli należy już do innej strefy pierwotnej, zostaje odrzucony z nazwą strefy w konflikcie.</div>
@@ -619,7 +619,7 @@
                     </sc-if>
                   </div>
                   <sc-if value="{{ s.invalid }}" hint-placeholder-val="{{ false }}">
-                    <div style="display:flex;align-items:center;gap:7px;background:#fbe9eb;border-radius:8px;padding:7px 10px;margin-bottom:10px;font:500 10.5px var(--font-ui);color:var(--color-primary)">⚠ {{ s.invalidMsg }}</div>
+                    <div style="display:flex;align-items:center;gap:7px;background:var(--color-danger-bg);border-radius:8px;padding:7px 10px;margin-bottom:10px;font:500 10.5px var(--font-ui);color:var(--color-primary)">⚠ {{ s.invalidMsg }}</div>
                   </sc-if>
                   <div style="display:flex;flex-direction:column;gap:7px">
                     <sc-for list="{{ s.choices }}" as="c" hint-placeholder-count="2">
@@ -631,7 +631,7 @@
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                           </button>
                           <sc-if value="{{ c.pickerOpen }}" hint-placeholder-val="{{ false }}">
-                          <div style="position:absolute;z-index:70;top:100%;left:0;margin-top:5px;width:300px;max-width:90vw;background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.16);overflow:hidden">
+                          <div style="position:absolute;z-index:70;top:100%;left:0;margin-top:5px;width:300px;max-width:90vw;background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:10px;box-shadow:0 14px 40px rgba(46, 22, 12,.16);overflow:hidden">
                             <div style="padding:9px;border-bottom:.5px solid var(--color-border-tertiary)">
                               <div style="display:flex;align-items:center;gap:7px;background:var(--color-background-secondary);border-radius:7px;padding:7px 9px">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
@@ -647,7 +647,7 @@
                           </sc-if>
                         </div>
                         <div style="display:flex;align-items:center;gap:4px"><span style="font:600 11px var(--font-ui);color:var(--color-text-muted)">Δ</span><input type="number" step="0.10" value="{{ c.delta }}" onChange="{{ c.setDelta }}" style="{{ c.miniInput }};width:58px;text-align:right"/></div>
-                        <div style="display:flex;align-items:center;gap:4px"><span style="font:600 11px var(--font-ui);color:#8C4A2F" title="Koszt surowca">€</span><input type="number" step="0.10" value="{{ c.cost }}" onChange="{{ c.setCost }}" style="{{ c.miniInput }};width:56px;text-align:right"/></div>
+                        <div style="display:flex;align-items:center;gap:4px"><span style="font:600 11px var(--font-ui);color:var(--choco-500)" title="Koszt surowca">€</span><input type="number" step="0.10" value="{{ c.cost }}" onChange="{{ c.setCost }}" style="{{ c.miniInput }};width:56px;text-align:right"/></div>
                         <button onClick="{{ c.actToggle }}" style="{{ c.actStyle }}"><span style="{{ c.actKnob }}"></span></button>
                         <button onClick="{{ c.up }}" style="{{ c.sqBtn }}">↑</button>
                         <button onClick="{{ c.down }}" style="{{ c.sqBtn }}">↓</button>
@@ -676,18 +676,18 @@
 
           <!-- PREVIEW -->
           <div style="position:sticky;top:0;display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#2d7a3e"></span><span style="font:600 10px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted)">Podgląd klienta · okno produktu</span></div>
-            <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:14px;overflow:hidden;box-shadow:0 10px 34px rgba(0,0,0,.07)">
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:var(--success)"></span><span style="font:600 10px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted)">Podgląd klienta · okno produktu</span></div>
+            <div style="background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:14px;overflow:hidden;box-shadow:0 10px 34px rgba(46, 22, 12,.07)">
               <div style="padding:16px 18px;border-bottom:.5px solid var(--color-border-tertiary)">
                 <div style="font-family:var(--font-display);font-size:19px;color:var(--color-text)">{{ previewProduct }}</div>
                 <sc-if value="{{ previewDisabled }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font:500 10.5px var(--font-ui);color:var(--color-primary)">⚠ Menu ukryte po stronie klienta · menu_effectif = 0</div></sc-if>
-                <sc-if value="{{ armedEmpty }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font:500 10.5px var(--font-ui);color:#b26a00">⚠ Menu uzbrojone, ale bez aktywnego zestawu — klient nic nie zobaczy</div></sc-if>
+                <sc-if value="{{ armedEmpty }}" hint-placeholder-val="{{ false }}"><div style="margin-top:6px;font:500 10.5px var(--font-ui);color:var(--caramel-600)">⚠ Menu uzbrojone, ale bez aktywnego zestawu — klient nic nie zobaczy</div></sc-if>
               </div>
               <div class="lz" style="max-height:52vh;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:16px">
                 <sc-if value="{{ catTriggerAuto }}" hint-placeholder-val="{{ false }}">
                   <div>
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font:600 12.5px var(--font-ui);color:var(--color-text)">Votre {{ catTriggerLabel }}</span><span style="display:inline-flex;align-items:center;font:600 9px var(--font-ui);border-radius:20px;padding:3px 8px;background:var(--color-background-secondary);color:var(--color-text-muted)">W zestawie · zablokowane</span></div>
-                    <div style="display:flex;align-items:center;gap:9px;border:.5px solid var(--color-primary);border-radius:10px;padding:9px 11px;background:#fbe9eb">
+                    <div style="display:flex;align-items:center;gap:9px;border:.5px solid var(--color-primary);border-radius:10px;padding:9px 11px;background:var(--color-danger-bg)">
                       <span style="width:16px;height:16px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px">✓</span>
                       <span style="font:500 12px var(--font-ui);color:var(--color-text)">Le produit choisi ({{ catTriggerLabel }})</span>
                     </div>
@@ -718,7 +718,7 @@
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px"><span style="font:600 12px var(--font-ui);letter-spacing:.02em;color:var(--color-text)">Marża menu</span><span style="font:600 10px var(--font-mono,monospace);color:var(--color-text-muted)">koszt surowca · food cost</span></div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px">
                 <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Cena menu · zablokowana</div><div style="font:700 16px var(--font-ui);color:var(--color-text)">{{ marPrice }}</div></div>
-                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Koszt surowca</div><div style="font:700 16px var(--font-ui);color:#8C4A2F">{{ marCost }}</div></div>
+                <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Koszt surowca</div><div style="font:700 16px var(--font-ui);color:var(--choco-500)">{{ marCost }}</div></div>
                 <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Marża brutto</div><div style="font:700 16px var(--font-ui);color:{{ marMarginColor }}">{{ marMargin }}</div></div>
                 <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 12px"><div style="font:600 9px var(--font-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);margin-bottom:4px">Food cost</div><div style="font:700 16px var(--font-ui);color:{{ marFoodColor }}">{{ marFoodPct }}</div></div>
               </div>
@@ -738,13 +738,13 @@
 
   <!-- TOAST -->
   <sc-if value="{{ toastShow }}" hint-placeholder-val="{{ false }}">
-  <div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:2500;background:var(--color-text);color:#fff;border-radius:10px;padding:14px 22px;font:500 13px var(--font-ui);box-shadow:0 8px 30px rgba(0,0,0,.3)">{{ toast }}</div>
+  <div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:2500;background:var(--color-text);color:#fff;border-radius:10px;padding:14px 22px;font:500 13px var(--font-ui);box-shadow:0 8px 30px rgba(46, 22, 12,.3)">{{ toast }}</div>
   </sc-if>
 
   <!-- FORM MODAL -->
   <sc-if value="{{ formOpen }}" hint-placeholder-val="{{ false }}">
-  <div onClick="{{ formClose }}" style="position:fixed;inset:0;background:rgba(34,34,34,.42);display:flex;align-items:center;justify-content:center;z-index:2100;padding:24px">
-    <div onClick="{{ stop }}" style="background:var(--color-surface);border-radius:14px;width:490px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div onClick="{{ formClose }}" style="position:fixed;inset:0;background:rgba(46, 22, 12,.42);display:flex;align-items:center;justify-content:center;z-index:2100;padding:24px">
+    <div onClick="{{ stop }}" style="background:var(--color-surface);border-radius:14px;width:490px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(46, 22, 12,.3)">
       <div style="padding:20px 24px 16px;border-bottom:.5px solid var(--color-border-tertiary);display:flex;justify-content:space-between;align-items:start">
         <div style="min-width:0"><div class="t-page-title" style="font-size:18px">{{ formTitle }}</div><div style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;background:var(--color-background-secondary);border-radius:6px;padding:4px 9px"><span style="font:600 11px var(--font-mono,monospace);color:var(--color-text-muted)">{{ formTable }}</span></div></div>
         <button onClick="{{ formClose }}" style="background:transparent;border:none;cursor:pointer;color:var(--color-text-muted);font-size:22px;line-height:1;padding:0">×</button>
@@ -771,13 +771,13 @@
           <div style="position:relative">
             <input type="text" value="{{ vtQ }}" onChange="{{ vtSearch }}" placeholder="{{ vtSearchPh }}" style="width:100%;padding:10px 12px;border:.5px solid var(--color-border-secondary);border-radius:9px;font:400 12.5px var(--font-ui);color:var(--color-text);background:var(--color-surface);box-sizing:border-box"/>
             <sc-if value="{{ vtHasResults }}" hint-placeholder-val="{{ false }}">
-            <div class="lz" style="position:absolute;z-index:60;top:100%;left:0;right:0;margin-top:5px;max-height:200px;overflow-y:auto;background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.16)">
+            <div class="lz" style="position:absolute;z-index:60;top:100%;left:0;right:0;margin-top:5px;max-height:200px;overflow-y:auto;background:var(--color-surface);border:.5px solid var(--color-border-tertiary);border-radius:10px;box-shadow:0 14px 40px rgba(46, 22, 12,.16)">
               <sc-for list="{{ vtResults }}" as="r" hint-placeholder-count="4"><div onClick="{{ r.pick }}" style="padding:9px 12px;cursor:pointer;font:500 12px var(--font-ui);color:var(--color-text);border-bottom:.5px solid var(--color-border-tertiary)">{{ r.label }}</div></sc-for>
             </div>
             </sc-if>
           </div>
           <sc-if value="{{ vtSelDone }}" hint-placeholder-val="{{ false }}">
-            <div style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:#fdf3f4;border:.5px solid var(--color-primary);border-radius:20px;padding:6px 12px"><span style="font:600 11.5px var(--font-ui);color:var(--color-primary)">Ciblé : {{ vtSelLabel }}</span><button onClick="{{ vtClear }}" style="background:transparent;border:none;cursor:pointer;color:var(--color-primary);font-size:15px;line-height:1;padding:0">×</button></div>
+            <div style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:var(--cream-50);border:.5px solid var(--color-primary);border-radius:20px;padding:6px 12px"><span style="font:600 11.5px var(--font-ui);color:var(--color-primary)">Ciblé : {{ vtSelLabel }}</span><button onClick="{{ vtClear }}" style="background:transparent;border:none;cursor:pointer;color:var(--color-primary);font-size:15px;line-height:1;padding:0">×</button></div>
           </sc-if>
           </sc-if>
         </div>
@@ -793,8 +793,8 @@
 
   <!-- MODALE PROFIL & PARAMÈTRES DU SITE (clic sur l'avatar) -->
   <sc-if value="{{ profileOpen }}" hint-placeholder-val="{{ false }}">
-  <div onClick="{{ closeProfile }}" style="position:fixed;inset:0;background:rgba(34,34,34,.42);display:flex;align-items:center;justify-content:center;z-index:2100;padding:24px">
-    <div onClick="{{ stop }}" style="background:var(--color-surface);border-radius:14px;width:440px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div onClick="{{ closeProfile }}" style="position:fixed;inset:0;background:rgba(46, 22, 12,.42);display:flex;align-items:center;justify-content:center;z-index:2100;padding:24px">
+    <div onClick="{{ stop }}" style="background:var(--color-surface);border-radius:14px;width:440px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(46, 22, 12,.3)">
       <div style="padding:20px 24px 16px;border-bottom:.5px solid var(--color-border-tertiary);display:flex;justify-content:space-between;align-items:center">
         <div style="display:flex;align-items:center;gap:11px">
           <div style="width:38px;height:38px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font:600 14px var(--font-ui)">{{ profInit }}</div>
@@ -879,7 +879,7 @@ class Component extends DCLogic {
         const jx=((this.geoHash(String(c.id))%100)/100-0.5)*0.008, jy=((this.geoHash(String(c.id)+'y')%100)/100-0.5)*0.008;
         const lat=e.lat+jx, lng=e.lng+jy; pts.push([lat,lng]);
         const dim=S.geoHl!=null && c.shop_id!==S.geoHl;
-        const col=c.type==='office'?'#E8B84B':'#3B6BC9', bord=c.type==='office'?'#b28a1f':'#24488f';
+        const col=c.type==='office'?'var(--gold-500)':'var(--info)', bord=c.type==='office'?'var(--caramel-600)':'var(--info)';
         const mk=L.circleMarker([lat,lng],{radius:7,color:bord,weight:1.5,fillColor:col,fillOpacity:dim?0.12:0.8,opacity:dim?0.15:1});
         mk.bindPopup('<div style="font:12.5px sans-serif;min-width:180px"><strong>'+esc(c.name)+'</strong><br>'+(c.type==='office'?'Klient biurowy (B2B)':'Klient indywidualny')+'<br>Sklep: '+esc(shopName[c.shop_id]||'—')+'<br>Obrót łącznie: '+(c.ca?c.ca.toLocaleString('pl-PL',{minimumFractionDigits:2})+' €':'—')+'</div>');
         g.addLayer(mk); return; }
@@ -889,21 +889,21 @@ class Component extends DCLogic {
       const pct=Math.round(cl.length*100/totalMass);
       const ca=cl.reduce((t,c)=>t+(+c.ca||0),0);
       const sz=Math.min(52,26+cl.length*2);
-      const bg=(off&&priv)?('conic-gradient(#E8B84B 0 '+Math.round(off*360/cl.length)+'deg, #3B6BC9 0 360deg)'):(off?'#E8B84B':'#3B6BC9');
-      const ic=L.divIcon({className:'',html:'<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+bg+';opacity:'+(dim?0.22:1)+';border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><span style="background:rgba(255,255,255,.94);border-radius:999px;padding:1px 7px;font:700 12px sans-serif;color:#1c1c1c">'+cl.length+'</span></div>',iconSize:[sz,sz],iconAnchor:[Math.round(sz/2),Math.round(sz/2)]});
+      const bg=(off&&priv)?('conic-gradient(var(--gold-500) 0 '+Math.round(off*360/cl.length)+'deg, var(--info) 0 360deg)'):(off?'var(--gold-500)':'var(--info)');
+      const ic=L.divIcon({className:'',html:'<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+bg+';opacity:'+(dim?0.22:1)+';border:2px solid #fff;box-shadow:0 1px 6px rgba(46, 22, 12,.35);display:flex;align-items:center;justify-content:center"><span style="background:rgba(255,255,255,.94);border-radius:999px;padding:1px 7px;font:700 12px sans-serif;color:var(--ink-900)">'+cl.length+'</span></div>',iconSize:[sz,sz],iconAnchor:[Math.round(sz/2),Math.round(sz/2)]});
       const mk=L.marker([e.lat,e.lng],{icon:ic});
       const names=cl.slice().sort((a,b)=>(+b.ca||0)-(+a.ca||0)).slice(0,8)
-        .map(c=>'<span style="color:'+(c.type==='office'?'#b28a1f':'#24488f')+'">●</span> '+esc(c.name)).join('<br>');
+        .map(c=>'<span style="color:'+(c.type==='office'?'var(--caramel-600)':'var(--info)')+'">●</span> '+esc(c.name)).join('<br>');
       mk.bindPopup('<div style="font:12.5px sans-serif;min-width:210px"><strong>'+esc(cp)+' '+esc(e.city||'')+'</strong><br>'
         +cl.length+' klientów — <strong>'+pct+' %</strong> wyświetlanej sumy<br>'
         +off+' biurowych · '+priv+' indywidualnych<br>Obrót łącznie: '+(ca?ca.toLocaleString('pl-PL',{minimumFractionDigits:2})+' €':'—')
-        +'<hr style="margin:6px 0;border:none;border-top:1px solid #ddd">'+names+(cl.length>8?'<br>… +'+(cl.length-8)+' autres':'')+'</div>');
+        +'<hr style="margin:6px 0;border:none;border-top:1px solid var(--border-subtle)">'+names+(cl.length>8?'<br>… +'+(cl.length-8)+' autres':'')+'</div>');
       g.addLayer(mk); });
     (D.shops||[]).filter(s2=>shopSet?shopSet.includes(Number(s2.id)):true).forEach(s2=>{
       let e=s2.cp&&geo.idx[String(s2.cp).trim()];
       if(!e&&s2.city){ const cl=String(s2.city).toLowerCase(); const hit=geo.list.find(x=>String(x[1]).toLowerCase()===cl); if(hit) e={lat:hit[2],lng:hit[3]}; }
       if(!e) return; pts.push([e.lat,e.lng]);
-      const ic=L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-primary);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);color:#fff;font:700 12px sans-serif">A</span></div>',iconSize:[26,26],iconAnchor:[13,26]});
+      const ic=L.divIcon({className:'',html:'<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-primary);border:2px solid #fff;box-shadow:0 1px 4px rgba(46, 22, 12,.4);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);color:#fff;font:700 12px sans-serif">A</span></div>',iconSize:[26,26],iconAnchor:[13,26]});
       const mk=L.marker([e.lat,e.lng],{icon:ic});
       mk.bindTooltip(s2.name+' — kliknij, aby izolować jego klientów');
       mk.on('click',()=>this.setState(st=>({geoHl:st.geoHl===Number(s2.id)?null:Number(s2.id)})));
@@ -934,7 +934,7 @@ class Component extends DCLogic {
     if(this._zKey===key) return; this._zKey=key;
     if(this._zLayer) m.removeLayer(this._zLayer);
     const g=L.layerGroup(); const pts=[];
-    const palette=['#8D1D2C','#C87A3F','#3B3468','#2d7a3e','#8C4A2F','#b26a00'];
+    const palette=['var(--brand)','var(--accent)','var(--berry-600)','var(--success)','var(--choco-500)','var(--caramel-600)'];
     rows.forEach((z,i)=>{ const col=palette[i%palette.length];
       String(z.postcodes||'').split(/[^0-9]+/).filter(Boolean).forEach(cp=>{ const e=geo.idx[cp]; if(!e) return; pts.push([e.lat,e.lng]);
         const mk=L.circleMarker([e.lat,e.lng],{radius:7,color:col,weight:2,fillColor:col,fillOpacity:.55});
@@ -1005,14 +1005,14 @@ class Component extends DCLogic {
     if(!fr.base){ // mode seed : ajoute la livraison localement
       const rows=(window.BOServer?window.BOServer.table('deliveries'):[])||[]; const cli=clients[0]||{raison:'—',points:[{}]}; const pt=(cli.points&&cli.points[0])||{};
       const yr=new Date().getFullYear(); const code=((pt.validation==='PIN')?'PIN':'QR')+'-'+Math.floor(1000+Math.random()*9000);
-      rows.unshift({id:Date.now(),ref:'LIV-'+yr+'-'+String(rows.length+1).padStart(4,'0'),client:cli.raison,point:pt.libelle||'—',driver:'',driver_color:'#8D1D2C',round:'',status:'planifiée',window:pt.fenetre||'',validation:pt.validation||'QR',confirm_code:code,confirmed:0,ca:420,couts:180,marge:240});
+      rows.unshift({id:Date.now(),ref:'LIV-'+yr+'-'+String(rows.length+1).padStart(4,'0'),client:cli.raison,point:pt.libelle||'—',driver:'',driver_color:'var(--brand)',round:'',status:'planifiée',window:pt.fenetre||'',validation:pt.validation||'QR',confirm_code:code,confirmed:0,ca:420,couts:180,marge:240});
       if(window.BOServer)window.BOServer.save('deliveries',rows); this.setState(st=>({_rev:(st._rev||0)+1})); this.printJob('✔ Livraison test '+rows[0].ref+' · kod '+code+' (local)'); return; }
     if(!pointId){ this.printJob('⚠ Brak dostępnego punktu dostawy'); return; }
     this.frPostR('/franchisor/deliveries',{point_id:pointId,ca:420,couts:180,notes:'Dostawa testowa'})
       .then(res=>{ if(res&&res.ok&&res.body&&res.body.ref){ this.printJob('✔ Livraison test '+res.body.ref+' · kod '+res.body.confirm_code); this.livReload(); }
         else this.printJob('⚠ '+((res&&res.body&&res.body.error)||'Utworzenie nie powiodło się')); }); }
   livAssign(d){ const fr=(typeof window!=='undefined'&&window.__FR)||{}; const drivers=(window.BOServer?window.BOServer.table('drivers'):[])||[]; const drv=drivers[0];
-    if(!fr.base){ this._livMutate(d.id,{status:'assignée',driver:(drv&&drv.nom)||'Kierowca',driver_color:(drv&&drv.color)||'#8D1D2C'}); this.printJob('✔ '+d.ref+' przypisana do '+((drv&&drv.nom)||'—')); return; }
+    if(!fr.base){ this._livMutate(d.id,{status:'assignée',driver:(drv&&drv.nom)||'Kierowca',driver_color:(drv&&drv.color)||'var(--brand)'}); this.printJob('✔ '+d.ref+' przypisana do '+((drv&&drv.nom)||'—')); return; }
     this.frPostR('/franchisor/deliveries/'+d.id+'/assign',{driver_id:drv?drv.id:null}).then(res=>{ if(res&&res.ok){ this.printJob('✔ '+d.ref+' przypisana'); this.livReload(); } else this.printJob('⚠ Przypisanie nie powiodło się'); }); }
   livConfirm(d){ const fr=(typeof window!=='undefined'&&window.__FR)||{};
     if(!fr.base){ this._livMutate(d.id,{status:'livrée',confirmed:1}); this.printJob('✔ '+d.ref+' dostarczona ('+d.validation+')'); return; }
@@ -1132,10 +1132,10 @@ class Component extends DCLogic {
     const pill=(bg,c)=>'display:inline-flex;align-items:center;font:600 10px var(--font-ui);border-radius:20px;padding:4px 10px;background:'+bg+';color:'+c;
     const tog=(key,def)=>{ const on=S.flags[key]!==undefined?S.flags[key]:def; return { on,
       style:'position:relative;width:38px;height:21px;border-radius:20px;border:none;cursor:pointer;background:'+(on?'var(--color-primary)':'var(--color-border-secondary)'),
-      knob:'position:absolute;top:2px;left:'+(on?'19px':'2px')+';width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)',
+      knob:'position:absolute;top:2px;left:'+(on?'19px':'2px')+';width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(46, 22, 12,.2)',
       toggle:()=>this.setState(st=>({flags:{...st.flags,[key]:!(st.flags[key]!==undefined?st.flags[key]:def)}})) }; };
     const dot=c=>'width:7px;height:7px;border-radius:50%;flex:none;background:'+c;
-    const APRICOT='#E8A15C', COPPER='#8C4A2F';
+    const APRICOT='var(--caramel-400)', COPPER='var(--choco-500)';
 
     const paramNavOpen=S.paramNavOpen!==undefined?S.paramNavOpen:false;
     const navRaw=[
@@ -1167,16 +1167,16 @@ class Component extends DCLogic {
     // Boutiques
     const shopsRaw=SRV('shops');
     const shopsRows=shopsRaw.map(s=>{ const w=tog('shopWeb_'+s.id,s.web), a=tog('shopAct_'+s.id,s.act); const ca=s.caShop+s.caOffice;
-      const adColor=s.adoption>=85?'#2d7a3e':(s.adoption>=70?'#b26a00':'var(--color-primary)');
+      const adColor=s.adoption>=85?'var(--success)':(s.adoption>=70?'var(--caramel-600)':'var(--color-primary)');
       return {...s, ca:ca?this.eur(ca):'—', caShopTxt:s.caShop?this.eur(s.caShop):'—', caOfficeTxt:s.caOffice?this.eur(s.caOffice):'—', adoption:s.adoption+' %', adColor,
-        webPill:pill(w.on?'#eaf5ec':'var(--color-background-secondary)',w.on?'#2d7a3e':'var(--color-text-muted)'), webTxt:w.on?'Online':'Odcięty',
+        webPill:pill(w.on?'var(--color-success-bg)':'var(--color-background-secondary)',w.on?'var(--success)':'var(--color-text-muted)'), webTxt:w.on?'Online':'Odcięty',
         webStyle:w.style,webKnob:w.knob,toggleWeb:()=>{ w.toggle(); this.frPost('/franchisor/shop',{id:s.id,webshop_enabled:!w.on}); },
         actStyle:a.style,actKnob:a.knob,toggleAct:()=>{ a.toggle(); this.frPost('/franchisor/shop',{id:s.id,active:!a.on}); },
         edit:this.editForm('shop',{id:s.id,nom:s.nom,ville:s.ville.replace(/\s\d+$/,''),contrat:(s.contrat&&s.contrat!=='—')?s.contrat:''})}; });
 
     // Catalogue + gouvernance + prix — arbre catégories › produits
     const CATALOG=SRV('catalog');
-    const stPill=s=>pill(s==='Opublikowany'?'#eaf5ec':(s==='Szkic'?'var(--color-background-secondary)':'#fbf1e3'),s==='Opublikowany'?'#2d7a3e':(s==='Szkic'?'var(--color-text-muted)':'#b26a00'));
+    const stPill=s=>pill(s==='Opublikowany'?'var(--color-success-bg)':(s==='Szkic'?'var(--color-background-secondary)':'var(--cream-100)'),s==='Opublikowany'?'var(--success)':(s==='Szkic'?'var(--color-text-muted)':'var(--caramel-600)'));
     const catTree=[];
     const activeOnly=S.flags['catActiveOnly']!==undefined?S.flags['catActiveOnly']:true;
     const seasonFilter=S.seasonFilter||'';
@@ -1190,13 +1190,13 @@ class Component extends DCLogic {
     const swS=(on)=>'position:relative;width:34px;height:19px;border-radius:20px;border:none;cursor:pointer;flex:none;background:'+(on?'var(--color-primary)':'var(--color-border-secondary)');
     // Variante « apricot » — canal livraison bureau (ws_office).
     const swSa=(on)=>'position:relative;width:34px;height:19px;border-radius:20px;border:none;cursor:pointer;flex:none;background:'+(on?APRICOT:'var(--color-border-secondary)');
-    const knS=(on)=>'position:absolute;top:2px;left:'+(on?'17px':'2px')+';width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)';
+    const knS=(on)=>'position:absolute;top:2px;left:'+(on?'17px':'2px')+';width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(46, 22, 12,.2)';
     // Toggles à taille HIÉRARCHIQUE (Catégorie > Sous-catégorie > Produit) : seules
     // la hauteur et la pastille décroissent selon le niveau ; la LARGEUR reste 34px
     // à tous les niveaux → toggles alignés en colonne et de largeur identique.
     const RUBY='var(--color-primary)', HCAT=19, HSUB=17, HPRD=15;
     const swL=(on,color,h)=>'position:relative;width:34px;height:'+h+'px;border-radius:'+h+'px;border:none;cursor:pointer;flex:none;background:'+(on?color:'var(--color-border-secondary)');
-    const knL=(on,h)=>{ const k=h-4; return 'position:absolute;top:2px;left:'+(on?(32-k)+'px':'2px')+';width:'+k+'px;height:'+k+'px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)'; };
+    const knL=(on,h)=>{ const k=h-4; return 'position:absolute;top:2px;left:'+(on?(32-k)+'px':'2px')+';width:'+k+'px;height:'+k+'px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(46, 22, 12,.2)'; };
     // Paramètres du site (ws_param) pilotés depuis la modale profil. Valeur '0'/'1' -> toggle,
     // sinon champ texte. Persistance : POST /franchisor/param (upsert + audit). bo_show_source
     // est garanti présent même si le param n'jeszcze nie istnieje.
@@ -1251,13 +1251,13 @@ class Component extends DCLogic {
             subMenuStyle:swL(sMenu,RUBY,HSUB),subMenuKnob:knL(sMenu,HSUB),subMenuToggle:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); doSubMenu(); }}); }
         if(p.sub && !subOpen) return;
         const pk='prix_'+ci+'_'+pi, pv=S.flags[pk]!==undefined?S.flags[pk]:p.prix;
-        const adColor=p.ad>=80?'#2d7a3e':(p.ad>=50?'#b26a00':'var(--color-primary)');
+        const adColor=p.ad>=80?'var(--success)':(p.ad>=50?'var(--caramel-600)':'var(--color-primary)');
         const pmid=p.id||('cat-'+slugId(p.nom));
         const rm=this.api?this.api.resolveMenu(pmid):{effective:0,origin:'default',category:c.cat,override:null};
         const _md=S.menus||{}; const _inStore=!!_md[pmid]; const _catDef=this.api?!!this.api.getCategoryDefault(c.cat):false;
         const mnOn=_inStore?(rm.effective===1):_catDef;
         catTree.push({isCat:false,isProd:true,nom:p.nom,
-          hasSaison:!!p.saison, saison:p.saison||'', saisonPill:pill('#fbf1e3','#C87A3F'),
+          hasSaison:!!p.saison, saison:p.saison||'', saisonPill:pill('var(--cream-100)','var(--accent)'),
           photoMissing:(p.photo===false),
           mnStyle:swL(mnOn,RUBY,HPRD),mnKnob:knL(mnOn,HPRD),
           mnToggle:()=>{ if(!this.api)return; this.api.ensureProduct(pmid,p.nom,pv,c.cat); this.setState({menus:this.api.setProductOverride(pmid,mnOn?'off':'on')}); if(p.id!=null)this.frPost('/franchisor/product',{id:p.id,menu_override:mnOn?'off':'on'}); },
@@ -1268,7 +1268,7 @@ class Component extends DCLogic {
     });
 
     // Promotions
-    const porteeBadge=pill('#eef3fb','#2a5a9e');
+    const porteeBadge=pill('var(--color-info-bg)','var(--info)');
     const vouchersM=SRV('vouchers');
     const pricingR=SRV('pricing_rules');
 
@@ -1284,22 +1284,22 @@ class Component extends DCLogic {
     // Utilisateurs
     const usersRaw=SRV('users');
     const usersRows=usersRaw.map((u,i)=>{ const a=tog('userAct_'+i,u.act);
-      return {...u, rolePill:pill(u.role==='Centrala'?'#fbe9eb':'var(--color-background-secondary)',u.role==='Centrala'?'var(--color-primary)':'var(--color-text-muted)'),
+      return {...u, rolePill:pill(u.role==='Centrala'?'var(--color-danger-bg)':'var(--color-background-secondary)',u.role==='Centrala'?'var(--color-primary)':'var(--color-text-muted)'),
         actStyle:a.style,actKnob:a.knob,toggleAct:a.toggle, edit:this.editForm('user',{nom:u.nom,email:u.email,role:u.role,portee:u.portee})}; });
 
     // Audit
-    const vPill=v=>pill(v==='Utworzenie'?'#eaf5ec':(v==='Usunięcie'?'#fbe9eb':'#fbf1e3'),v==='Utworzenie'?'#2d7a3e':(v==='Usunięcie'?'var(--color-primary)':'#b26a00'));
+    const vPill=v=>pill(v==='Utworzenie'?'var(--color-success-bg)':(v==='Usunięcie'?'var(--color-danger-bg)':'var(--cream-100)'),v==='Utworzenie'?'var(--success)':(v==='Usunięcie'?'var(--color-primary)':'var(--caramel-600)'));
     const auditRows=SRV('audit').map(a=>({...a,actPill:vPill(a.verb)}));
 
     // ===== MENU BUILDER (ws_bundles → slots → choices) =====
     const menusDB=S.menus||{}; const pid0=S.menuProductId||Object.keys(menusDB).filter(k=>k!=='_categories')[0]||'';
     const M=menusDB[pid0]||{productName:'…',category:'',menuOverride:null,basePrice:0,baseCost:0,bundles:[]}, selMap=S.sel||{};
     const switchS=(on)=>'position:relative;width:38px;height:21px;border-radius:20px;border:none;cursor:pointer;flex:none;background:'+(on?'var(--color-primary)':'var(--color-border-secondary)');
-    const knobS=(on)=>'position:absolute;top:2px;left:'+(on?'19px':'2px')+';width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)';
+    const knobS=(on)=>'position:absolute;top:2px;left:'+(on?'19px':'2px')+';width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(46, 22, 12,.2)';
     const miniInput='border:.5px solid var(--color-border-secondary);border-radius:7px;padding:7px 9px;font:500 12px var(--font-ui);color:var(--color-text);background:var(--color-surface);box-sizing:border-box';
     const sqBtn='width:26px;height:26px;border-radius:6px;border:.5px solid var(--color-border-tertiary);background:var(--color-surface);cursor:pointer;color:var(--color-text-muted);display:flex;align-items:center;justify-content:center;flex:none;font-size:12px';
     const segStyle=(on)=>'padding:6px 12px;border:none;border-radius:7px;cursor:pointer;font:600 11px var(--font-ui);'+(on?'background:var(--color-primary);color:#fff':'background:transparent;color:var(--color-text-muted)');
-    const IMGC={a:'#E8A15C',b:'#8C4A2F',c:'#9E2A3B',d:'#7a8c5a'};
+    const IMGC={a:'var(--caramel-400)',b:'var(--choco-500)',c:'var(--berry-500)',d:'var(--pistachio)'};
     const imgBox=(img)=>{ const base='width:38px;height:38px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font:700 15px var(--font-ui);cursor:pointer;'; return img?(base+'background:'+(IMGC[img]||'#b98')+';color:#fff;border:none'):(base+'background:var(--color-background-secondary);color:var(--color-text-muted);border:1px dashed var(--color-border-secondary)'); };
     const pvImg=(img)=>'width:34px;height:34px;border-radius:8px;flex:none;'+(img?('background:'+(IMGC[img]||'#b98')):'background:var(--color-background-secondary)');
     // Ikona kategorii = l'image PNG de ws_categories (img). Une étape validée
@@ -1322,7 +1322,7 @@ class Component extends DCLogic {
     const choiceCatImg=(label)=>{ const cat=prodCat[label]; return cat?catImgMap[cat]:null; };
     const productOptions=flatProds.filter(p=>p.name.toLowerCase().includes(pq)||p.cat.toLowerCase().includes(pq)).map(p=>{ const on=p.id===pid0; const has=(S.menus&&S.menus[p.id]&&S.menus[p.id].bundles.length)||0;
       return { id:p.id, name:p.name, catLabel:p.cat, countLabel: has?(has+(has>1?' formules':' formule')):(p.menu?'menu':'—'),
-        style:'display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;background:'+(on?'#fbe9eb':'transparent'),
+        style:'display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;background:'+(on?'var(--color-danger-bg)':'transparent'),
         pick:()=>{ const db=this.api?this.api.ensureProduct(p.id,p.name,p.price):S.menus; this.setState({menus:db,menuProductId:p.id,productPickerOpen:false,productSearch:'',sel:{}}); } }; });
     const AB=M.bundles.find(b=>b.id===activeBundleId)||null;
     const menuRes=this.api?this.api.resolveMenu(pid0):{effective:0,origin:'default',category:M.category||'',catDefault:0,override:M.menuOverride||null};
@@ -1335,12 +1335,12 @@ class Component extends DCLogic {
     const ovOff={ style:ovStyle(menuRes.override==='off'), click:setOv('off') };
     const effYes=menuRes.effective===1;
     const originTxt=menuRes.origin==='override'?'wymuszone':('dziedziczone z '+(menuRes.category||'kategoria'));
-    const menuResBadge={ text:(effYes?'Tak':'Nie')+' · '+originTxt, style:pill(effYes?'#eaf5ec':'#fbe9eb',effYes?'#2d7a3e':'var(--color-primary)') };
+    const menuResBadge={ text:(effYes?'Tak':'Nie')+' · '+originTxt, style:pill(effYes?'var(--color-success-bg)':'var(--color-danger-bg)',effYes?'var(--success)':'var(--color-primary)') };
     const armedEmpty=effYes&&M.bundles.filter(b=>b.active).length===0;
     const menuMode=S.menuMode||'list';
     const _cats=menusDB._categories||{};
     const menuKeys=Object.keys(menusDB).filter(k=>k!=='_categories');
-    const availableMenus=menuKeys.map(id=>{ const mm=menusDB[id]; const r2=this.api?this.api.resolveMenu(id):{effective:0,origin:'default'}; const nb=(mm.bundles||[]).length; return {id,mm,r2,nb}; }).filter(x=>x.r2.effective||x.nb>0).map(x=>({ id:x.id, name:x.mm.productName, category:x.mm.category||'—', nbLabel:x.nb+(x.nb>1?' formules':' formule'), originText:(x.r2.effective?'Tak':'Nie')+' · '+(x.r2.origin==='override'?'wymuszone':'dziedziczone'), originBadge:pill(x.r2.effective?'#eaf5ec':'#fbe9eb',x.r2.effective?'#2d7a3e':'var(--color-primary)'), rowClick:()=>this.setState({menuMode:'edit',menuProductId:x.id,sel:{},menuCreate:false}), delMenu:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); if(this.api)this.setState({menus:this.api.deleteProduct(x.id),menuMode:'list'}); this.printJob('✖ Menu usunięte (wraz z zestawami)'); } }));
+    const availableMenus=menuKeys.map(id=>{ const mm=menusDB[id]; const r2=this.api?this.api.resolveMenu(id):{effective:0,origin:'default'}; const nb=(mm.bundles||[]).length; return {id,mm,r2,nb}; }).filter(x=>x.r2.effective||x.nb>0).map(x=>({ id:x.id, name:x.mm.productName, category:x.mm.category||'—', nbLabel:x.nb+(x.nb>1?' formules':' formule'), originText:(x.r2.effective?'Tak':'Nie')+' · '+(x.r2.origin==='override'?'wymuszone':'dziedziczone'), originBadge:pill(x.r2.effective?'var(--color-success-bg)':'var(--color-danger-bg)',x.r2.effective?'var(--success)':'var(--color-primary)'), rowClick:()=>this.setState({menuMode:'edit',menuProductId:x.id,sel:{},menuCreate:false}), delMenu:(e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); if(this.api)this.setState({menus:this.api.deleteProduct(x.id),menuMode:'list'}); this.printJob('✖ Menu usunięte (wraz z zestawami)'); } }));
     const createCats=Object.keys(_cats).map(cn=>{ const on=!!_cats[cn].menu_default; return {name:cn, defStyle:switchS(on), defKnob:knobS(on), toggle:()=>{ if(this.api)this.setState({menus:this.api.setCategoryDefault(cn,on?0:1)}); } }; });
     const cq=(S.menuCreateSearch||'').toLowerCase();
     const createProducts=flatProds.filter(p=>p.name.toLowerCase().includes(cq)||p.cat.toLowerCase().includes(cq)).map(p=>({ name:p.name, catLabel:p.cat, pick:()=>{ if(!this.api)return; this.api.ensureProduct(p.id,p.name,p.price,p.cat); const db=this.api.setProductOverride(p.id,'on'); this.setState({menus:db,menuMode:'edit',menuProductId:p.id,sel:{},menuCreate:false}); } }));
@@ -1361,8 +1361,8 @@ class Component extends DCLogic {
     const vBtn=(active)=>'display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;border-radius:8px;border:none;cursor:'+(active?'pointer':'default')+';background:'+(active?'var(--color-primary)':'var(--color-border-secondary)')+';color:#fff';
     const bundleTabs=M.bundles.map(b=>{ const on=b.id===activeBundleId; const pm=b.price_modifier;
       return { id:b.id, name:b.name, priceMod:(pm>0?'+':'')+this.eur2(pm),
-        style:'display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;cursor:pointer;border:.5px solid '+(on?'var(--color-primary)':'var(--color-border-tertiary)')+';background:'+(on?'#fbe9eb':'var(--color-surface)'),
-        dot:'width:8px;height:8px;border-radius:50%;flex:none;background:'+(b.active?'#2d7a3e':'var(--color-border-secondary)'),
+        style:'display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;cursor:pointer;border:.5px solid '+(on?'var(--color-primary)':'var(--color-border-tertiary)')+';background:'+(on?'var(--color-danger-bg)':'var(--color-surface)'),
+        dot:'width:8px;height:8px;border-radius:50%;flex:none;background:'+(b.active?'var(--success)':'var(--color-border-secondary)'),
         nameStyle:'font:600 12.5px var(--font-ui);color:'+(on?'var(--color-primary)':'var(--color-text)'),
         select:()=>this.setState({activeBundle:b.id}) }; });
     const editSlots=AB?AB.slots.map(s=>{ const acs=s.choices.filter(c=>c.active); const invalid=s.required&&acs.length===0;
@@ -1392,7 +1392,7 @@ class Component extends DCLogic {
       let selected; if(isSingle){ selected=selMap[s.id]!==undefined?selMap[s.id]:(s.required&&acs[0]?acs[0].id:null); if(acs.every(c=>c.id!==selected))selected=(s.required&&acs[0]?acs[0].id:null); effSel[s.id]=selected; }
       else { selected=Array.isArray(selMap[s.id])?selMap[s.id]:[]; effSel[s.id]=selected; }
       return { label:s.label, tag:s.required?(isSingle?'Wybierz 1':'Obowiązkowy'):(isSingle?'Optionnel':'do '+s.max_select),
-        tagStyle:pill(s.required?'#fbe9eb':'var(--color-background-secondary)',s.required?'var(--color-primary)':'var(--color-text-muted)'),
+        tagStyle:pill(s.required?'var(--color-danger-bg)':'var(--color-background-secondary)',s.required?'var(--color-primary)':'var(--color-text-muted)'),
         choices:acs.map(c=>{ const on=isSingle?selected===c.id:selected.includes(c.id); const cImg=choiceCatImg(c.label);
           // Vignette = image de catégorie (comme l'éditeur) ; la sélection est
           // marquée par l'anneau sur la vignette + la surbrillance de la ligne,
@@ -1400,22 +1400,22 @@ class Component extends DCLogic {
           const tile=cImg?(catBox(cImg,34,false)+(on?';outline:2px solid var(--color-primary);outline-offset:2px':'')):pvImg(c.img);
           const markSel=cImg?'display:none':((isSingle?'border-radius:50%;':'border-radius:5px;')+'width:18px;height:18px;flex:none;border:2px solid '+(on?'var(--color-primary)':'var(--color-border-secondary)')+';background:'+(on?'var(--color-primary)':'transparent')+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px');
           return { label:c.label, imgStyle:tile, priceTag:c.delta?((c.delta>0?'+':'')+this.eur2(c.delta)):'inclus',
-            rowStyle:'display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;cursor:pointer;border:1px solid '+(on?'var(--color-primary)':'var(--color-border-tertiary)')+';background:'+(on?'#fdf3f4':'var(--color-surface)'),
+            rowStyle:'display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;cursor:pointer;border:1px solid '+(on?'var(--color-primary)':'var(--color-border-tertiary)')+';background:'+(on?'var(--cream-50)':'var(--color-surface)'),
             markStyle:markSel,
             mark:(on&&!cImg)?'✓':'', pick:isSingle?(()=>this.selectSingle(s.id,c.id)):(()=>this.toggleMulti(s.id,c.id,s.max_select)) }; }) };
     }):[];
     const mtotal=(this.api&&AB)?this.api.resolvePrice(pid0,AB.id,effSel):Math.max(0,M.basePrice+(AB?AB.price_modifier:0));
     const mar=(this.api&&AB)?this.api.resolveMargin(pid0,AB.id,effSel):{price:0,cost:0,margin:0,marginPct:0,foodCostPct:0};
     const mRange=(this.api&&AB)?this.api.marginRange(pid0,AB.id):{min:0,max:0};
-    const marMarginColor=mar.marginPct>=60?'#2d7a3e':(mar.marginPct>=45?'#b26a00':'var(--color-primary)');
-    const marFoodColor=mar.foodCostPct<=30?'#2d7a3e':(mar.foodCostPct<=40?'#b26a00':'var(--color-primary)');
+    const marMarginColor=mar.marginPct>=60?'var(--success)':(mar.marginPct>=45?'var(--caramel-600)':'var(--color-primary)');
+    const marFoodColor=mar.foodCostPct<=30?'var(--success)':(mar.foodCostPct<=40?'var(--caramel-600)':'var(--color-primary)');
     const schemaOpen=(typeof window!=='undefined'&&window.BOServer)?!!window.BOServer.getParam('admin.schema_reports',1):true;
     const schemaItems=[
-      {tag:'DDL (b)',tagC:'var(--color-primary)',tagBg:'#fbe9eb',t:'Wyzwalacz kategorii + nadpisanie produktu',d:'ws_categories.menu_default TINYINT + ws_products.menu_override VARCHAR(8) NULL. menu_effectif = COALESCE(override, kategoria.menu_default, 0). DDL przedstawiony, nie wykonany.'},
-      {tag:'Duplikat',tagC:'#b26a00',tagBg:'#fbf1e3',t:'has_menu_options redondant',d:'Po zweryfikowaniu przełączenia zapisana kolumna staje się redundantna wobec wartości wyliczanej → przestać ją czytać; DROP = osobny DDL do zatwierdzenia (najpierw fallback).'},
-      {tag:'Do zatwierdzenia',tagC:'#b26a00',tagBg:'#fbf1e3',t:'ws_bundle_slots — wybór „do N”',d:'API udostępnia tylko required. Brak kolumn kind / min_select / max_select. DDL przedstawiony, nie wykonany: ADD kind ENUM(single,multi), ADD min_select INT, ADD max_select INT.'},
+      {tag:'DDL (b)',tagC:'var(--color-primary)',tagBg:'var(--color-danger-bg)',t:'Wyzwalacz kategorii + nadpisanie produktu',d:'ws_categories.menu_default TINYINT + ws_products.menu_override VARCHAR(8) NULL. menu_effectif = COALESCE(override, kategoria.menu_default, 0). DDL przedstawiony, nie wykonany.'},
+      {tag:'Duplikat',tagC:'var(--caramel-600)',tagBg:'var(--cream-100)',t:'has_menu_options redondant',d:'Po zweryfikowaniu przełączenia zapisana kolumna staje się redundantna wobec wartości wyliczanej → przestać ją czytać; DROP = osobny DDL do zatwierdzenia (najpierw fallback).'},
+      {tag:'Do zatwierdzenia',tagC:'var(--caramel-600)',tagBg:'var(--cream-100)',t:'ws_bundle_slots — wybór „do N”',d:'API udostępnia tylko required. Brak kolumn kind / min_select / max_select. DDL przedstawiony, nie wykonany: ADD kind ENUM(single,multi), ADD min_select INT, ADD max_select INT.'},
       {tag:'Front only',tagC:'var(--color-text-muted)',tagBg:'var(--color-background-secondary)',t:'„À la carte” — pseudo-zestaw',d:'Poprzedzana oknem produktu po stronie klienta. Brak wiersza ws_bundles, nieedytowalne tutaj.'},
-      {tag:'Jednojęzyczny',tagC:'#2a5a9e',tagBg:'#eef3fb',t:'i18n zestawy / kroki / wybory',d:'Brak tabeli tłumaczeń dla bundles/slots/choices. Przyjęto jeden język — inaczej tabela aliasów do zatwierdzenia (por. product_alias).'},
+      {tag:'Jednojęzyczny',tagC:'var(--info)',tagBg:'var(--color-info-bg)',t:'i18n zestawy / kroki / wybory',d:'Brak tabeli tłumaczeń dla bundles/slots/choices. Przyjęto jeden język — inaczej tabela aliasów do zatwierdzenia (por. product_alias).'},
     ];
 
     // Form modal view
@@ -1437,19 +1437,19 @@ class Component extends DCLogic {
         toggle:()=>this.setState(st=>{ const cur=Array.isArray(st.formVals[f.k])?st.formVals[f.k]:[]; const nx=cur.includes(o)?cur.filter(x=>x!==o):[...cur,o]; return {formVals:{...st.formVals,[f.k]:nx}}; }) }; });
       const bOn=!!S.formVals[f.k];
       const boolStyle='position:relative;width:44px;height:24px;border-radius:20px;border:none;cursor:pointer;background:'+(bOn?'var(--color-primary)':'var(--color-border-secondary)');
-      const boolKnob='position:absolute;top:2px;left:'+(bOn?'22px':'2px')+';width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)';
+      const boolKnob='position:absolute;top:2px;left:'+(bOn?'22px':'2px')+';width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(46, 22, 12,.2)';
       const boolToggle=()=>this.setState(st=>({formVals:{...st.formVals,[f.k]:!st.formVals[f.k]}}));
       return { label:f.label, ph:f.ph||'', value:val, onInput, options:f.options||[], inputStyle:inputBase, areaStyle:inputBase+';min-height:96px;resize:vertical;font-family:var(--font-ui)',
         isSelect:f.type==='select', isNumber:f.type==='number', isArea:f.type==='area', isChecks:f.type==='checks', isBool:f.type==='bool', checkOpts, boolStyle, boolKnob, boolToggle, isText:f.type!=='select'&&f.type!=='number'&&f.type!=='area'&&f.type!=='checks'&&f.type!=='bool' }; }):[];
 
     // --- Livraisons (module livraison · wsm_deliveries) ---
     const DELIV=SRV('deliveries')||[];
-    const livStatus={'brouillon':['#8a8f98','Szkic'],'planifiée':['#C87A3F','Zaplanowana'],'assignée':['#3B3468','Przypisana'],'en_cours':['#2563eb','W trakcie'],'livrée':['#2d7a3e','Dostarczona'],'échouée':['var(--color-primary)','Nieudana']};
+    const livStatus={'brouillon':['var(--ink-500)','Szkic'],'planifiée':['var(--accent)','Zaplanowana'],'assignée':['var(--berry-600)','Przypisana'],'en_cours':['var(--info)','W trakcie'],'livrée':['var(--success)','Dostarczona'],'échouée':['var(--color-primary)','Nieudana']};
     const eur0=(n)=>Math.round(+n||0).toLocaleString('pl-PL')+' €';
-    const livRows=DELIV.map(d=>{ const sm=livStatus[d.status]||['#8a8f98',d.status]; const done=d.status==='livrée'||!!d.confirmed;
+    const livRows=DELIV.map(d=>{ const sm=livStatus[d.status]||['var(--ink-500)',d.status]; const done=d.status==='livrée'||!!d.confirmed;
       return {ref:d.ref,client:d.client,point:d.point,driverTxt:d.driver||'— nieprzypisany',statusLabel:sm[1],
         statusPill:'display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);background:'+sm[0]+'22;color:'+sm[0],
-        caTxt:eur0(d.ca),margeTxt:eur0(d.marge),margeColor:(+d.marge<0)?'var(--color-primary)':'#2d7a3e',
+        caTxt:eur0(d.ca),margeTxt:eur0(d.marge),margeColor:(+d.marge<0)?'var(--color-primary)':'var(--success)',
         canAssign:d.status==='planifiée',canConfirm:!done&&d.status!=='planifiée',done,
         assign:()=>this.livAssign(d),confirm:()=>this.livConfirm(d),
         assignStyle:'border:none;cursor:pointer;border-radius:7px;padding:6px 11px;font:600 11px var(--font-ui);background:var(--color-background-secondary);color:var(--color-text)',
@@ -1508,7 +1508,7 @@ class Component extends DCLogic {
       
       czRows:SRV('catchment').map(z=>{ const cps=String(z.postcodes||'').split(/[^0-9]+/).filter(Boolean);
         return {...z,shopLabel:z.shop_name||(z.shop_id?('Sklep #'+z.shop_id):'Sieć — nieprzypisana'),assigned:!!(z.shop_name||z.shop_id),
-          shopPill:'display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);'+((z.shop_name||z.shop_id)?'background:#fdf3e7;color:#8C4A2F;border:.5px solid #ead9c3':'background:var(--color-background-secondary);color:var(--color-text-muted);border:.5px solid var(--color-border-tertiary)'),
+          shopPill:'display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font:600 10.5px var(--font-ui);'+((z.shop_name||z.shop_id)?'background:var(--cream-100);color:var(--choco-500);border:.5px solid var(--cream-300)':'background:var(--color-background-secondary);color:var(--color-text-muted);border:.5px solid var(--color-border-tertiary)'),
           isExcl:!!z.exclusive,cpChips:cps.map(cp=>({cp})),cpCount:cps.length+' CP',edit:this.czEdit(z),del:this.czDel(z)};}),
       czEmpty:SRV('catchment').length===0,
       czSug:(function(self,S){ const q=(S.czDraft||'').trim(); if(!S.czOpen||!window.__CPGEO||q.length<2) return [];
@@ -1521,7 +1521,7 @@ class Component extends DCLogic {
         // 3) codes individuels
         G.list.filter(e=>String(e[0]).indexOf(q)===0||String(e[1]).toLowerCase().includes(ql)).slice(0,Math.max(4,10-grpCount))
           .forEach(e=>out.push({label:e[0]+' — '+e[1],grp:false,pick:self.czPick(String(e[0]))}));
-        return out.slice(0,12).map(o=>({...o,btnStyle:o.grp?'background:#fdf3e7;border:.5px solid #ead9c3;border-radius:999px;padding:5px 12px;font:700 11.5px var(--font-ui);cursor:pointer;color:#6b4420':'background:#fff;border:.5px solid var(--color-border-secondary);border-radius:999px;padding:5px 12px;font:600 11.5px var(--font-ui);cursor:pointer'})); })(this,S),
+        return out.slice(0,12).map(o=>({...o,btnStyle:o.grp?'background:var(--cream-100);border:.5px solid var(--cream-300);border-radius:999px;padding:5px 12px;font:700 11.5px var(--font-ui);cursor:pointer;color:var(--choco-600)':'background:#fff;border:.5px solid var(--color-border-secondary);border-radius:999px;padding:5px 12px;font:600 11.5px var(--font-ui);cursor:pointer'})); })(this,S),
       czHasSug:!!(S.czOpen&&window.__CPGEO&&(S.czDraft||'').trim().length>=2),
       czF:S.cz, czChips:S.cz.cps.map(cp=>({cp,remove:this.czRemoveCp(cp)})), czDraft:S.czDraft||'',
       czOpen:S.czOpen, czNew:()=>this.czNew(), czClose:()=>this.czClose(), czSave:()=>this.czSave(),
