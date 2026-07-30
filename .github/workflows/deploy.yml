@@ -420,12 +420,16 @@ jobs:
           # VIES tombe régulièrement — c'est justement pourquoi l'intégration
           # distingue « inconnu » de « indisponible ». On observe donc, sans
           # faire échouer le déploiement sur une panne de la Commission.
-          VSTAT=$(curl -sk -o /dev/null -w '%{http_code}' "$BO/api/franchisor/vies" -X POST \
+          # On vise https:// DIRECTEMENT. En http, le .htaccess répond 308 vers
+          # https et c'est cette page de redirection qu'on lirait — l'erreur a
+          # déjà été faite une fois sur les écrans de console.
+          BOS="https://localhost/mrszoko/backoffice"
+          VSTAT=$(curl -sk -o /dev/null -w '%{http_code}' "$BOS/api/franchisor/vies" -X POST \
                    -H 'Content-Type: application/json' -d '{"vat_eu":"PL5252248481"}')
           echo "  $VSTAT  POST /franchisor/vies  (sans identité — attendu 401)"
           [ "$VSTAT" = "401" ] || { echo "  ^ FUITE : vérification VIES ouverte à tous"; fail=1; }
           if [ -n "$TOK" ]; then
-            VJSON=$(curl -sk -X POST "$BO/api/franchisor/vies" -H "X-Admin-Token: $TOK" \
+            VJSON=$(curl -sk -X POST "$BOS/api/franchisor/vies" -H "X-Admin-Token: $TOK" \
                      -H 'Content-Type: application/json' -d '{"vat_eu":"PL5252248481","force":true}')
             VS=$(printf '%s' "$VJSON" | sed 's/.*"status":"\([a-z]*\)".*/\1/')
             echo "  VIES depuis ce serveur : $VS"
