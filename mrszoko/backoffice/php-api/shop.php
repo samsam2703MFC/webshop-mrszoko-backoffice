@@ -338,6 +338,65 @@ function wsm_shop_parcel_template(PDO $pdo, array $lines): string {
     return '';
 }
 
+/**
+ * Valide les champs « vitrine » d'un produit (ce que la boutique affiche).
+ * Seules les clés PRÉSENTES dans la requête sont touchées : la page produit
+ * envoie ce qu'elle modifie, pas l'objet entier.
+ *
+ * @return array [colonnes à écrire, erreurs par champ]
+ */
+function wsm_validate_product_shop(PDO $pdo, array $in, string $id): array {
+    require_once __DIR__ . '/media.php';
+    $e = []; $out = [];
+
+    if (array_key_exists('slug', $in)) {
+        $slug = strtolower(trim((string) $in['slug']));
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+        $slug = trim($slug, '-');
+        if ($slug === '') {
+            $e['slug'] = 'wymagany';
+        } elseif (strlen($slug) > 80) {
+            $e['slug'] = 'maks. 80 znaków';
+        } else {
+            // Le slug est l'adresse publique du produit : deux produits ne
+            // peuvent pas se la partager, sinon l'un devient inatteignable.
+            $st = $pdo->prepare("SELECT id FROM wsm_products WHERE slug = ? AND id <> ?");
+            $st->execute([$slug, $id]);
+            if ($st->fetchColumn()) $e['slug'] = 'zajęty przez inny produkt';
+        }
+        $out['slug'] = $slug;
+    }
+
+    if (array_key_exists('image_url', $in)) {
+        $url = trim((string) $in['image_url']);
+        if (!wsm_media_valid_url($url)) $e['image_url'] = 'wgraj plik lub podaj adres https://';
+        $out['image_url'] = $url;
+    }
+
+    if (array_key_exists('stock', $in)) {
+        $s = (int) $in['stock'];
+        if ($s < 0) $e['stock'] = 'nie może być ujemny';
+        $out['stock'] = max(0, $s);
+    }
+
+    if (array_key_exists('shop_visible', $in)) $out['shop_visible'] = !empty($in['shop_visible']) ? 1 : 0;
+
+    foreach (['origin' => 80, 'cocoa' => 16, 'unit_label' => 40, 'badge' => 40,
+              'swatch_from' => 32, 'swatch_to' => 32] as $k => $max) {
+        if (!array_key_exists($k, $in)) continue;
+        $v = trim((string) $in[$k]);
+        if (mb_strlen($v) > $max) $e[$k] = 'maks. ' . $max . ' znaków';
+        $out[$k] = $v;
+    }
+
+    // Un produit sans slug ne peut pas être mis en vente : il n'aurait pas d'URL.
+    if (($out['shop_visible'] ?? 0) === 1 && array_key_exists('slug', $out) && $out['slug'] === '') {
+        $e['slug'] = 'wymagany, aby produkt był widoczny w sklepie';
+    }
+
+    return [$out, $e];
+}
+
 /** Code de commande lisible : MS-AAMMJJ-NNNN. */
 function wsm_next_order_code(PDO $pdo): string {
     $prefix = 'MS-' . date('ymd') . '-';

@@ -147,6 +147,27 @@ it in the console *before* the integration is switched on, so missing data is
 visible immediately. Without a ShipX token nothing is sent — the parcel is
 prepared by hand and the shipment row stays `oczekuje_na_konfiguracje`.
 
+## Product photos
+
+Uploaded from the console (`/mrszoko/backoffice/produkty.php`, role `Centrala`),
+or through `POST /franchisor/product-photo`.
+
+A file is not an image because it ends in `.jpg`. It is one because we managed
+to decode it — so every upload is decoded and **re-encoded** by GD (`media.php`).
+What lands in `shop/media/` is an image *we* produced: metadata, comments and
+anything else that might have travelled inside are left at the door. It is also
+capped at 1400 px and written as WebP.
+
+The filename is random — a user-chosen name is a user-chosen path. The extension
+comes from the re-encoded format, not from what was claimed. And
+`shop/media/.htaccess` disables script execution, so a perfectly valid image
+carrying PHP is downloaded, never interpreted. `image_url` accepts only our own
+`media/<32 hex>.webp|jpg` or an `https://` URL — `http://` would be blocked by
+the browser as mixed content.
+
+Replacing a photo deletes the old file. `media/` is not versioned and `rsync`
+runs without `--delete`, so deploys never carry the photos away.
+
 ## Configuration
 
 All in `config.php`, entirely env-driven (see the header there).
@@ -188,6 +209,7 @@ from the console.
 | GET | `/franchisor/shop-config` | integration state only — never a secret |
 | POST | `/franchisor/orders/{id}/status` | status transition (admin) |
 | POST | `/franchisor/orders/{id}/ship` | create the InPost shipment (admin, paid orders only) |
+| POST | `/franchisor/product-photo` | multipart upload — decoded and **re-encoded** server-side |
 | **Commerce (tpay + InPost)** | | |
 | POST | `/franchisor/client` | upsert/delete `wsm_clients` — validated payer + invoice data |
 | POST | `/franchisor/client-point` | upsert/delete `wsm_client_points` — locker code or courier address |
