@@ -70,6 +70,7 @@ function console_menu(): array {
         'poczta.php'      => 'Poczta',
         'produkty.php'    => 'Produkty',
         'magazyn.php'     => 'Magazyn',
+        'tresci.php'      => 'Treści',
         'kontrahenci.php' => 'Kontrahenci',
         'kraje.php'       => 'Kraje',
         'rabaty.php'      => 'Rabaty',
