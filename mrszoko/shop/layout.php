@@ -49,8 +49,9 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
       <img src="<?= e(u('assets/logo.png')) ?>" alt="<?= e($S['brand'] ?? 'Mister Szoko') ?>" width="150" height="44">
     </a>
     <nav class="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
-      <a class="navlink" href="<?= e(u()) ?>"><?= e($S['nav.shop'] ?? '') ?></a>
-      <a class="navlink" href="<?= e(shop_base() . '/../landing/') ?>"><?= e($S['nav.landing'] ?? '') ?></a>
+      <a class="navlink" href="<?= e(u()) ?>#katalog"><?= e($S['nav.shop'] ?? '') ?></a>
+      <a class="navlink" href="<?= e(u()) ?>#pracownia"><?= e($S['nav.landing'] ?? '') ?></a>
+      <a class="navlink" href="<?= e(u()) ?>#pro"><?= e($S['story.pro.eyebrow'] ?? '') ?></a>
     </nav>
     <div class="head-right">
       <div class="langs" role="group" aria-label="<?= e($S['a11y.lang'] ?? '') ?>">
@@ -75,10 +76,14 @@ function layout_footer(array $S): void {
   <div class="wrap foot-in">
     <div>
       <img class="foot-logo" src="<?= e(u('assets/logo.png')) ?>" alt="<?= e($S['brand'] ?? '') ?>" width="120" height="36" loading="lazy">
+      <p class="mono"><?= e($S['footer.tagline'] ?? '') ?></p>
       <p class="mono"><?= e(date('Y')) ?> · <?= e($S['brand'] ?? '') ?> · <?= e($S['footer.rights'] ?? '') ?></p>
     </div>
     <nav class="foot-links mono" aria-label="<?= e($S['footer.contact'] ?? '') ?>">
-      <a href="<?= e(shop_base() . '/../landing/') ?>"><?= e($S['footer.landing'] ?? '') ?></a>
+      <?php if (($S['footer.email'] ?? '') !== ''): ?>
+      <a href="mailto:<?= e($S['footer.email']) ?>"><?= e($S['footer.email']) ?></a>
+      <?php endif; ?>
+      <a href="<?= e(u()) ?>#pracownia"><?= e($S['nav.landing'] ?? '') ?></a>
       <a href="<?= e(shop_base() . '/../backoffice/') ?>"><?= e($S['footer.console'] ?? '') ?></a>
     </nav>
   </div>

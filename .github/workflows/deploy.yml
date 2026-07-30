@@ -93,14 +93,16 @@ jobs:
           # -- En-têtes de sécurité à la racine du site --------------------------
           cp mrszoko/.htaccess site/.htaccess
 
-          # -- /mrszoko/ → redirect to the landing ------------------------------
+          # -- /mrszoko/ → la boutique, qui EST désormais le site public --------
+          # La page de marque et la boutique n'en font plus qu'une : /landing
+          # reste vivante (elle a été partagée) mais ne fait que rediriger.
           cat > site/index.html <<'HTML'
           <!DOCTYPE html>
-          <html lang="fr"><head><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=landing/">
+          <html lang="pl"><head><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=shop/">
           <title>Mister Szoko</title>
-          <link rel="canonical" href="landing/">
-          </head><body><p><a href="landing/">Mister Szoko</a></p></body></html>
+          <link rel="canonical" href="shop/">
+          </head><body><p><a href="shop/">Mister Szoko</a></p></body></html>
           HTML
 
           ls -R site | head -60
@@ -300,13 +302,16 @@ jobs:
                    /img/logo.png; do
             run "$BO$f" 1
           done
-          echo "== landing =="
-          run "$LP/" 1000
-          run "$LP/app.js" 1000
+          echo "== landing : fusionnée dans la boutique, ne doit plus que rediriger =="
+          run "$LP/" 100
+          LP_HTML=$(curl -skL "$LP/")
+          if printf '%s' "$LP_HTML" | grep -q 'url=../shop/'; then
+            echo "  /landing/ renvoie vers la boutique : confirmé"
+          else
+            echo "  ^ NOT OK : /landing/ ne redirige pas vers /shop/"; fail=1
+          fi
+          # content_seed.json reste servi : c'est la source du seed de wsm_landing_i18n.
           run "$LP/content_seed.json" 4000
-          run "$LP/tokens.css" 100
-          run "$LP/tokens/colors.css" 500
-          run "$LP/assets/logo.png" 1000
           echo "== API landing : contenu servi en 3 langues depuis la base =="
           for lg in pl uk en; do run "$BO/api/landing/content?lang=$lg" 2000; done
 
@@ -326,6 +331,15 @@ jobs:
           echo "  produits rendus côté serveur : $N_PROD  ·  prix rendus : $N_PRICE"
           [ "${N_PROD:-0}" -ge 5 ] || { echo "  ^ NOT OK : le catalogue n'est pas dans le HTML initial"; fail=1; }
           [ "${N_PRICE:-0}" -ge 5 ] || { echo "  ^ NOT OK : les prix ne sont pas dans le HTML initial"; fail=1; }
+          # Page unique : le contenu éditorial de la landing doit y être, rendu
+          # par le serveur comme le reste — sinon la fusion n'a pas eu lieu.
+          for anchor in 'id="formaty"' 'id="pracownia"' 'id="pro"' 'hero-strip'; do
+            if printf '%s' "$HOME_HTML" | grep -q "$anchor"; then
+              echo "  section $anchor : présente"
+            else
+              echo "  ^ NOT OK : section $anchor absente de la page unique"; fail=1
+            fi
+          done
           # Fiche produit : on suit un vrai lien du catalogue.
           SLUG=$(printf '%s' "$HOME_HTML" | grep -o 'href="[^"]*/shop/p/[^"]*"' | head -1 | sed 's/.*\/p\///;s/"$//')
           if [ -n "$SLUG" ]; then run "$SH/p/$SLUG" 4000; else echo "  ^ NOT OK : aucun lien produit"; fail=1; fi
@@ -437,8 +451,11 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
-          echo "== racine /mrszoko → redirection landing =="
+          echo "== racine /mrszoko → redirection boutique =="
           run "http://localhost/mrszoko/" 50
+          curl -skL "http://localhost/mrszoko/" | grep -q 'url=shop/' \
+            && echo "  la racine renvoie vers la boutique : confirmé" \
+            || { echo "  ^ NOT OK : la racine ne renvoie pas vers /shop/"; fail=1; }
           if [ "$fail" = "0" ]; then echo "ALL CHECKS OK"; else echo "CHECK FAILED"; exit 1; fi
           REMOTE
 
