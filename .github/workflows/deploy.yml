@@ -418,6 +418,11 @@ jobs:
           curl -skL "$BO/console.css" | grep -q 'grid-template-columns: 268px' \
             && echo "  colonne de navigation à gauche : présente dans la feuille" \
             || { echo "  ^ NOT OK : la mise en page à deux colonnes a disparu"; fail=1; }
+          # Le bloc marque et l'en-tête de page partagent leur hauteur : sans
+          # cette variable, le bandeau du haut se lit comme deux morceaux.
+          curl -skL "$BO/console.css" | grep -q -- '--wsm-bar-h' \
+            && echo "  bandeau supérieur d'une seule hauteur : confirmé" \
+            || { echo "  ^ NOT OK : le bandeau du haut va se désaligner"; fail=1; }
           run "$BO/console-nav.js" 1000
           curl -skL "$BO/" | grep -q 'console-nav.js' \
             && echo "  la console porte la navigation des écrans : confirmé" \
