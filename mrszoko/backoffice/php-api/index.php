@@ -325,6 +325,27 @@ if ($method === 'POST') {
     $body = wsm_body();
 
     switch ($route) {
+        // ---- photo produit : envoi multipart, ré-encodée par le serveur -----
+        // Le fichier reçu est décodé puis réécrit par GD (media.php) : ce qui
+        // est stocké est une image que NOUS avons fabriquée.
+        case 'product-photo': {
+            require_once __DIR__ . '/media.php';
+            $id = (string) ($_POST['id'] ?? '');
+            $st = $pdo->prepare("SELECT image_url FROM wsm_products WHERE id=?");
+            $st->execute([$id]);
+            $old = $st->fetch();
+            if ($old === false) wsm_fail('product_not_found', 404);
+
+            [$url, $err] = wsm_media_store($_FILES['photo'] ?? []);
+            if ($err !== null) wsm_fail_fields(['photo' => $err]);
+
+            $pdo->prepare("UPDATE wsm_products SET image_url=? WHERE id=?")->execute([$url, $id]);
+            $prev = (string) $old['image_url'];
+            if ($prev !== '' && $prev !== $url) wsm_media_delete($prev);
+            wsm_audit($pdo, $actorName, 'Zmiana', 'wsm_products ' . $id . ' zdjęcie', 'Sieć');
+            wsm_send(['ok' => true, 'id' => $id, 'image_url' => $url]);
+        }
+
         // ---- client B2B : payeur tpay + destinataire InPost -----------------
         case 'client': {
             if (!empty($body['delete'])) {
@@ -435,6 +456,16 @@ if ($method === 'POST') {
                 if ($errors) wsm_fail_fields($errors);
                 foreach ($log as $k => $v) { $set[] = "$k=?"; $vals[] = $v; }
             }
+
+            // Vitrine : photo, slug, stock, mise en vente, mentions de la carte.
+            $shopKeys = ['slug', 'image_url', 'stock', 'shop_visible', 'origin', 'cocoa',
+                         'unit_label', 'badge', 'swatch_from', 'swatch_to'];
+            if (array_intersect($shopKeys, array_keys($body))) {
+                [$shop, $errors] = wsm_validate_product_shop($pdo, array_intersect_key($body, array_flip($shopKeys)), $id);
+                if ($errors) wsm_fail_fields($errors);
+                foreach ($shop as $k => $v) { $set[] = "$k=?"; $vals[] = $v; }
+            }
+
             if (!$set) wsm_fail('no_fields');
             $vals[] = $id;
             $pdo->prepare("UPDATE wsm_products SET " . implode(',', $set) . " WHERE id=?")->execute($vals);

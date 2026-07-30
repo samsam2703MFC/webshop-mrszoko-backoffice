@@ -78,8 +78,17 @@ jobs:
           test -s site/shop/tokens.css && grep -q -- '--choco-700' site/shop/tokens.css \
             || { echo "tokens.css régénéré vide ou incomplet"; exit 1; }
 
-          # Écran Commandes de la console (page PHP autonome, même session).
-          cp mrszoko/backoffice/zamowienia.php site/backoffice/
+          # Écrans PHP autonomes de la console (même session, mêmes rôles) :
+          # Commandes et Produits/photos. Le fichier exporté par Claude Design
+          # n'est pas touché — un patch à la main le rendrait irrécupérable au
+          # prochain export.
+          cp mrszoko/backoffice/zamowienia.php mrszoko/backoffice/produkty.php site/backoffice/
+
+          # Dossier des photos envoyées depuis la console. Il ne contient que
+          # son .htaccess : rsync tourne sans --delete, donc les photos déjà
+          # présentes sur le serveur survivent au déploiement.
+          mkdir -p site/shop/media
+          cp mrszoko/shop/media/.htaccess site/shop/media/.htaccess
 
           # -- En-têtes de sécurité à la racine du site --------------------------
           cp mrszoko/.htaccess site/.htaccess
@@ -112,6 +121,9 @@ jobs:
           API="$DIR/backoffice/api"
           mkdir -p "$API/data"
           chown -R www-data:www-data "$API/data" 2>/dev/null || chmod -R 777 "$API/data"
+          # Photos produit : c'est le serveur web qui écrit ici, pas le déploiement.
+          mkdir -p "$DIR/shop/media"
+          chown -R www-data:www-data "$DIR/shop/media" 2>/dev/null || chmod -R 775 "$DIR/shop/media"
           command -v rsync >/dev/null || { echo 'rsync manquant sur le serveur — apt-get install -y rsync'; exit 1; }
           # pdo_sqlite = repli dev/CI ; installé au run #10, on vérifie sans réinstaller.
           php -m 2>/dev/null | grep -qi '^pdo_sqlite' && echo 'pdo_sqlite présent (repli)' || echo 'pdo_sqlite absent (repli indisponible)'
@@ -265,7 +277,7 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' DIR_SHOP='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/shop' bash -s" << 'REMOTE'
           fail=0
           run() { URL="$1"; MIN="${2:-1}"
             out=$(curl -skL -o /dev/null -w "%{http_code}|%{size_download}|%{content_type}" "$URL")
@@ -321,6 +333,30 @@ jobs:
           c=$(curl -skL -o /dev/null -w '%{http_code}' "$SH/content_seed.json")
           echo "  $c  GET /shop/content_seed.json  (attendu 403/404)"
           case "$c" in 403|404) ;; *) echo "  ^ FUITE : la source du contenu est publique"; fail=1;; esac
+
+          echo "== console : écrans PHP autonomes (session exigée) =="
+          for pg in zamowienia.php produkty.php; do
+            c=$(curl -sk -o /dev/null -w '%{http_code}' "$BO/$pg")
+            echo "  $c  GET /backoffice/$pg  (sans session — attendu 302 vers la console)"
+            [ "$c" = "302" ] || { echo "  ^ NOT OK : écran accessible sans authentification"; fail=1; }
+          done
+          # Le dossier des photos doit être inscriptible par le serveur web,
+          # sinon l'envoi échoue au moment où le client en a besoin.
+          if sudo -n -u www-data test -w "$DIR_SHOP/media" 2>/dev/null || [ -w "$DIR_SHOP/media" ]; then
+            echo "  shop/media inscriptible : oui"
+          else
+            echo "  ^ ATTENTION : shop/media non inscriptible — l'envoi de photos échouera"; fail=1
+          fi
+          # Une image reste une image : le dossier ne doit pas exécuter de script.
+          printf '%s' '<?php echo "EXECUTED"; ?>' > "$DIR_SHOP/media/_probe.php" 2>/dev/null || true
+          if [ -f "$DIR_SHOP/media/_probe.php" ]; then
+            OUT=$(curl -sk "http://localhost/mrszoko/shop/media/_probe.php" | head -c 40)
+            rm -f "$DIR_SHOP/media/_probe.php"
+            case "$OUT" in
+              *EXECUTED*) echo "  ^ FUITE : PHP s'exécute dans shop/media"; fail=1;;
+              *) echo "  shop/media n'exécute pas PHP : confirmé";;
+            esac
+          fi
 
           echo "== API boutique : catalogue public, écriture protégée =="
           for lg in pl uk en; do run "$BO/api/shop/catalog?lang=$lg" 3000; done

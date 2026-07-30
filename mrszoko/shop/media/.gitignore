@@ -1,0 +1,5 @@
+# Les photos envoyées depuis la console vivent sur le serveur, pas dans git.
+# rsync tourne sans --delete : un déploiement ne les efface pas.
+*
+!.gitignore
+!.htaccess

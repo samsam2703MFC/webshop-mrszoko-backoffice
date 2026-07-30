@@ -44,6 +44,36 @@ libellés nouveaux (`migrate.php --sync-content`) sans écraser les retouches.
 
 Le fichier n'est pas servi au public (`.htaccess`).
 
+## Les photos produit
+
+Elles s'envoient depuis la console — **Produkty i zdjęcia**
+(`../backoffice/produkty.php`), réservé au rôle `Centrala`.
+
+Un fichier n'est pas une image parce qu'il finit par `.jpg`. Il l'est parce
+qu'on a réussi à le décoder : chaque envoi est décodé puis **ré-encodé** par GD
+(`../backoffice/php-api/media.php`). Ce qui atterrit dans `media/` est donc une
+image que nous avons fabriquée — métadonnées, commentaires et tout ce qui
+aurait pu voyager dedans restent à la porte. Elle est aussi ramenée à 1400 px
+et convertie en WebP, ce qui divise le poids par cinq ou dix.
+
+Trois autres précautions :
+
+- le nom du fichier est **tiré au sort**, jamais repris de l'envoi — un nom
+  choisi par l'utilisateur est un chemin choisi par l'utilisateur ;
+- l'extension vient du format ré-encodé, pas de ce qui était annoncé ;
+- `media/.htaccess` **coupe l'exécution de script** : une image parfaitement
+  valide contenant du PHP y serait téléchargée, jamais interprétée.
+
+Remplacer une photo efface l'ancienne. Le dossier `media/` n'est pas versionné
+(les photos vivent sur le serveur) et `rsync` tourne sans `--delete` : un
+déploiement ne les emporte pas.
+
+On peut aussi coller une adresse `https://` au lieu d'envoyer un fichier — en
+`http` le navigateur bloquerait l'image pour contenu mixte, c'est refusé.
+
+Preuve : les 19 assertions « zdjęcia produktów » de
+`../backoffice/php-api/tests/e2e_shop.php`.
+
 ## En local
 
 ```bash
@@ -57,9 +87,9 @@ déployé.
 
 ## Ce qui n'y est pas encore
 
-- **Les photos.** Faute de photographie produit, les vignettes sont des dégradés
-  aux couleurs de chaque chocolat. Dès que `wsm_products.image_url` est
-  renseignée en base, l'image prend la place — aucune modification de code.
+- **Les photos réelles.** Les vignettes restent des dégradés aux couleurs de
+  chaque chocolat tant qu'aucune photo n'a été envoyée. Elles s'envoient depuis
+  la console : `/mrszoko/backoffice/produkty.php`.
 - **L'appel réel à tpay et InPost** attend des identifiants. Le code est écrit
   et testé ; sans identifiants il est fermé, pas approximatif : aucune
   transaction créée, aucune notification acceptée.

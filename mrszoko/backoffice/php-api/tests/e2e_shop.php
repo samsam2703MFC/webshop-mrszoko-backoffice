@@ -252,5 +252,98 @@ for ($i = 0; $i < 7; $i++) {
 }
 ok('powtarzane zamówienia z tego samego adresu → 429', $last === 429, $last);
 
+// ---- 6. Photos produit -----------------------------------------------------
+// Un fichier n'est pas une image parce qu'il s'appelle .jpg : le serveur le
+// décode et le RÉ-ENCODE. Ce qui ressort est une image fabriquée par nous.
+echo "-- zdjęcia produktów --\n";
+require_once dirname(__DIR__) . '/media.php';
+
+$tmpDir = sys_get_temp_dir();
+$png = $tmpDir . '/wsm-test.png';
+$im = imagecreatetruecolor(2000, 1200);                 // volontairement trop grande
+imagefill($im, 0, 0, imagecolorallocate($im, 65, 40, 26));
+imagepng($im, $png);
+imagedestroy($im);
+
+$fake = $tmpDir . '/wsm-fake.jpg';                       // du texte déguisé en .jpg
+file_put_contents($fake, "<?php echo 'nie jestem obrazem'; ?>");
+
+function upload(string $url, string $id, string $file, ?string $token): array {
+    $ch = curl_init($url);
+    $headers = ['Accept: application/json'];
+    if ($token !== null) $headers[] = 'X-Admin-Token: ' . $token;
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => ['id' => $id, 'photo' => new CURLFile($file)],
+    ]);
+    $raw = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$code, json_decode($raw ?: 'null', true)];
+}
+
+$PHOTO = "$BASE/franchisor/product-photo";
+ok('wgranie zdjęcia bez tożsamości → 401', upload($PHOTO, $prod['id'], $png, null)[0] === 401);
+
+$r = upload($PHOTO, $prod['id'], $fake, $TOKEN);
+ok('plik, który nie jest obrazem → 422', badField($r, 'photo'), $r);
+
+$r = upload($PHOTO, 'nie-ma-takiego', $png, $TOKEN);
+ok('nieznany produkt → 404', $r[0] === 404, $r[0]);
+
+$r = upload($PHOTO, $prod['id'], $png, $TOKEN);
+ok('poprawne zdjęcie → 200', $r[0] === 200 && !empty($r[1]['image_url']), $r);
+$mediaUrl = $r[1]['image_url'] ?? '';
+ok('nazwa pliku jest losowa, nie pochodzi z wgrania',
+    preg_match('#^media/[a-f0-9]{24}\.(webp|jpg)$#', $mediaUrl) === 1, $mediaUrl);
+
+$onDisk = dirname(__DIR__, 3) . '/shop/' . $mediaUrl;
+ok('plik istnieje na dysku', is_file($onDisk), $onDisk);
+$dim = @getimagesize($onDisk);
+ok('obraz został zmniejszony do 1400 px', $dim && max($dim[0], $dim[1]) <= 1400, $dim ? [$dim[0], $dim[1]] : null);
+ok('obraz został przekodowany (nie jest już PNG)', $dim && $dim[2] !== IMAGETYPE_PNG, $dim[2] ?? null);
+ok('plik wyjściowy jest lżejszy od wgranego', filesize($onDisk) < filesize($png),
+    [filesize($png), filesize($onDisk)]);
+
+[, $catNow] = http('GET', "$BASE/shop/catalog");
+$withImg = null;
+foreach ($catNow['products'] as $p) if ($p['id'] === $prod['id']) $withImg = $p;
+ok('sklep podaje zdjęcie produktu', ($withImg['image'] ?? '') === $mediaUrl, $withImg['image'] ?? null);
+
+// Remplacer la photo doit effacer l'ancienne : un dossier media/ qui ne fait
+// que grossir finit par remplir le disque du serveur.
+$r2 = upload($PHOTO, $prod['id'], $png, $TOKEN);
+ok('podmiana zdjęcia → 200', $r2[0] === 200);
+ok('stare zdjęcie zostało usunięte z dysku', !is_file($onDisk), $onDisk);
+
+// Champs vitrine par l'API.
+$r = http('POST', "$BASE/franchisor/product", ['id' => $prod['id'], 'image_url' => 'http://exemple.pl/x.jpg'], $TOKEN);
+ok('adres http (nie https) → 422', badField($r, 'image_url'), $r);
+$r = http('POST', "$BASE/franchisor/product", ['id' => $prod['id'], 'image_url' => 'media/../../api/config.local.php'], $TOKEN);
+ok('próba wyjścia poza media/ → 422', badField($r, 'image_url'), $r);
+$r = http('POST', "$BASE/franchisor/product", ['id' => $prod['id'], 'stock' => -5], $TOKEN);
+ok('ujemny stan → 422', badField($r, 'stock'), $r);
+
+$other = null;
+foreach ($products as $p) if ($p['id'] !== $prod['id']) $other = $p;
+$r = http('POST', "$BASE/franchisor/product", ['id' => $prod['id'], 'slug' => $other['slug']], $TOKEN);
+ok('slug zajęty przez inny produkt → 422', badField($r, 'slug'), $r);
+
+$r = http('POST', "$BASE/franchisor/product", ['id' => $prod['id'], 'slug' => 'Czekolada Testowa 70%!!'], $TOKEN);
+ok('slug jest normalizowany, nie odrzucany', $r[0] === 200, $r);
+[, $c3] = http('GET', "$BASE/shop/catalog");
+$slugged = null;
+foreach ($c3['products'] as $p) if ($p['id'] === $prod['id']) $slugged = $p;
+ok('slug zapisany jako czekolada-testowa-70', ($slugged['slug'] ?? '') === 'czekolada-testowa-70', $slugged['slug'] ?? null);
+ok('produkt osiągalny pod nowym slugiem',
+    http('GET', "$BASE/shop/product/" . rawurlencode((string) $slugged['slug']))[0] === 200);
+
+// nettoyage : on ne laisse pas traîner le média du test
+$last = $r2[1]['image_url'] ?? '';
+if ($last !== '') { wsm_media_delete($last); }
+http('POST', "$BASE/franchisor/product", ['id' => $prod['id'], 'image_url' => '', 'slug' => $prod['slug']], $TOKEN);
+@unlink($png); @unlink($fake);
+
+
 echo "\n" . ($fail === 0 ? "ALL GREEN: $pass passed, 0 failed" : "FAILURES: $pass passed, $fail FAILED") . "\n";
 exit($fail === 0 ? 0 : 1);
