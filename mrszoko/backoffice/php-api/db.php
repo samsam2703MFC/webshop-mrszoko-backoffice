@@ -271,6 +271,18 @@ function wsm_ensure_trade(PDO $pdo): void {
     wsm_ensure_columns($pdo, 'wsm_order_items', [
         // Combien de cette ligne reste à produire : ce que l'atelier doit savoir.
         'backorder' => $int,
+        // Le coût de revient AU MOMENT DE LA VENTE, en grosze. Recalculer une
+        // marge d'il y a six mois avec le prix d'achat d'aujourd'hui donnerait
+        // un chiffre faux : la matière première bouge, la vente est passée.
+        // Comme les lignes de facture, la ligne de commande fige ce qu'elle
+        // doit prouver.
+        'unit_cost' => $int,
+    ]);
+    // Ce que le transporteur nous facture, à distinguer de ce que le client
+    // paie. Sans les deux, « quelle part du port le client couvre-t-il ? » n'a
+    // pas de réponse : le rapport vaudrait 100 % par construction.
+    wsm_ensure_columns($pdo, 'wsm_shipping_methods', [
+        'cost_net' => $int,
     ]);
     try {
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_discount_tiers")->fetchColumn()) {

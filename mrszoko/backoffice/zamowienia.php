@@ -22,6 +22,11 @@ require_once $API . '/stock.php';
 
 $flash = ''; $flashKind = 'ok';
 
+$statusLabel = ['nowe' => 'Nowe', 'oplacone' => 'Opłacone', 'w_realizacji' => 'W realizacji',
+                'wyslane' => 'Wysłane', 'dostarczone' => 'Dostarczone', 'anulowane' => 'Anulowane'];
+$payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 'Nieudana',
+             'niedostepne' => 'Niedostępna'];
+
 // ---- Actions (réservées à Centrala) ---------------------------------------
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!$isAdmin) {
@@ -33,10 +38,33 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $flash = 'Nie znaleziono zamówienia.'; $flashKind = 'err';
         } elseif (isset($_POST['status'])) {
             $new = (string) $_POST['status'];
-            if (in_array($new, WSM_ORDER_STATUSES, true)) {
+            if (!in_array($new, WSM_ORDER_STATUSES, true)) {
+                $flash = 'Nieznany status.'; $flashKind = 'err';
+            } elseif ($new === (string) $order['status']) {
+                $flash = 'Zamówienie już ma ten status — nic nie zmieniono.';
+            } else {
                 $pdo->prepare("UPDATE wsm_orders SET status = ? WHERE id = ?")->execute([$new, $id]);
                 wsm_order_event($pdo, $id, 'status', $new, (string) ($me['nom'] ?? ''));
-                $flash = $order['code'] . ' → ' . $new;
+                $flash = $order['code'] . ' → ' . ($statusLabel[$new] ?? $new);
+
+                // Le client apprend le changement s'il y a un modèle pour cet
+                // état ET si l'opérateur ne l'a pas décoché. Un changement de
+                // rangement interne ne mérite pas toujours un e-mail.
+                if (!empty($_POST['powiadom'])) {
+                    $fresh = wsm_order_by_id($pdo, $id) ?: $order;
+                    $mid = wsm_mail_for_status($pdo, $fresh, $new, (string) ($me['nom'] ?? ''));
+                    if ($mid > 0) {
+                        $flash .= ' · powiadomiono ' . $fresh['email'];
+                    } elseif (in_array($new, WSM_MAIL_STATUS_EVENTS, true)) {
+                        // Distinguer « déjà envoyé » de « pas de modèle » évite
+                        // de chercher une panne là où il n'y en a pas.
+                        $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_messages WHERE event_key = ?");
+                        $st->execute(['status:' . $id . ':' . $new]);
+                        $flash .= (int) $st->fetchColumn() > 0
+                            ? ' · maila o tym statusie już wcześniej wysłano'
+                            : ' · bez maila (brak szablonu, adresu lub poczta wyłączona)';
+                    }
+                }
             }
         } elseif (isset($_POST['wz'])) {
             [$d, $err] = wsm_stock_issue_wz($pdo, $order, (string) ($me['nom'] ?? ''));
@@ -60,10 +88,6 @@ $orders = wsm_orders_list($pdo, 200);
 $kpis   = wsm_shop_kpis($pdo);
 $cfg    = ['tpay' => wsm_tpay_enabled(), 'inpost' => wsm_inpost_enabled()];
 
-$statusLabel = ['nowe' => 'Nowe', 'oplacone' => 'Opłacone', 'w_realizacji' => 'W realizacji',
-                'wyslane' => 'Wysłane', 'dostarczone' => 'Dostarczone', 'anulowane' => 'Anulowane'];
-$payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 'Nieudana',
-             'niedostepne' => 'Niedostępna'];
 
 console_head('Zamówienia', $me, '', $kpis['orders_pending'] ? $kpis['orders_pending'] . ' czeka na płatność' : '');
 console_flash($flash, $flashKind);
@@ -91,7 +115,13 @@ console_crumbs($detail
   $st = $pdo->prepare("SELECT event, detail, actor, created_at FROM wsm_order_events WHERE order_id = ? ORDER BY id");
   $st->execute([(int) $o['id']]);
   $events = $st->fetchAll();
-  $blockers = wsm_inpost_blockers($o); ?>
+  $blockers = wsm_inpost_blockers($o);
+  // Le WZ est cherché ici, pas dans le bloc réservé à Centrala : un préparateur
+  // doit pouvoir IMPRIMER le bon de sortie même s'il n'a pas le droit de le
+  // créer. Lire n'est pas écrire.
+  $wzq = $pdo->prepare("SELECT id, number FROM wsm_stock_docs WHERE kind='WZ' AND order_id = ?");
+  $wzq->execute([(int) $o['id']]);
+  $wzRow = $wzq->fetch() ?: null; ?>
   <div class="panel">
     <h2><?= h($o['code']) ?> · <?= h(pln($o['total_gross'])) ?></h2>
     <div class="cols">
@@ -121,19 +151,21 @@ console_crumbs($detail
 
     <?php if ($isAdmin): ?>
     <div class="actions">
-      <form method="post">
+      <form method="post" style="align-items:center">
         <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
         <select name="status">
           <?php foreach (WSM_ORDER_STATUSES as $s): ?>
           <option value="<?= h($s) ?>"<?= $s === $o['status'] ? ' selected' : '' ?>><?= h($statusLabel[$s] ?? $s) ?></option>
           <?php endforeach; ?>
         </select>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13.5px;white-space:nowrap">
+          <input type="checkbox" name="powiadom" value="1" checked>
+          Powiadom klienta
+        </label>
         <button type="submit">Zmień status</button>
       </form>
       <form method="post">
         <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
-        <?php $wzq = $pdo->prepare("SELECT id, number FROM wsm_stock_docs WHERE kind='WZ' AND order_id = ?");
-              $wzq->execute([(int) $o['id']]); $wzRow = $wzq->fetch(); ?>
         <?php if ($wzRow): ?>
         <a class="code" href="magazyn.php?dok=<?= (int) $wzRow['id'] ?>">WZ <?= h((string) $wzRow['number']) ?> →</a>
         <?php else: ?>
@@ -150,9 +182,40 @@ console_crumbs($detail
     </div>
     <?php endif; ?>
 
-    <p class="actions" style="margin-top:18px">
-      <a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>&amp;druk=1" target="_blank" rel="noopener">Drukuj zamówienie ↗</a>
-      <a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>&amp;etykieta=1" target="_blank" rel="noopener">Drukuj etykietę ↗</a>
+    <?php
+    // Ce qu'on imprime réellement pour un colis : le bon de préparation, le WZ
+    // qui part avec la marchandise et se signe à la réception, et l'étiquette.
+    // L'étiquette du transporteur est celle qui fait foi dès qu'elle existe —
+    // la nôtre ne sert qu'à défaut, et le dit sur la feuille.
+    $shipRow = $pdo->prepare("SELECT shipment_id, tracking_number FROM wsm_shipments WHERE order_id = ? ORDER BY id DESC LIMIT 1");
+    $shipRow->execute([(int) $o['id']]);
+    $shipNow = $shipRow->fetch() ?: [];
+    $maPrzesylke = trim((string) ($shipNow['shipment_id'] ?? '')) !== '';
+    ?>
+    <h2 style="margin-top:22px">Wydruki</h2>
+    <p class="actions" style="margin-top:8px">
+      <a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>&amp;druk=1" target="_blank" rel="noopener">Bon zamówienia (A4) ↗</a>
+      <?php if ($wzRow): ?>
+      <a class="code" href="magazyn.php?dok=<?= (int) $wzRow['id'] ?>&amp;druk=1" target="_blank" rel="noopener">Drukuj WZ <?= h((string) $wzRow['number']) ?> (A4) ↗</a>
+      <?php endif; ?>
+      <?php if ($maPrzesylke): ?>
+      <a class="code" href="etykieta_inpost.php?id=<?= (int) $o['id'] ?>" target="_blank" rel="noopener">Etykieta InPost — A6 ↗</a>
+      <a class="code" href="etykieta_inpost.php?id=<?= (int) $o['id'] ?>&amp;format=a4" target="_blank" rel="noopener">Etykieta InPost — A4 ↗</a>
+      <?php endif; ?>
+      <a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>&amp;etykieta=1" target="_blank" rel="noopener">Etykieta wewnętrzna ↗</a>
+    </p>
+    <p class="muted small" style="margin-top:4px">
+      <?php if ($maPrzesylke): ?>
+        Na paczkę naklejamy <b>etykietę InPost</b> — to ona ma kod kreskowy i tylko ona jest
+        listem przewozowym. A6 na drukarkę etykiet, A4 na zwykłą kartkę.
+        Etykieta wewnętrzna to opis pomocniczy, nie przewozowy.
+      <?php else: ?>
+        Przesyłka nie została jeszcze utworzona w InPost, więc etykiety przewoźnika nie ma.
+        Do tego czasu można wydrukować <b>etykietę wewnętrzną</b> — nie zastępuje listu przewozowego.
+      <?php endif; ?>
+      <?php if (!$wzRow): ?>
+        <br>WZ pojawi się tu do druku po utworzeniu dokumentu wydania.
+      <?php endif; ?>
     </p>
 
     <h2 style="margin-top:26px">Ładunek ShipX</h2>

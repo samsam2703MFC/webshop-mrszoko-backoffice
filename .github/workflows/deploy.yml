@@ -90,6 +90,7 @@ jobs:
              mrszoko/backoffice/magazyn_druk.php mrszoko/backoffice/uzytkownicy.php \
              mrszoko/backoffice/audyt.php mrszoko/backoffice/zamowienie_druk.php \
              mrszoko/backoffice/etykieta_druk.php mrszoko/backoffice/tresci.php \
+             mrszoko/backoffice/etykieta_inpost.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -403,7 +404,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
