@@ -70,14 +70,34 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Prepare remote directory (validates SSH login)
+      - name: Prepare remote directory + PHP pdo_sqlite (validates SSH login)
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "mkdir -p '${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api/data' && { chown -R www-data:www-data '${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api/data' 2>/dev/null || chmod -R 777 '${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api/data'; } && command -v rsync >/dev/null || (echo 'rsync manquant sur le serveur — apt-get install -y rsync'; exit 1)"
+            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' bash -s" << 'REMOTE'
+          set -e
+          DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
+          mkdir -p "$DIR/backoffice/api/data"
+          chown -R www-data:www-data "$DIR/backoffice/api/data" 2>/dev/null \
+            || chmod -R 777 "$DIR/backoffice/api/data"
+          command -v rsync >/dev/null || { echo 'rsync manquant sur le serveur — apt-get install -y rsync'; exit 1; }
+          # L'API tourne par défaut sur SQLite (aucun config.local.php MySQL) :
+          # le driver PDO sqlite doit exister côté Apache. Constaté manquant au
+          # run #9 (500 «could not find driver») — on l'installe si absent.
+          if ! php -m 2>/dev/null | grep -qi '^pdo_sqlite'; then
+            echo 'pdo_sqlite manquant — installation de php-sqlite3…'
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq && apt-get install -y -qq php-sqlite3
+            systemctl reload apache2 2>/dev/null || systemctl restart apache2 2>/dev/null || service apache2 restart 2>/dev/null || true
+            systemctl restart 'php*-fpm' 2>/dev/null || true
+            php -m | grep -qi '^pdo_sqlite' && echo 'pdo_sqlite OK'
+          else
+            echo 'pdo_sqlite déjà présent'
+          fi
+          REMOTE
 
       - name: Deploy → ${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}
         env:
@@ -100,7 +120,11 @@ jobs:
             IFS='|' read -r code size type <<< "$out"
             size="${size%.*}"
             echo "  $code  $type  ${size}b  $URL"
-            if [ "$code" != "200" ] || [ "${size:-0}" -lt "$MIN" ]; then echo "  ^ NOT OK"; fail=1; fi
+            if [ "$code" != "200" ] || [ "${size:-0}" -lt "$MIN" ]; then
+              echo "  ^ NOT OK — corps de la réponse :"
+              curl -s "$URL" | head -c 300; echo
+              fail=1
+            fi
           }
           BO="http://localhost/mrszoko/backoffice"
           LP="http://localhost/mrszoko/landing"
