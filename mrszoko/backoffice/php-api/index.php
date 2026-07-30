@@ -10,6 +10,7 @@ declare(strict_types=1);
 require __DIR__ . '/db.php';
 require __DIR__ . '/delivery.php';
 require __DIR__ . '/auth.php';
+require __DIR__ . '/commerce.php';
 
 $cfg = wsm_config();
 
@@ -36,6 +37,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(20
 
 function wsm_send($data, int $code = 200): void { http_response_code($code); echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
 function wsm_fail(string $msg, int $code = 400): void { wsm_send(['error' => $msg], $code); }
+/** Erreurs de validation champ par champ — le formulaire les affiche en place. */
+function wsm_fail_fields(array $errors): void { wsm_send(['error' => 'validation', 'fields' => $errors], 422); }
+
+/** Prochain code client libre (CL-0001, CL-0002…). */
+function wsm_next_client_code(PDO $pdo): string {
+    $max = $pdo->query("SELECT code FROM wsm_clients WHERE code LIKE 'CL-%' ORDER BY code DESC LIMIT 1")->fetchColumn();
+    $n = $max ? ((int) substr((string) $max, 3)) + 1 : 1;
+    return sprintf('CL-%04d', $n);
+}
+
 function wsm_body(): array { $raw = file_get_contents('php://input'); $j = json_decode($raw ?: 'null', true); return is_array($j) ? $j : []; }
 
 // ---- Routes : /franchisor/* (protégé), /landing/* (public), /auth/* --------
@@ -199,6 +210,123 @@ if ($method === 'POST') {
     $body = wsm_body();
 
     switch ($route) {
+        // ---- client B2B : payeur tpay + destinataire InPost -----------------
+        case 'client': {
+            if (!empty($body['delete'])) {
+                $pdo->prepare("DELETE FROM wsm_clients WHERE id=?")->execute([(int) $body['delete']]);
+                wsm_audit($pdo, $actorName, 'Usunięcie', 'wsm_clients #' . (int) $body['delete'], 'Sieć');
+                wsm_send(['ok' => true]);
+            }
+            $isUpdate = !empty($body['id']);
+            [$c, $errors] = wsm_validate_client($body, $isUpdate);
+            if ($errors) wsm_fail_fields($errors);
+
+            $base = [
+                'raison'   => trim((string) ($body['raison'] ?? '')),
+                'seg'      => (string) ($body['seg'] ?? 'horeca'),
+                'statut'   => (string) ($body['statut'] ?? 'aktywny'),
+                'paiement' => (string) ($body['paiement'] ?? ''),
+                'plafond'  => (int) ($body['plafond'] ?? 0),
+                'franco'   => (string) ($body['franco'] ?? ''),
+                'remise'   => (string) ($body['remise'] ?? ''),
+                'fact'     => (string) ($body['fact'] ?? ''),
+            ];
+            if (!$isUpdate && $base['raison'] === '') wsm_fail_fields(['raison' => 'wymagana']);
+            $row = array_merge($base, $c);
+
+            if ($isUpdate) {
+                $set = implode(',', array_map(fn($k) => "$k=?", array_keys($row)));
+                $pdo->prepare("UPDATE wsm_clients SET $set WHERE id=?")
+                    ->execute([...array_values($row), (int) $body['id']]);
+                $id = (int) $body['id'];
+            } else {
+                $row['code'] = trim((string) ($body['code'] ?? '')) ?: wsm_next_client_code($pdo);
+                $cols = implode(',', array_keys($row));
+                $ph = rtrim(str_repeat('?,', count($row)), ',');
+                $pdo->prepare("INSERT INTO wsm_clients ($cols) VALUES ($ph)")->execute(array_values($row));
+                $id = (int) $pdo->lastInsertId();
+            }
+            wsm_audit($pdo, $actorName, $isUpdate ? 'Zmiana' : 'Utworzenie', 'wsm_clients #' . $id, 'Sieć');
+            wsm_send(['ok' => true, 'id' => $id]);
+        }
+
+        // ---- point de livraison : Paczkomat ou adresse coursier -------------
+        case 'client-point': {
+            if (!empty($body['delete'])) {
+                $pdo->prepare("DELETE FROM wsm_client_points WHERE id=?")->execute([(int) $body['delete']]);
+                wsm_send(['ok' => true]);
+            }
+            $isUpdate = !empty($body['id']);
+            if (!$isUpdate && empty($body['client_id'])) wsm_fail_fields(['client_id' => 'wymagany']);
+            [$p, $errors] = wsm_validate_point($body, $isUpdate);
+            if ($errors) wsm_fail_fields($errors);
+
+            $row = array_merge([
+                'libelle'    => trim((string) ($body['libelle'] ?? '')),
+                'fenetre'    => (string) ($body['fenetre'] ?? ''),
+                'jours'      => (string) ($body['jours'] ?? ''),
+                'validation' => (string) ($body['validation'] ?? 'QR'),
+            ], $p);
+            if (!$isUpdate && $row['libelle'] === '') wsm_fail_fields(['libelle' => 'wymagana']);
+
+            if ($isUpdate) {
+                $set = implode(',', array_map(fn($k) => "$k=?", array_keys($row)));
+                $pdo->prepare("UPDATE wsm_client_points SET $set WHERE id=?")
+                    ->execute([...array_values($row), (int) $body['id']]);
+                $id = (int) $body['id'];
+            } else {
+                $row['client_id'] = (int) $body['client_id'];
+                $cols = implode(',', array_keys($row));
+                $ph = rtrim(str_repeat('?,', count($row)), ',');
+                $pdo->prepare("INSERT INTO wsm_client_points ($cols) VALUES ($ph)")->execute(array_values($row));
+                $id = (int) $pdo->lastInsertId();
+            }
+            wsm_audit($pdo, $actorName, $isUpdate ? 'Zmiana' : 'Utworzenie', 'wsm_client_points #' . $id, 'Sieć');
+            wsm_send(['ok' => true, 'id' => $id]);
+        }
+
+        // ---- produit : gouvernance + logistique InPost + TVA tpay -----------
+        case 'product': {
+            if (empty($body['id'])) wsm_fail_fields(['id' => 'wymagany']);
+            $id = (string) $body['id'];
+            $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_products WHERE id=?");
+            $st->execute([$id]);
+            if (!(int) $st->fetchColumn()) wsm_fail('product_not_found', 404);
+
+            $set = []; $vals = [];
+            // Champs de gouvernance déjà pilotés par les interrupteurs du catalogue.
+            foreach (['active', 'brand_whitelist', 'brand_mandatory'] as $f) {
+                if (array_key_exists($f, $body)) { $set[] = "$f=?"; $vals[] = (int) $body[$f]; }
+            }
+            if (array_key_exists('price', $body) || array_key_exists('prix', $body)) {
+                $set[] = 'prix=?'; $vals[] = (float) ($body['price'] ?? $body['prix']);
+            }
+            if (array_key_exists('menu_override', $body)) {
+                $set[] = 'menu_override=?'; $vals[] = $body['menu_override'] !== null ? (string) $body['menu_override'] : null;
+            }
+            if (array_key_exists('nom', $body)) { $set[] = 'nom=?'; $vals[] = (string) $body['nom']; }
+
+            // Logistique / fiscalité : validées ensemble si l'un des champs est fourni.
+            $logisticKeys = ['sku', 'ean', 'vat_rate', 'weight_g', 'length_mm', 'width_mm', 'height_mm', 'parcel_template'];
+            if (array_intersect($logisticKeys, array_keys($body))) {
+                $cur = $pdo->prepare("SELECT " . implode(',', $logisticKeys) . " FROM wsm_products WHERE id=?");
+                $cur->execute([$id]);
+                $merged = array_merge($cur->fetch() ?: [], array_intersect_key($body, array_flip($logisticKeys)));
+                // Le gabarit n'est repris de la base que s'il est explicitement
+                // imposé dans la requête : sinon il doit être recalculé, faute
+                // de quoi un changement de dimensions garderait l'ancien casier.
+                if (!array_key_exists('parcel_template', $body)) unset($merged['parcel_template']);
+                [$log, $errors] = wsm_validate_product_logistics($merged);
+                if ($errors) wsm_fail_fields($errors);
+                foreach ($log as $k => $v) { $set[] = "$k=?"; $vals[] = $v; }
+            }
+            if (!$set) wsm_fail('no_fields');
+            $vals[] = $id;
+            $pdo->prepare("UPDATE wsm_products SET " . implode(',', $set) . " WHERE id=?")->execute($vals);
+            wsm_audit($pdo, $actorName, 'Zmiana', 'wsm_products ' . $id, 'Sieć');
+            wsm_send(['ok' => true, 'id' => $id]);
+        }
+
         // ---- landing content (Mister Szoko public site) --------------------
         case 'landing-string': {
             // Upsert {lang,k,v} — or delete the key when v is null/absent.
@@ -346,6 +474,14 @@ function wsm_catalog(PDO $pdo): array {
             'id' => $p['id'], 'nom' => $p['nom'], 'prix' => (float) $p['prix'], 'statut' => $p['statut'],
             'bw' => (bool) $p['brand_whitelist'], 'bm' => (bool) $p['brand_mandatory'],
             'ad' => (int) $p['adoption'], 'saison' => $p['saison'],
+            // Logistique InPost + TVA tpay (voir commerce.php)
+            'sku' => $p['sku'] ?? '', 'ean' => $p['ean'] ?? '',
+            'vat_rate' => isset($p['vat_rate']) ? (float) $p['vat_rate'] : 0.23,
+            'weight_g' => (int) ($p['weight_g'] ?? 0),
+            'length_mm' => (int) ($p['length_mm'] ?? 0),
+            'width_mm' => (int) ($p['width_mm'] ?? 0),
+            'height_mm' => (int) ($p['height_mm'] ?? 0),
+            'parcel_template' => $p['parcel_template'] ?? '',
         ];
     }
     $out = [];

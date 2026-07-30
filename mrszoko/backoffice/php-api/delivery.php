@@ -218,8 +218,17 @@ function wsm_rounds(PDO $pdo): array {
                         FROM wsm_rounds r LEFT JOIN wsm_drivers dr ON dr.id=r.driver_id ORDER BY r.id")->fetchAll();
 }
 function wsm_delivery_clients(PDO $pdo): array {
-    $clients = $pdo->query("SELECT id, code, raison, seg, statut FROM wsm_clients ORDER BY raison")->fetchAll();
-    $pts = $pdo->query("SELECT id, client_id, libelle, adresse, fenetre, jours, validation, marge FROM wsm_client_points ORDER BY id")->fetchAll();
+    // Champs tpay (payeur/facture) et InPost (destinataire/point) inclus :
+    // l'écran client doit pouvoir les afficher et les éditer.
+    $clients = $pdo->query("SELECT id, code, raison, seg, statut, client_type, email, phone,
+                                   first_name, last_name, nip, vat_eu, tva,
+                                   bill_street, bill_building, bill_postcode, bill_city, bill_country,
+                                   paiement, plafond, encours, franco, remise, fact
+                            FROM wsm_clients ORDER BY raison")->fetchAll();
+    $pts = $pdo->query("SELECT id, client_id, libelle, adresse, fenetre, jours, validation, marge,
+                               delivery_method, inpost_point, street, building, postcode, city, country,
+                               contact_phone, contact_email
+                        FROM wsm_client_points ORDER BY id")->fetchAll();
     $byClient = [];
     foreach ($pts as $p) { $byClient[$p['client_id']][] = $p; }
     foreach ($clients as &$c) { $c['points'] = $byClient[$c['id']] ?? []; }

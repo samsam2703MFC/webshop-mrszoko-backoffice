@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS `wsm_categories` (
 -- --- Products (catalogue) ---------------------------------------------------
 CREATE TABLE IF NOT EXISTS `wsm_products` (
   `id`              VARCHAR(48)  NOT NULL,
+  -- Expédition InPost + fiscalité tpay
+  `sku`             VARCHAR(60)  NOT NULL DEFAULT '',
+  `ean`             VARCHAR(14)  NOT NULL DEFAULT '',
+  `vat_rate`        DECIMAL(4,2) NOT NULL DEFAULT 0.23,
+  `weight_g`        INT NOT NULL DEFAULT 0,
+  `length_mm`       INT NOT NULL DEFAULT 0,
+  `width_mm`        INT NOT NULL DEFAULT 0,
+  `height_mm`       INT NOT NULL DEFAULT 0,
+  `parcel_template` CHAR(1)      NOT NULL DEFAULT '',
   `category_id`     INT UNSIGNED NOT NULL,
   `nom`             VARCHAR(160) NOT NULL,
   `prix`            DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -219,6 +228,19 @@ CREATE TABLE IF NOT EXISTS `wsm_bundle_slot_choices` (
 -- --- B2B clients ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `wsm_clients` (
   `id`       INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  -- tpay (payeur + facture) & InPost (destinataire) — voir commerce.php
+  `client_type`   VARCHAR(10)  NOT NULL DEFAULT 'firma',
+  `email`         VARCHAR(200) NOT NULL DEFAULT '',
+  `phone`         VARCHAR(20)  NOT NULL DEFAULT '',
+  `first_name`    VARCHAR(120) NOT NULL DEFAULT '',
+  `last_name`     VARCHAR(120) NOT NULL DEFAULT '',
+  `nip`           VARCHAR(15)  NOT NULL DEFAULT '',
+  `vat_eu`        VARCHAR(20)  NOT NULL DEFAULT '',
+  `bill_street`   VARCHAR(200) NOT NULL DEFAULT '',
+  `bill_building` VARCHAR(30)  NOT NULL DEFAULT '',
+  `bill_postcode` VARCHAR(10)  NOT NULL DEFAULT '',
+  `bill_city`     VARCHAR(120) NOT NULL DEFAULT '',
+  `bill_country`  CHAR(2)      NOT NULL DEFAULT 'PL',
   `code`     VARCHAR(24)  NOT NULL,
   `raison`   VARCHAR(200) NOT NULL,
   `seg`      VARCHAR(40)  NOT NULL DEFAULT 'horeca',
@@ -237,6 +259,16 @@ CREATE TABLE IF NOT EXISTS `wsm_clients` (
 -- --- Delivery points (adresses de livraison d'un client) --------------------
 CREATE TABLE IF NOT EXISTS `wsm_client_points` (
   `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  -- InPost : Paczkomat (code) ou coursier (adresse structurée)
+  `delivery_method` VARCHAR(20)  NOT NULL DEFAULT 'inpost_locker',
+  `inpost_point`    VARCHAR(20)  NOT NULL DEFAULT '',
+  `street`          VARCHAR(200) NOT NULL DEFAULT '',
+  `building`        VARCHAR(30)  NOT NULL DEFAULT '',
+  `postcode`        VARCHAR(10)  NOT NULL DEFAULT '',
+  `city`            VARCHAR(120) NOT NULL DEFAULT '',
+  `country`         CHAR(2)      NOT NULL DEFAULT 'PL',
+  `contact_phone`   VARCHAR(20)  NOT NULL DEFAULT '',
+  `contact_email`   VARCHAR(200) NOT NULL DEFAULT '',
   `client_id`  INT UNSIGNED NOT NULL,
   `libelle`    VARCHAR(200) NOT NULL,
   `adresse`    VARCHAR(255) NOT NULL DEFAULT '',

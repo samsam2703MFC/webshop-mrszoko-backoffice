@@ -94,6 +94,7 @@ function wsm_bootstrap(bool $seed = true): PDO {
         }
     }
     wsm_ensure_auth_columns($pdo);
+    wsm_ensure_commerce_columns($pdo);
     return $pdo;
 }
 
@@ -115,25 +116,79 @@ function wsm_table_columns(PDO $pdo, string $table): array {
 }
 
 /**
- * Ajoute les colonnes d'authentification à wsm_users si elles manquent.
- * Nécessaire car CREATE TABLE IF NOT EXISTS ne touche pas une table déjà
- * créée (c'est le cas de la base MySQL de production). Idempotent.
+ * Ajoute à une table les colonnes manquantes. Nécessaire car
+ * CREATE TABLE IF NOT EXISTS ne touche pas une table déjà créée — c'est le cas
+ * de la base MySQL de production. Idempotent.
+ *
+ * @param array $cols  colonne => [déclaration MySQL, déclaration SQLite]
  */
-function wsm_ensure_auth_columns(PDO $pdo): void {
-    $have = wsm_table_columns($pdo, 'wsm_users');
+function wsm_ensure_columns(PDO $pdo, string $table, array $cols): void {
+    $have = wsm_table_columns($pdo, $table);
     if (!$have) return;                                   // table absente : le schéma la créera complète
     $mysql = wsm_config()['engine'] === 'mysql';
-    $add = [
-        'password_hash'   => $mysql ? 'VARCHAR(255) NULL DEFAULT NULL' : 'TEXT DEFAULT NULL',
-        'last_login'      => $mysql ? 'DATETIME NULL DEFAULT NULL'     : 'TEXT DEFAULT NULL',
-        'failed_attempts' => $mysql ? 'INT NOT NULL DEFAULT 0'         : 'INTEGER NOT NULL DEFAULT 0',
-        'locked_until'    => $mysql ? 'DATETIME NULL DEFAULT NULL'     : 'TEXT DEFAULT NULL',
-    ];
-    foreach ($add as $col => $decl) {
-        if (in_array($col, $have, true)) continue;
-        try { $pdo->exec("ALTER TABLE wsm_users ADD COLUMN " . ($mysql ? "`$col`" : $col) . " $decl"); }
+    foreach ($cols as $col => $decl) {
+        if (in_array(strtolower($col), $have, true)) continue;
+        $sql = $mysql ? $decl[0] : $decl[1];
+        try { $pdo->exec("ALTER TABLE $table ADD COLUMN " . ($mysql ? "`$col`" : $col) . " $sql"); }
         catch (Throwable $e) { /* concurrence : une autre requête vient de l'ajouter */ }
     }
+}
+
+/** Colonnes d'authentification (voir auth.php). */
+function wsm_ensure_auth_columns(PDO $pdo): void {
+    wsm_ensure_columns($pdo, 'wsm_users', [
+        'password_hash'   => ['VARCHAR(255) NULL DEFAULT NULL', 'TEXT DEFAULT NULL'],
+        'last_login'      => ['DATETIME NULL DEFAULT NULL',     'TEXT DEFAULT NULL'],
+        'failed_attempts' => ['INT NOT NULL DEFAULT 0',         'INTEGER NOT NULL DEFAULT 0'],
+        'locked_until'    => ['DATETIME NULL DEFAULT NULL',     'TEXT DEFAULT NULL'],
+    ]);
+}
+
+/**
+ * Colonnes exigées par tpay (payeur, facture, TVA) et InPost (destinataire,
+ * point de retrait, poids/dimensions du colis) — voir commerce.php.
+ */
+function wsm_ensure_commerce_columns(PDO $pdo): void {
+    $txt = fn(int $n, string $d = "''") => ["VARCHAR($n) NOT NULL DEFAULT $d", "TEXT NOT NULL DEFAULT $d"];
+    $int = ['INT NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'];
+
+    wsm_ensure_columns($pdo, 'wsm_clients', [
+        'client_type'   => $txt(10, "'firma'"),
+        'email'         => $txt(200),
+        'phone'         => $txt(20),
+        'first_name'    => $txt(120),
+        'last_name'     => $txt(120),
+        'nip'           => $txt(15),
+        'vat_eu'        => $txt(20),
+        'bill_street'   => $txt(200),
+        'bill_building' => $txt(30),
+        'bill_postcode' => $txt(10),
+        'bill_city'     => $txt(120),
+        'bill_country'  => $txt(2, "'PL'"),
+    ]);
+
+    wsm_ensure_columns($pdo, 'wsm_client_points', [
+        'delivery_method' => $txt(20, "'inpost_locker'"),
+        'inpost_point'    => $txt(20),
+        'street'          => $txt(200),
+        'building'        => $txt(30),
+        'postcode'        => $txt(10),
+        'city'            => $txt(120),
+        'country'         => $txt(2, "'PL'"),
+        'contact_phone'   => $txt(20),
+        'contact_email'   => $txt(200),
+    ]);
+
+    wsm_ensure_columns($pdo, 'wsm_products', [
+        'sku'             => $txt(60),
+        'ean'             => $txt(14),
+        'vat_rate'        => ['DECIMAL(4,2) NOT NULL DEFAULT 0.23', 'REAL NOT NULL DEFAULT 0.23'],
+        'weight_g'        => $int,
+        'length_mm'       => $int,
+        'width_mm'        => $int,
+        'height_mm'       => $int,
+        'parcel_template' => $txt(1),
+    ]);
 }
 
 /**

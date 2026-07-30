@@ -43,6 +43,15 @@ CREATE TABLE IF NOT EXISTS wsm_categories (
 
 CREATE TABLE IF NOT EXISTS wsm_products (
   id              TEXT PRIMARY KEY,
+  -- Expédition InPost + fiscalité tpay
+  sku             TEXT NOT NULL DEFAULT '',
+  ean             TEXT NOT NULL DEFAULT '',
+  vat_rate        REAL NOT NULL DEFAULT 0.23,    -- PL : 0 / 0.05 / 0.08 / 0.23
+  weight_g        INTEGER NOT NULL DEFAULT 0,
+  length_mm       INTEGER NOT NULL DEFAULT 0,
+  width_mm        INTEGER NOT NULL DEFAULT 0,
+  height_mm       INTEGER NOT NULL DEFAULT 0,
+  parcel_template TEXT NOT NULL DEFAULT '',      -- A | B | C (déduit si vide)
   category_id     INTEGER NOT NULL REFERENCES wsm_categories(id) ON DELETE CASCADE,
   nom             TEXT NOT NULL,
   prix            REAL NOT NULL DEFAULT 0,
@@ -163,6 +172,19 @@ CREATE TABLE IF NOT EXISTS wsm_bundle_slot_choices (
 -- ===== DELIVERY MODULE ======================================================
 CREATE TABLE IF NOT EXISTS wsm_clients (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  -- tpay (payeur + facture) & InPost (destinataire) — voir commerce.php
+  client_type   TEXT NOT NULL DEFAULT 'firma',   -- firma | osoba
+  email         TEXT NOT NULL DEFAULT '',        -- tpay : obligatoire
+  phone         TEXT NOT NULL DEFAULT '',        -- InPost : 9 chiffres
+  first_name    TEXT NOT NULL DEFAULT '',
+  last_name     TEXT NOT NULL DEFAULT '',
+  nip           TEXT NOT NULL DEFAULT '',        -- NIP polonais (facture)
+  vat_eu        TEXT NOT NULL DEFAULT '',        -- TVA intracom. (VIES)
+  bill_street   TEXT NOT NULL DEFAULT '',
+  bill_building TEXT NOT NULL DEFAULT '',
+  bill_postcode TEXT NOT NULL DEFAULT '',        -- NN-NNN
+  bill_city     TEXT NOT NULL DEFAULT '',
+  bill_country  TEXT NOT NULL DEFAULT 'PL',
   code     TEXT NOT NULL UNIQUE,
   raison   TEXT NOT NULL,
   seg      TEXT NOT NULL DEFAULT 'horeca',
@@ -178,6 +200,16 @@ CREATE TABLE IF NOT EXISTS wsm_clients (
 
 CREATE TABLE IF NOT EXISTS wsm_client_points (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  -- InPost : Paczkomat (code) ou coursier (adresse structurée)
+  delivery_method TEXT NOT NULL DEFAULT 'inpost_locker',
+  inpost_point    TEXT NOT NULL DEFAULT '',      -- ex. KRA010
+  street          TEXT NOT NULL DEFAULT '',
+  building        TEXT NOT NULL DEFAULT '',
+  postcode        TEXT NOT NULL DEFAULT '',
+  city            TEXT NOT NULL DEFAULT '',
+  country         TEXT NOT NULL DEFAULT 'PL',
+  contact_phone   TEXT NOT NULL DEFAULT '',
+  contact_email   TEXT NOT NULL DEFAULT '',
   client_id  INTEGER NOT NULL REFERENCES wsm_clients(id) ON DELETE CASCADE,
   libelle    TEXT NOT NULL,
   adresse    TEXT NOT NULL DEFAULT '',

@@ -6,6 +6,8 @@
 //  live or not. Runs once on a fresh database (see wsm_bootstrap()).
 // ============================================================================
 
+require_once __DIR__ . '/commerce.php';
+
 function wsm_seed(PDO $pdo): void {
     $ins = function(string $table, array $row) use ($pdo) {
         $cols = array_keys($row);
@@ -59,15 +61,15 @@ function wsm_seed(PDO $pdo): void {
     // ---- Products (catalogue + menu products) -------------------------------
     // [id, category, nom, prix, base_cost, statut, saison, bw, bm, ad, menu_override]
     $products = [
-        ['p-baguette', 'Pieczywo', 'Bagietka tradycyjna', 1.35, 0.40, 'Opublikowany', '', 1, 1, 96, null],
-        ['p-pain-choco', 'Pieczywo', 'Czekoladowa drożdżówka', 1.60, 0.55, 'Opublikowany', '', 1, 0, 74, null],
-        ['p-eclair', 'Ciasta świeże', 'Ekler czekoladowy', 3.50, 1.20, 'Opublikowany', '', 1, 1, 88, null],
-        ['p-tarte-fraises', 'Ciasta świeże', 'Tarta truskawkowa', 4.20, 1.60, 'Sezonowy', 'Lato', 1, 0, 52, null],
-        ['p-buche', 'Ciasta świeże', 'Rolada firmowa', 24.00, 9.00, 'Opublikowany', 'Boże Narodzenie', 1, 1, 100, null],
-        ['p-macarons', 'Czekolada', 'Makaroniki (pudełko 24)', 19.90, 7.50, 'Opublikowany', '', 1, 0, 64, null],
-        ['p-quiche', 'Katering', 'Quiche lorraine', 5.80, 2.20, 'Szkic', '', 0, 0, 22, null],
-        ['p-foiegras', 'Katering', 'Foie gras mi-cuit', 28.00, 12.00, 'Opublikowany', '', 1, 0, 41, null],
-        ['p-glace', 'Lody', 'Lody rzemieślnicze', 6.50, 2.10, 'Opublikowany', 'Lato', 0, 0, 30, null],
+        ['p-baguette', 'Pieczywo', 'Bagietka tradycyjna', 1.35, 0.40, 'Opublikowany', '', 1, 1, 96, null, [280, 650, 90, 90]],
+        ['p-pain-choco', 'Pieczywo', 'Czekoladowa drożdżówka', 1.60, 0.55, 'Opublikowany', '', 1, 0, 74, null, [90, 140, 90, 60]],
+        ['p-eclair', 'Ciasta świeże', 'Ekler czekoladowy', 3.50, 1.20, 'Opublikowany', '', 1, 1, 88, null, [120, 160, 60, 50]],
+        ['p-tarte-fraises', 'Ciasta świeże', 'Tarta truskawkowa', 4.20, 1.60, 'Sezonowy', 'Lato', 1, 0, 52, null, [850, 260, 260, 60]],
+        ['p-buche', 'Ciasta świeże', 'Rolada firmowa', 24.00, 9.00, 'Opublikowany', 'Boże Narodzenie', 1, 1, 100, null, [1200, 350, 120, 100]],
+        ['p-macarons', 'Czekolada', 'Makaroniki (pudełko 24)', 19.90, 7.50, 'Opublikowany', '', 1, 0, 64, null, [420, 250, 180, 60]],
+        ['p-quiche', 'Katering', 'Quiche lorraine', 5.80, 2.20, 'Szkic', '', 0, 0, 22, null, [600, 240, 240, 45]],
+        ['p-foiegras', 'Katering', 'Foie gras mi-cuit', 28.00, 12.00, 'Opublikowany', '', 1, 0, 41, null, [350, 150, 90, 70]],
+        ['p-glace', 'Lody', 'Lody rzemieślnicze', 6.50, 2.10, 'Opublikowany', 'Lato', 0, 0, 30, null, [500, 120, 120, 110]],
         // menu products (menu builder)
         ['p-midi', 'Menu i zestawy', "Menu lunchowe — Mister Szoko", 8.50, 2.40, 'Opublikowany', '', 0, 0, 0, 'on'],
         ['p-gouter', 'Menu i zestawy', "Zestaw podwieczorkowy — Mister Szoko", 3.20, 0.90, 'Opublikowany', '', 0, 0, 0, 'on'],
@@ -75,10 +77,16 @@ function wsm_seed(PDO $pdo): void {
         ['p-brunch', 'Menu i zestawy', "Brunch weekendowy — Mister Szoko", 18.00, 5.50, 'Opublikowany', '', 0, 0, 0, null],
     ];
     foreach ($products as $i => $p) {
+        // Logistique InPost + TVA tpay : gabarit déduit des dimensions.
+        $lg = $p[11] ?? [230, 0, 0, 0];        // [poids g, L, l, H en mm]
         $ins('wsm_products', ['id' => $p[0], 'category_id' => $catId[$p[1]], 'nom' => $p[2],
             'prix' => $p[3], 'base_cost' => $p[4], 'statut' => $p[5], 'saison' => $p[6],
             'brand_whitelist' => $p[7], 'brand_mandatory' => $p[8], 'adoption' => $p[9],
-            'menu_override' => $p[10], 'sort_order' => $i, 'active' => 1]);
+            'menu_override' => $p[10], 'sort_order' => $i, 'active' => 1,
+            'sku' => strtoupper(str_replace('p-', 'MS-', $p[0])), 'ean' => '',
+            'vat_rate' => 0.23, 'weight_g' => $lg[0],
+            'length_mm' => $lg[1], 'width_mm' => $lg[2], 'height_mm' => $lg[3],
+            'parcel_template' => wsm_inpost_template($lg[1], $lg[2], $lg[3])]);
     }
 
     // ---- Menu builder tree (bundles → slots → choices) ----------------------
@@ -170,27 +178,45 @@ function wsm_seed(PDO $pdo): void {
     // Clients + their delivery points
     $clients = [
         ['CL-0021', 'Le Cirio SA', 'horeca', 'aktywny', 'BE 0421.111.222', '30 dni koniec mies.', 6000, 3200, '250 €', '8 %', 'Miesięczna',
-            ['Brasserie — wejście od tyłu', 'Rue de la Bourse 18, 1000 Bruxelles', '08:00–11:00', 'Pn Wt Śr Cz Pt So', 'QR', 230, 50.8481, 4.3520]],
+            ['Brasserie — wejście od tyłu', 'Rue de la Bourse 18, 1000 Bruxelles', '08:00–11:00', 'Pn Wt Śr Cz Pt So', 'QR', 230, 50.8481, 4.3520, ['inpost_locker', 'WAW01M', 'Marszałkowska', '104', '00-026', 'Warszawa', '512340011', 'zamowienia@lecirio.pl']],
+            ['firma', 'zamowienia@lecirio.pl', '512340011', '', '', '5252248481', 'PL5252248481', 'Marszałkowska', '104', '00-026', 'Warszawa', 'PL']],
         ['CL-0044', 'Rocco Forte', 'horeca', 'aktywny', 'BE 0455.222.333', '30 dni', 8000, 2600, '300 €', '10 %', 'Tygodniowa',
-            ['Kuchnia — rampa serwisowa', "Rue de l'Amigo 1-3, 1000 Bruxelles", '07:30–10:00', 'Pn Wt Śr Cz Pt', 'PIN', 205, 50.8455, 4.3519]],
+            ['Kuchnia — rampa serwisowa', "Rue de l'Amigo 1-3, 1000 Bruxelles", '07:30–10:00', 'Pn Wt Śr Cz Pt', 'PIN', 205, 50.8455, 4.3519, ['inpost_courier', '', 'Floriańska', '12', '31-019', 'Kraków', '512340022', 'kuchnia@roccoforte.pl']],
+            ['firma', 'kuchnia@roccoforte.pl', '512340022', '', '', '6751745962', 'PL6751745962', 'Floriańska', '12', '31-019', 'Kraków', 'PL']],
         ['CL-0052', 'Belga SPRL', 'horeca', 'zawieszony', 'BE 0466.333.444', '7 dni', 4000, 4120, '—', '5 %', 'Za dostawę',
-            ['Taras — dostęp Flagey', 'Place Eugène Flagey 18, 1050 Ixelles', '09:00–11:30', 'Wt Śr Cz Pt So', 'Podpis', 60, 50.8275, 4.3705]],
+            ['Taras — dostęp Flagey', 'Place Eugène Flagey 18, 1050 Ixelles', '09:00–11:30', 'Wt Śr Cz Pt So', 'Podpis', 60, 50.8275, 4.3705, ['inpost_locker', 'LOD24A', 'Piotrkowska', '58', '90-105', 'Łódź', '512340033', 'biuro@belga.pl']],
+            ['firma', 'biuro@belga.pl', '512340033', '', '', '9542752600', 'PL9542752600', 'Piotrkowska', '58', '90-105', 'Łódź', 'PL']],
         ['CL-0060', 'Dandoy', 'retail', 'aktywny', 'BE 0401.444.555', '30 dni', 5000, 1900, '200 €', '6 %', 'Miesięczna',
-            ['Sklep Sablon — tył', 'Rue Charles Buls 14, 1000 Bruxelles', '08:00–10:30', 'Pn Śr Pt', 'QR', 180, 50.8459, 4.3524]],
+            ['Sklep Sablon — tył', 'Rue Charles Buls 14, 1000 Bruxelles', '08:00–10:30', 'Pn Śr Pt', 'QR', 180, 50.8459, 4.3524, ['inpost_courier', '', 'Długa', '7', '80-827', 'Gdańsk', '512340044', 'sklep@dandoy.pl']],
+            ['firma', 'sklep@dandoy.pl', '512340044', '', '', '5213017228', 'PL5213017228', 'Długa', '7', '80-827', 'Gdańsk', 'PL']],
         ['CL-0071', 'KBC Group', 'corporate', 'aktywny', 'BE 0403.227.515', '30 dni koniec mies.', 12000, 5400, '400 €', '12 %', 'Miesięczna',
-            ['Kafeteria HQ — hala dostaw', 'Havenlaan 2, 3000 Leuven', '07:00–09:00', 'Pn Wt Śr Cz Pt', 'PIN', -15, 50.8798, 4.7005]],
+            ['Kafeteria HQ — hala dostaw', 'Havenlaan 2, 3000 Leuven', '07:00–09:00', 'Pn Wt Śr Cz Pt', 'PIN', -15, 50.8798, 4.7005, ['inpost_courier', '', 'Świdnicka', '40', '50-024', 'Wrocław', '512340055', 'kafeteria@kbc.pl']],
+            ['firma', 'kafeteria@kbc.pl', '512340055', '', '', '5252248481', 'PL5252248481', 'Świdnicka', '40', '50-024', 'Wrocław', 'PL']],
         ['CL-0088', 'Événements Sud', 'event', 'prospekt', 'BE 0788.555.666', 'Gotówka', 2000, 0, '—', '0 %', 'Za dostawę',
-            ['Zamek — dostęp kateringu', 'Chaussée de Bruxelles 100, 1410 Waterloo', '11:00–13:00', 'So Nd', 'Zostawienie', -78, 50.7147, 4.3990]],
+            ['Zamek — dostęp kateringu', 'Chaussée de Bruxelles 100, 1410 Waterloo', '11:00–13:00', 'So Nd', 'Zostawienie', -78, 50.7147, 4.3990, ['inpost_locker', 'POZ103', 'Zamkowa', '3', '61-768', 'Poznań', '512340066', 'anna.nowak@example.pl']],
+            ['osoba', 'anna.nowak@example.pl', '512340066', 'Anna', 'Nowak', '', '', 'Zamkowa', '3', '61-768', 'Poznań', 'PL']],
     ];
     $pointId = [];  // client code → point id
     foreach ($clients as $c) {
+        // Champs tpay (payeur + facture) / InPost (destinataire) — NIP à somme
+        // de contrôle valide, téléphones à 9 chiffres, codes postaux NN-NNN.
+        $x = $c[12] ?? [];
         $cid = $ins('wsm_clients', ['code' => $c[0], 'raison' => $c[1], 'seg' => $c[2], 'statut' => $c[3],
             'tva' => $c[4], 'paiement' => $c[5], 'plafond' => $c[6], 'encours' => $c[7],
-            'franco' => $c[8], 'remise' => $c[9], 'fact' => $c[10]]);
+            'franco' => $c[8], 'remise' => $c[9], 'fact' => $c[10],
+            'client_type' => $x[0] ?? 'firma', 'email' => $x[1] ?? '', 'phone' => $x[2] ?? '',
+            'first_name' => $x[3] ?? '', 'last_name' => $x[4] ?? '', 'nip' => $x[5] ?? '',
+            'vat_eu' => $x[6] ?? '', 'bill_street' => $x[7] ?? '', 'bill_building' => $x[8] ?? '',
+            'bill_postcode' => $x[9] ?? '', 'bill_city' => $x[10] ?? '', 'bill_country' => $x[11] ?? 'PL']);
         $pt = $c[11];
+        $px = $pt[8] ?? [];
         $pid = $ins('wsm_client_points', ['client_id' => $cid, 'libelle' => $pt[0], 'adresse' => $pt[1],
             'fenetre' => $pt[2], 'jours' => $pt[3], 'validation' => $pt[4], 'marge' => $pt[5],
-            'lat' => $pt[6], 'lng' => $pt[7]]);
+            'lat' => $pt[6], 'lng' => $pt[7],
+            'delivery_method' => $px[0] ?? 'inpost_courier', 'inpost_point' => $px[1] ?? '',
+            'street' => $px[2] ?? '', 'building' => $px[3] ?? '', 'postcode' => $px[4] ?? '',
+            'city' => $px[5] ?? '', 'country' => 'PL',
+            'contact_phone' => $px[6] ?? '', 'contact_email' => $px[7] ?? '']);
         $pointId[$c[0]] = ['point' => $pid, 'client' => $cid, 'window' => $pt[2], 'validation' => $pt[4]];
     }
 

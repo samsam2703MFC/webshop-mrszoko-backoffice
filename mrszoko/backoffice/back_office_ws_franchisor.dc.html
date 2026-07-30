@@ -1069,10 +1069,55 @@ class Component extends DCLogic {
         {k:'contrat',label:'Umowa',type:'select',options:sel(['Franczyza','Oddział','Master']),def:'Franczyza'},
         {k:'accent',label:'Akcent (branding)',type:'select',options:sel(['Ruby Red','Morela','Old Copper']),def:'Ruby Red'},
       ]},
-      product:{ title:'Produkt', table:'ws_products', save:'Utwórz', fields:[
+      product:{ title:'Produkt', table:'wsm_products', save:'Zapisz', fields:[
         {k:'nom',label:'Nazwa',type:'text',ph:'np. Ekler czekoladowy'},
         {k:'cat',label:'Kategoria',type:'select',options:sel(cats),def:cats[0]},
         {k:'prix',label:'Cena referencyjna (€)',type:'number',def:3.5},
+        // Fiskalność tpay
+        {k:'vat_rate',label:'Stawka VAT (tpay)',type:'select',options:[
+          {value:'0.23',label:'23 %'},{value:'0.08',label:'8 %'},{value:'0.05',label:'5 %'},{value:'0',label:'0 %'}],def:'0.23'},
+        {k:'sku',label:'SKU',type:'text',ph:'np. MS-ECLAIR'},
+        {k:'ean',label:'EAN (8 lub 13 cyfr)',type:'text',ph:'5901234123457'},
+        // Wysyłka InPost — gabaryt A/B/C wyliczany z wymiarów
+        {k:'weight_g',label:'Waga (g) — InPost, maks. 25 000',type:'number',def:0},
+        {k:'length_mm',label:'Długość (mm)',type:'number',def:0},
+        {k:'width_mm',label:'Szerokość (mm)',type:'number',def:0},
+        {k:'height_mm',label:'Wysokość (mm)',type:'number',def:0},
+      ]},
+      client:{ title:'Klient B2B', table:'wsm_clients', save:'Zapisz', fields:[
+        {k:'raison',label:'Nazwa / firma',type:'text',ph:'np. Cukiernia Nowak'},
+        {k:'client_type',label:'Typ klienta',type:'select',options:[
+          {value:'firma',label:'Firma (faktura na NIP)'},{value:'osoba',label:'Osoba prywatna'}],def:'firma'},
+        // tpay : e-mail obowiązkowy dla płatnika
+        {k:'email',label:'E-mail (tpay — wymagany)',type:'text',ph:'zamowienia@firma.pl'},
+        // InPost : telefon 9 cyfr obowiązkowy dla odbiorcy
+        {k:'phone',label:'Telefon (InPost — 9 cyfr)',type:'text',ph:'512 340 011'},
+        {k:'first_name',label:'Imię (osoba prywatna)',type:'text',ph:'Anna'},
+        {k:'last_name',label:'Nazwisko (osoba prywatna)',type:'text',ph:'Nowak'},
+        {k:'nip',label:'NIP (firma — 10 cyfr)',type:'text',ph:'525 224 84 81'},
+        {k:'vat_eu',label:'VAT UE / VIES',type:'text',ph:'PL5252248481'},
+        {k:'bill_street',label:'Ulica (faktura)',type:'text',ph:'Marszałkowska'},
+        {k:'bill_building',label:'Nr budynku',type:'text',ph:'104'},
+        {k:'bill_postcode',label:'Kod pocztowy (NN-NNN)',type:'text',ph:'00-026'},
+        {k:'bill_city',label:'Miasto',type:'text',ph:'Warszawa'},
+        {k:'seg',label:'Segment',type:'select',options:sel(['horeca','retail','corporate','event']),def:'horeca'},
+        {k:'statut',label:'Status',type:'select',options:sel(['aktywny','zawieszony','prospekt']),def:'aktywny'},
+      ]},
+      point:{ title:'Punkt dostawy', table:'wsm_client_points', save:'Zapisz', fields:[
+        {k:'libelle',label:'Etykieta punktu',type:'text',ph:'np. Kuchnia — rampa'},
+        {k:'delivery_method',label:'Sposób dostawy (InPost)',type:'select',options:[
+          {value:'inpost_locker',label:'Paczkomat InPost'},
+          {value:'inpost_courier',label:'Kurier InPost'},
+          {value:'own',label:'Dostawa własna'}],def:'inpost_locker'},
+        {k:'inpost_point',label:'Kod paczkomatu (np. KRA010)',type:'text',ph:'WAW01M'},
+        {k:'street',label:'Ulica (kurier)',type:'text',ph:'Floriańska'},
+        {k:'building',label:'Nr budynku',type:'text',ph:'12'},
+        {k:'postcode',label:'Kod pocztowy (NN-NNN)',type:'text',ph:'31-019'},
+        {k:'city',label:'Miasto',type:'text',ph:'Kraków'},
+        {k:'contact_phone',label:'Telefon kontaktowy (9 cyfr)',type:'text',ph:'512 340 022'},
+        {k:'contact_email',label:'E-mail kontaktowy',type:'text',ph:'kuchnia@firma.pl'},
+        {k:'fenetre',label:'Okno czasowe',type:'text',ph:'08:00–11:00'},
+        {k:'jours',label:'Dni',type:'text',ph:'Pn Wt Śr Cz Pt'},
       ]},
       voucher:{ title:'Kupon', table:'ws_vouchers', save:'Utwórz kupon', fields:[
         {k:'code',label:'Kod',type:'text',ph:'np. WITAMY10'},
@@ -1119,11 +1164,32 @@ class Component extends DCLogic {
     // Mappe le formulaire → endpoint d'écriture ; repli toast si non câblé.
     let path=null, payload=null;
     if(key==='shop'){ path='/franchisor/shop'; payload={id:v.id, contrat:v.contrat}; }
-    else if(key==='product'){ path='/franchisor/product'; payload={id:v.id, price:v.prix}; }
+    else if(key==='product'){ path='/franchisor/product'; payload={id:v.id, nom:v.nom, price:v.prix,
+      vat_rate:v.vat_rate, sku:v.sku, ean:v.ean, weight_g:v.weight_g,
+      length_mm:v.length_mm, width_mm:v.width_mm, height_mm:v.height_mm}; }
+    else if(key==='client'){ path='/franchisor/client'; payload={id:v.id, raison:v.raison,
+      client_type:v.client_type, email:v.email, phone:v.phone, first_name:v.first_name,
+      last_name:v.last_name, nip:v.nip, vat_eu:v.vat_eu, bill_street:v.bill_street,
+      bill_building:v.bill_building, bill_postcode:v.bill_postcode, bill_city:v.bill_city,
+      seg:v.seg, statut:v.statut}; }
+    else if(key==='point'){ path='/franchisor/client-point'; payload={id:v.id, client_id:v.client_id,
+      libelle:v.libelle, delivery_method:v.delivery_method, inpost_point:v.inpost_point,
+      street:v.street, building:v.building, postcode:v.postcode, city:v.city,
+      contact_phone:v.contact_phone, contact_email:v.contact_email, fenetre:v.fenetre, jours:v.jours}; }
     else if(key==='voucher'){ path='/franchisor/voucher'; payload={code:v.code,type:v.type,value:v.value,min_order:v.min_order,max_uses:v.max_uses,expires_at:v.expires_at,active:v.active, target_kind:tk, target_id:(tk!=='NETWORK'&&tsel)?tsel.id:null}; }
     else if(key==='user'){ path='/franchisor/user'; payload={nom:v.nom,email:v.email,role:v.role,portee:v.portee,active:true}; }
     else if(key==='template'){ path='/franchisor/email-template'; payload={cle:v.cle,langue:v.langue,sujet:v.sujet,corps:v.corps}; }
-    if(path && !((key==='shop'||key==='product') && v.id==null)){ this.frPost(path,payload); }
+    if(path && !((key==='shop'||key==='product') && v.id==null)){
+      this.frPostR(path,payload).then(res=>{
+        if(res && res.ok){ this.printJob('✔ Zapisano w bazie'); this.livReload&&this.livReload(); }
+        else if(res && res.status===422 && res.body && res.body.fields){
+          // Erreurs de validation tpay/InPost : on nomme le champ fautif.
+          const f=Object.keys(res.body.fields)[0];
+          this.printJob('⚠ '+f+' : '+res.body.fields[f]);
+        }
+        else this.printJob('⚠ Zapis nie powiódł się');
+      });
+    }
     else { this.printJob((this.state.formEdit?'✔ Zaktualizowano w ':'✔ Zapisano w ')+c.table); } }
   navStyle(s){ const on=this.state.screen===s; return 'display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;border:none;border-radius:9px;cursor:pointer;font:'+(on?'600':'500')+' 13px/1 var(--font-ui);text-align:left;'+(on?'background:var(--color-primary);color:#fff':'background:transparent;color:var(--color-text)'); }
   renderVals(){
