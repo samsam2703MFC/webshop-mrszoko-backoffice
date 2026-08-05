@@ -20,6 +20,7 @@ require_once $API . '/shop.php';
 require_once $API . '/mail.php';
 require_once $API . '/inbox.php';
 require_once $API . '/invoice.php';
+require_once $API . '/translate.php';
 
 $flash = ''; $flashKind = 'ok';
 $view  = ($_GET['widok'] ?? '') === 'szablony' ? 'szablony' : 'poczta';
@@ -33,6 +34,33 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         [$ok, $err] = wsm_mail_send($pdo, $id);
         $flash = $ok ? 'Wiadomość wysłana.' : ('Nie wysłano: ' . ($err ?: 'nieznany błąd'));
         $flashKind = $ok ? 'ok' : 'err';
+    } elseif (isset($_POST['tlumacz_wiadomosc'])) {
+        // On traduit VERS le polonais pour lire. L'original ne bouge pas :
+        // c'est la pièce, et la traduction n'est qu'une aide à la lecture.
+        [$tr, $errT] = wsm_tr_message($pdo, (int) $_POST['tlumacz_wiadomosc'],
+                                      WSM_LANG_BASE, (string) ($me['nom'] ?? ''));
+        if ($tr) { $flash = 'Przetłumaczono — oryginał zostaje nietknięty.'; }
+        else     { $flash = 'Nie przetłumaczono: ' . $errT; $flashKind = 'err'; }
+
+    } elseif (isset($_POST['tlumacz_odpowiedz'])) {
+        // L'opérateur écrit en polonais, on propose la traduction DANS LE
+        // CHAMP. Rien ne part : il relit, corrige, puis envoie. Expédier une
+        // phrase que personne n'a lue est exactement ce qu'il ne faut pas faire.
+        $cible = (string) ($_POST['lang_klienta'] ?? WSM_LANG_BASE);
+        [$suj, $eS] = wsm_tr_text((string) ($_POST['subject'] ?? ''), WSM_LANG_BASE, $cible);
+        [$cor, $eC] = wsm_tr_text((string) ($_POST['body'] ?? ''), WSM_LANG_BASE, $cible);
+        if ($eS !== null || $eC !== null) {
+            $flash = 'Nie przetłumaczono: ' . ($eS ?? $eC); $flashKind = 'err';
+            $trDraft = ['email' => (string) ($_POST['email'] ?? ''),
+                        'subject' => (string) ($_POST['subject'] ?? ''),
+                        'body' => (string) ($_POST['body'] ?? '')];
+        } else {
+            $flash = 'Przetłumaczono ' . wsm_lang_na($cible)
+                   . ' — przeczytaj i popraw przed wysłaniem.';
+            $trDraft = ['email' => (string) ($_POST['email'] ?? ''),
+                        'subject' => (string) $suj, 'body' => (string) $cor];
+        }
+
     } elseif (isset($_POST['nowa'])) {
         $email = trim((string) ($_POST['email'] ?? ''));
         $subject = trim((string) ($_POST['subject'] ?? ''));
@@ -141,7 +169,7 @@ $orders    = wsm_orders_list($pdo, 60);
 // Rédaction : commande et modèle choisis en amont, variables déjà remplacées.
 $pickOrder = (int) ($_GET['order_id'] ?? 0);
 $pickTpl   = (string) ($_GET['tpl'] ?? '');
-$draft = ['email' => '', 'subject' => '', 'body' => ''];
+$draft = $trDraft ?? ['email' => '', 'subject' => '', 'body' => ''];
 $draftOrder = $pickOrder ? wsm_order_by_id($pdo, $pickOrder) : null;
 if ($draftOrder) $draft['email'] = (string) $draftOrder['email'];
 if ($pickTpl !== '') {
@@ -153,10 +181,25 @@ if ($pickTpl !== '') {
     }
 }
 
+// La langue dans laquelle écrire à ce client : celle qu'il a choisie sur la
+// boutique si on l'a, sinon celle détectée dans son dernier message.
+$langClient = WSM_LANG_BASE;
+if (($draft['email'] ?? '') !== '')          $langClient = wsm_tr_lang_client($pdo, (string) $draft['email']);
+elseif ($detail && ($detail['email'] ?? '')) $langClient = wsm_tr_lang_client($pdo, (string) $detail['email']);
+$traduction = $detail ? wsm_tr_cached($pdo, (int) $detail['id'], WSM_LANG_BASE) : null;
+$iaPrete = wsm_tr_enabled();
+
 $statusTag = ['wyslana' => 'ok', 'kolejka' => 'wait', 'blad' => 'bad'];
 $statusLbl = ['wyslana' => 'Wysłana', 'kolejka' => 'W kolejce', 'blad' => 'Błąd'];
 
 console_head('Poczta', $me, <<<'CSS'
+  /* La traduction se lit comme une note en marge, pas comme le message :
+     le cadre et la teinte disent qu'on n'est plus dans les mots du client. */
+  .tradu { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border-subtle);
+           border-left: 3px solid var(--accent); border-radius: 10px;
+           background: var(--surface-sunken); }
+  .tradu h3 { margin: 0 0 6px; font-size: 14px; }
+  .tradu pre { margin: 6px 0 0; }
   .tiles { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 12px 0 4px; }
   @media (min-width: 760px) { .tiles { grid-template-columns: 1fr 1fr; } }
   .tile { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
@@ -274,6 +317,43 @@ console_crumbs($detail
       <?php endif; ?>
     </dl>
     <pre style="white-space:pre-wrap"><?= h($detail['body']) ?></pre>
+
+    <?php
+    // La traduction est présentée À CÔTÉ de l'original, jamais à sa place :
+    // ce que le client a écrit est la pièce, et une machine se trompe. On
+    // affiche donc la langue détectée, puis la lecture polonaise en dessous.
+    [$langDetectee, $confiance] = wsm_tr_detect((string) $detail['subject'] . "\n" . (string) $detail['body']);
+    ?>
+    <?php if ($detail['direction'] === 'wejscie' && $langDetectee !== WSM_LANG_BASE): ?>
+      <?php if ($traduction): ?>
+      <div class="tradu">
+        <h3>Po polsku <span class="tag">tłumaczenie maszynowe</span></h3>
+        <p class="muted small">
+          Oryginał powyżej zostaje nietknięty — to on jest dokumentem.
+          Wykryty język: <b><?= h(wsm_lang_name((string) ($traduction['src_lang'] ?: $langDetectee))) ?></b>.
+        </p>
+        <?php if (($traduction['subject'] ?? '') !== ''): ?>
+        <p><b><?= h((string) $traduction['subject']) ?></b></p>
+        <?php endif; ?>
+        <pre style="white-space:pre-wrap"><?= h((string) $traduction['body']) ?></pre>
+      </div>
+      <?php elseif ($iaPrete && $isAdmin): ?>
+      <form method="post" style="margin-top:12px">
+        <p class="muted small">
+          Wiadomość wygląda na napisaną <b><?= h(wsm_lang_po($langDetectee)) ?></b><?php
+          if ($confiance < 0.3): ?> <span class="tag">niepewne</span><?php endif; ?>.
+          Tłumaczenie zostanie zapisane obok — nie zastąpi oryginału, i płaci się za nie raz.
+        </p>
+        <button class="btn sm" name="tlumacz_wiadomosc" value="<?= (int) $detail['id'] ?>">
+          Przetłumacz na polski</button>
+      </form>
+      <?php elseif (!$iaPrete): ?>
+      <p class="muted small" style="margin-top:12px">
+        Wiadomość wygląda na napisaną <b><?= h(wsm_lang_po($langDetectee)) ?></b>.
+        Tłumaczenie automatyczne nie jest skonfigurowane (klucz API żyje w <code>config.local.php</code>).
+      </p>
+      <?php endif; ?>
+    <?php endif; ?>
 
     <?php if ($detail['direction'] === 'wejscie'):
       $an = wsm_inbox_parse($pdo, (string) $detail['body']);
@@ -407,7 +487,27 @@ console_crumbs($detail
       </label>
       <div class="actions">
         <button class="primary" type="submit"<?= $isAdmin ? '' : ' disabled' ?>>Zapisz i wyślij</button>
+        <?php if ($iaPrete && $langClient !== WSM_LANG_BASE): ?>
+        <?php // Le bouton porte le NOM du bouton d'envoi voisin : on veut que
+              // la différence soit lisible d'un coup d'œil, parce que l'un
+              // écrit au client et l'autre non. ?>
+        <input type="hidden" name="lang_klienta" value="<?= h($langClient) ?>">
+        <button class="ghost" type="submit" name="tlumacz_odpowiedz" value="1"<?= $isAdmin ? '' : ' disabled' ?>>
+          Przetłumacz <?= h(wsm_lang_na($langClient)) ?></button>
+        <?php endif; ?>
       </div>
+      <?php if ($langClient !== WSM_LANG_BASE): ?>
+      <p class="muted small">
+        Ten klient pisze <b><?= h(wsm_lang_po($langClient)) ?></b>.
+        <?php if ($iaPrete): ?>
+          Napisz po polsku i kliknij „Przetłumacz” — tekst wróci <b>do tego pola</b>, do przeczytania
+          i poprawienia. Nic nie wychodzi, dopóki go nie wyślesz: wysłanie zdania, którego nikt nie
+          przeczytał, jest dokładnie tym, czego robić nie należy.
+        <?php else: ?>
+          Tłumaczenie automatyczne nie jest skonfigurowane.
+        <?php endif; ?>
+      </p>
+      <?php endif; ?>
     </form>
   </div>
 

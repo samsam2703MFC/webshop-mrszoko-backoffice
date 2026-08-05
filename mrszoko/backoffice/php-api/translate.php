@@ -226,3 +226,272 @@ function wsm_tr_approve(PDO $pdo, string $table, string $lang, string $key): boo
         return true;
     } catch (Throwable $e) { return false; }
 }
+
+// ============================================================================
+//  TRADUCTION DU COURRIER (§11)
+//
+//  Trois règles, et la première décide de tout :
+//
+//   1. L'ORIGINAL NE SE REMPLACE JAMAIS. Ce que le client a écrit est la
+//      pièce ; la traduction n'est qu'une aide à la lecture. Écraser le corps
+//      du message par sa traduction ferait disparaître la seule version qui
+//      fasse foi — et une machine se trompe.
+//
+//   2. RIEN NE PART SANS QU'UN HUMAIN AIT LU LE TEXTE TRADUIT. On propose la
+//      traduction dans le champ de rédaction, modifiable ; on ne l'envoie pas
+//      dans le dos de l'opérateur. Envoyer à un client une phrase que
+//      personne n'a relue, c'est exactement ce qu'il ne faut pas faire.
+//
+//   3. UNE TRADUCTION SE PAIE UNE FOIS. Elle est rangée en base : rouvrir un
+//      message ne rappelle pas l'API. Sans ça, relire trois fois un fil de
+//      dix messages coûte trente traductions.
+// ============================================================================
+
+/**
+ * Les lettres PROPRES à une langue. Trouver l'une d'elles est un signe fort.
+ *
+ * « ä ö ü » n'y sont PAS pour l'allemand : le hongrois, le turc, le finnois et
+ * le suédois les emploient aussi, et « köszönöm » (hongrois, trois ö) faisait
+ * gagner l'allemand sur un texte qui n'en contenait pas un mot. Seul « ß » est
+ * vraiment allemand. La leçon vaut pour toutes les lignes : ce tableau ne
+ * contient que ce qui n'appartient qu'à une langue.
+ */
+const WSM_TR_EXCLUSIF = [
+    'uk' => '/[іїєґ]/iu',
+    'pl' => '/[ąćęłńśźż]/iu',
+    'cs' => '/[řůě]/iu',
+    'sk' => '/[ľŕ]/iu',
+    'hu' => '/[őű]/iu',
+    'de' => '/[ß]/iu',
+    'fr' => '/[çœ]/iu',
+];
+
+/**
+ * Les lettres PARTAGÉES : un indice faible, qui ne doit jamais l'emporter
+ * seul sur un mot reconnu.
+ */
+const WSM_TR_PARTAGE = [
+    'de' => '/[äöü]/iu',
+    'hu' => '/[áéíóúöü]/iu',
+    'cs' => '/[áéíóúýč]/iu',
+    'sk' => '/[áéíóúýôč]/iu',
+    'fr' => '/[àâèéêëîïôùû]/iu',
+];
+
+/** Poids : un signe exclusif vaut plus qu'un mot, un mot plus qu'une lettre partagée. */
+const WSM_TR_POIDS = ['exclusif' => 5, 'mot' => 3, 'partage' => 1];
+
+/** Mots outils fréquents — départage quand les diacritiques manquent. */
+const WSM_TR_MOTS = [
+    'pl' => ['dzień dobry', 'proszę', 'dziękuję', 'zamówienie', 'czy', 'jest', 'nie', 'oraz'],
+    'en' => ['hello', 'please', 'thanks', 'thank you', 'order', 'would', 'could', 'the '],
+    'de' => ['guten tag', 'bitte', 'danke', 'bestellung', 'ich', 'und', 'nicht', 'sehr geehrte'],
+    'fr' => ['bonjour', 'merci', 'commande', 'je ', 'nous', 'votre', 'cordialement', 'pouvez'],
+    'uk' => ['доброго дня', 'дякую', 'замовлення', 'будь ласка', 'вітаю'],
+    'cs' => ['dobrý den', 'děkuji', 'objednávka', 'prosím'],
+    'sk' => ['dobrý deň', 'ďakujem', 'objednávka', 'prosím'],
+    'hu' => ['jó napot', 'köszönöm', 'rendelés', 'kérem'],
+];
+
+/**
+ * Dans quelle langue ce texte est-il écrit ?
+ *
+ * Heuristique d'abord, et c'est délibéré : un alphabet et huit mots outils
+ * suffisent pour la quasi-totalité du courrier réel, gratuitement et
+ * instantanément. Appeler un modèle pour reconnaître « Dzień dobry » serait
+ * payer pour ce qu'on sait déjà.
+ *
+ * @return array [code, confiance 0..1] — 'pl' par défaut, la langue de la maison
+ */
+function wsm_tr_detect(string $texte): array {
+    $t = mb_strtolower(trim($texte));
+    if ($t === '') return ['pl', 0.0];
+
+    $pts = [];
+    $add = function (string $code, int $n) use (&$pts) { $pts[$code] = ($pts[$code] ?? 0) + $n; };
+
+    // 1. Les lettres qui n'appartiennent qu'à une langue.
+    foreach (WSM_TR_EXCLUSIF as $code => $motif) {
+        $n = preg_match_all($motif, $t);
+        if ($n) $add($code, $n * WSM_TR_POIDS['exclusif']);
+    }
+    // Du cyrillique sans lettre ukrainienne propre reste probablement de
+    // l'ukrainien : c'est la seule langue cyrillique que la boutique sert.
+    if (preg_match('/\p{Cyrillic}/u', $t)) $add('uk', WSM_TR_POIDS['exclusif']);
+
+    // 2. Les mots outils : plus parlants qu'une lettre partagée.
+    foreach (WSM_TR_MOTS as $code => $mots) {
+        foreach ($mots as $mot) if (str_contains($t, $mot)) $add($code, WSM_TR_POIDS['mot']);
+    }
+
+    // 3. Les lettres communes à plusieurs langues, en dernier et au plus bas :
+    //    elles départagent, elles ne décident pas.
+    foreach (WSM_TR_PARTAGE as $code => $motif) {
+        $n = preg_match_all($motif, $t);
+        if ($n) $add($code, min($n, 6) * WSM_TR_POIDS['partage']);
+    }
+
+    if (!$pts) return ['pl', 0.0];
+    arsort($pts);
+    $codes = array_keys($pts);
+    $premier = $codes[0];
+    $second  = $pts[$codes[1] ?? ''] ?? 0;
+    $total   = array_sum($pts);
+    // La confiance est l'ÉCART avec le suivant, pas le score brut : deux
+    // langues au coude à coude sont une ambiguïté, quel que soit le nombre
+    // d'indices trouvés. L'écran s'en sert pour dire « niepewne ».
+    $conf = $total > 0 ? round(($pts[$premier] - $second) / $total, 2) : 0.0;
+    return [$premier, max(0.0, min(1.0, $conf))];
+}
+
+function wsm_tr_ensure(PDO $pdo): void {
+    if (!wsm_table_exists($pdo, 'wsm_message_tr')) wsm_apply_schema($pdo);
+}
+
+/** La traduction déjà rangée, s'il y en a une. */
+function wsm_tr_cached(PDO $pdo, int $messageId, string $lang): ?array {
+    wsm_tr_ensure($pdo);
+    try {
+        $st = $pdo->prepare("SELECT * FROM wsm_message_tr WHERE message_id = ? AND lang = ?");
+        $st->execute([$messageId, $lang]);
+        return $st->fetch() ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
+/**
+ * Traduit un texte libre. Sert dans les deux sens : lire un message reçu en
+ * polonais, ou rédiger une réponse dans la langue du client.
+ *
+ * @return array [texte|null, erreur|null]
+ */
+function wsm_tr_text(string $texte, string $source, string $cible): array {
+    if (!wsm_tr_enabled())            return [null, 'tłumaczenie nie jest skonfigurowane'];
+    if (trim($texte) === '')          return ['', null];
+    if ($source === $cible)           return [$texte, null];
+    if (!isset(WSM_LANGS[$cible]))    return [null, 'nieznany język docelowy'];
+
+    $nomC = WSM_LANGS[$cible][2] ?? $cible;
+    $nomS = WSM_LANGS[$source][2] ?? 'une langue inconnue';
+
+    $sys = "Tu traduis la correspondance d'une chocolaterie polonaise (Mister Szoko) "
+         . "depuis le $nomS vers le $nomC.\n\n"
+         . "RÈGLES :\n"
+         . "- Traduis FIDÈLEMENT, sans résumer, sans ajouter de politesse absente, "
+         . "sans corriger le fond. Une traduction qui arrondit fait prendre une décision sur "
+         . "un message qui n'a pas été écrit.\n"
+         . "- Garde la mise en forme : sauts de ligne, listes, numéros de commande, "
+         . "références, montants et unités À L'IDENTIQUE.\n"
+         . "- « Mister Szoko » ne se traduit pas.\n"
+         . "- Registre commerçant soigné.\n"
+         . "- Si le texte est déjà en $nomC, renvoie-le inchangé.\n\n"
+         . "Réponds UNIQUEMENT par la traduction, sans préambule ni guillemets.";
+
+    $payload = json_encode([
+        'model' => WSM_TR_MODEL, 'max_tokens' => 4000, 'system' => $sys,
+        'messages' => [['role' => 'user', 'content' => $texte]],
+    ], JSON_UNESCAPED_UNICODE);
+
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload, CURLOPT_TIMEOUT => 90,
+        CURLOPT_HTTPHEADER => ['content-type: application/json',
+                               'x-api-key: ' . wsm_tr_key(),
+                               'anthropic-version: 2023-06-01'],
+    ]);
+    $body = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $errc = curl_error($ch);
+    curl_close($ch);
+
+    if ($body === false) return [null, 'sieć: ' . $errc];
+    if ($code !== 200)   return [null, 'API odpowiedziało ' . $code];
+
+    $d = json_decode((string) $body, true);
+    $out = '';
+    foreach ($d['content'] ?? [] as $b) if (($b['type'] ?? '') === 'text') $out .= (string) $b['text'];
+    $out = trim($out);
+    return $out === '' ? [null, 'pusta odpowiedź'] : [$out, null];
+}
+
+/**
+ * Traduit un message de la boîte, et RANGE le résultat.
+ *
+ * L'original reste intact en base : c'est la pièce. La traduction vit à côté,
+ * dans sa propre table, et se retrouve à la réouverture sans repayer.
+ *
+ * @return array [traduction|null, erreur|null]
+ */
+function wsm_tr_message(PDO $pdo, int $messageId, string $cible, string $actor = ''): array {
+    wsm_tr_ensure($pdo);
+    if ($dejaLa = wsm_tr_cached($pdo, $messageId, $cible)) {
+        return [$dejaLa, null];
+    }
+    $st = $pdo->prepare("SELECT id, subject, body FROM wsm_messages WHERE id = ?");
+    $st->execute([$messageId]);
+    $m = $st->fetch();
+    if (!$m) return [null, 'nie znaleziono wiadomości'];
+
+    [$src] = wsm_tr_detect((string) $m['subject'] . "\n" . (string) $m['body']);
+    if ($src === $cible) {
+        // Rien à traduire — mais on le RANGE quand même, avec la source
+        // détectée : sinon l'écran redemande la traduction à chaque ouverture
+        // d'un message déjà dans la bonne langue.
+        $st2 = $pdo->prepare("INSERT INTO wsm_message_tr
+                                (message_id, lang, src_lang, subject, body, actor, created_at)
+                              VALUES (?,?,?,?,?,?,?)");
+        try {
+            $st2->execute([$messageId, $cible, $src, (string) $m['subject'], (string) $m['body'],
+                           mb_substr($actor, 0, 120), date('Y-m-d H:i:s')]);
+        } catch (Throwable $e) { /* course : déjà rangée */ }
+        return [wsm_tr_cached($pdo, $messageId, $cible), null];
+    }
+
+    [$suj, $e1] = wsm_tr_text((string) $m['subject'], $src, $cible);
+    if ($e1 !== null) return [null, $e1];
+    [$cor, $e2] = wsm_tr_text((string) $m['body'], $src, $cible);
+    if ($e2 !== null) return [null, $e2];
+
+    $ins = $pdo->prepare("INSERT INTO wsm_message_tr
+                            (message_id, lang, src_lang, subject, body, actor, created_at)
+                          VALUES (?,?,?,?,?,?,?)");
+    try {
+        $ins->execute([$messageId, $cible, $src, (string) $suj, (string) $cor,
+                       mb_substr($actor, 0, 120), date('Y-m-d H:i:s')]);
+    } catch (Throwable $e) { /* course : une autre requête vient de la ranger */ }
+    return [wsm_tr_cached($pdo, $messageId, $cible), null];
+}
+
+/**
+ * La langue dans laquelle écrire à cette adresse.
+ *
+ * Par ordre de fiabilité : la langue déclarée sur une commande du client (il
+ * l'a choisie lui-même sur la boutique), puis celle détectée dans son dernier
+ * message, puis le polonais. Deviner à partir du seul texte quand on a une
+ * réponse ferme en base serait perdre de l'information.
+ */
+function wsm_tr_lang_client(PDO $pdo, string $email): string {
+    $email = strtolower(trim($email));
+    if ($email === '') return WSM_LANG_BASE;
+    try {
+        $st = $pdo->prepare("SELECT lang FROM wsm_orders WHERE LOWER(email) = ?
+                              ORDER BY id DESC LIMIT 1");
+        $st->execute([$email]);
+        $l = (string) $st->fetchColumn();
+        if ($l !== '' && isset(WSM_LANGS[$l])) return $l;
+    } catch (Throwable $e) { /* pas de commande */ }
+
+    try {
+        $st = $pdo->prepare("SELECT subject, body FROM wsm_messages
+                              WHERE LOWER(email) = ? AND direction = 'wejscie'
+                              ORDER BY id DESC LIMIT 1");
+        $st->execute([$email]);
+        if ($m = $st->fetch()) {
+            [$code, $conf] = wsm_tr_detect((string) $m['subject'] . "\n" . (string) $m['body']);
+            // Sous ce seuil, deux langues se disputent le texte : mieux vaut
+            // le polonais assumé qu'un allemand deviné sur trois mots.
+            if ($conf >= 0.25) return $code;
+        }
+    } catch (Throwable $e) { /* rien */ }
+    return WSM_LANG_BASE;
+}

@@ -49,6 +49,36 @@ const WSM_LANGS = [
     'hu' => ['Magyar',     'HU', 'hongrois'],
 ];
 
+/**
+ * Le nom d'une langue DANS LES PHRASES POLONAISES de la console.
+ *
+ * Le nom natif (« Українська ») est ce qu'un visiteur cherche dans un
+ * sélecteur, mais il ne se décline pas : « napisaną po Українська » ne se dit
+ * pas. Le polonais demande l'adverbe (« po ukraińsku ») et l'accusatif
+ * (« na ukraiński ») — deux formes, donc deux colonnes, plutôt qu'un nom
+ * recollé de force au milieu d'une phrase.
+ */
+const WSM_LANG_PL = [
+    'pl' => ['po polsku',     'na polski'],
+    'en' => ['po angielsku',  'na angielski'],
+    'uk' => ['po ukraińsku',  'na ukraiński'],
+    'de' => ['po niemiecku',  'na niemiecki'],
+    'fr' => ['po francusku',  'na francuski'],
+    'cs' => ['po czesku',     'na czeski'],
+    'sk' => ['po słowacku',   'na słowacki'],
+    'hu' => ['po węgiersku',  'na węgierski'],
+];
+
+/** « po ukraińsku » — pour « wiadomość napisana … ». */
+function wsm_lang_po(string $code): string {
+    return WSM_LANG_PL[$code][0] ?? ('po ' . strtoupper($code));
+}
+
+/** « na ukraiński » — pour « przetłumacz … ». */
+function wsm_lang_na(string $code): string {
+    return WSM_LANG_PL[$code][1] ?? ('na ' . strtoupper($code));
+}
+
 /** La langue source : elle ne se dépublie pas et sert de repli partout. */
 const WSM_LANG_BASE = 'pl';
 

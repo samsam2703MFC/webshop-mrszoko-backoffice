@@ -701,3 +701,17 @@ CREATE TABLE IF NOT EXISTS wsm_i18n_history (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_wsm_i18n_history_lookup ON wsm_i18n_history (tbl, lang, k);
+
+-- Traductions du courrier : l'original reste dans wsm_messages (c'est la
+-- pièce), la traduction vit ici. L'UNIQUE évite de payer deux fois la même.
+CREATE TABLE IF NOT EXISTS wsm_message_tr (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER NOT NULL,
+  lang       TEXT NOT NULL,
+  src_lang   TEXT NOT NULL DEFAULT '',
+  subject    TEXT NOT NULL DEFAULT '',
+  body       TEXT,
+  actor      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  UNIQUE (message_id, lang)
+);
