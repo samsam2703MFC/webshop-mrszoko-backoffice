@@ -1092,3 +1092,22 @@ CREATE TABLE IF NOT EXISTS `wsm_links` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_links_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Campagnes d'e-mails. RIEN NE PART D'ICI VERS UN SERVEUR SMTP : l'envoi met
+--  les messages en file dans wsm_messages, et le travailleur de fond les
+--  ecoule. Cent messages d'un coup coutent la reputation du domaine — et avec
+--  elle, les confirmations de commande.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_campaigns` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `nom`        VARCHAR(190) NOT NULL DEFAULT '',
+  `segment`    VARCHAR(24)  NOT NULL DEFAULT 'klienci',
+  `sujet`      VARCHAR(250) NOT NULL DEFAULT '',
+  `corps`      TEXT,
+  `statut`     VARCHAR(20)  NOT NULL DEFAULT 'przygotowana',
+  `wyslane`    INT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  `sent_at`    DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

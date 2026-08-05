@@ -853,3 +853,25 @@ CREATE TABLE IF NOT EXISTS wsm_links (
   active     INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
+
+-- Campagnes d'e-mails.
+--
+--  RIEN NE PART D'ICI VERS UN SERVEUR SMTP. L'envoi met les messages en
+--  `kolejka` dans wsm_messages, et le travailleur de fond les ecoule a son
+--  rythme. Cent messages pousses d'un coup depuis une IP qui n'en envoie
+--  jamais coutent la reputation du domaine — et avec elle, les
+--  confirmations de commande.
+--
+--  L'idempotence vit sur wsm_messages.event_key (« camp-<id>-<adresse> ») :
+--  rejouer l'ecran ne renvoie rien.
+CREATE TABLE IF NOT EXISTS wsm_campaigns (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  nom        TEXT NOT NULL DEFAULT '',
+  segment    TEXT NOT NULL DEFAULT 'klienci',
+  sujet      TEXT NOT NULL DEFAULT '',
+  corps      TEXT NOT NULL DEFAULT '',
+  statut     TEXT NOT NULL DEFAULT 'przygotowana',
+  wyslane    INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  sent_at    TEXT DEFAULT NULL
+);

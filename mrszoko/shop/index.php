@@ -192,6 +192,31 @@ function upsell_block(PDO $pdo, array $ids, string $lang, array $S): void {
     <?php
 }
 
+// ---- Désabonnement : ?stop=<adresse>&t=<jeton> ------------------------------
+//  EN UN CLIC, SANS FORMULAIRE ET SANS CONNEXION. Un désabonnement qui exige
+//  de retrouver un mot de passe n'est pas un désabonnement : c'est un
+//  signalement pour courrier indésirable, et celui-là coûte la réputation du
+//  domaine — donc les confirmations de commande.
+//
+//  Le jeton est signé : sans lui, n'importe qui pourrait désabonner
+//  n'importe quelle adresse en devinant un e-mail.
+if (isset($_GET['stop']) && $method === 'GET') {
+    $cf = $WSM_API_DIR . '/campaign.php';
+    if (is_file($cf)) {
+        require_once $cf;
+        $adr = (string) $_GET['stop'];
+        $stopOk = wsm_camp_stop_ok($adr, (string) ($_GET['t'] ?? ''));
+        if ($stopOk) [$stopOk, ] = wsm_camp_stop($pdo, $adr, 'klient');
+        layout_head($S, $lang, $langs, $S['stop.title'] ?? '', '', 'koszyk');  // noindex
+        layout_header($S, $lang, $langs, cart_count($cart));
+        echo '<main class="wrap block"><h1>' . e($S['stop.title'] ?? '') . '</h1>';
+        echo '<p class="lead">' . e($stopOk ? ($S['stop.done'] ?? '') : ($S['stop.bad'] ?? '')) . '</p>';
+        echo '<p><a class="btn btn--brand" href="' . e(u()) . '">' . e($S['cart.empty_cta'] ?? '') . '</a></p></main>';
+        layout_footer($S);
+        exit;
+    }
+}
+
 // ============================ ACTIONS (POST) ================================
 if ($method === 'POST') {
     if (!csrf_ok()) { http_response_code(400); exit('Bad request.'); }
