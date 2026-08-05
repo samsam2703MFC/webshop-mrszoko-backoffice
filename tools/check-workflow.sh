@@ -43,3 +43,58 @@ else:
     print(f"OK — la plus grosse expression fait {pire} caractères (limite {limite}).")
 sys.exit(sortie)
 PY
+RC=$?
+
+# ---------------------------------------------------------------------------
+#  Deuxième vérification : les scripts envoyés par SSH sont-ils du bash VALIDE ?
+#
+#  Ce qui s'est passé. Un commentaire PHP contenait « quelqu\'un ». Ce bloc PHP
+#  vit à l'intérieur d'une chaîne shell entre quotes simples, où le backslash
+#  ne protège RIEN : la première apostrophe referme la commande, et la suite
+#  part au parseur bash. Résultat sur le serveur :
+#
+#      bash: line 70: unexpected EOF while looking for matching `)'
+#
+#  Le déploiement est mort à mi-course, APRÈS avoir déjà copié les fichiers.
+#  Ni YAML, ni actionlint, ni la mesure de taille ci-dessus ne voient ça —
+#  pour eux le bloc est du texte. Seul bash sait lire du bash.
+#
+#  On extrait donc chaque corps « << 'REMOTE' … REMOTE » et on le passe à
+#  `bash -n` : analyse syntaxique seule, aucune commande exécutée.
+# ---------------------------------------------------------------------------
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+python3 - "$F" "$TMP" <<'PY'
+import io, sys, os, re
+f, tmp = sys.argv[1], sys.argv[2]
+L = io.open(f, encoding='utf-8').read().split('\n')
+n = 0
+i = 0
+while i < len(L):
+    if re.search(r"<<\s*'REMOTE'\s*$", L[i]):
+        corps, i = [], i + 1
+        while i < len(L) and L[i].strip() != 'REMOTE':
+            corps.append(L[i])
+            i += 1
+        # Le heredoc est indenté dans le YAML ; bash reçoit le texte dédenté
+        # de la même façon, donc on retire le préfixe commun.
+        marge = min((len(l) - len(l.lstrip()) for l in corps if l.strip()), default=0)
+        n += 1
+        io.open(os.path.join(tmp, f'remote{n}.sh'), 'w', encoding='utf-8').write(
+            '\n'.join(l[marge:] if len(l) >= marge else l for l in corps) + '\n')
+    i += 1
+print(n)
+PY
+NB=$(ls "$TMP" 2>/dev/null | wc -l)
+BAD=0
+for s in "$TMP"/remote*.sh; do
+  [ -e "$s" ] || continue
+  ERR=$(bash -n "$s" 2>&1) || { BAD=1; echo "  $(basename "$s") : $ERR"; }
+done
+if [ "$BAD" != "0" ]; then
+  echo "REFUSÉ — un script envoyé par SSH ne se parse pas. Il mourrait EN COURS de déploiement."
+  echo "         Cause la plus fréquente : une apostrophe dans un bloc php -r '…'."
+  exit 1
+fi
+echo "OK — les $NB scripts distants se parsent (bash -n)."
+exit $RC
