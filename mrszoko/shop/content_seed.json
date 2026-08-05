@@ -375,7 +375,10 @@
       "sub.rhythm": "Jak często",
       "sub.cta": "Ustaw subskrypcję",
       "sub.done": "Gotowe. Pierwsza dostawa: {data}. Nic nie zostało pobrane.",
-      "sub.already": "Ten adres ma już taką subskrypcję."
+      "sub.already": "Ten adres ma już taką subskrypcję.",
+      "upsell.title": "Może się przydać",
+      "upsell.together": "często kupowane razem",
+      "upsell.shelf": "z tej samej półki"
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -574,7 +577,10 @@
       "sub.rhythm": "Як часто",
       "sub.cta": "Налаштувати підписку",
       "sub.done": "Готово. Перша доставка: {data}. Нічого не списано.",
-      "sub.already": "Ця адреса вже має таку підписку."
+      "sub.already": "Ця адреса вже має таку підписку.",
+      "upsell.title": "Може стати в пригоді",
+      "upsell.together": "часто купують разом",
+      "upsell.shelf": "з тієї ж полиці"
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -773,7 +779,10 @@
       "sub.rhythm": "How often",
       "sub.cta": "Set up a subscription",
       "sub.done": "Done. First delivery: {data}. Nothing has been charged.",
-      "sub.already": "This address already has such a subscription."
+      "sub.already": "This address already has such a subscription.",
+      "upsell.title": "You might also need",
+      "upsell.together": "often bought together",
+      "upsell.shelf": "from the same shelf"
     }
   }
 }

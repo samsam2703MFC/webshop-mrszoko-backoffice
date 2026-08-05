@@ -1064,6 +1064,37 @@ jobs:
             *obiecuje_pobranie=0) ;;
             *) echo "  ^ ATTENTION : wzór listu obiecuje pobranie, a sklep NIE pobiera — popraw go w Poczcie"; fail=1;;
           esac
+          echo "== propozycje : etykieta nie klamie =="
+          # « Souvent achete ensemble » sous deux produits que personne n a
+          # jamais commandes ensemble est un mensonge. La regle se verifie ici
+          # SANS BASE : deux sources, deux cles de libelle, jamais la meme.
+          UOUT=$(php -r '
+            require_once "'"$DIR_API"'/upsell.php";
+            $d = wsm_upsell_cle("razem") !== wsm_upsell_cle("kategoria");
+            $r = wsm_upsell_cle("razem") === "upsell.together";
+            $k = wsm_upsell_cle("kategoria") === "upsell.shelf";
+            $b = WSM_UPSELL_MAX === 3 && WSM_UPSELL_MIN_PAR >= 2;
+            echo ($d && $r && $k ? "zrodla-ok" : "zrodla-ZLE"), " ",
+                 ($b ? "granice-ok" : "granice-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || UOUT="php-ZLE :: $UOUT"
+          echo "  $UOUT"
+          case "$UOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : etykiety propozycji nie rozroznaja zrodel"; fail=1;;
+            *) ;;
+          esac
+          # Les libelles doivent EXISTER en base, sinon la carte sort muette.
+          QU="SELECT CONCAT('etykiet=', COUNT(*)) FROM mrszoko.wsm_shop_i18n WHERE k IN ('upsell.title','upsell.together','upsell.shelf')"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            UV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QU" 2>&1 || echo "sql-ZLE")
+          else
+            UV=$(mysql -N -e "$QU" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $UV"
+          case "$UV" in
+            *ZLE*) echo "  ^ ATTENTION : nie udalo sie policzyc etykiet"; fail=1;;
+            *etykiet=0) echo "  ^ ATTENTION : brak etykiet propozycji — karty bylyby nieme"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 
