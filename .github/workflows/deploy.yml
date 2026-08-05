@@ -957,6 +957,55 @@ jobs:
             *poza_zakresem=0) ;;
             *) echo "  ^ UWAGA : rabat poza zakresem 0-50 % na karcie klienta — jest ignorowany przez sklep, popraw go ręcznie";;
           esac
+          echo "== kody rabatowe : nic nie oddaje pieniędzy =="
+          # Un bon de 50 zl sur un panier de 30 zl doit enlever 30, pas 50.
+          # Et un code SANS VALEUR doit etre REFUSE : la table portait deja des
+          # lignes de demonstration decrites en toutes lettres et vides de
+          # valeur exploitable. Acceptees, elles auraient repondu « code
+          # applique » en laissant payer le prix plein — pire qu un refus.
+          KOUT=$(php -r '
+            require_once "'"$DIR_API"'/promo.php";
+            $g = wsm_promo_grosze("20,00") === 2000 && wsm_promo_grosze("20 zl") === 2000;
+            $l = str_contains(wsm_promo_label(["kind"=>"procent","pct"=>0]), "bez efektu")
+              && wsm_promo_label(["kind"=>"wysylka"]) === "Darmowa wysyłka";
+            $lignes = [["line_gross"=>3000,"line_net"=>2439,"line_vat"=>561,"vat_rate"=>0.23]];
+            $pris = wsm_promo_spread($lignes, 5000);
+            $rien = $pris === 3000 && $lignes[0]["line_gross"] === 0;
+            $deux = [["line_gross"=>10000,"line_net"=>9524,"line_vat"=>476,"vat_rate"=>0.05],
+                     ["line_gross"=>5000,"line_net"=>4065,"line_vat"=>935,"vat_rate"=>0.23]];
+            $p2 = wsm_promo_spread($deux, 2000);
+            $somme = 0; $coh = true;
+            foreach ($deux as $x) {
+              $somme += $x["line_gross"];
+              if ($x["line_net"] + $x["line_vat"] !== $x["line_gross"]) $coh = false;
+            }
+            $vat = $p2 === 2000 && $somme === 13000 && $coh;
+            $bornes = count(WSM_PROMO_KINDS) === 3 && WSM_PROMO_MAX_PCT <= 50;
+            echo ($g ? "grosze-ok" : "grosze-ZLE"), " ",
+                 ($l ? "etykieta-ok" : "etykieta-ZLE"), " ",
+                 ($rien ? "bez-zwrotu-ok" : "bez-zwrotu-ZLE"), " ",
+                 ($vat ? "vat-ok" : "vat-ZLE"), " ",
+                 ($bornes ? "granice-ok" : "granice-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || KOUT="php-ZLE :: $KOUT"
+          echo "  $KOUT"
+          case "$KOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguły kodów rabatowych nie działają"; fail=1;;
+            *) ;;
+          esac
+          # Un code actif mais SANS VALEUR est un piege pour le client : il faut
+          # le voir en production, la ou les lignes de demonstration dorment.
+          QK="SELECT CONCAT('kodow=', COUNT(*), ' czynnych=', COALESCE(SUM(active),0), ' bez_efektu=', COALESCE(SUM(active = 1 AND ((kind = 'procent' AND pct <= 0) OR (kind = 'kwota' AND kwota <= 0))),0)) FROM mrszoko.wsm_vouchers"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            KV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QK" 2>&1 || echo "sql-ZLE")
+          else
+            KV=$(mysql -N -e "$QK" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $KV"
+          case "$KV" in
+            *ZLE*) echo "  ^ ATTENTION : nie udało się policzyć kodów"; fail=1;;
+            *bez_efektu=0) ;;
+            *) echo "  ^ UWAGA : aktywny kod bez wartości — sklep go ODRZUCA, popraw go lub wycofaj w Rabatach";;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 

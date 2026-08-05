@@ -180,7 +180,12 @@ if ($sroute !== '') {
             // prix public à l'écran et un autre montant sur sa facture. Un prix
             // qui change entre le devis et la caisse fait abandonner le panier.
             ['country' => (string) ($b['country'] ?? ''), 'vat_eu' => (string) ($b['vat_eu'] ?? ''),
-             'email' => (string) ($b['email'] ?? '')]);
+             'email' => (string) ($b['email'] ?? ''),
+             // Le code de réduction est jugé ICI, pas à la caisse : l'acheteur
+             // doit voir ce qu'il enlève AVANT de saisir son adresse. Un code
+             // refusé revient en `voucher_error`, en polonais, avec le geste
+             // à faire — et ne fait pas échouer le devis.
+             'voucher' => (string) ($b['voucher'] ?? '')]);
         if ($e) wsm_send(['error' => 'validation', 'fields' => $e, 'quote' => $q], 422);
         wsm_send($q);
     }

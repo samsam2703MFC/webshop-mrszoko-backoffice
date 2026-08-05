@@ -401,6 +401,44 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
             $tier = ['label' => $b2b['source'], 'percent' => $b2b['remise'], 'b2b' => true];
         }
     }
+
+    // ---- Le bon de réduction -----------------------------------------------
+    //
+    // TROISIÈME PRÉTENDANT À LA MÊME QUESTION. Le palier au poids, le tarif
+    // professionnel et un bon en pourcent disent tous « combien vous prenez ».
+    // Le MEILLEUR DES TROIS s'applique. Empiler 20 % + 12 % + 10 % ferait
+    // 42 % sur une commande que personne n'aurait relue.
+    //
+    // Un bon en MONTANT, lui, n'est pas un taux : il s'applique après, sur la
+    // marchandise seule, et il est réparti au prorata plus bas — sans quoi la
+    // TVA d'un panier à deux taux serait fausse.
+    //
+    // La validité est jugée sur la marchandise AU PRIX PLEIN : un seuil
+    // « à partir de 200 zł » qu'une remise ferait manquer de trois grosze
+    // serait incompréhensible pour l'acheteur qui voit 200 zł dans son panier.
+    $promoFile = __DIR__ . '/promo.php';
+    $codeSaisi = strtoupper(trim((string) ($opts['voucher'] ?? '')));
+    $bon = null; $bonErr = ''; $bonMontant = 0; $bonPort = false;
+    if ($codeSaisi !== '' && is_file($promoFile)) {
+        require_once $promoFile;
+        $brut = 0;
+        foreach ($picked as $x) $brut += $x['p']['price'] * $x['qty'];
+        $v = wsm_promo_check($pdo, $codeSaisi, $brut, (string) ($opts['email'] ?? ''));
+        if (!$v['ok']) {
+            $bonErr = $v['raison'];
+        } else {
+            $bon = $v['bon'];
+            $kind = (string) ($bon['kind'] ?? 'procent');
+            if ($kind === 'procent' && (float) $bon['pct'] > $discountPct) {
+                $discountPct = (float) $bon['pct'];
+                $tier = ['label' => 'Kod ' . $bon['code'], 'percent' => $discountPct, 'voucher' => true];
+            } elseif ($kind === 'wysylka') {
+                $bonPort = true;
+            }
+            // Le montant fixe est traité après le calcul des lignes.
+        }
+    }
+
     $backorder = false;
 
     // ---- Deuxième passe : les montants -------------------------------------
@@ -448,6 +486,23 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
         $discountAmount = max(0, $discountAmount - $itemsGross);
     }
 
+    // ---- Le bon en MONTANT, réparti sur les lignes -------------------------
+    //
+    // Après la remise, jamais avant : un bon de 20 zł sur un panier déjà
+    // remisé enlève 20 zł de ce qui reste à payer, ce que l'acheteur lit.
+    // Réparti au prorata parce que les taux de TVA diffèrent d'une ligne à
+    // l'autre — 5 % sur une denrée, 23 % ailleurs. Et plafonné à la
+    // marchandise : un bon ne rend jamais d'argent (règle 1).
+    if ($bon !== null && (string) ($bon['kind'] ?? '') === 'kwota') {
+        $bonMontant = wsm_promo_spread($lines, (int) $bon['kwota'], $reverseCharge);
+        $itemsGross = 0; $itemsNet = 0; $itemsVat = 0;
+        foreach ($lines as $l) {
+            $itemsGross += (int) $l['line_gross'];
+            $itemsNet   += (int) $l['line_net'];
+            $itemsVat   += (int) $l['line_vat'];
+        }
+    }
+
     // --- Livraison ----------------------------------------------------------
     $methods = wsm_shipping_methods($pdo, $lang, $country);
     if (!$methods) $e['delivery_method'] = 'brak dostawy do tego kraju';
@@ -470,6 +525,9 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
             $seuil = (int) $b2b['franco'];
         }
         $freeShipping = $seuil > 0 && $itemsGross >= $seuil;
+        // Le bon « livraison offerte » ne discute pas de seuil : c'est ce
+        // qu'il promet, et c'est la seule réduction qui touche le port.
+        if ($bonPort) $freeShipping = true;
         if (!$freeShipping) {
             $shipNet   = $method['price_net'];
             $shipGross = $shipNet + (int) round($shipNet * $method['vat_rate']);
@@ -490,7 +548,28 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
         'discount_percent' => $discountPct,
         'discount_amount'  => $discountAmount,
         'discount_label'   => $tier['label'] ?? '',
+        // D'OÙ VIENT LA REMISE. Sans ça, l'écran affichait « Rabat ilościowy »
+        // pour une remise venue d'un code ou d'un compte professionnel : le
+        // libellé nommait la mauvaise raison, et l'acheteur qui retire son
+        // code ne comprenait pas pourquoi le montant ne bougeait pas.
+        'discount_source'  => ($tier['voucher'] ?? false) ? 'kod'
+                            : (($tier['b2b'] ?? false) ? 'firma' : 'waga'),
         'discount_next'    => wsm_discount_next($pdo, $weight),
+        // Le bon tel qu'il a AGI, pas tel qu'il a été tapé. `error` est en
+        // polonais et dit quoi faire ; `applied` distingue « code accepté »
+        // de « code accepté mais déjà battu par une meilleure remise ».
+        'voucher' => $bon === null ? null : [
+            'id'      => (int) $bon['id'],
+            'code'    => (string) $bon['code'],
+            'kind'    => (string) $bon['kind'],
+            'label'   => wsm_promo_label($bon),
+            'amount'  => $bonMontant,
+            'free_shipping' => $bonPort,
+            'applied' => $bonMontant > 0 || $bonPort
+                      || (($tier['voucher'] ?? false) === true),
+        ],
+        'voucher_error' => $bonErr,
+        'voucher_input' => $codeSaisi,
         'backorder'        => $backorder,
         'country'        => $country,
         'reverse_charge' => $reverseCharge,
@@ -748,8 +827,9 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     $method = (string) ($body['delivery_method'] ?? 'inpost_locker');
     $invoice = !empty($body['invoice']);
 
+    $code_bon = (string) ($body['voucher'] ?? '');
     [$quote, $qErr] = wsm_shop_quote($pdo, (array) ($body['items'] ?? []), $method, $lang,
-                                     ['email' => (string) ($body['email'] ?? '')]);
+                                     ['email' => (string) ($body['email'] ?? ''), 'voucher' => $code_bon]);
     [$buyer, $bErr] = wsm_validate_buyer($body, $method, $invoice);
     $errors = $qErr + $bErr;
     if ($errors) return [null, $errors];
@@ -766,8 +846,17 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     // foi, pas celui qu'a vu le navigateur.
     $shipCountry = (string) ($buyer['ship_country'] ?: WSM_SHOP_HOME_COUNTRY);
     [$quote, $qErr2] = wsm_shop_quote($pdo, (array) ($body['items'] ?? []), $method, $lang,
-        ['country' => $shipCountry, 'vies' => $vies, 'email' => (string) ($buyer['email'] ?? '')]);
+        ['country' => $shipCountry, 'vies' => $vies, 'email' => (string) ($buyer['email'] ?? ''),
+         'voucher' => $code_bon]);
     if ($qErr2) return [null, $qErr2];
+
+    // Un code tapé et refusé ARRÊTE la commande. Laisser passer serait faire
+    // payer le prix plein à quelqu'un qui croit avoir une réduction — il ne
+    // s'en apercevrait qu'en lisant sa facture, et il aurait raison de se
+    // plaindre. Le message dit ce qui cloche et ce qu'il faut faire.
+    if ($code_bon !== '' && ($quote['voucher_error'] ?? '') !== '') {
+        return [null, ['voucher' => $quote['voucher_error']]];
+    }
 
     $pdo->beginTransaction();
     try {
@@ -817,6 +906,9 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
             'backorder' => !empty($quote['backorder']) ? 1 : 0,
             'discount_percent' => $quote['discount_percent'],
             'discount_amount'  => $quote['discount_amount'],
+            // Gelé sur la commande : le bon peut changer, celle-ci ne doit pas.
+            'voucher_code'   => (string) ($quote['voucher']['code'] ?? ''),
+            'voucher_amount' => (int) ($quote['voucher']['amount'] ?? 0),
         ] + wsm_vies_columns($vies);
         $names = array_keys($cols);
         $sql = 'INSERT INTO wsm_orders (' . implode(',', $names) . ') VALUES (' .
@@ -858,11 +950,33 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
             ]);
         }
 
+        // ---- Le bon est DÉCOMPTÉ ici, pas au devis -------------------------
+        //
+        // C'est le seul endroit où la double dépense peut être arbitrée : deux
+        // onglets ouverts passent tous les deux la validation à la même
+        // seconde, et seul un UPDATE conditionnel départage. Si le quota vient
+        // d'être atteint, TOUTE la commande est annulée et l'acheteur
+        // l'apprend — plutôt que de payer le prix plein sans le savoir.
+        if (!empty($quote['voucher']['id']) && !empty($quote['voucher']['applied'])) {
+            require_once __DIR__ . '/promo.php';
+            [$okBon, $msgBon] = wsm_promo_redeem($pdo, (int) $quote['voucher']['id'], $orderId,
+                                                 (string) $buyer['email'],
+                                                 (int) $quote['voucher']['amount']);
+            if (!$okBon) throw new RuntimeException('voucher:' . $msgBon);
+            wsm_order_event($pdo, $orderId, 'kod_rabatowy',
+                            (string) $quote['voucher']['code'] . ' · ' . (string) $quote['voucher']['label'], 'sklep');
+        }
+
         wsm_order_event($pdo, $orderId, 'utworzone', $code . ' · ' . wsm_money($quote['total_gross']) . ' PLN', 'sklep');
 
         $pdo->commit();
     } catch (Throwable $ex) {
         if ($pdo->inTransaction()) $pdo->rollBack();
+        // Le code épuisé n'est pas une panne : c'est une réponse, et elle se
+        // dit dans la langue de l'acheteur, sur le bon champ du formulaire.
+        if (str_starts_with($ex->getMessage(), 'voucher:')) {
+            return [null, ['voucher' => 'Ten kod właśnie się wyczerpał. Usuń go, aby dokończyć zamówienie.']];
+        }
         return [null, ['db' => $ex->getMessage()]];
     }
 
@@ -965,6 +1079,11 @@ function wsm_order_hydrate(PDO $pdo, array $o): array {
         'backorder' => (int) ($o['backorder'] ?? 0) === 1,
         'discount_percent' => (float) ($o['discount_percent'] ?? 0),
         'discount_amount'  => (int) ($o['discount_amount'] ?? 0),
+        // Le bon tel qu'il a agi sur CETTE commande. Il est relu d'ici et pas
+        // de la table des bons : celui-ci peut avoir été retiré depuis, et la
+        // facture doit rester explicable.
+        'voucher_code'   => (string) ($o['voucher_code'] ?? ''),
+        'voucher_amount' => (int) ($o['voucher_amount'] ?? 0),
         'note' => (string) ($o['note'] ?? ''),
         'created_at' => (string) $o['created_at'], 'paid_at' => $o['paid_at'],
         'shipment' => $ship ? ['service' => $ship['service'], 'target_point' => $ship['target_point'],
