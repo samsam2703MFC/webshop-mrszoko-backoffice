@@ -939,3 +939,22 @@ CREATE TABLE IF NOT EXISTS `wsm_message_tr` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_message_tr` (`message_id`, `lang`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Notes sur les clients (§6).
+--
+--  La clé est l'ADRESSE E-MAIL et non un identifiant : le client de la
+--  boutique n'a pas de fiche, il a des commandes. Une note doit pouvoir
+--  exister avant qu'on ouvre une fiche B2B, sinon on ne note jamais rien.
+--
+--  Signée et datée : « client difficile » sans auteur est une rumeur.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_client_notes` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `email`      VARCHAR(190) NOT NULL,
+  `note`       TEXT,
+  `actor`      VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_wsm_client_notes_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

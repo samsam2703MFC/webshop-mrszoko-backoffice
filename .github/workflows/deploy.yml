@@ -91,6 +91,7 @@ jobs:
              mrszoko/backoffice/audyt.php mrszoko/backoffice/zamowienie_druk.php \
              mrszoko/backoffice/etykieta_druk.php mrszoko/backoffice/tresci.php \
              mrszoko/backoffice/etykieta_inpost.php mrszoko/backoffice/superadmin.php \
+             mrszoko/backoffice/klienci.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -430,7 +431,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php superadmin.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php superadmin.php klienci.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -564,6 +565,19 @@ jobs:
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' DIR_SHOP='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/shop' bash -s" << 'REMOTE'
           fail=0
+          # Le PHP en LIGNE DE COMMANDE de ce serveur n'a pas forcément les
+          # mêmes extensions que celui qui sert les pages : php-cli et php-fpm
+          # chargent des .ini différents, et pdo_mysql manque souvent au
+          # premier. Trois déploiements ont échoué sur « could not find
+          # driver » avant qu'on le constate. On le mesure une fois, et les
+          # contrôles qui ont besoin de la base passent par le client mysql —
+          # qui, lui, marche. Un contrôle impossible ici n'est pas un défaut
+          # du produit, et ne doit pas se lire comme tel.
+          PHPPDO=$(php -r 'echo in_array("mysql", PDO::getAvailableDrivers(), true) ? "1" : "0";' 2>/dev/null || echo 0)
+          [ "$PHPPDO" = "1" ] \
+            && echo "  php-cli parle à MySQL : oui" \
+            || echo "  php-cli SANS pdo_mysql — kontrole bazy idą przez klienta mysql (nie jest to usterka aplikacji)"
+
           echo "== moteur de données (preuve MySQL) =="
           Q="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name LIKE 'wsm_%'"
           if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
@@ -694,49 +708,54 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
-          echo "== treści dosypane po starcie =="
-          # Le piège qui avait rendu muets les modèles de mail : un semis qui
-          # ne tourne que sur base vide laisse pour toujours sans texte tout
-          # ce qui est livré après la mise en route.
-          TOUT=$(php -r '
-            require_once "'"$DIR_API"'/db.php";
-            $pdo = wsm_bootstrap();
-            require_once "'"$DIR_API"'/cms.php";
-            $n = wsm_cms_topup_all($pdo);
-            $k = (int) $pdo->query("SELECT COUNT(*) FROM wsm_shop_i18n WHERE k LIKE \"contact.%\"")->fetchColumn();
-            $m = (int) $pdo->query("SELECT COUNT(*) FROM wsm_mail_templates WHERE code = \"formularz\"")->fetchColumn();
-            echo "dosypano=$n etykiety_kontaktu=$k szablony_potwierdzenia=$m";
-          ' 2>&1); [ $? -eq 0 ] || TOUT="php-ZLE :: $TOUT"
-          echo "  $TOUT"
-          case "$TOUT" in
-            *"etykiety_kontaktu=0"*|*ZLE*|*Error*) echo "  ^ ATTENTION : formularz kontaktowy bez etykiet"; fail=1;;
-            *) ;;
+          echo "== treści i szablony dosypane po starcie =="
+          # Le semis ne tournait que sur base vide : tout ce qui est livré
+          # après la mise en route restait sans texte. Ces deux comptes le
+          # vérifient sur la base RÉELLE — via le client mysql, parce que le
+          # php-cli d'ici n'a pas de pilote (voir la sonde plus haut).
+          QK="SELECT CONCAT('etykiety_kontaktu=', (SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n WHERE k LIKE 'contact.%'), ' szablony_potwierdzenia=', (SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE code='formularz'), ' jezyki=', (SELECT COUNT(*) FROM mrszoko.wsm_langs WHERE published=1), ' tlumaczenia_poczty=', (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name='wsm_message_tr'), ' notatki=', (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name='wsm_client_notes'))"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            KV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QK" 2>&1 || echo "sql-ZLE")
+          else
+            KV=$(mysql -N -e "$QK" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $KV"
+          case "$KV" in
+            *"etykiety_kontaktu=0"*) echo "  ^ ATTENTION : formularz kontaktowy bez etykiet"; fail=1;;
           esac
-          case "$TOUT" in
+          case "$KV" in
             *"szablony_potwierdzenia=0"*) echo "  ^ ATTENTION : brak szablonu potwierdzenia — gość nie dostanie odpowiedzi"; fail=1;;
-            *) ;;
           esac
-          echo "== języki : publikacja jest decyzją, znaczniki przeżywają =="
-          # La bascule la plus risquée de cette version : la liste publique des
-          # langues passe de « ce qui est en base » à « ce qui est coché ». Si
-          # la reprise ratait, l'ukrainien et l'anglais disparaîtraient de la
-          # vitrine sans une ligne de journal, sur des pages déjà indexées.
+          case "$KV" in
+            *"jezyki=0"*) echo "  ^ ATTENTION : żaden język nie jest opublikowany — sklep byłby niemy"; fail=1;;
+          esac
+          case "$KV" in
+            *"tlumaczenia_poczty=0"*) echo "  ^ ATTENTION : brak tabeli tłumaczeń poczty"; fail=1;;
+          esac
+          case "$KV" in
+            *"notatki=0"*) echo "  ^ ATTENTION : brak tabeli notatek o klientach"; fail=1;;
+          esac
+          case "$KV" in
+            *ZLE*|"") echo "  ^ ATTENTION : nie udało się odczytać bazy"; fail=1;;
+          esac
+
+          echo "== języki : rejestr i reguły (bez bazy) =="
+          # Logika czysta: bez PDO, bo php-cli tego serwera nie ma sterownika.
+          # Stan bazy sprawdza blok wyżej, przez klienta mysql.
           LOUT=$(php -r '
             require_once "'"$DIR_API"'/i18n.php";
-            $pdo = wsm_bootstrap();
-            wsm_i18n_ensure($pdo);
-            $pub = wsm_lang_published($pdo);
-            $huit = count(WSM_LANGS) === 8;
-            $pl = in_array("pl", $pub, true);
-            [$okPl] = wsm_lang_publish($pdo, "pl", false);
             require_once "'"$DIR_API"'/translate.php";
+            $osiem = count(WSM_LANGS) === 8;
+            $baza  = WSM_LANG_BASE === "pl";
+            $prog  = WSM_LANG_MIN_COVERAGE >= 50;
             $ph = wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {qty}")
               && !wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {ilosc}");
-            echo ($huit ? "osiem-ok" : "osiem-ZLE"), " ",
-                 ($pl ? "pl-ok" : "pl-ZLE"), " ",
-                 ($okPl === false ? "filet-ok" : "filet-ZLE"), " ",
+            $odm = wsm_lang_po("uk") === "po ukraińsku" && wsm_lang_na("de") === "na niemiecki";
+            echo ($osiem ? "osiem-ok" : "osiem-ZLE"), " ",
+                 ($baza ? "pl-zrodlem-ok" : "pl-zrodlem-ZLE"), " ",
+                 ($prog ? "prog-ok" : "prog-ZLE"), " ",
                  ($ph ? "znaczniki-ok" : "znaczniki-ZLE"), " ",
-                 "publiczne=", implode("/", $pub);
+                 ($odm ? "odmiana-ok" : "odmiana-ZLE");
           ' 2>&1); [ $? -eq 0 ] || LOUT="php-ZLE :: $LOUT"
           echo "  $LOUT"
           case "$LOUT" in
@@ -746,30 +765,61 @@ jobs:
           # Les langues servies hier doivent l'être encore. On le VÉRIFIE sur la
           # vitrine, pas sur la table : c'est la page qui compte.
           for L in pl uk en; do
-            EFF=$(curl -skL -o /dev/null -w '%{http_code}' "http://localhost/mrszoko/shop/?lang=$L")
             HTML=$(curl -skL "http://localhost/mrszoko/shop/?lang=$L" | head -c 400)
             case "$HTML" in
               *"lang=\"$L\""*) echo "  sklep w $L : serwowany";;
-              *) echo "  ^ ATTENTION : sklep nie serwuje już języka $L (kod $EFF)"; fail=1;;
+              *) echo "  ^ ATTENTION : sklep nie serwuje już języka $L"; fail=1;;
             esac
           done
-          echo "== tłumaczenie poczty : wykrywanie i nienaruszalny oryginał =="
+          echo "== tłumaczenie poczty : wykrywanie języka (bez bazy) =="
           MOUT=$(php -r '
             require_once "'"$DIR_API"'/translate.php";
-            $pdo = wsm_bootstrap();
-            $t = wsm_table_exists($pdo, "wsm_message_tr");
             [$hu] = wsm_tr_detect("Jó napot kívánok, köszönöm a rendelést.");
             [$uk] = wsm_tr_detect("Доброго дня! Дякую за замовлення.");
             [$de] = wsm_tr_detect("Grüße aus Berlin, vielen Dank");
-            echo ($t ? "tabela-ok" : "tabela-ZLE"), " ",
-                 ($hu === "hu" ? "hu-ok" : "hu-ZLE"), " ",
+            [$fr] = wsm_tr_detect("Bonjour, je voudrais commander du chocolat noir.");
+            echo ($hu === "hu" ? "hu-ok" : "hu-ZLE"), " ",
                  ($uk === "uk" ? "uk-ok" : "uk-ZLE"), " ",
                  ($de === "de" ? "de-ok" : "de-ZLE"), " ",
-                 (wsm_lang_po("uk") === "po ukraińsku" ? "odmiana-ok" : "odmiana-ZLE");
+                 ($fr === "fr" ? "fr-ok" : "fr-ZLE");
           ' 2>&1); [ $? -eq 0 ] || MOUT="php-ZLE :: $MOUT"
           echo "  $MOUT"
           case "$MOUT" in
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : wykrywanie języka poczty nie działa"; fail=1;;
+            *) ;;
+          esac
+          echo "== CRM : obrót klientów zgadza się z zamówieniami =="
+          # Sto czterdziestu kupujących było niewidocznych w konsoli. Ta
+          # kontrola pilnuje, żeby suma obrotu z ekranu Klienci nie rozjechała
+          # się z zapłaconymi zamówieniami — bo wtedy ktoś liczy inaczej niż
+          # Audyt, i dwa ekrany mówią co innego o tych samych pieniądzach.
+          QC="SELECT CONCAT('kupujacych=', COUNT(DISTINCT LOWER(email)), ' obrot=', COALESCE(SUM(total_gross),0)) FROM mrszoko.wsm_orders WHERE status <> 'anulowane' AND payment_status = 'oplacone' AND email <> ''"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            CV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QC" 2>&1 || echo "sql-ZLE")
+          else
+            CV=$(mysql -N -e "$QC" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $CV"
+          case "$CV" in
+            *ZLE*) echo "  ^ ATTENTION : nie udało się policzyć kupujących"; fail=1;;
+          esac
+          # Reguły plakietek: logika czysta, bez bazy.
+          BOUT=$(php -r '
+            require_once "'"$DIR_API"'/crm.php";
+            $stary = ["orders"=>4,"paid_orders"=>3,"revenue"=>50000,"unpaid"=>1,
+                      "nip"=>"","last_at"=>date("Y-m-d H:i:s")];
+            $b = wsm_crm_badges($stary, 10000);
+            $nigdy = ["orders"=>2,"paid_orders"=>0,"revenue"=>0,"unpaid"=>2,
+                      "nip"=>"","last_at"=>date("Y-m-d H:i:s", time()-400*86400)];
+            $bn = wsm_crm_badges($nigdy, 10000);
+            echo (isset($b["staly"]) ? "staly-ok" : "staly-ZLE"), " ",
+                 (isset($b["nieoplacone"]) ? "nieoplacone-ok" : "nieoplacone-ZLE"), " ",
+                 (isset($bn["nowy"]) && !isset($bn["spiacy"]) ? "nigdy-ok" : "nigdy-ZLE"), " ",
+                 (isset($b["vip"]) && !str_contains($b["vip"], "%") ? "plakietka-bez-procentu-ok" : "plakietka-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || BOUT="php-ZLE :: $BOUT"
+          echo "  $BOUT"
+          case "$BOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguły plakietek nie działają"; fail=1;;
             *) ;;
           esac
           echo "== platforma : brama superadmina i rachunek =="
