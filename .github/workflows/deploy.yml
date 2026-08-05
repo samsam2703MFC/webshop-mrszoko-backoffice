@@ -699,14 +699,14 @@ jobs:
           # ne tourne que sur base vide laisse pour toujours sans texte tout
           # ce qui est livré après la mise en route.
           TOUT=$(php -r '
-            require "'"$DIR_API"'/db.php";
+            require_once "'"$DIR_API"'/db.php";
             $pdo = wsm_bootstrap();
-            require "'"$DIR_API"'/cms.php";
+            require_once "'"$DIR_API"'/cms.php";
             $n = wsm_cms_topup_all($pdo);
             $k = (int) $pdo->query("SELECT COUNT(*) FROM wsm_shop_i18n WHERE k LIKE \"contact.%\"")->fetchColumn();
             $m = (int) $pdo->query("SELECT COUNT(*) FROM wsm_mail_templates WHERE code = \"formularz\"")->fetchColumn();
             echo "dosypano=$n etykiety_kontaktu=$k szablony_potwierdzenia=$m";
-          ' 2>&1) || TOUT="php-ZLE"
+          ' 2>&1); [ $? -eq 0 ] || TOUT="php-ZLE :: $TOUT"
           echo "  $TOUT"
           case "$TOUT" in
             *"etykiety_kontaktu=0"*|*ZLE*|*Error*) echo "  ^ ATTENTION : formularz kontaktowy bez etykiet"; fail=1;;
@@ -722,14 +722,14 @@ jobs:
           # la reprise ratait, l'ukrainien et l'anglais disparaîtraient de la
           # vitrine sans une ligne de journal, sur des pages déjà indexées.
           LOUT=$(php -r '
-            require "'"$DIR_API"'/i18n.php";
+            require_once "'"$DIR_API"'/i18n.php";
             $pdo = wsm_bootstrap();
             wsm_i18n_ensure($pdo);
             $pub = wsm_lang_published($pdo);
             $huit = count(WSM_LANGS) === 8;
             $pl = in_array("pl", $pub, true);
             [$okPl] = wsm_lang_publish($pdo, "pl", false);
-            require "'"$DIR_API"'/translate.php";
+            require_once "'"$DIR_API"'/translate.php";
             $ph = wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {qty}")
               && !wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {ilosc}");
             echo ($huit ? "osiem-ok" : "osiem-ZLE"), " ",
@@ -737,7 +737,7 @@ jobs:
                  ($okPl === false ? "filet-ok" : "filet-ZLE"), " ",
                  ($ph ? "znaczniki-ok" : "znaczniki-ZLE"), " ",
                  "publiczne=", implode("/", $pub);
-          ' 2>&1) || LOUT="php-ZLE"
+          ' 2>&1); [ $? -eq 0 ] || LOUT="php-ZLE :: $LOUT"
           echo "  $LOUT"
           case "$LOUT" in
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : warstwa językowa nie działa poprawnie"; fail=1;;
@@ -753,6 +753,25 @@ jobs:
               *) echo "  ^ ATTENTION : sklep nie serwuje już języka $L (kod $EFF)"; fail=1;;
             esac
           done
+          echo "== tłumaczenie poczty : wykrywanie i nienaruszalny oryginał =="
+          MOUT=$(php -r '
+            require_once "'"$DIR_API"'/translate.php";
+            $pdo = wsm_bootstrap();
+            $t = wsm_table_exists($pdo, "wsm_message_tr");
+            [$hu] = wsm_tr_detect("Jó napot kívánok, köszönöm a rendelést.");
+            [$uk] = wsm_tr_detect("Доброго дня! Дякую за замовлення.");
+            [$de] = wsm_tr_detect("Grüße aus Berlin, vielen Dank");
+            echo ($t ? "tabela-ok" : "tabela-ZLE"), " ",
+                 ($hu === "hu" ? "hu-ok" : "hu-ZLE"), " ",
+                 ($uk === "uk" ? "uk-ok" : "uk-ZLE"), " ",
+                 ($de === "de" ? "de-ok" : "de-ZLE"), " ",
+                 (wsm_lang_po("uk") === "po ukraińsku" ? "odmiana-ok" : "odmiana-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || MOUT="php-ZLE :: $MOUT"
+          echo "  $MOUT"
+          case "$MOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : wykrywanie języka poczty nie działa"; fail=1;;
+            *) ;;
+          esac
           echo "== platforma : brama superadmina i rachunek =="
           # La porte AVANT l'arithmétique : ce module chiffre ce que la boutique
           # doit à son propriétaire. Sans liste configurée il doit être FERMÉ, et
@@ -760,7 +779,7 @@ jobs:
           # et pourrait réécrire, sa propre facture.
           POUT=$(php -r '
             putenv("WSM_SUPERADMIN_EMAILS=");
-            require "'"$DIR_API"'/platform.php";
+            require_once "'"$DIR_API"'/platform.php";
             $ferme = !wsm_platform_enabled()
                   && !wsm_is_superadmin(["email"=>"ktos@example.com","role"=>"Centrala"]);
             wsm_config_overlay(["superadmin_emails"=>"wl@example.com"]);
@@ -774,7 +793,7 @@ jobs:
                  ($ouvert ? "wlasc-ok" : "wlasc-ZLE"), " ",
                  (!$centrala && !$jeton ? "izolacja-ok" : "izolacja-ZLE"), " ",
                  ($c["commission_net"] === 15000 && $c["total_net"] === 35000 ? "rachunek-ok" : "rachunek-ZLE");
-          ' 2>&1) || POUT="php-ZLE"
+          ' 2>&1); [ $? -eq 0 ] || POUT="php-ZLE :: $POUT"
           echo "  $POUT"
           case "$POUT" in
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la brama superadmina lub rachunek nie działa poprawnie"; fail=1;;
@@ -787,13 +806,13 @@ jobs:
           # MARQUÉE théorique — c'est cette marque qui empêche de présenter un
           # chiffre postulé comme un chiffre mesuré.
           VOUT=$(php -r '
-            require "'"$DIR_API"'/analytics.php";
+            require_once "'"$DIR_API"'/analytics.php";
             $t = wsm_valuation([["revenue_costed"=>10000]], ["revenue"=>100000,"result"=>9000]);
             $m = wsm_valuation([["revenue_costed"=>80000]], ["revenue"=>100000,"result"=>16000]);
             echo ($t["target_value"] === (int) round(100000*0.15*4.5) ? "cel-ok" : "cel-ZLE"), " ",
                  ($t["theoretical"] === true ? "teor-ok" : "teor-ZLE"), " ",
                  ($m["theoretical"] === false && abs($m["actual_rate"]-0.20) < 1e-9 ? "real-ok" : "real-ZLE");
-          ' 2>&1) || VOUT="php-ZLE"
+          ' 2>&1); [ $? -eq 0 ] || VOUT="php-ZLE :: $VOUT"
           echo "  $VOUT"
           case "$VOUT" in
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la valorisation ne se calcule pas juste sur le serveur"; fail=1;;

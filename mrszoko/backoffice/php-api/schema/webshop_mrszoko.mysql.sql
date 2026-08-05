@@ -915,3 +915,27 @@ CREATE TABLE IF NOT EXISTS `wsm_i18n_history` (
   KEY `ix_wsm_i18n_history_lookup` (`tbl`, `lang`, `k`),
   KEY `ix_wsm_i18n_history_time` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Traductions du courrier (§11).
+--
+--  L'ORIGINAL NE BOUGE PAS : wsm_messages garde ce que le client a écrit,
+--  c'est la pièce. La traduction vit ici, à côté, et se retrouve à la
+--  réouverture sans rappeler l'API — sinon relire trois fois un fil de dix
+--  messages coûterait trente traductions.
+--
+--  L'UNIQUE (message_id, lang) est le garde-fou : deux clics simultanés sur
+--  « traduire » ne produisent pas deux appels facturés.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_message_tr` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `message_id` INT UNSIGNED NOT NULL,
+  `lang`       VARCHAR(5) NOT NULL,      -- langue de la traduction
+  `src_lang`   VARCHAR(5) NOT NULL DEFAULT '',  -- langue détectée à la source
+  `subject`    VARCHAR(250) NOT NULL DEFAULT '',
+  `body`       MEDIUMTEXT,
+  `actor`      VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_message_tr` (`message_id`, `lang`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
