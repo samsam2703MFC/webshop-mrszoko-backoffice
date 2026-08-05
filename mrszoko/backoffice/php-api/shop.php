@@ -1104,6 +1104,11 @@ function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bo
         ->execute([$orderId]);
     $pdo->prepare("UPDATE wsm_payments SET status='oplacone' WHERE order_id=?")->execute([$orderId]);
     wsm_order_event($pdo, $orderId, 'oplacone', '', $actor);
+    // Une échéance d'abonnement payée remet le compteur d'impayés à zéro.
+    // Sans ce retour, un client parfaitement à jour serait mis en pause au
+    // bout de trois livraisons — pour avoir payé trois fois.
+    $cykl = __DIR__ . '/cykl.php';
+    if (is_file($cykl)) { require_once $cykl; wsm_cykl_paid($pdo, $orderId); }
     $paid = wsm_order_by_id($pdo, $orderId);
     if ($paid) wsm_mail_auto($pdo, 'platnosc', $paid);
     return true;

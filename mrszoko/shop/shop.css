@@ -397,3 +397,16 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
               padding: 0 0 14px; border-bottom: 1px solid var(--border-subtle); }
 .brand-line .brand-name { display: flex; flex-direction: column; gap: 1px; font-size: 15px; }
 .brand-line .brand-name a { color: var(--brand); }
+
+/* ---- Reprendre la même commande, à un rythme --------------------------------
+   Le bloc vit sous la confirmation : c'est le seul moment où l'acheteur sait
+   exactement ce qu'il reprendrait. */
+.resub { margin-top: var(--space-6); padding: var(--space-5);
+         background: var(--surface-card); border: 1px solid var(--border-subtle);
+         border-radius: var(--radius-lg); }
+.resub h2 { margin-bottom: 6px; }
+.resub p { margin-bottom: var(--space-4); max-width: 62ch; }
+.resub form { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.resub-pick { display: flex; flex-direction: column; gap: 5px; font-size: var(--text-sm);
+              font-weight: var(--weight-semibold); color: var(--text-strong); }
+.resub-pick select { min-width: 190px; }

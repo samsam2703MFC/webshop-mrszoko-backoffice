@@ -369,7 +369,13 @@
       "cart.voucher_apply": "Użyj",
       "cart.voucher_drop": "Usuń kod",
       "cart.voucher_line": "Kod rabatowy",
-      "cart.voucher_ship": "Kod: darmowa wysyłka"
+      "cart.voucher_ship": "Kod: darmowa wysyłka",
+      "sub.title": "Chcesz to samo co jakiś czas?",
+      "sub.lead": "Odłożymy Ci to samo zamówienie w wybranym rytmie i przyślemy link do zapłaty. Nic nie pobieramy automatycznie — nie przechowujemy kart. Przerywasz jednym zdaniem.",
+      "sub.rhythm": "Jak często",
+      "sub.cta": "Ustaw subskrypcję",
+      "sub.done": "Gotowe. Pierwsza dostawa: {data}. Nic nie zostało pobrane.",
+      "sub.already": "Ten adres ma już taką subskrypcję."
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -562,7 +568,13 @@
       "cart.voucher_apply": "Застосувати",
       "cart.voucher_drop": "Прибрати код",
       "cart.voucher_line": "Промокод",
-      "cart.voucher_ship": "Код: безкоштовна доставка"
+      "cart.voucher_ship": "Код: безкоштовна доставка",
+      "sub.title": "Хочете те саме регулярно?",
+      "sub.lead": "Ми відкладемо те саме замовлення в обраному ритмі й надішлемо посилання на оплату. Нічого не списуємо автоматично — ми не зберігаємо карток. Скасувати можна одним реченням.",
+      "sub.rhythm": "Як часто",
+      "sub.cta": "Налаштувати підписку",
+      "sub.done": "Готово. Перша доставка: {data}. Нічого не списано.",
+      "sub.already": "Ця адреса вже має таку підписку."
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -755,7 +767,13 @@
       "cart.voucher_apply": "Apply",
       "cart.voucher_drop": "Remove code",
       "cart.voucher_line": "Discount code",
-      "cart.voucher_ship": "Code: free shipping"
+      "cart.voucher_ship": "Code: free shipping",
+      "sub.title": "Want the same thing regularly?",
+      "sub.lead": "We will set aside the same order at the rhythm you choose and send you a payment link. Nothing is charged automatically — we store no cards. One sentence stops it.",
+      "sub.rhythm": "How often",
+      "sub.cta": "Set up a subscription",
+      "sub.done": "Done. First delivery: {data}. Nothing has been charged.",
+      "sub.already": "This address already has such a subscription."
     }
   }
 }

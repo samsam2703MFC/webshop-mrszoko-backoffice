@@ -931,6 +931,61 @@ Mister Szoko
 Mister Szoko
 {{sklep}}", 'formularz'];
 
+    // ---- Abonnement : l'échéance est PRÊTE, elle n'est pas PRÉLEVÉE --------
+    //  Ce texte est le contrat. Rien n'est débité : la boutique n'enregistre
+    //  aucune carte. Écrire « pobraliśmy » ferait du premier renouvellement
+    //  un litige — et donnerait raison au client.
+    $t[] = ['subskrypcja', 'pl', 'Subskrypcja — gotowe do opłacenia',
+            'Twoje zamówienie {{numer}} czeka na opłacenie',
+"Dzień dobry {{imie}},
+
+nadszedł termin Twojej subskrypcji. Przygotowaliśmy zamówienie {{numer}}:
+
+{{pozycje}}
+
+Do zapłaty: {{kwota}}. Nic nie zostało pobrane — płacisz sam, kiedy zechcesz:
+{{link}}
+
+Dostawa: {{dostawa}}. Jeśli chcesz coś zmienić, przerwać lub zakończyć
+subskrypcję — odpisz na tę wiadomość, wystarczy jedno zdanie.
+
+Mister Szoko
+{{sklep}}", 'subskrypcja'];
+
+    $t[] = ['subskrypcja', 'en', 'Subscription — ready to pay',
+            'Your order {{numer}} is ready',
+"Hello {{imie}},
+
+your subscription is due. We have prepared order {{numer}}:
+
+{{pozycje}}
+
+Amount: {{kwota}}. Nothing has been charged — you pay yourself, whenever you
+like: {{link}}
+
+Delivery: {{dostawa}}. To change, pause or stop the subscription, just reply
+to this e-mail — one sentence is enough.
+
+Mister Szoko
+{{sklep}}", 'subskrypcja'];
+
+    $t[] = ['subskrypcja', 'uk', 'Підписка — готово до оплати',
+            'Ваше замовлення {{numer}} чекає на оплату',
+"Доброго дня, {{imie}}!
+
+Настав час вашої підписки. Ми підготували замовлення {{numer}}:
+
+{{pozycje}}
+
+До сплати: {{kwota}}. Нічого не списано — ви платите самі, коли забажаєте:
+{{link}}
+
+Доставка: {{dostawa}}. Щоб щось змінити, призупинити або завершити підписку,
+просто відповідайте на цей лист — достатньо одного речення.
+
+Mister Szoko
+{{sklep}}", 'subskrypcja'];
+
     // ---- Modèle libre, sans événement : la réponse écrite à la main --------
     $t[] = ['kontakt', 'pl', 'Odpowiedź do klienta (pusty)', 'W sprawie zamówienia {{numer}}',
 "Dzień dobry {{imie}},
