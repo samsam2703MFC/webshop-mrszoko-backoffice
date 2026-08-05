@@ -145,7 +145,11 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Ustawienia' => null]);
   <h2>Test poczty</h2>
   <p class="muted small">Wysyła jedną wiadomość na wskazany adres i zapisuje wynik w zakładce Poczta.</p>
   <form method="post" class="actions">
-    <input type="email" name="test_email" value="<?= h((string) ($me['email'] ?? '')) ?>" required>
+    <?php // Le champ portait l'adresse de l'utilisateur et AUCUN nom : à
+          // l'oreille, une zone de saisie sans intitulé au milieu d'un
+          // formulaire de réglages. ?>
+    <input type="email" name="test_email" aria-label="Adres, na który wysłać wiadomość testową"
+           placeholder="adres do testu" value="<?= h((string) ($me['email'] ?? '')) ?>" required>
     <button type="submit" name="test_poczty" value="1"<?= $isAdmin ? '' : ' disabled' ?>>Wyślij test</button>
   </form>
 </div>

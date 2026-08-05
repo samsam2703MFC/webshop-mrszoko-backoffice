@@ -279,15 +279,21 @@ console_crumbs($doc
         <?php for ($i = 0; $i < WSM_PZ_ROWS; $i++): ?>
         <tr>
           <td>
-            <select name="line_product[<?= $i ?>]">
+            <?php // Cinq listes déroulantes identiques : sans numéro de ligne,
+                  // on ne sait pas laquelle on remplit. Le tableau a un
+                  // en-tête, mais un en-tête ne se lit pas à voix haute à
+                  // chaque cellule. ?>
+            <select name="line_product[<?= $i ?>]" aria-label="Produkt, wiersz <?= $i + 1 ?>">
               <option value="">— pusty wiersz —</option>
               <?php foreach ($ov as $r): ?>
               <option value="<?= h($r['id']) ?>"><?= h($r['name']) ?> (stan <?= (int) $r['stock'] ?>)</option>
               <?php endforeach; ?>
             </select>
           </td>
-          <td class="num"><input type="number" name="line_qty[<?= $i ?>]" min="0" placeholder="0"></td>
-          <td class="num"><input type="text" name="line_cost[<?= $i ?>]" inputmode="decimal" placeholder="0,00"></td>
+          <td class="num"><input type="number" name="line_qty[<?= $i ?>]" min="0" placeholder="0"
+                 aria-label="Ilość, wiersz <?= $i + 1 ?>"></td>
+          <td class="num"><input type="text" name="line_cost[<?= $i ?>]" inputmode="decimal" placeholder="0,00"
+                 aria-label="Cena zakupu, wiersz <?= $i + 1 ?>"></td>
         </tr>
         <?php endfor; ?>
       </table>
@@ -326,8 +332,10 @@ console_crumbs($doc
   <p class="why">PZ — przyjęcia od dostawców. WZ — wydania do klientów, wystawiane przy zamówieniu
     (przycisk „Utwórz WZ” na zamówieniu). Oba mają numer, który można podać przez telefon.</p>
   <form method="get" class="actions" style="margin-bottom:12px">
-    <select name="dk">
-      <option value="">wszystkie</option>
+    <?php // « Toutes » quoi ? À l'oreille, une liste sans nom au milieu d'un
+          // écran qui en compte plusieurs. ?>
+    <select name="dk" aria-label="Filtruj dokumenty po rodzaju">
+      <option value="">wszystkie rodzaje</option>
       <?php foreach (WSM_STOCK_DOC_KINDS as $k => $lbl): ?>
       <option value="<?= h($k) ?>"<?= ($_GET['dk'] ?? '') === $k ? ' selected' : '' ?>><?= h($k) ?> — <?= h($lbl) ?></option>
       <?php endforeach; ?>

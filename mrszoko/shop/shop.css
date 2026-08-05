@@ -58,6 +58,16 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .btn--ghost { background: transparent; color: var(--text-body); border-color: var(--border-default); }
 .btn--ghost:hover { background: var(--surface-raised); }
 .btn--sm { padding: 8px 16px; font-size: var(--text-xs); }
+/* « Dodaj do koszyka » est un btn--sm : 33 px de haut sur un telephone, sous
+   la barre du tactile. C'est LE bouton de la boutique — le rater une fois sur
+   trois, c'est un panier qu'on ne remplit pas. La taille visuelle ne change
+   pas sur un ecran pointe a la souris ; seule la zone touchable grandit. */
+@media (pointer: coarse), (max-width: 760px) {
+  .btn--sm { min-height: 44px; padding-top: 11px; padding-bottom: 11px; }
+  /* Les liens du pied de page se touchent aussi : 20 px, colles les uns aux
+     autres, on vise « Kontakt » et on ouvre « Panel marki ». */
+  .site-foot a { display: inline-block; min-height: 40px; line-height: 40px; }
+}
 .btn--lg { padding: 15px 30px; font-size: var(--text-md); }
 .btn--block { display: flex; width: 100%; }
 .linkbtn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--text-muted);
