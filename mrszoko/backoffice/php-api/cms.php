@@ -82,6 +82,7 @@ const WSM_CMS_SECTIONS = [
     'pay' => 'Statusy płatności',
     'ship' => 'Sposoby dostawy',
     'story' => 'O nas',
+    'contact' => 'Formularz kontaktowy',
     'seller' => 'Dane sprzedawcy w stopce',
     'footer' => 'Stopka',
     // Page d'accueil
@@ -112,6 +113,53 @@ function wsm_cms_langs(PDO $pdo, string $table): array {
     $out = array_map(fn($r) => (string) $r['lang'], $rows);
     usort($out, fn($a, $b) => ($a === WSM_CMS_BASE_LANG ? -1 : ($b === WSM_CMS_BASE_LANG ? 1 : strcmp($a, $b))));
     return $out ?: [WSM_CMS_BASE_LANG];
+}
+
+/**
+ * Verse dans la base les clés du fichier source QUI N'Y SONT PAS ENCORE.
+ *
+ * C'EST LA MÊME OMISSION QUI A DÉJÀ COÛTÉ CHER. Les modèles de mail n'étaient
+ * semés que sur table vide : tout ce qui était livré après la mise en route
+ * restait muet pour toujours. Les libellés de la boutique avaient exactement
+ * le même défaut — une page ajoutée aujourd'hui s'afficherait en production
+ * avec des champs sans étiquette, et personne ne verrait pourquoi, parce que
+ * ça marche en développement où la base a été refaite.
+ *
+ * On ne touche JAMAIS à une valeur existante : quelqu'un a pu la corriger
+ * depuis le CMS, et le fichier du dépôt n'a pas à écraser ce travail.
+ *
+ * @return int nombre de textes ajoutés
+ */
+function wsm_cms_topup(PDO $pdo, string $table, string $seedFile): int {
+    if (!wsm_table_exists($pdo, $table)) return 0;
+    $src = wsm_cms_source($seedFile);
+    if (!$src) return 0;
+
+    $present = [];
+    try {
+        foreach ($pdo->query("SELECT lang, k FROM $table")->fetchAll() ?: [] as $r) {
+            $present[$r['lang'] . '|' . $r['k']] = true;
+        }
+    } catch (Throwable $e) { return 0; }
+
+    $ins = $pdo->prepare("INSERT INTO $table (lang, k, v) VALUES (?,?,?)");
+    $n = 0;
+    foreach ($src as $k => $byLang) {
+        foreach ($byLang as $lang => $v) {
+            if (isset($present[$lang . '|' . $k])) continue;
+            try { $ins->execute([$lang, $k, $v]); $n++; } catch (Throwable $e) { /* course : déjà posée */ }
+        }
+    }
+    return $n;
+}
+
+/** Complète les deux sites publics d'un coup. Appelé au démarrage. */
+function wsm_cms_topup_all(PDO $pdo): int {
+    $n = 0;
+    foreach (wsm_cms_sites() as $s) {
+        $n += wsm_cms_topup($pdo, $s['table'], $s['seed']);
+    }
+    return $n;
 }
 
 /**

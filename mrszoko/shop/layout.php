@@ -133,6 +133,7 @@ function layout_footer(array $S): void {
       <?php if (($S['footer.email'] ?? '') !== ''): ?>
       <a href="mailto:<?= e($S['footer.email']) ?>"><?= e($S['footer.email']) ?></a>
       <?php endif; ?>
+      <a href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? '') ?></a>
       <a href="<?= e(shop_base() . '/../backoffice/') ?>"><?= e($S['footer.console'] ?? '') ?></a>
     </nav>
   </div>

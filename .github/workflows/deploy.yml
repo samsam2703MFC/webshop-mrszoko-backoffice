@@ -546,52 +546,6 @@ jobs:
           curl -skL "http://localhost/mrszoko/" | grep -q 'url=shop/' \
             && echo "  la racine renvoie vers la boutique : confirmé" \
             || { echo "  ^ NOT OK : la racine ne renvoie pas vers /shop/"; fail=1; }
-          echo "== SEO : nic prywatnego w indeksie, hreflang bezwzględne =="
-          # La page de suivi porte nom, adresse et détail d'achat. Un lien
-          # partagé, ou suivi par un robot depuis une boîte mail, et la
-          # commande de quelqu'un devient cherchable. Cette ligne passe avant
-          # tout le reste du référencement.
-          for pg in koszyk kasa zamowienie/MS-TEST; do
-            H=$(curl -skL "$SH/$pg")
-            case "$H" in
-              *'name="robots" content="noindex'*) echo "  /$pg : noindex — potwierdzone";;
-              *) echo "  ^ FUITE : /$pg może trafić do wyszukiwarki"; fail=1;;
-            esac
-          done
-          # Un hreflang relatif est ignoré en bloc par Google, sans un mot dans
-          # la Search Console : la grappe entière ne sert alors à rien.
-          HOME_HTML=$(curl -skL "$SH/")
-          if echo "$HOME_HTML" | grep -q 'hreflang=' ; then
-            if echo "$HOME_HTML" | grep -oE 'hreflang="[a-z-]+" href="[^"]+"' | grep -qv 'href="http'; then
-              echo "  ^ ATTENTION : hreflang względny — Google zignoruje całą grupę"; fail=1
-            else
-              echo "  hreflang bezwzględne : potwierdzone"
-            fi
-            echo "$HOME_HTML" | grep -q 'hreflang="x-default"' \
-              && echo "  x-default obecny" \
-              || { echo "  ^ ATTENTION : brak x-default — grupa jest niekompletna"; fail=1; }
-          else
-            echo "  ^ ATTENTION : sklep nie emituje hreflang"; fail=1
-          fi
-          echo "$HOME_HTML" | grep -q 'rel="canonical" href="http' \
-            && echo "  kanoniczny bezwzględny : potwierdzone" \
-            || { echo "  ^ ATTENTION : brak kanonicznego albo względny"; fail=1; }
-          # Chaque langue doit être une VRAIE page (200), pas une redirection :
-          # sinon toute la grappe pointe vers une seule adresse et le
-          # multilingue ne référence rien.
-          for L in en uk; do
-            C=$(curl -sk -o /dev/null -w '%{http_code}' "$SH/?lang=$L")
-            [ "$C" = "200" ] && echo "  /?lang=$L → 200 (strona, nie przekierowanie)" \
-              || { echo "  ^ ATTENTION : /?lang=$L odpowiada $C — grupa hreflang wskazuje przekierowania"; fail=1; }
-          done
-          run "$SH/robots.txt" 20
-          run "$SH/sitemap.xml" 200
-          curl -skL "$SH/sitemap.xml" | grep -q 'xmlns:xhtml' \
-            && echo "  sitemap deklaruje alternates" \
-            || { echo "  ^ ATTENTION : sitemap bez xhtml:link"; fail=1; }
-          curl -skL "$SH/sitemap.xml" | grep -qE '/(koszyk|kasa|zamowienie)' \
-            && { echo "  ^ FUITE : sitemap wymienia stronę prywatną"; fail=1; } \
-            || echo "  sitemap nie wymienia stron prywatnych"
           if [ "$fail" = "0" ]; then echo "ALL WEB CHECKS OK"; else echo "WEB CHECK FAILED"; exit 1; fi
           REMOTE
 
@@ -740,6 +694,28 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
+          echo "== treści dosypane po starcie =="
+          # Le piège qui avait rendu muets les modèles de mail : un semis qui
+          # ne tourne que sur base vide laisse pour toujours sans texte tout
+          # ce qui est livré après la mise en route.
+          TOUT=$(php -r '
+            require "'"$DIR_API"'/db.php";
+            $pdo = wsm_bootstrap();
+            require "'"$DIR_API"'/cms.php";
+            $n = wsm_cms_topup_all($pdo);
+            $k = (int) $pdo->query("SELECT COUNT(*) FROM wsm_shop_i18n WHERE k LIKE \"contact.%\"")->fetchColumn();
+            $m = (int) $pdo->query("SELECT COUNT(*) FROM wsm_mail_templates WHERE code = \"formularz\"")->fetchColumn();
+            echo "dosypano=$n etykiety_kontaktu=$k szablony_potwierdzenia=$m";
+          ' 2>&1) || TOUT="php-ZLE"
+          echo "  $TOUT"
+          case "$TOUT" in
+            *"etykiety_kontaktu=0"*|*ZLE*|*Error*) echo "  ^ ATTENTION : formularz kontaktowy bez etykiet"; fail=1;;
+            *) ;;
+          esac
+          case "$TOUT" in
+            *"szablony_potwierdzenia=0"*) echo "  ^ ATTENTION : brak szablonu potwierdzenia — gość nie dostanie odpowiedzi"; fail=1;;
+            *) ;;
+          esac
           echo "== języki : publikacja jest decyzją, znaczniki przeżywają =="
           # La bascule la plus risquée de cette version : la liste publique des
           # langues passe de « ce qui est en base » à « ce qui est coché ». Si
@@ -824,6 +800,103 @@ jobs:
             *) ;;
           esac
           if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
+          REMOTE
+
+      - name: Verify public shop (SEO, contact)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' DIR_SHOP='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/shop' bash -s" << 'REMOTE'
+          fail=0
+          # Ces deux-là vivaient dans l'étape « Verify web surfaces » : en
+          # scindant, cette étape ne les avait plus. Sans « run », toutes les
+          # vérifications d'URL auraient été silencieusement vides — et un
+          # contrôle qui ne contrôle rien passe au vert, ce qui est pire que
+          # pas de contrôle du tout.
+          SH="http://localhost/mrszoko/shop"
+          run() { URL="$1"; MIN="${2:-1}"
+            out=$(curl -skL -o /dev/null -w "%{http_code}|%{size_download}" "$URL")
+            IFS='|' read -r code size <<< "$out"
+            size="${size%.*}"
+            echo "  $code  ${size}b  $URL"
+            if [ "$code" != "200" ] || [ "${size:-0}" -lt "$MIN" ]; then
+              echo "  ^ NOT OK"; fail=1
+            fi
+          }
+          echo "== formularz kontaktowy =="
+          run "$SH/kontakt" 500
+          KH=$(curl -skL "$SH/kontakt")
+          echo "$KH" | grep -q 'name="firma_www"' \
+            && echo "  pułapka na roboty: obecna" \
+            || { echo "  ^ ATTENTION : brak pułapki — formularz zbierze spam"; fail=1; }
+          echo "$KH" | grep -q 'name="_ts"' \
+            && echo "  podpisany znacznik czasu: obecny" \
+            || { echo "  ^ ATTENTION : brak znacznika czasu"; fail=1; }
+          # Les libellés doivent EXISTER : un formulaire dont les étiquettes
+          # manquent s'affiche en production avec des cases anonymes, et ça
+          # marche parfaitement en développement où la base est refaite.
+          echo "$KH" | grep -q 'contact\.' \
+            && { echo "  ^ ATTENTION : klucz i18n wyświetlony zamiast tekstu"; fail=1; } \
+            || echo "  etykiety przetłumaczone: potwierdzone"
+          echo "== SEO : nic prywatnego w indeksie, hreflang bezwzględne =="
+          # La page de suivi porte nom, adresse et détail d'achat. Un lien
+          # partagé, ou suivi par un robot depuis une boîte mail, et la
+          # commande de quelqu'un devient cherchable. Cette ligne passe avant
+          # tout le reste du référencement.
+          for pg in koszyk kasa zamowienie/MS-TEST; do
+            H=$(curl -skL "$SH/$pg")
+            case "$H" in
+              *'name="robots" content="noindex'*) echo "  /$pg : noindex — potwierdzone";;
+              *) echo "  ^ FUITE : /$pg może trafić do wyszukiwarki"; fail=1;;
+            esac
+          done
+          # Un hreflang relatif est ignoré en bloc par Google, sans un mot dans
+          # la Search Console : la grappe entière ne sert alors à rien.
+          HOME_HTML=$(curl -skL "$SH/")
+          if echo "$HOME_HTML" | grep -q 'hreflang=' ; then
+            if echo "$HOME_HTML" | grep -oE 'hreflang="[a-z-]+" href="[^"]+"' | grep -qv 'href="http'; then
+              echo "  ^ ATTENTION : hreflang względny — Google zignoruje całą grupę"; fail=1
+            else
+              echo "  hreflang bezwzględne : potwierdzone"
+            fi
+            echo "$HOME_HTML" | grep -q 'hreflang="x-default"' \
+              && echo "  x-default obecny" \
+              || { echo "  ^ ATTENTION : brak x-default — grupa jest niekompletna"; fail=1; }
+          else
+            echo "  ^ ATTENTION : sklep nie emituje hreflang"; fail=1
+          fi
+          echo "$HOME_HTML" | grep -q 'rel="canonical" href="http' \
+            && echo "  kanoniczny bezwzględny : potwierdzone" \
+            || { echo "  ^ ATTENTION : brak kanonicznego albo względny"; fail=1; }
+          # Chaque langue doit être une VRAIE page (200), pas une redirection :
+          # sinon toute la grappe pointe vers une seule adresse et le
+          # multilingue ne référence rien.
+          # On SUIT les redirections : le serveur renvoie d'abord un 308 vers
+          # HTTPS, et le lire comme la réponse de la page ferait échouer un
+          # contrôle parfaitement sain. Ce qu'on vérifie, c'est l'adresse
+          # d'ARRIVÉE : si « ?lang=en » atterrit sans sa langue, toute la
+          # grappe hreflang pointe vers une seule page.
+          for L in en uk; do
+            EFF=$(curl -skL -o /dev/null -w '%{http_code}|%{url_effective}' "$SH/?lang=$L")
+            IFS='|' read -r C U <<< "$EFF"
+            case "$C|$U" in
+              200*lang=$L*) echo "  /?lang=$L → 200, język zachowany w adresie";;
+              200*) echo "  ^ ATTENTION : /?lang=$L ląduje na $U — grupa hreflang wskazuje jedną stronę"; fail=1;;
+              *) echo "  ^ ATTENTION : /?lang=$L odpowiada $C"; fail=1;;
+            esac
+          done
+          run "$SH/robots.txt" 20
+          run "$SH/sitemap.xml" 200
+          curl -skL "$SH/sitemap.xml" | grep -q 'xmlns:xhtml' \
+            && echo "  sitemap deklaruje alternates" \
+            || { echo "  ^ ATTENTION : sitemap bez xhtml:link"; fail=1; }
+          curl -skL "$SH/sitemap.xml" | grep -qE '/(koszyk|kasa|zamowienie)' \
+            && { echo "  ^ FUITE : sitemap wymienia stronę prywatną"; fail=1; } \
+            || echo "  sitemap nie wymienia stron prywatnych"
+          if [ "$fail" = "0" ]; then echo "ALL SHOP CHECKS OK"; else echo "SHOP CHECK FAILED"; exit 1; fi
           REMOTE
 
 

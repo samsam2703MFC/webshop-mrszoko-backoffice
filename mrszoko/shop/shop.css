@@ -242,6 +242,13 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .field.wide { grid-column: 1 / -1; }
 .pay-info { margin-top: var(--space-4); text-align: center; }
 
+/* Le piège du formulaire de contact. `display:none` suffirait à le cacher,
+   mais certains robots l'évitent précisément parce qu'il est trop visible
+   dans le style ; on le sort du flux sans le déclarer masqué. Il porte déjà
+   aria-hidden et tabindex="-1" : personne au clavier ni au lecteur d'écran
+   ne le rencontre. */
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
 .notice { border-radius: var(--radius-md); padding: 12px 16px; font-size: var(--text-sm); margin-bottom: var(--space-5); }
 .notice--error { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 .notice--warn  { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--caramel-600); }
