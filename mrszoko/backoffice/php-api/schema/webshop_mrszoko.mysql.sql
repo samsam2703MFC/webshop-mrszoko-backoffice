@@ -994,3 +994,56 @@ CREATE TABLE IF NOT EXISTS `wsm_voucher_uses` (
   UNIQUE KEY `uq_wsm_voucher_uses` (`voucher_id`, `order_id`),
   KEY `ix_wsm_voucher_uses_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Abonnements — commandes récurrentes.
+--
+--  RIEN N'EST PRELEVE. Cette boutique n'enregistre aucune carte : tpay
+--  encaisse chez lui et ne rend qu'un etat. A l'echeance on PREPARE la
+--  commande et on envoie un lien de paiement. Promettre un prelevement
+--  automatique serait un mensonge a l'ecran et un litige au premier
+--  renouvellement.
+--
+--  L'adresse est FIGEE ici. Elle vient de la commande d'origine et ne suit
+--  pas la fiche client : quelqu'un qui demenage doit le dire, et une adresse
+--  qui change toute seule envoie un colis chez l'ancien occupant.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_subscriptions` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `email`           VARCHAR(190) NOT NULL,
+  `first_name`      VARCHAR(120) NOT NULL DEFAULT '',
+  `last_name`       VARCHAR(120) NOT NULL DEFAULT '',
+  `phone`           VARCHAR(40)  NOT NULL DEFAULT '',
+  `company`         VARCHAR(190) NOT NULL DEFAULT '',
+  `nip`             VARCHAR(20)  NOT NULL DEFAULT '',
+  `lang`            VARCHAR(5)   NOT NULL DEFAULT 'pl',
+  `rytm`            VARCHAR(24)  NOT NULL DEFAULT 'co_miesiac',
+  `statut`          VARCHAR(16)  NOT NULL DEFAULT 'aktywny',
+  `next_at`         DATE         NOT NULL,
+  `last_run_at`     DATETIME     NULL DEFAULT NULL,
+  `runs`            INT          NOT NULL DEFAULT 0,
+  `unpaid_streak`   INT          NOT NULL DEFAULT 0,
+  `delivery_method` VARCHAR(40)  NOT NULL DEFAULT 'inpost_locker',
+  `inpost_point`    VARCHAR(40)  NOT NULL DEFAULT '',
+  `ship_street`     VARCHAR(190) NOT NULL DEFAULT '',
+  `ship_building`   VARCHAR(40)  NOT NULL DEFAULT '',
+  `ship_postcode`   VARCHAR(20)  NOT NULL DEFAULT '',
+  `ship_city`       VARCHAR(120) NOT NULL DEFAULT '',
+  `ship_country`    VARCHAR(2)   NOT NULL DEFAULT 'PL',
+  `token`           VARCHAR(64)  NOT NULL,
+  `source_order_id` INT UNSIGNED NOT NULL DEFAULT 0,
+  `note`            VARCHAR(190) NOT NULL DEFAULT '',
+  `created_at`      DATETIME     NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_wsm_subs_next` (`statut`, `next_at`),
+  KEY `ix_wsm_subs_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_subscription_items` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `subscription_id` INT UNSIGNED NOT NULL,
+  `product_id`      VARCHAR(64)  NOT NULL,
+  `qty`             INT          NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `ix_wsm_sub_items` (`subscription_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

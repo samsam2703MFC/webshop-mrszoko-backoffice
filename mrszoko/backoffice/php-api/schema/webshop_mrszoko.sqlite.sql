@@ -759,3 +759,52 @@ CREATE TABLE IF NOT EXISTS wsm_voucher_uses (
   UNIQUE (voucher_id, order_id)
 );
 CREATE INDEX IF NOT EXISTS ix_wsm_voucher_uses_email ON wsm_voucher_uses (email);
+
+-- Abonnements — commandes récurrentes.
+--
+--  RIEN N'EST PRELEVE. Cette boutique n'enregistre aucune carte : tpay
+--  encaisse chez lui et ne rend qu'un etat. A l'echeance on PREPARE la
+--  commande et on envoie un lien de paiement. Promettre un prelevement
+--  automatique serait un mensonge a l'ecran et un litige au premier
+--  renouvellement.
+--
+--  L'adresse est FIGEE ici. Elle vient de la commande d'origine et ne suit
+--  pas la fiche client : quelqu'un qui demenage doit le dire, et une adresse
+--  qui change toute seule envoie un colis chez l'ancien occupant.
+CREATE TABLE IF NOT EXISTS wsm_subscriptions (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  email           TEXT NOT NULL,
+  first_name      TEXT NOT NULL DEFAULT '',
+  last_name       TEXT NOT NULL DEFAULT '',
+  phone           TEXT NOT NULL DEFAULT '',
+  company         TEXT NOT NULL DEFAULT '',
+  nip             TEXT NOT NULL DEFAULT '',
+  lang            TEXT NOT NULL DEFAULT 'pl',
+  rytm            TEXT NOT NULL DEFAULT 'co_miesiac',
+  statut          TEXT NOT NULL DEFAULT 'aktywny',   -- aktywny | wstrzymana | zakonczona
+  next_at         TEXT NOT NULL,
+  last_run_at     TEXT DEFAULT NULL,
+  runs            INTEGER NOT NULL DEFAULT 0,
+  unpaid_streak   INTEGER NOT NULL DEFAULT 0,
+  delivery_method TEXT NOT NULL DEFAULT 'inpost_locker',
+  inpost_point    TEXT NOT NULL DEFAULT '',
+  ship_street     TEXT NOT NULL DEFAULT '',
+  ship_building   TEXT NOT NULL DEFAULT '',
+  ship_postcode   TEXT NOT NULL DEFAULT '',
+  ship_city       TEXT NOT NULL DEFAULT '',
+  ship_country    TEXT NOT NULL DEFAULT 'PL',
+  token           TEXT NOT NULL,
+  source_order_id INTEGER NOT NULL DEFAULT 0,
+  note            TEXT NOT NULL DEFAULT '',
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wsm_subs_next ON wsm_subscriptions (statut, next_at);
+CREATE INDEX IF NOT EXISTS ix_wsm_subs_email ON wsm_subscriptions (email);
+
+CREATE TABLE IF NOT EXISTS wsm_subscription_items (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  subscription_id INTEGER NOT NULL,
+  product_id      TEXT NOT NULL,
+  qty             INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS ix_wsm_sub_items ON wsm_subscription_items (subscription_id);

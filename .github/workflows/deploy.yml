@@ -900,6 +900,30 @@ jobs:
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la valorisation ne se calcule pas juste sur le serveur"; fail=1;;
             *) ;;
           esac
+          if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
+          REMOTE
+
+      # ----------------------------------------------------------------------
+      #  Les règles qui touchent à L'ARGENT, dans une étape à part.
+      #
+      #  Pas par goût du rangement : GitHub REFUSE un fichier de workflow dont
+      #  une expression dépasse 21 000 caractères, et le refus est SILENCIEUX —
+      #  la course est créée puis tuée, zéro job, conclusion « failure », aucun
+      #  message nulle part. C'est arrivé une fois sur ce dépôt et le
+      #  diagnostic a coûté plus cher que la correction.
+      #
+      #  tools/check-workflow.sh mesure chaque étape et refuse de laisser
+      #  passer. Ce découpage vient de son avertissement, pas d'un incident.
+      # ----------------------------------------------------------------------
+      - name: Verify money rules (B2B, vouchers, subscriptions)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
+          fail=0
           echo "== konta firmowe : rabaty się NIE kumulują =="
           # Le palier au poids et la remise pro répondent à la même question.
           # Les cumuler donne 32 % — toute la marge. On vérifie sur le serveur
@@ -1005,6 +1029,40 @@ jobs:
             *ZLE*) echo "  ^ ATTENTION : nie udało się policzyć kodów"; fail=1;;
             *bez_efektu=0) ;;
             *) echo "  ^ UWAGA : aktywny kod bez wartości — sklep go ODRZUCA, popraw go lub wycofaj w Rabatach";;
+          esac
+          echo "== subskrypcje : nic nie jest pobierane =="
+          # La regle qui protege le plus : ce module ne PRELEVE pas. Aucune
+          # carte n est enregistree. Un texte qui promettrait un debit ferait
+          # du premier renouvellement un litige — et donnerait raison au
+          # client. On le verifie SUR LE MODELE DE COURRIER livre.
+          COUT=$(php -r '
+            require_once "'"$DIR_API"'/cykl.php";
+            $r = count(WSM_CYKL_RYTMY) === 4
+              && WSM_CYKL_RYTMY["co_miesiac"]["dni"] === 30
+              && wsm_cykl_rytm("cokolwiek")["dni"] === 30;
+            $p = WSM_CYKL_MAX_NIEOPLACONYCH === 3;
+            echo ($r ? "rytmy-ok" : "rytmy-ZLE"), " ",
+                 ($p ? "pauza-ok" : "pauza-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || COUT="php-ZLE :: $COUT"
+          echo "  $COUT"
+          case "$COUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguły subskrypcji nie działają"; fail=1;;
+            *) ;;
+          esac
+          # Le modele est en base : on le lit par le client mysql, comme le
+          # reste de l etat. « pobraliśmy » est le mot qui ne doit PAS y etre.
+          QS="SELECT CONCAT('subskrypcji=', (SELECT COUNT(*) FROM mrszoko.wsm_subscriptions), ' aktywnych=', (SELECT COUNT(*) FROM mrszoko.wsm_subscriptions WHERE statut='aktywny'), ' wzor_pl=', (SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE code='subskrypcja' AND lang='pl'), ' obiecuje_pobranie=', (SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE code='subskrypcja' AND (body LIKE '%pobraliśmy%' OR body LIKE '%obciążyliśmy%')))"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            SV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QS" 2>&1 || echo "sql-ZLE")
+          else
+            SV=$(mysql -N -e "$QS" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $SV"
+          case "$SV" in
+            *ZLE*) echo "  ^ ATTENTION : nie udało się sprawdzić subskrypcji"; fail=1;;
+            *wzor_pl=0*) echo "  ^ ATTENTION : brak wzoru listu — subskrypcja byłaby niema"; fail=1;;
+            *obiecuje_pobranie=0) ;;
+            *) echo "  ^ ATTENTION : wzór listu obiecuje pobranie, a sklep NIE pobiera — popraw go w Poczcie"; fail=1;;
           esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE

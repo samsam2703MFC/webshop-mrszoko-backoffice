@@ -83,6 +83,7 @@ const WSM_CMS_SECTIONS = [
     'ship' => 'Sposoby dostawy',
     'story' => 'O nas',
     'contact' => 'Formularz kontaktowy',
+    'sub' => 'Subskrypcja na stronie potwierdzenia',
     'seller' => 'Dane sprzedawcy w stopce',
     'footer' => 'Stopka',
     // Page d'accueil
