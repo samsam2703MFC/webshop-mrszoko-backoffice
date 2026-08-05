@@ -70,7 +70,7 @@ console_head('Zgłoszenia', $me, <<<'CSS'
   .kpi.alarme b { color: var(--danger); }
   .filtres { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .filtres a { font-size: 13px; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--border-subtle);
-               color: var(--text-body); text-decoration: none; min-height: 36px; display: inline-flex; align-items: center; }
+               color: var(--text-body); text-decoration: none; min-height: 38px; display: inline-flex; align-items: center; }
   .filtres a.on { background: var(--brand); color: var(--cream-50); border-color: var(--brand); }
   .zgl { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
          padding: 16px; margin-bottom: 14px; background: var(--surface-card); }

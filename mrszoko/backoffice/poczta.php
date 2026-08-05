@@ -535,8 +535,11 @@ console_crumbs($detail
     <h2>Skrzynka</h2>
     <form method="get" class="actions" style="margin-bottom:12px">
       <input type="search" name="q" value="<?= h((string) ($_GET['q'] ?? '')) ?>" placeholder="adres lub temat">
-      <select name="status">
-        <option value="">wszystkie</option>
+      <?php // Un lecteur d'écran annonce « liste déroulante » et rien d'autre :
+            // sans nom, on ne sait pas si l'on filtre un état, une langue ou
+            // un client. L'étiquette est visuellement inutile, pas sonore. ?>
+      <select name="status" aria-label="Filtruj po stanie wiadomości">
+        <option value="">wszystkie stany</option>
         <?php foreach (WSM_MAIL_STATUSES as $s): ?>
         <option value="<?= h($s) ?>"<?= ($_GET['status'] ?? '') === $s ? ' selected' : '' ?>><?= h($statusLbl[$s] ?? $s) ?></option>
         <?php endforeach; ?>

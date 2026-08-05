@@ -100,7 +100,11 @@ function depuis(string $d): string {
 console_head('Klienci', $me, <<<'CSS'
   .why { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0 0 14px; }
   .segs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+  /* 33 px, collés les uns aux autres : sur un pouce on vise « Stali » et on
+     touche « Wysoki obrót ». La pastille garde sa taille visuelle, c'est la
+     zone touchable qui grandit. */
   .segs a { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; text-decoration: none;
+            min-height: 38px; display: inline-flex; align-items: center;
             border: 1px solid var(--border-default); color: var(--text-muted); }
   .segs a.on { border-color: var(--brand); color: var(--brand); font-weight: 600; }
   .segs a b { font-family: var(--font-mono); font-size: 11px; margin-left: 5px; opacity: .75; }
