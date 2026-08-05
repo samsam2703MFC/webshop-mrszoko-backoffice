@@ -363,7 +363,13 @@
       "contact.topic.wspolpraca": "Współpraca / hurt",
       "contact.topic.reklamacja": "Reklamacja",
       "contact.topic.inne": "Inne",
-      "nav.contact": "Kontakt"
+      "nav.contact": "Kontakt",
+      "cart.voucher": "Kod rabatowy",
+      "cart.voucher_ph": "Wpisz kod",
+      "cart.voucher_apply": "Użyj",
+      "cart.voucher_drop": "Usuń kod",
+      "cart.voucher_line": "Kod rabatowy",
+      "cart.voucher_ship": "Kod: darmowa wysyłka"
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -550,7 +556,13 @@
       "contact.topic.wspolpraca": "Співпраця / гурт",
       "contact.topic.reklamacja": "Скарга",
       "contact.topic.inne": "Інше",
-      "nav.contact": "Контакти"
+      "nav.contact": "Контакти",
+      "cart.voucher": "Промокод",
+      "cart.voucher_ph": "Введіть код",
+      "cart.voucher_apply": "Застосувати",
+      "cart.voucher_drop": "Прибрати код",
+      "cart.voucher_line": "Промокод",
+      "cart.voucher_ship": "Код: безкоштовна доставка"
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -737,7 +749,13 @@
       "contact.topic.wspolpraca": "Wholesale / partnership",
       "contact.topic.reklamacja": "A complaint",
       "contact.topic.inne": "Something else",
-      "nav.contact": "Contact"
+      "nav.contact": "Contact",
+      "cart.voucher": "Discount code",
+      "cart.voucher_ph": "Enter your code",
+      "cart.voucher_apply": "Apply",
+      "cart.voucher_drop": "Remove code",
+      "cart.voucher_line": "Discount code",
+      "cart.voucher_ship": "Code: free shipping"
     }
   }
 }

@@ -15,7 +15,10 @@ require_once __DIR__ . '/console.php';
 [$pdo, $me, $isAdmin] = console_boot();
 $API = console_api_dir();
 require_once $API . '/shop.php';
+require_once $API . '/promo.php';
+wsm_promo_ensure($pdo);
 function kg($g): string { return number_format(((int) $g) / 1000, ((int) $g) % 1000 ? 2 : 0, ',', ' ') . ' kg'; }
+$bonPost = [];
 
 $csrf = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
 if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {
@@ -34,6 +37,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $pdo->prepare("DELETE FROM wsm_discount_tiers WHERE id = ?")->execute([(int) $_POST['delete']]);
         wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Usunięcie', 'wsm_discount_tiers #' . (int) $_POST['delete'], 'Sieć');
         $flash = 'Usunięto próg.';
+    } elseif (isset($_POST['bon_off'])) {
+        [$okB, $msgB] = wsm_promo_disable($pdo, (int) $_POST['bon_off'], (string) ($me['nom'] ?? ''));
+        $flash = $msgB; $kind = $okB ? 'ok' : 'err';
+    } elseif (isset($_POST['bon_save'])) {
+        [$okB, $msgB] = wsm_promo_save($pdo, $_POST, (string) ($me['nom'] ?? ''));
+        $flash = $msgB; $kind = $okB ? 'ok' : 'err';
+        if (!$okB) $bonPost = $_POST;      // on réaffiche ce qui a été tapé
     } else {
         // Un poids en kilogrammes côté écran, en grammes en base : l'unité de
         // saisie doit être celle du métier, pas celle du stockage.
@@ -89,6 +99,14 @@ console_head('Rabaty', $me, <<<'CSS'
   @media (min-width: 760px) { .add { grid-template-columns: 130px 110px 1fr auto auto; } }
   .add label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text-strong); }
   .ex { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+  select { font-family: var(--font-sans); width: 100%; }
+  /* Le formulaire de code a NEUF champs : une seule colonne les empile sur
+     deux écrans de haut, et le bouton disparaît sous le pli. */
+  .add--bon { grid-template-columns: 1fr; }
+  @media (min-width: 620px) { .add--bon { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 980px) { .add--bon { grid-template-columns: repeat(4, 1fr); }
+                              .add--bon .wideL { grid-column: span 2; } }
+  .add--bon .chk, .add--bon button { align-self: end; }
   .tier { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; align-items: end;
           padding: 14px 0; border-bottom: 1px solid var(--border-subtle); }
   .tier:last-child { border-bottom: 0; }
@@ -156,6 +174,90 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Rabaty' => null]);
       <label>Opis <input class="wide" type="text" name="label" placeholder="od 10 kg"></label>
       <label class="chk"><input type="checkbox" name="active" value="1" checked> Aktywny</label>
       <button class="primary" type="submit">Dodaj</button>
+    </form>
+  </div>
+  <?php endif; ?>
+
+  <?php // ---- Kody rabatowe ---------------------------------------------------
+        // Ces codes existaient en base depuis le premier jour, listés dans la
+        // console et LUS NULLE PART : aucune caisse n'en acceptait un seul.
+        $bons = wsm_promo_list($pdo); ?>
+  <div class="panel">
+    <h2>Kody rabatowe</h2>
+    <p class="hint" style="margin-bottom:14px">
+      Kod <b>procentowy nie sumuje się</b> z rabatem ilościowym ani z ceną firmową — działa
+      <b>lepszy z nich</b>. Kod <b>kwotowy</b> odejmuje się po rabacie, tylko od towaru
+      (dostawy nie opłaca żaden kod poza „darmowa wysyłka”), i <b>nigdy nie oddaje pieniędzy</b>:
+      50 zł na koszyku za 30 zł zdejmuje 30 zł. Wycofany kod zostaje na liście —
+      zamówienia, które go użyły, muszą pozostać wytłumaczalne.
+    </p>
+    <?php if (!$bons): ?><p class="muted">Brak kodów.</p><?php endif; ?>
+    <?php if ($bons): ?>
+    <div class="tablewrap">
+    <table class="rwd">
+      <thead><tr><th>Kod</th><th>Rabat</th><th class="num">Od kwoty</th><th>Ważny do</th>
+                 <th class="num">Użycia</th><th class="num">Koszt</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($bons as $b): $s = $b['stats']; $czynny = (int) $b['active'] === 1; ?>
+      <tr<?= $czynny ? '' : ' style="opacity:.55"' ?>>
+        <td data-l="Kod"><b class="mono"><?= h((string) $b['code']) ?></b>
+            <?= $czynny ? '' : ' <small>(wycofany)</small>' ?>
+            <?php if (trim((string) $b['note']) !== ''): ?><br><small class="muted"><?= h((string) $b['note']) ?></small><?php endif; ?></td>
+        <td data-l="Rabat"><?= h((string) $b['libelle']) ?></td>
+        <td data-l="Od kwoty" class="num"><?= (int) $b['min_gross'] > 0 ? h(wsm_promo_zl((int) $b['min_gross'])) : '—' ?></td>
+        <td data-l="Ważny do"><?= trim((string) $b['ends_at']) !== '' ? h(substr((string) $b['ends_at'], 0, 10)) : 'bezterminowo' ?></td>
+        <td data-l="Użycia" class="num"><?= (int) $s['uses'] ?><?= (int) $b['max_uses'] > 0 ? ' / ' . (int) $b['max_uses'] : '' ?></td>
+        <td data-l="Koszt" class="num"><?= (int) $s['amount'] > 0 ? h(wsm_promo_zl((int) $s['amount'])) : '—' ?></td>
+        <td class="num">
+          <?php if ($isAdmin && $czynny): ?>
+          <form method="post" style="display:inline">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <button class="danger" type="submit" name="bon_off" value="<?= (int) $b['id'] ?>">Wycofaj</button>
+          </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+  </div>
+
+  <?php if ($isAdmin): ?>
+  <div class="panel">
+    <h2>Nowy kod</h2>
+    <form class="add add--bon" method="post">
+      <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+      <input type="hidden" name="bon_save" value="1">
+      <label>Kod
+        <input type="text" name="code" placeholder="zostaw puste = wylosuj"
+               value="<?= h((string) ($bonPost['code'] ?? '')) ?>"></label>
+      <label>Rodzaj
+        <select name="kind">
+          <?php foreach (['procent' => 'Procent', 'kwota' => 'Kwota', 'wysylka' => 'Darmowa wysyłka'] as $k => $lib): ?>
+          <option value="<?= h($k) ?>"<?= ($bonPost['kind'] ?? '') === $k ? ' selected' : '' ?>><?= h($lib) ?></option>
+          <?php endforeach; ?>
+        </select></label>
+      <label>Rabat (%)
+        <input type="text" name="pct" placeholder="10" value="<?= h((string) ($bonPost['pct'] ?? '')) ?>"></label>
+      <label>Kwota (zł)
+        <input type="text" name="kwota" placeholder="20,00" value="<?= h((string) ($bonPost['kwota'] ?? '')) ?>"></label>
+      <label>Od kwoty (zł)
+        <input type="text" name="min_gross" placeholder="0" value="<?= h((string) ($bonPost['min_gross'] ?? '')) ?>"></label>
+      <label>Ważny do
+        <input type="date" name="ends_at" value="<?= h((string) ($bonPost['ends_at'] ?? '')) ?>"></label>
+      <label>Ile użyć
+        <input type="number" name="max_uses" min="0" placeholder="0 = bez limitu"
+               value="<?= h((string) ($bonPost['max_uses'] ?? '')) ?>"></label>
+      <label>Na adres
+        <input type="number" name="per_email" min="0" placeholder="0 = bez limitu"
+               value="<?= h((string) ($bonPost['per_email'] ?? '')) ?>"></label>
+      <label class="wideL">Opis wewnętrzny
+        <input class="wide" type="text" name="note" placeholder="np. kampania jesienna"
+               value="<?= h((string) ($bonPost['note'] ?? '')) ?>"></label>
+      <label class="chk"><input type="checkbox" name="active" value="1" checked> Aktywny</label>
+      <button class="primary" type="submit">Dodaj kod</button>
     </form>
   </div>
   <?php endif; ?>

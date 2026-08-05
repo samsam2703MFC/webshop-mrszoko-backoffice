@@ -82,7 +82,21 @@ CREATE TABLE IF NOT EXISTS wsm_vouchers (
   code     TEXT NOT NULL UNIQUE,
   valeur   TEXT NOT NULL DEFAULT '',
   type     TEXT NOT NULL DEFAULT 'Panier',
-  validite TEXT NOT NULL DEFAULT ''
+  validite TEXT NOT NULL DEFAULT '',
+  -- Ce qui agit REELLEMENT sur le prix. Les quatre colonnes ci-dessus sont
+  -- d'affichage : elles etaient seules, et aucune caisse n'a jamais lu un code.
+  kind       TEXT NOT NULL DEFAULT 'procent',   -- procent | kwota | wysylka
+  pct        REAL NOT NULL DEFAULT 0,
+  kwota      INTEGER NOT NULL DEFAULT 0,        -- grosze
+  min_gross  INTEGER NOT NULL DEFAULT 0,        -- grosze, 0 = sans minimum
+  starts_at  TEXT DEFAULT NULL,
+  ends_at    TEXT DEFAULT NULL,
+  max_uses   INTEGER NOT NULL DEFAULT 0,        -- 0 = illimite
+  per_email  INTEGER NOT NULL DEFAULT 0,        -- 0 = illimite
+  used       INTEGER NOT NULL DEFAULT 0,
+  active     INTEGER NOT NULL DEFAULT 1,
+  note       TEXT NOT NULL DEFAULT '',
+  created_at TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS wsm_pricing_rules (
@@ -726,3 +740,22 @@ CREATE TABLE IF NOT EXISTS wsm_client_notes (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_wsm_client_notes_email ON wsm_client_notes (email);
+
+-- Utilisations des bons de réduction.
+--
+--  L'UNICITÉ (voucher_id, order_id) EST LA RÈGLE MÉTIER : un webhook rejoué
+--  ou un double clic ne peuvent pas décompter deux fois la même commande.
+--
+--  Le montant est GELÉ ici. Le bon peut être modifié ou retiré demain ; ce
+--  que cette commande-là a réellement obtenu ne doit plus jamais bouger,
+--  exactement comme une facture ou un mouvement de stock.
+CREATE TABLE IF NOT EXISTS wsm_voucher_uses (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  voucher_id INTEGER NOT NULL,
+  order_id   INTEGER NOT NULL,
+  email      TEXT NOT NULL DEFAULT '',
+  amount     INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  UNIQUE (voucher_id, order_id)
+);
+CREATE INDEX IF NOT EXISTS ix_wsm_voucher_uses_email ON wsm_voucher_uses (email);

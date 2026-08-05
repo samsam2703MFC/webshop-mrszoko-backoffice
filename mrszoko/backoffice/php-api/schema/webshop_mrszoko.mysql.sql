@@ -106,6 +106,20 @@ CREATE TABLE IF NOT EXISTS `wsm_vouchers` (
   `valeur`   VARCHAR(160) NOT NULL DEFAULT '',
   `type`     VARCHAR(40)  NOT NULL DEFAULT 'Panier',
   `validite` VARCHAR(80)  NOT NULL DEFAULT '',
+  -- Ce qui agit REELLEMENT sur le prix. Les quatre colonnes ci-dessus sont
+  -- d'affichage : elles etaient seules, et aucune caisse n'a jamais lu un code.
+  `kind`       VARCHAR(20)  NOT NULL DEFAULT 'procent',
+  `pct`        DECIMAL(5,2) NOT NULL DEFAULT 0,
+  `kwota`      INT          NOT NULL DEFAULT 0,
+  `min_gross`  INT          NOT NULL DEFAULT 0,
+  `starts_at`  DATETIME     NULL DEFAULT NULL,
+  `ends_at`    DATETIME     NULL DEFAULT NULL,
+  `max_uses`   INT          NOT NULL DEFAULT 0,
+  `per_email`  INT          NOT NULL DEFAULT 0,
+  `used`       INT          NOT NULL DEFAULT 0,
+  `active`     TINYINT(1)   NOT NULL DEFAULT 1,
+  `note`       VARCHAR(190) NOT NULL DEFAULT '',
+  `created_at` DATETIME     NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_vouchers_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -957,4 +971,26 @@ CREATE TABLE IF NOT EXISTS `wsm_client_notes` (
   `created_at` DATETIME NOT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_wsm_client_notes_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Utilisations des bons de réduction.
+--
+--  L'UNICITÉ (voucher_id, order_id) EST LA RÈGLE MÉTIER : un webhook rejoué
+--  ou un double clic ne peuvent pas décompter deux fois la même commande.
+--
+--  Le montant est GELÉ ici. Le bon peut être modifié ou retiré demain ; ce
+--  que cette commande-là a réellement obtenu ne doit plus jamais bouger,
+--  exactement comme une facture ou un mouvement de stock.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_voucher_uses` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `voucher_id` INT UNSIGNED NOT NULL,
+  `order_id`   INT UNSIGNED NOT NULL,
+  `email`      VARCHAR(190) NOT NULL DEFAULT '',
+  `amount`     INT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_voucher_uses` (`voucher_id`, `order_id`),
+  KEY `ix_wsm_voucher_uses_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

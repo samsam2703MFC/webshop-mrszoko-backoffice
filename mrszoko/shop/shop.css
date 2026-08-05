@@ -214,6 +214,22 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .radio small, .check small { display: block; color: var(--text-muted); font-size: var(--text-xs); margin-top: 2px; }
 .ship-pick { margin-bottom: var(--space-5); }
 
+/* ---- Code de réduction ------------------------------------------------------
+   Le champ et son bouton sur UNE ligne : séparés, le bouton passe sous le pli
+   sur un téléphone et le code saisi n'est jamais appliqué. */
+.voucher { margin-bottom: var(--space-5); }
+.voucher .field { margin-bottom: 0; }
+.voucher-row { display: flex; gap: 8px; align-items: stretch; }
+.voucher-row input { flex: 1 1 auto; min-width: 0; text-transform: uppercase; }
+.voucher-row .btn { flex: none; white-space: nowrap; }
+.voucher-on { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+              padding: 10px 14px; border-radius: var(--radius-md);
+              background: var(--cream-200, var(--surface-card));
+              border: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.voucher-on strong { color: var(--text-strong); letter-spacing: .04em; }
+.voucher-on span { color: var(--price); }
+.voucher-on .linkbtn { margin-left: auto; }
+
 /* ---- Caisse ---------------------------------------------------------------- */
 .checkout-form fieldset { background: var(--surface-card); border: 1px solid var(--border-subtle);
                           border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-5);

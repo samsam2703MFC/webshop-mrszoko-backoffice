@@ -181,9 +181,16 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
     // pas, et c'est exactement ce qu'un test a attrapé. Six SHOW TABLES ne
     // valent pas ce risque, et les autres wsm_ensure_* n'en ont pas non plus.
     foreach (['wsm_langs', 'wsm_i18n_history', 'wsm_message_tr',
-              'wsm_client_notes', 'wsm_platform_terms', 'wsm_platform_periods'] as $t) {
+              'wsm_client_notes', 'wsm_platform_terms', 'wsm_platform_periods',
+              'wsm_voucher_uses'] as $t) {
         if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
     }
+    // Les colonnes qui font AGIR un bon. Sans elles la boutique interrogerait
+    // des colonnes absentes et rendrait 500 : la table wsm_vouchers existe en
+    // production depuis le premier jour, et CREATE TABLE IF NOT EXISTS ne
+    // touche pas une table déjà créée.
+    $promo = __DIR__ . '/promo.php';
+    if (is_file($promo)) { require_once $promo; wsm_promo_ensure($pdo); }
     // Le registre des langues doit exister ET reprendre ce qui était servi
     // hier : sans cette reprise, la vitrine perdrait l'ukrainien et l'anglais.
     $i18n = __DIR__ . '/i18n.php';
@@ -297,6 +304,12 @@ function wsm_ensure_trade(PDO $pdo): void {
         'backorder'        => ['TINYINT(1) NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
         'discount_percent' => ['DECIMAL(5,2) NOT NULL DEFAULT 0', 'REAL NOT NULL DEFAULT 0'],
         'discount_amount'  => $int,
+        // Le bon utilisé, GELÉ sur la commande. Le code peut être modifié ou
+        // retiré demain ; ce que cette commande-là a obtenu doit rester
+        // lisible dans un an, quand quelqu'un demandera pourquoi elle a coûté
+        // 40 zł de moins. Même principe qu'une ligne de facture.
+        'voucher_code'   => ["VARCHAR(60) NOT NULL DEFAULT ''", "TEXT NOT NULL DEFAULT ''"],
+        'voucher_amount' => $int,
     ]);
     wsm_ensure_columns($pdo, 'wsm_order_items', [
         // Combien de cette ligne reste à produire : ce que l'atelier doit savoir.

@@ -131,6 +131,17 @@ if ($method === 'POST') {
             cart_write($cart);
             redirect(u('koszyk'));
         }
+        // Le code de réduction : posé ou retiré, puis on recharge le panier.
+        // Il n'est PAS validé ici — c'est le devis qui juge, et lui seul sait
+        // ce que pèse le panier au moment où on le regarde.
+        if (isset($_POST['kod_set'])) {
+            voucher_write((string) ($_POST['kod'] ?? ''));
+            redirect(u('koszyk'));
+        }
+        if (isset($_POST['kod_drop'])) {
+            voucher_write('');
+            redirect(u('koszyk'));
+        }
         if (isset($_POST['set']) && is_array($_POST['set'])) {
             foreach ($_POST['set'] as $id => $q) {
                 $q = (int) $q;
@@ -150,6 +161,10 @@ if ($method === 'POST') {
         $body['lang']  = $lang;
         $body['invoice'] = !empty($_POST['invoice']);
         $body['consent_terms'] = !empty($_POST['consent_terms']);
+        // Le code vient du cookie, jamais d'un champ caché : un champ caché
+        // est modifiable dans le navigateur, et le cookie est de toute façon
+        // revalidé en base à la création de la commande.
+        $body['voucher'] = voucher_read();
 
         [$order, $errors] = wsm_shop_create_order($pdo, $body);
         if ($errors) {
@@ -158,6 +173,10 @@ if ($method === 'POST') {
             // on retombe sur l'affichage de la caisse, plus bas
         } else {
             cart_write([]);
+            // Le code part avec le panier : il vient d'être consommé, et le
+            // laisser traîner le ferait re-tenter — puis refuser — sur la
+            // commande suivante, ce qui ressemblerait à une panne.
+            voucher_write('');
             $base = wsm_shop_base_url();
             $pay = wsm_tpay_start($pdo, $order,
                 $base . '/zamowienie/' . rawurlencode($order['code']) . '?t=' . $order['access_token'],
@@ -501,7 +520,8 @@ if ($page === 'koszyk') {
     // verrait le prix public jusqu'au dernier écran, puis un autre montant sur
     // sa facture. Un prix qui change en cours de route fait abandonner.
     [$q, $qErr] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang,
-                                 ['email' => (string) ($_POST['email'] ?? $_GET['email'] ?? '')]);
+                                 ['email' => (string) ($_POST['email'] ?? $_GET['email'] ?? ''),
+                                  'voucher' => voucher_read()]);
 
     layout_head($S, $lang, $langs, $S['cart.title'] ?? '', '', 'koszyk');
     layout_header($S, $lang, $langs, $cartCount);
@@ -566,6 +586,37 @@ if ($page === 'koszyk') {
         $kg = number_format($n['missing_g'] / 1000, 2, ',', ' ') . ' kg'; ?>
       <p class="nudge mono"><?= e(str_replace(['{x}', '{p}'], [$kg, (int) $n['percent']], $S['cart.discount_next'] ?? '')) ?></p>
       <?php endif; ?>
+      <?php // Le code de réduction. Un code refusé affiche POURQUOI, en toutes
+            // lettres et à côté du champ : « nie znamy tego kodu » et « kod
+            // działa od 200,00 zakupów » appellent deux gestes différents, et
+            // un message unique les confondrait. ?>
+      <form class="voucher" method="post" action="<?= e(u('koszyk')) ?>">
+        <?= csrf_field() ?>
+        <?php $kodCourant = voucher_read(); ?>
+        <?php if (($q['voucher']['applied'] ?? false)): ?>
+        <p class="voucher-on mono">
+          <strong><?= e($q['voucher']['code']) ?></strong>
+          <span><?= e($q['voucher']['kind'] === 'wysylka'
+                     ? ($S['cart.voucher_ship'] ?? '') : $q['voucher']['label']) ?></span>
+          <button class="linkbtn" type="submit" name="kod_drop" value="1"><?= e($S['cart.voucher_drop'] ?? '') ?></button>
+        </p>
+        <?php else: ?>
+        <p class="field<?= ($q['voucher_error'] ?? '') !== '' ? ' has-error' : '' ?>">
+          <label for="f-kod"><?= e($S['cart.voucher'] ?? '') ?></label>
+          <span class="voucher-row">
+            <input id="f-kod" name="kod" type="text" value="<?= e($kodCourant) ?>"
+                   placeholder="<?= e($S['cart.voucher_ph'] ?? '') ?>"
+                   autocomplete="off" spellcheck="false" maxlength="40"
+                   <?= ($q['voucher_error'] ?? '') !== '' ? ' aria-invalid="true" aria-describedby="f-kod-e"' : '' ?>>
+            <button class="btn btn--ghost btn--sm" type="submit" name="kod_set" value="1"><?= e($S['cart.voucher_apply'] ?? '') ?></button>
+          </span>
+          <?php if (($q['voucher_error'] ?? '') !== ''): ?>
+          <small class="err" id="f-kod-e"><?= e($q['voucher_error']) ?></small>
+          <?php endif; ?>
+        </p>
+        <?php endif; ?>
+      </form>
+
       <form class="ship-pick" method="get" action="<?= e(u('koszyk')) ?>">
         <?php foreach ($q['methods'] as $sm): ?>
         <label class="radio">
@@ -581,8 +632,20 @@ if ($page === 'koszyk') {
       <dl class="totals mono">
         <dt><?= e($S['cart.subtotal'] ?? '') ?></dt><dd><?= e(zl($q['items_gross'])) ?></dd>
         <?php if (($q['discount_percent'] ?? 0) > 0): ?>
-        <dt class="disc"><?= e($S['cart.discount'] ?? '') ?> −<?= (int) $q['discount_percent'] ?> %</dt>
+        <?php // Le libellé dit D'OÙ vient la remise. « Rabat ilościowy » sur une
+              // remise venue d'un code nommait la mauvaise raison : celui qui
+              // retire son code ne comprenait pas que le montant ne bouge pas. ?>
+        <dt class="disc"><?= e(($q['discount_source'] ?? 'waga') === 'waga'
+              ? ($S['cart.discount'] ?? '')
+              : (string) ($q['discount_label'] ?? ($S['cart.discount'] ?? ''))) ?> −<?= (int) $q['discount_percent'] ?> %</dt>
         <dd class="disc">−<?= e(zl($q['discount_amount'])) ?></dd>
+        <?php endif; ?>
+        <?php // Le bon en MONTANT a sa propre ligne : additionné à la remise
+              // au poids il deviendrait illisible, et l'acheteur ne saurait
+              // plus lequel des deux il perd s'il retire son code. ?>
+        <?php if ((int) ($q['voucher']['amount'] ?? 0) > 0): ?>
+        <dt class="disc"><?= e($S['cart.voucher_line'] ?? '') ?> <?= e($q['voucher']['code']) ?></dt>
+        <dd class="disc">−<?= e(zl((int) $q['voucher']['amount'])) ?></dd>
         <?php endif; ?>
         <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
         <dd><?= $q['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($q['shipping_gross'])) ?></dd>
@@ -609,7 +672,7 @@ if ($page === 'kasa') {
     $shipCty = (string) ($v['ship_country'] ?? ($_GET['kraj'] ?? ''));
     [$q, ] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang,
         ['country' => $shipCty, 'vat_eu' => (string) ($v['vat_eu'] ?? ''),
-         'email' => (string) ($v['email'] ?? '')]);
+         'email' => (string) ($v['email'] ?? ''), 'voucher' => voucher_read()]);
 
     /** Champ de formulaire : valeur réaffichée, erreur montrée sous le champ. */
     $field = function (string $name, string $label, array $opt = []) use ($v, $errors, $S) {
@@ -756,8 +819,20 @@ if ($page === 'kasa') {
       <dl class="totals mono">
         <dt><?= e($S['cart.subtotal'] ?? '') ?></dt><dd><?= e(zl($q['items_gross'])) ?></dd>
         <?php if (($q['discount_percent'] ?? 0) > 0): ?>
-        <dt class="disc"><?= e($S['cart.discount'] ?? '') ?> −<?= (int) $q['discount_percent'] ?> %</dt>
+        <?php // Le libellé dit D'OÙ vient la remise. « Rabat ilościowy » sur une
+              // remise venue d'un code nommait la mauvaise raison : celui qui
+              // retire son code ne comprenait pas que le montant ne bouge pas. ?>
+        <dt class="disc"><?= e(($q['discount_source'] ?? 'waga') === 'waga'
+              ? ($S['cart.discount'] ?? '')
+              : (string) ($q['discount_label'] ?? ($S['cart.discount'] ?? ''))) ?> −<?= (int) $q['discount_percent'] ?> %</dt>
         <dd class="disc">−<?= e(zl($q['discount_amount'])) ?></dd>
+        <?php endif; ?>
+        <?php // Le bon en MONTANT a sa propre ligne : additionné à la remise
+              // au poids il deviendrait illisible, et l'acheteur ne saurait
+              // plus lequel des deux il perd s'il retire son code. ?>
+        <?php if ((int) ($q['voucher']['amount'] ?? 0) > 0): ?>
+        <dt class="disc"><?= e($S['cart.voucher_line'] ?? '') ?> <?= e($q['voucher']['code']) ?></dt>
+        <dd class="disc">−<?= e(zl((int) $q['voucher']['amount'])) ?></dd>
         <?php endif; ?>
         <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
         <dd><?= $q['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($q['shipping_gross'])) ?></dd>

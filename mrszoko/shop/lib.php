@@ -24,6 +24,7 @@ require_once $WSM_API_DIR . '/tpay.php';
 
 const WSM_CART_COOKIE = 'ms_cart';
 const WSM_LANG_COOKIE = 'ms_lang';
+const WSM_VOUCHER_COOKIE = 'ms_kod';
 
 /** Échappement HTML — appliqué à TOUTE valeur venant de la base ou du client. */
 function e(?string $s): string {
@@ -111,6 +112,34 @@ function cart_write(array $cart): void {
         'secure'   => wsm_is_https(),
     ]);
     $_COOKIE[WSM_CART_COOKIE] = $value;
+}
+
+// ---------------------------------------------------------------------------
+//  Le code de réduction — un cookie, comme le panier.
+//
+//  Il DOIT survivre au passage panier → caisse : un acheteur qui saisit son
+//  code puis le voit disparaître à l'écran suivant croit l'avoir perdu, et
+//  c'est le moment précis où l'on abandonne un panier. Rien de sensible n'y
+//  est stocké : le code seul, revalidé en base à chaque affichage — un cookie
+//  trafiqué ne peut donc rien accorder.
+// ---------------------------------------------------------------------------
+function voucher_read(): string {
+    $raw = strtoupper(trim((string) ($_COOKIE[WSM_VOUCHER_COOKIE] ?? '')));
+    if ($raw === '' || strlen($raw) > 40) return '';
+    return preg_replace('/[^A-Z0-9]/', '', $raw) ?? '';
+}
+
+function voucher_write(string $code): void {
+    $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', trim($code)) ?? '');
+    if (strlen($code) > 40) $code = '';
+    setcookie(WSM_VOUCHER_COOKIE, $code, [
+        'expires'  => $code !== '' ? time() + 7 * 86400 : time() - 3600,
+        'path'     => shop_base() . '/',
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure'   => wsm_is_https(),
+    ]);
+    $_COOKIE[WSM_VOUCHER_COOKIE] = $code;
 }
 
 function cart_count(array $cart): int {
