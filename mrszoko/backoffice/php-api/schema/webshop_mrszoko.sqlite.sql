@@ -808,3 +808,48 @@ CREATE TABLE IF NOT EXISTS wsm_subscription_items (
   qty             INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS ix_wsm_sub_items ON wsm_subscription_items (subscription_id);
+
+-- Reclamations et retractations.
+--
+--  LE MONTANT PAYE EST FIGE ICI (paid_gross). Le prix peut changer demain ;
+--  ce que cette commande-la a coute ne bouge plus. C'est la borne du
+--  remboursement : on ne rend jamais plus que ce qu'on a encaisse.
+--
+--  Une demande ne se SUPPRIME pas : elle se clot, avec sa raison. Une
+--  reclamation effacee est une preuve detruite — et le client, lui, a garde
+--  son courriel.
+CREATE TABLE IF NOT EXISTS wsm_claims (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  numer        TEXT NOT NULL UNIQUE,
+  order_id     INTEGER NOT NULL,
+  order_code   TEXT NOT NULL DEFAULT '',
+  email        TEXT NOT NULL DEFAULT '',
+  type         TEXT NOT NULL DEFAULT 'reklamacja',
+  statut       TEXT NOT NULL DEFAULT 'nowa',
+  raison       TEXT NOT NULL DEFAULT '',
+  decision     TEXT NOT NULL DEFAULT '',
+  paid_gross   INTEGER NOT NULL DEFAULT 0,
+  refund_gross INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL,
+  resolved_at  TEXT DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wsm_claims_order ON wsm_claims (order_id);
+CREATE INDEX IF NOT EXISTS ix_wsm_claims_statut ON wsm_claims (statut);
+
+-- Liens directs traces.
+--
+--  Un lien partage doit pouvoir DIRE ce qu'il a rapporte, sinon on reconduit
+--  une campagne sans savoir si elle a vendu quoi que ce soit. Le compteur de
+--  clics et le chiffre d'affaires vivent ici ; la commande, elle, garde la
+--  source dans sa propre colonne (wsm_orders.source), figee.
+CREATE TABLE IF NOT EXISTS wsm_links (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  code       TEXT NOT NULL UNIQUE,
+  nom        TEXT NOT NULL DEFAULT '',
+  cible      TEXT NOT NULL DEFAULT '',
+  produkt    TEXT NOT NULL DEFAULT '',
+  kod        TEXT NOT NULL DEFAULT '',
+  klikniec   INTEGER NOT NULL DEFAULT 0,
+  active     INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);

@@ -104,6 +104,7 @@ function console_sections(?array $me = null): array {
             'zamowienia.php'  => 'Zamówienia',
             'subskrypcje.php' => 'Subskrypcje',
             'faktury.php'     => 'Faktury',
+            'zgloszenia.php'  => 'Zgłoszenia',
         ],
 
         // Les gens. La messagerie est ici et pas ailleurs : un message est

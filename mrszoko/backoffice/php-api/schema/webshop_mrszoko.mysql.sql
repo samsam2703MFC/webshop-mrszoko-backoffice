@@ -1047,3 +1047,48 @@ CREATE TABLE IF NOT EXISTS `wsm_subscription_items` (
   PRIMARY KEY (`id`),
   KEY `ix_wsm_sub_items` (`subscription_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Reclamations et retractations.
+--
+--  LE MONTANT PAYE EST FIGE ICI (paid_gross) : c'est la borne du
+--  remboursement. On ne rend jamais plus que ce qu'on a encaisse.
+--  Une demande ne se SUPPRIME pas : elle se clot, avec sa raison.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_claims` (
+  `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `numer`        VARCHAR(24)  NOT NULL,
+  `order_id`     INT UNSIGNED NOT NULL,
+  `order_code`   VARCHAR(40)  NOT NULL DEFAULT '',
+  `email`        VARCHAR(190) NOT NULL DEFAULT '',
+  `type`         VARCHAR(20)  NOT NULL DEFAULT 'reklamacja',
+  `statut`       VARCHAR(20)  NOT NULL DEFAULT 'nowa',
+  `raison`       TEXT,
+  `decision`     TEXT,
+  `paid_gross`   INT NOT NULL DEFAULT 0,
+  `refund_gross` INT NOT NULL DEFAULT 0,
+  `created_at`   DATETIME NOT NULL,
+  `resolved_at`  DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_claims_numer` (`numer`),
+  KEY `ix_wsm_claims_order` (`order_id`),
+  KEY `ix_wsm_claims_statut` (`statut`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Liens directs traces. Un lien partage doit pouvoir DIRE ce qu'il a
+--  rapporte, sinon on reconduit une campagne sans savoir si elle a vendu.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_links` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `code`       VARCHAR(40)  NOT NULL,
+  `nom`        VARCHAR(190) NOT NULL DEFAULT '',
+  `cible`      VARCHAR(190) NOT NULL DEFAULT '',
+  `produkt`    VARCHAR(64)  NOT NULL DEFAULT '',
+  `kod`        VARCHAR(60)  NOT NULL DEFAULT '',
+  `klikniec`   INT NOT NULL DEFAULT 0,
+  `active`     TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_links_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

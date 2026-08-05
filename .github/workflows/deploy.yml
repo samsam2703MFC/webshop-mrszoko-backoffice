@@ -1095,6 +1095,53 @@ jobs:
             *etykiet=0) echo "  ^ ATTENTION : brak etykiet propozycji — karty bylyby nieme"; fail=1;;
             *) ;;
           esac
+          echo "== zgloszenia : milczenie kosztuje towar =="
+          # Le droit polonais donne QUATORZE JOURS pour repondre a une
+          # reclamation ; passe ce delai sans reponse, elle est reputee
+          # ACCEPTEE. C est la seule regle du logiciel ou ne rien faire coute
+          # le produit — d ou le compteur, qui doit devenir NEGATIF.
+          ZOUT=$(php -r '
+            require_once "'"$DIR_API"'/claims.php";
+            $d = WSM_CLAIM_ODPOWIEDZ_DNI === 14 && WSM_CLAIM_ZWROT_DNI === 14
+              && WSM_CLAIM_REKOJMIA_MIES === 24;
+            $vieux = ["created_at" => date("Y-m-d H:i:s", time() - 20*86400),
+                      "statut" => "nowa", "type" => "reklamacja",
+                      "paid_gross" => 10000, "refund_gross" => 0];
+            $h = wsm_claim_hydrate(new PDO("sqlite::memory:"), $vieux);
+            $neg = $h["reponse_reste"] < 0 && $h["milczenie_zgoda"] === true;
+            $reste = $h["remboursable"] === 10000;
+            echo ($d ? "terminy-ok" : "terminy-ZLE"), " ",
+                 ($neg ? "licznik-ok" : "licznik-ZLE"), " ",
+                 ($reste ? "granica-zwrotu-ok" : "granica-zwrotu-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || ZOUT="php-ZLE :: $ZOUT"
+          echo "  $ZOUT"
+          case "$ZOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguly zgloszen nie dzialaja"; fail=1;;
+            *) ;;
+          esac
+          echo "== linki : adres sklepu, nie konsoli =="
+          # Le lien affiche dans la console pointait sur /backoffice/... :
+          # copie-colle dans une infolettre, il envoyait les clients sur une
+          # page de connexion. On verifie DEPUIS UN CHEMIN DE CONSOLE.
+          LOUT2=$(php -r '
+            require_once "'"$DIR_API"'/shop.php";
+            require_once "'"$DIR_API"'/links.php";
+            $_SERVER["HTTP_HOST"] = "example.pl";
+            $_SERVER["REQUEST_URI"] = "/mrszoko/backoffice/zgloszenia.php";
+            $a = wsm_shop_base_url();
+            $_SERVER["REQUEST_URI"] = "/mrszoko/backoffice/api/shop/quote";
+            $b = wsm_shop_base_url();
+            $bon = $a === $b && str_ends_with($a, "/mrszoko/shop");
+            $u = wsm_link_url($a, "abc123");
+            $p = str_contains($u, "?l=abc123") && !str_contains($u, "backoffice");
+            echo ($bon ? "adres-ok" : "adres-ZLE :: $a"), " ",
+                 ($p ? "param-ok" : "param-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || LOUT2="php-ZLE :: $LOUT2"
+          echo "  $LOUT2"
+          case "$LOUT2" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : link do udostepnienia prowadzilby do konsoli"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 

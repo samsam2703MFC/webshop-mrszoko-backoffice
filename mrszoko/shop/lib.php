@@ -25,6 +25,11 @@ require_once $WSM_API_DIR . '/tpay.php';
 const WSM_CART_COOKIE = 'ms_cart';
 const WSM_LANG_COOKIE = 'ms_lang';
 const WSM_VOUCHER_COOKIE = 'ms_kod';
+const WSM_SOURCE_COOKIE = 'ms_zrodlo';
+
+// Le paramètre du lien tracé. Le même nom que côté API (links.php), redéclaré
+// ici pour que la boutique n'ait pas à charger ce fichier pour lire une URL.
+const WSM_LINK_PARAM_PUB = 'l';
 
 /** Échappement HTML — appliqué à TOUTE valeur venant de la base ou du client. */
 function e(?string $s): string {
@@ -140,6 +145,36 @@ function voucher_write(string $code): void {
         'secure'   => wsm_is_https(),
     ]);
     $_COOKIE[WSM_VOUCHER_COOKIE] = $code;
+}
+
+// ---------------------------------------------------------------------------
+//  La source — d'où vient ce visiteur.
+//
+//  UN CODE DE CAMPAGNE, PAS UNE IDENTITÉ. Rien ici ne désigne une personne :
+//  ni identifiant, ni adresse, ni empreinte. Le cookie porte le nom du lien
+//  cliqué, il est recopié sur la commande, et c'est tout ce qu'on saura
+//  jamais — l'équivalent d'un « vu en vitrine » noté sur un ticket.
+//
+//  Trente jours : au-delà, attribuer une vente à un lien cliqué le mois
+//  dernier revient à s'attribuer un mérite qu'on ne peut pas prouver.
+// ---------------------------------------------------------------------------
+function source_read(): string {
+    $raw = strtolower(trim((string) ($_COOKIE[WSM_SOURCE_COOKIE] ?? '')));
+    if ($raw === '' || strlen($raw) > 40) return '';
+    return preg_replace('/[^a-z0-9_.-]/', '', $raw) ?? '';
+}
+
+function source_write(string $code): void {
+    $code = strtolower(preg_replace('/[^A-Za-z0-9_.-]/', '', trim($code)) ?? '');
+    if (strlen($code) > 40) $code = substr($code, 0, 40);
+    setcookie(WSM_SOURCE_COOKIE, $code, [
+        'expires'  => $code !== '' ? time() + 30 * 86400 : time() - 3600,
+        'path'     => shop_base() . '/',
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure'   => wsm_is_https(),
+    ]);
+    $_COOKIE[WSM_SOURCE_COOKIE] = $code;
 }
 
 function cart_count(array $cart): int {

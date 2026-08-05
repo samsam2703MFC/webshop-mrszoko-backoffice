@@ -182,9 +182,12 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
     // valent pas ce risque, et les autres wsm_ensure_* n'en ont pas non plus.
     foreach (['wsm_langs', 'wsm_i18n_history', 'wsm_message_tr',
               'wsm_client_notes', 'wsm_platform_terms', 'wsm_platform_periods',
-              'wsm_voucher_uses', 'wsm_subscriptions', 'wsm_subscription_items'] as $t) {
+              'wsm_voucher_uses', 'wsm_subscriptions', 'wsm_subscription_items',
+              'wsm_claims', 'wsm_links'] as $t) {
         if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
     }
+    $links = __DIR__ . '/links.php';
+    if (is_file($links)) { require_once $links; wsm_links_ensure($pdo); }
     $cykl = __DIR__ . '/cykl.php';
     if (is_file($cykl)) { require_once $cykl; wsm_cykl_ensure($pdo); }
     // Les colonnes qui font AGIR un bon. Sans elles la boutique interrogerait

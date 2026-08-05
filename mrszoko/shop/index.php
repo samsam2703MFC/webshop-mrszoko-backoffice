@@ -88,6 +88,39 @@ $page   = $seg[0] ?? '';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $cart   = cart_read();
 
+// ---- Lien direct tracé : ?l=xxxxxx -----------------------------------------
+//  Un lien partagé doit pouvoir DIRE ce qu'il a rapporté, sinon on reconduit
+//  une campagne sans savoir si elle a vendu. Le lien peut aussi poser le code
+//  de réduction annoncé dans le message : sans ça, le visiteur cherche où le
+//  taper et referme l'onglet.
+//
+//  AUCUN PISTAGE : pas de cookie d'identification, pas d'adresse IP. On note
+//  la SOURCE sur la commande, comme « vu en vitrine » sur un ticket.
+if (isset($_GET[WSM_LINK_PARAM_PUB]) && $method === 'GET') {
+    $lf = $WSM_API_DIR . '/links.php';
+    if (is_file($lf)) {
+        require_once $lf;
+        $lien = wsm_link_find($pdo, (string) $_GET[WSM_LINK_PARAM_PUB]);
+        if ($lien) {
+            wsm_link_hit($pdo, (string) $lien['code']);
+            source_write((string) $lien['code']);
+            if (trim((string) $lien['kod']) !== '') voucher_write((string) $lien['kod']);
+            if ((string) $lien['cible'] === 'koszyk' && trim((string) $lien['produkt']) !== '') {
+                $cart[(string) $lien['produkt']] = min(WSM_SHOP_MAX_QTY,
+                    ($cart[(string) $lien['produkt']] ?? 0) + 1);
+                cart_write($cart);
+                redirect(u('koszyk'));
+            }
+            if ((string) $lien['cible'] === 'produkt' && trim((string) $lien['produkt']) !== '') {
+                $pr = wsm_shop_product($pdo, (string) $lien['produkt'], $lang);
+                if ($pr) redirect(u('p/' . $pr['slug']));
+            }
+            redirect(u());
+        }
+        // Un code inconnu ne casse rien : on sert la boutique, sans source.
+    }
+}
+
 // ==================== CE QUE LES MOTEURS VONT CHERCHER =======================
 //  Servis avant tout le reste : ce sont des fichiers, pas des pages — ils
 //  n'ont ni en-tête, ni panier, ni session à charger.
@@ -217,6 +250,26 @@ if ($method === 'POST') {
         // On retombe sur l'affichage de la confirmation, plus bas.
     }
 
+    // ---- Réclamation ou rétractation depuis le suivi ------------------------
+    //  Le jeton d'accès de la commande fait foi : sans lui, connaître un
+    //  numéro ne suffit pas à ouvrir un dossier au nom de quelqu'un d'autre.
+    if ($page === 'zamowienie' && isset($_POST['zgloszenie'])) {
+        $oCl = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
+        if ($oCl) {
+            require_once $WSM_API_DIR . '/claims.php';
+            [$cid, $mCl] = wsm_claim_open($pdo, (int) $oCl['id'], (string) ($_POST['ctype'] ?? ''),
+                                          (string) ($_POST['craison'] ?? ''), 'klient');
+            if ($cid > 0) {
+                $c = wsm_claim_get($pdo, $cid);
+                $claimMsg = str_replace('{numer}', (string) ($c['numer'] ?? ''),
+                                        $S['claim.done'] ?? $mCl);
+            } else {
+                $claimErr = $mCl;                 // le message dit ce qui manque
+            }
+        }
+        // On retombe sur l'affichage du suivi, plus bas.
+    }
+
     // ---- Passage de commande ----------------------------------------------
     if ($page === 'kasa') {
         $body = $_POST;
@@ -228,6 +281,9 @@ if ($method === 'POST') {
         // est modifiable dans le navigateur, et le cookie est de toute façon
         // revalidé en base à la création de la commande.
         $body['voucher'] = voucher_read();
+        // La source suit la commande, figée. Sans elle, un lien partagé ne
+        // peut jamais dire ce qu'il a rapporté.
+        $body['source'] = source_read();
 
         [$order, $errors] = wsm_shop_create_order($pdo, $body);
         if ($errors) {
@@ -1008,6 +1064,48 @@ if ($page === 'zamowienie') {
         </select>
       </label>
       <button class="btn btn--brand" type="submit" name="subskrybuj" value="1"><?= e($S['sub.cta'] ?? '') ?></button>
+    </form>
+    <?php endif; ?>
+  </section>
+  <?php endif; ?>
+
+  <?php // ---- Réclamation / rétractation ------------------------------------
+        //  Le compteur de jours est AFFICHÉ, y compris quand il est dépassé :
+        //  c'est ce chiffre qui fait agir, et le masquer ne l'annule pas.
+        //  Le droit de rétractation expire ; celui de signaler un défaut dure
+        //  deux ans, et l'écran le dit plutôt que de fermer la porte.
+        $clFile = $WSM_API_DIR . '/claims.php';
+        if (is_file($clFile)):
+          require_once $clFile;
+          $reste = wsm_claim_zwrot_reste($pdo, $o);
+          $dejaCl = $claimMsg ?? ''; ?>
+  <section class="claim">
+    <h2><?= e($S['claim.title'] ?? '') ?></h2>
+    <p class="muted"><?= e($S['claim.lead'] ?? '') ?></p>
+    <p class="mono muted"><?= $reste['jours'] > 0
+        ? e(str_replace('{n}', (string) $reste['jours'], $S['claim.left'] ?? ''))
+        : e($S['claim.over'] ?? '') ?></p>
+    <?php if ($dejaCl !== ''): ?>
+      <?php notice('ok', $dejaCl); ?>
+    <?php else: ?>
+      <?php if (isset($claimErr)) notice('warn', $claimErr); ?>
+    <form method="post" action="<?= e(u('zamowienie/' . rawurlencode($o['code']), ['t' => $o['access_token']])) ?>">
+      <?= csrf_field() ?>
+      <p class="field">
+        <label for="f-ctype"><?= e($S['claim.type'] ?? '') ?></label>
+        <select id="f-ctype" name="ctype">
+          <?php if ($reste['jours'] > 0): ?>
+          <option value="zwrot"><?= e($S['claim.zwrot'] ?? '') ?></option>
+          <?php endif; ?>
+          <option value="reklamacja"><?= e($S['claim.reklamacja'] ?? '') ?></option>
+        </select>
+      </p>
+      <p class="field">
+        <label for="f-craison"><?= e($S['claim.reason'] ?? '') ?></label>
+        <textarea id="f-craison" name="craison" rows="4" required
+                  placeholder="<?= e($S['claim.reason_ph'] ?? '') ?>"></textarea>
+      </p>
+      <button class="btn btn--brand" type="submit" name="zgloszenie" value="1"><?= e($S['claim.cta'] ?? '') ?></button>
     </form>
     <?php endif; ?>
   </section>
