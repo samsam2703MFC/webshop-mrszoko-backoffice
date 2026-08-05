@@ -85,6 +85,7 @@ const WSM_CMS_SECTIONS = [
     'contact' => 'Formularz kontaktowy',
     'sub' => 'Subskrypcja na stronie potwierdzenia',
     'upsell' => 'Propozycje produktów',
+    'claim' => 'Reklamacje i zwroty',
     'seller' => 'Dane sprzedawcy w stopce',
     'footer' => 'Stopka',
     // Page d'accueil

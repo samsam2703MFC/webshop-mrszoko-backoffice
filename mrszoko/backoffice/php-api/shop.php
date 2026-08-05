@@ -49,12 +49,33 @@ function wsm_api_base_url(): string {
     return wsm_request_origin() . $base;
 }
 
-/** URL publique de la boutique — sert à composer l'URL de retour tpay. */
+/**
+ * URL publique de la boutique.
+ *
+ * ELLE DOIT ÊTRE JUSTE DEPUIS N'IMPORTE QUELLE SURFACE. La version
+ * précédente ne réécrivait que « /backoffice/api » : appelée depuis un écran
+ * de la console — /backoffice/zgloszenia.php — elle rendait l'adresse de
+ * L'ÉCRAN LUI-MÊME. Le lien affiché à copier-coller dans une infolettre
+ * envoyait donc les clients sur une page de connexion. Trouvé en regardant
+ * l'écran, pas le code.
+ *
+ * La règle générale : la racine du déploiement est ce qui PRÉCÈDE
+ * « /backoffice » ou « /shop ». On la retrouve, et on rajoute « /shop ».
+ */
 function wsm_shop_base_url(): string {
     $fixed = (string) (wsm_config()['shop_url'] ?? '');
     if ($fixed !== '') return rtrim($fixed, '/');
-    $api = wsm_api_base_url();
-    return preg_replace('#/backoffice/api$#', '/shop', $api) ?: $api;
+
+    $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?? '/';
+    foreach (['/backoffice', '/shop', '/landing'] as $surface) {
+        $cut = strpos($path, $surface . '/');
+        if ($cut !== false) { $path = substr($path, 0, $cut); break; }
+        if (str_ends_with(rtrim($path, '/'), $surface)) {
+            $path = substr(rtrim($path, '/'), 0, -strlen($surface));
+            break;
+        }
+    }
+    return wsm_request_origin() . rtrim($path, '/') . '/shop';
 }
 
 /** Langue demandée, ramenée à une langue réellement disponible. */
@@ -909,6 +930,10 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
             // Gelé sur la commande : le bon peut changer, celle-ci ne doit pas.
             'voucher_code'   => (string) ($quote['voucher']['code'] ?? ''),
             'voucher_amount' => (int) ($quote['voucher']['amount'] ?? 0),
+            // D'où vient cette commande. Figée : le lien peut être renommé ou
+            // retiré demain, la commande doit rester attribuable.
+            'source' => substr(preg_replace('/[^a-z0-9_.-]/', '',
+                            strtolower(trim((string) ($body['source'] ?? '')))) ?? '', 0, 40),
         ] + wsm_vies_columns($vies);
         $names = array_keys($cols);
         $sql = 'INSERT INTO wsm_orders (' . implode(',', $names) . ') VALUES (' .

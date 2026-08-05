@@ -378,7 +378,19 @@
       "sub.already": "Ten adres ma już taką subskrypcję.",
       "upsell.title": "Może się przydać",
       "upsell.together": "często kupowane razem",
-      "upsell.shelf": "z tej samej półki"
+      "upsell.shelf": "z tej samej półki",
+      "claim.title": "Coś nie tak z tym zamówieniem?",
+      "claim.lead": "Napisz, co się stało. Odpowiemy w ciągu 14 dni — tyle daje nam prawo, i tyle sobie stawiamy.",
+      "claim.type": "Rodzaj zgłoszenia",
+      "claim.zwrot": "Odstąpienie od umowy (14 dni od odbioru)",
+      "claim.reklamacja": "Reklamacja — wada towaru",
+      "claim.reason": "Co się stało",
+      "claim.reason_ph": "Opisz w kilku zdaniach — co, kiedy, czego oczekujesz.",
+      "claim.cta": "Wyślij zgłoszenie",
+      "claim.left": "Na odstąpienie od umowy zostało Ci {n} dni.",
+      "claim.over": "Termin odstąpienia od umowy minął, ale reklamację z tytułu wady możesz złożyć przez 2 lata.",
+      "claim.done": "Przyjęliśmy zgłoszenie {numer}. Odpowiemy w ciągu 14 dni.",
+      "claim.open": "Zgłoszenie {numer} jest w toku."
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -580,7 +592,19 @@
       "sub.already": "Ця адреса вже має таку підписку.",
       "upsell.title": "Може стати в пригоді",
       "upsell.together": "часто купують разом",
-      "upsell.shelf": "з тієї ж полиці"
+      "upsell.shelf": "з тієї ж полиці",
+      "claim.title": "Щось не так із цим замовленням?",
+      "claim.lead": "Напишіть, що сталося. Відповімо протягом 14 днів — стільки дає закон, стільки ставимо й собі.",
+      "claim.type": "Тип звернення",
+      "claim.zwrot": "Відмова від договору (14 днів від отримання)",
+      "claim.reklamacja": "Рекламація — дефект товару",
+      "claim.reason": "Що сталося",
+      "claim.reason_ph": "Опишіть у кількох реченнях — що, коли, чого очікуєте.",
+      "claim.cta": "Надіслати звернення",
+      "claim.left": "На відмову від договору залишилось {n} днів.",
+      "claim.over": "Строк відмови минув, але рекламацію щодо дефекту можна подати протягом 2 років.",
+      "claim.done": "Ми прийняли звернення {numer}. Відповімо протягом 14 днів.",
+      "claim.open": "Звернення {numer} в опрацюванні."
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -782,7 +806,19 @@
       "sub.already": "This address already has such a subscription.",
       "upsell.title": "You might also need",
       "upsell.together": "often bought together",
-      "upsell.shelf": "from the same shelf"
+      "upsell.shelf": "from the same shelf",
+      "claim.title": "Something wrong with this order?",
+      "claim.lead": "Tell us what happened. We answer within 14 days — that is what the law gives us, and what we hold ourselves to.",
+      "claim.type": "Type of request",
+      "claim.zwrot": "Withdrawal from the contract (14 days from delivery)",
+      "claim.reklamacja": "Complaint — faulty goods",
+      "claim.reason": "What happened",
+      "claim.reason_ph": "A few sentences — what, when, what you expect.",
+      "claim.cta": "Send the request",
+      "claim.left": "You have {n} days left to withdraw from the contract.",
+      "claim.over": "The withdrawal period has passed, but you can report a fault for 2 years.",
+      "claim.done": "We have received request {numer}. We will answer within 14 days.",
+      "claim.open": "Request {numer} is being handled."
     }
   }
 }
