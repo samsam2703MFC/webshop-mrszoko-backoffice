@@ -67,6 +67,19 @@ sort($apres);
 ok('les langues déjà servies restent publiées', $apres === $avant, [$avant, $apres]);
 ok('et rien de plus n\'a été publié au passage', count($apres) === count($avant), $apres);
 
+// LA TABLE SE RECRÉE TOUTE SEULE. Sur le serveur, wsm_langs n'existait pas :
+// elle n'était créée que par un écran authentifié, que ni un visiteur ni le
+// déploiement n'ouvrent jamais. Troisième fois que « livré après le
+// démarrage n'arrive pas tout seul » coûte un cycle.
+echo "\n-- baza naprawia się sama --\n";
+$pdo->exec("DROP TABLE IF EXISTS wsm_langs");
+ok('la table a bien disparu', !wsm_table_exists($pdo, 'wsm_langs'));
+$pdo2 = wsm_bootstrap();                       // un simple démarrage, rien de plus
+ok('un démarrage ordinaire la recrée', wsm_table_exists($pdo2, 'wsm_langs'));
+$repub = wsm_lang_published($pdo2);
+ok('et la reprise a de nouveau préservé les langues servies',
+    in_array('pl', $repub, true) && count($repub) >= 1, $repub);
+
 // ---- 3. La publication ------------------------------------------------------------
 echo "\n-- publikacja to decyzja --\n";
 // L'allemand est vide : la publier reviendrait à afficher un menu allemand

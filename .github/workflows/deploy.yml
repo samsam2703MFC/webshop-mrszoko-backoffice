@@ -578,6 +578,11 @@ jobs:
             && echo "  php-cli parle à MySQL : oui" \
             || echo "  php-cli SANS pdo_mysql — kontrole bazy idą przez klienta mysql (nie jest to usterka aplikacji)"
 
+          # RÉVEIL. Certaines tables ne naissent qu'au premier démarrage de
+          # l'application (wsm_ensure_nouvelles_tables). Interroger la base
+          # avant que quiconque ait ouvert une page ferait échouer des
+          # contrôles parfaitement sains — c'est arrivé au déploiement 61.
+          curl -sk -o /dev/null --max-time 15 "http://localhost/mrszoko/shop/" || true
           echo "== moteur de données (preuve MySQL) =="
           Q="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name LIKE 'wsm_%'"
           if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
@@ -739,6 +744,21 @@ jobs:
             *ZLE*|"") echo "  ^ ATTENTION : nie udało się odczytać bazy"; fail=1;;
           esac
 
+          if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
+          REMOTE
+
+      - name: Verify business rules (pure logic, no DB)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
+          fail=0
+          # Rien ici n'ouvre la base : le php-cli de ce serveur n'a pas de
+          # pilote MySQL (voir la sonde de l'étape précédente). Ce sont les
+          # RÈGLES qu'on vérifie — celles qui décident ce qui part au client.
           echo "== języki : rejestr i reguły (bez bazy) =="
           # Logika czysta: bez PDO, bo php-cli tego serwera nie ma sterownika.
           # Stan bazy sprawdza blok wyżej, przez klienta mysql.
@@ -812,10 +832,18 @@ jobs:
             $nigdy = ["orders"=>2,"paid_orders"=>0,"revenue"=>0,"unpaid"=>2,
                       "nip"=>"","last_at"=>date("Y-m-d H:i:s", time()-400*86400)];
             $bn = wsm_crm_badges($nigdy, 10000);
+            // Une alerte doit nommer quelqu\'un ET dire quoi faire. Sans le
+            // nom elle oblige à chercher ; sans le geste elle culpabilise.
+            $al = [["type"=>"decroche","severite"=>3,"nom"=>"X","geste"=>"Y","href"=>"klienci.php?email=x"]];
+            $forme = ($al[0]["nom"] ?? "") !== "" && ($al[0]["geste"] ?? "") !== ""
+                  && str_contains($al[0]["href"], "klienci.php");
+            $conc = wsm_crm_concentration([], 5);
             echo (isset($b["staly"]) ? "staly-ok" : "staly-ZLE"), " ",
                  (isset($b["nieoplacone"]) ? "nieoplacone-ok" : "nieoplacone-ZLE"), " ",
                  (isset($bn["nowy"]) && !isset($bn["spiacy"]) ? "nigdy-ok" : "nigdy-ZLE"), " ",
-                 (isset($b["vip"]) && !str_contains($b["vip"], "%") ? "plakietka-bez-procentu-ok" : "plakietka-ZLE");
+                 (isset($b["vip"]) && !str_contains($b["vip"], "%") ? "plakietka-bez-procentu-ok" : "plakietka-ZLE"), " ",
+                 ($forme ? "alert-forma-ok" : "alert-forma-ZLE"), " ",
+                 ($conc["part"] === 0.0 ? "koncentracja-pusta-ok" : "koncentracja-ZLE");
           ' 2>&1); [ $? -eq 0 ] || BOUT="php-ZLE :: $BOUT"
           echo "  $BOUT"
           case "$BOUT" in
@@ -868,7 +896,7 @@ jobs:
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la valorisation ne se calcule pas juste sur le serveur"; fail=1;;
             *) ;;
           esac
-          if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
+          if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 
       - name: Verify public shop (SEO, contact)

@@ -180,8 +180,83 @@ ok('le filtre par segment ne garde que le segment',
     count($seg) >= 1 && count($seg) < count($trouve), [count($seg), count($trouve)]);
 ok('un segment inconnu ne renvoie personne', wsm_crm_filtre($liste4, '', 'inexistant') === []);
 
+// ---- 7. Les alertes : une chose à faire, jamais une statistique ------------------------
+echo "\n-- alerty --\n";
+$al = wsm_crm_alerts($pdo);
+foreach ($al as $a) {
+    ok('chaque alerte porte un nom de client', ($a['nom'] ?? '') !== '', $a);
+    ok('et un geste concret', ($a['geste'] ?? '') !== '', $a);
+    ok('et un lien vers la fiche', str_contains((string) ($a['href'] ?? ''), 'klienci.php'), $a);
+    break;
+}
+ok('les alertes sont triées, le plus coûteux d\'abord',
+    count($al) < 2 || (int) $al[0]['severite'] >= (int) $al[count($al) - 1]['severite'],
+    array_map(fn($x) => $x['severite'], $al));
+
+// UN HABITUÉ QUI DÉCROCHE : l'alerte qui vaut le plus cher.
+$parti = "parti.$sfx@example.com";
+for ($i = 0; $i < 4; $i++) {
+    $cmd($parti, 'dostarczone', 'oplacone', 30000, date('Y-m-d H:i:s', time() - (200 + $i * 30) * 86400));
+}
+$al2 = wsm_crm_alerts($pdo, 200);
+$vu = null;
+foreach ($al2 as $a) if ($a['email'] === $parti && $a['type'] === 'decroche') $vu = $a;
+ok('un habitué silencieux déclenche une alerte', $vu !== null, array_map(fn($x)=>$x['type'], $al2));
+ok('elle dit COMBIEN de fois il a acheté et depuis quand',
+    $vu && preg_match('/4 razy/u', $vu['texte']) && preg_match('/\d+ dni/u', $vu['texte']), $vu['texte'] ?? null);
+ok('et elle est de gravité haute', $vu && (int) $vu['severite'] === 3, $vu['severite'] ?? null);
+
+// LA FAUSSE ALERTE À NE PAS PRODUIRE.
+$al3 = wsm_crm_alerts($pdo, 200);
+$faux = false;
+foreach ($al3 as $a) if ($a['email'] === $jamais && $a['type'] === 'decroche') $faux = true;
+ok('un curieux qui n\'a jamais payé ne déclenche PAS « décroché »', $faux === false);
+
+$frais = "frais.$sfx@example.com";
+for ($i = 0; $i < 4; $i++) $cmd($frais, 'dostarczone', 'oplacone', 30000, date('Y-m-d H:i:s', time() - $i * 86400));
+$al4 = wsm_crm_alerts($pdo, 200);
+$bruit = false;
+foreach ($al4 as $a) if ($a['email'] === $frais && $a['type'] === 'decroche') $bruit = true;
+ok('un habitué qui a commandé hier ne déclenche rien — une alerte de trop tue les alertes',
+    $bruit === false);
+
+// ---- 8. Concentration, cohortes, nouveaux contre fidèles ---------------------------------
+echo "\n-- analiza --\n";
+$liste5 = wsm_crm_list($pdo);
+$conc = wsm_crm_concentration($liste5, 5);
+ok('la concentration est un pourcentage sensé', $conc['part'] > 0 && $conc['part'] <= 100, $conc['part']);
+ok('elle nomme les clients concernés', count($conc['top']) > 0);
+ok('le total sert de base au calcul', (int) $conc['total'] > 0);
+$videC = wsm_crm_concentration([], 5);
+ok('sans client, aucune division par zéro', $videC['part'] === 0.0 && $videC['top'] === []);
+
+$coh = wsm_crm_cohorts($pdo, 12);
+ok('les cohortes couvrent douze mois', count($coh) === 12, count($coh));
+$maxPct = 0.0;
+foreach ($coh as $r) $maxPct = max($maxPct, (float) $r['pct']);
+ok('aucun taux de retour ne dépasse 100 %', $maxPct <= 100.0, $maxPct);
+$dernier = $coh[count($coh) - 1];
+ok('la dernière cohorte est le mois courant', $dernier['ym'] === date('Y-m'), $dernier['ym']);
+
+$nvr = wsm_crm_new_vs_returning($pdo, 12);
+ok('la série couvre douze mois', count($nvr) === 12, count($nvr));
+$somme = 0;
+foreach ($nvr as $m) $somme += (int) $m['nouveau'] + (int) $m['fidele'];
+ok('aucune part n\'est négative', $somme >= 0, $somme);
+
+// Le PREMIER achat compte comme « nouveau », le suivant comme « fidèle » —
+// sinon la courbe raconte l'inverse de ce qui se passe.
+$sep = "sep.$sfx@example.com";
+$cmd($sep, 'dostarczone', 'oplacone', 10000, date('Y-m-d H:i:s', time() - 40 * 86400));
+$cmd($sep, 'dostarczone', 'oplacone', 10000, date('Y-m-d H:i:s', time() - 5 * 86400));
+$nvr2 = wsm_crm_new_vs_returning($pdo, 12);
+$nNouv = 0; $nFid = 0;
+foreach ($nvr2 as $m) { $nNouv += (int) $m['nouveau']; $nFid += (int) $m['fidele']; }
+ok('le second achat bascule du côté « fidèle »', $nFid > 0, [$nNouv, $nFid]);
+ok('et le premier reste du côté « nouveau »', $nNouv > 0, [$nNouv, $nFid]);
+
 // ---- Nettoyage -----------------------------------------------------------------------------------
-foreach ([$mail, strtoupper($mail), $jamais, $dort] as $m) {
+foreach ([$mail, strtoupper($mail), $jamais, $dort, $parti, $frais, $sep] as $m) {
     $pdo->prepare("DELETE FROM wsm_client_notes WHERE LOWER(email) = ?")->execute([strtolower($m)]);
     $pdo->prepare("DELETE FROM wsm_orders WHERE LOWER(email) = ?")->execute([strtolower($m)]);
 }
