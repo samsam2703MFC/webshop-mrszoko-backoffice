@@ -15,6 +15,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/lib.php';
+require __DIR__ . '/seo.php';
 require __DIR__ . '/layout.php';
 
 header('X-Content-Type-Options: nosniff');
@@ -30,14 +31,29 @@ try {
 }
 
 // ---- Langue ----------------------------------------------------------------
+//  L'ordre vient du registre des langues (i18n.php), pas d'une liste écrite
+//  ici : à trois langues une constante passait, à huit elle laisse tomber les
+//  cinq qu'elle ne connaît pas au même rang.
 $langs = wsm_shop_available_langs($pdo);
-sort($langs);
-$pref  = ['pl', 'uk', 'en'];                       // ordre d'affichage voulu
-usort($langs, fn($a, $b) => array_search($a, $pref, true) <=> array_search($b, $pref, true));
-$lang = pick_lang($pdo);
+$lang  = pick_lang($pdo);
+
 if (isset($_GET['lang'])) {
+    // ON NE REDIRIGE PLUS. Auparavant « ?lang=en » posait un cookie puis
+    // renvoyait en 302 vers la même adresse sans la langue : la langue ne
+    // vivait que dans le cookie, et « ?lang=en » n'était donc pas une page.
+    //
+    // Trois conséquences, toutes invisibles depuis un navigateur :
+    //  • toute la grappe hreflang pointait sur des adresses qui redirigeaient
+    //    vers UNE seule page — un moteur en conclut qu'il n'y a qu'une page,
+    //    et le multilingue ne référence rien du tout ;
+    //  • le sitemap listait les mêmes redirections ;
+    //  • un lien « ?lang=en » partagé affichait au destinataire la langue de
+    //    SON cookie, pas celle qu'on avait voulu montrer.
+    //
+    // La page se rend donc à son adresse, en 200. Le cookie garde le choix
+    // pour la navigation suivante, et « ?lang=pl » — qui ferait doublon avec
+    // « / » — est ramené sur « / » par la balise canonique.
     remember_lang($lang);
-    redirect(strtok((string) $_SERVER['REQUEST_URI'], '?') ?: u());
 }
 $S = wsm_shop_strings($pdo, $lang);
 
@@ -71,6 +87,31 @@ $seg    = route_segments();
 $page   = $seg[0] ?? '';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $cart   = cart_read();
+
+// ==================== CE QUE LES MOTEURS VONT CHERCHER =======================
+//  Servis avant tout le reste : ce sont des fichiers, pas des pages — ils
+//  n'ont ni en-tête, ni panier, ni session à charger.
+if ($page === 'robots.txt') {
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: public, max-age=3600');
+    echo seo_robots_txt();
+    exit;
+}
+
+if ($page === 'sitemap.xml') {
+    header('Content-Type: application/xml; charset=utf-8');
+    header('Cache-Control: public, max-age=3600');
+    // Le catalogue, puis chaque produit visible. Les pages personnelles n'y
+    // sont pas : elles portent un `noindex`, et les lister ici reviendrait à
+    // signaler leur existence à un robot pour lui demander de les ignorer.
+    $urls = [['path' => '/', 'priority' => '1.0']];
+    foreach (wsm_shop_products($pdo, $lang) as $prod) {
+        if (($prod['slug'] ?? '') === '') continue;
+        $urls[] = ['path' => '/p/' . $prod['slug'], 'priority' => '0.8'];
+    }
+    echo seo_sitemap($urls, $langs, WSM_SHOP_DEFAULT_LANG);
+    exit;
+}
 
 // ============================ ACTIONS (POST) ================================
 if ($method === 'POST') {
@@ -134,8 +175,10 @@ $cartCount = cart_count($cart);
 // ---------------------------------------------------------------- CATALOGUE -
 if ($page === '') {
     $products = wsm_shop_products($pdo, $lang);
-    layout_head($S, $lang, $langs);
+    layout_head($S, $lang, $langs, '', '', '');
     layout_header($S, $lang, $langs, $cartCount);
+    // La carte d'identité du vendeur, une seule fois, sur la page d'entrée.
+    seo_org($S, $lang, WSM_SHOP_DEFAULT_LANG);
     ?>
 <main>
   <section class="hero">
@@ -235,7 +278,7 @@ if ($page === 'p') {
     $p = wsm_shop_product($pdo, (string) ($seg[1] ?? ''), $lang);
     if (!$p) {
         http_response_code(404);
-        layout_head($S, $lang, $langs, $S['product.unknown'] ?? '');
+        layout_head($S, $lang, $langs, $S['product.unknown'] ?? '', '', 'p');
         layout_header($S, $lang, $langs, $cartCount);
         echo '<main class="wrap block"><h1>' . e($S['product.unknown'] ?? '') . '</h1>'
            . '<p><a class="btn btn--brand" href="' . e(u()) . '">' . e($S['product.back'] ?? '') . '</a></p></main>';
@@ -247,8 +290,17 @@ if ($page === 'p') {
     $stockLabel = $p['stock'] <= 0 ? ($S['product.on_demand'] ?? '')
         : ($p['stock'] <= 10 ? ($S['product.stock_low'] ?? '') : ($S['product.stock_in'] ?? ''));
 
-    layout_head($S, $lang, $langs, $p['name'], $p['desc']);
+    $ogImg = ($p['image'] ?? '') !== '' && seo_origin() !== ''
+    ? (preg_match('#^https?://#i', (string) $p['image'])
+        ? (string) $p['image']
+        : seo_origin() . shop_base() . '/' . ltrim((string) $p['image'], '/'))
+    : '';
+layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
     layout_header($S, $lang, $langs, $cartCount);
+    // Le prix balisé sort du MÊME tableau que le prix affiché douze lignes
+    // plus bas : un écart entre les deux fait retirer les résultats enrichis
+    // du site entier, et ce serait mérité.
+    seo_product($p, $lang, WSM_SHOP_DEFAULT_LANG);
     ?>
 <main class="wrap block">
   <?php layout_crumbs([
@@ -330,7 +382,7 @@ if ($page === 'koszyk') {
     $shipId = (string) ($_GET['dostawa'] ?? 'inpost_locker');
     [$q, $qErr] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang);
 
-    layout_head($S, $lang, $langs, $S['cart.title'] ?? '');
+    layout_head($S, $lang, $langs, $S['cart.title'] ?? '', '', 'koszyk');
     layout_header($S, $lang, $langs, $cartCount);
     ?>
 <main class="wrap block">
@@ -456,7 +508,7 @@ if ($page === 'kasa') {
         echo '</p>';
     };
 
-    layout_head($S, $lang, $langs, $S['checkout.title'] ?? '');
+    layout_head($S, $lang, $langs, $S['checkout.title'] ?? '', '', 'kasa');
     layout_header($S, $lang, $langs, $cartCount);
     ?>
 <main class="wrap block">
@@ -606,7 +658,7 @@ if ($page === 'kasa') {
 // ------------------------------------------------------------- CONFIRMATION -
 if ($page === 'zamowienie') {
     $o = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
-    layout_head($S, $lang, $langs, $S['order.title'] ?? '');
+    layout_head($S, $lang, $langs, $S['order.title'] ?? '', '', 'zamowienie');
     layout_header($S, $lang, $langs, $cartCount);
     if (!$o) {
         http_response_code(404);
@@ -672,7 +724,7 @@ if ($page === 'zamowienie') {
 
 // ----------------------------------------------------------------- 404 ------
 http_response_code(404);
-layout_head($S, $lang, $langs, '404');
+layout_head($S, $lang, $langs, '404', '', 'koszyk');   // 'koszyk' = non indexable
 layout_header($S, $lang, $langs, $cartCount);
 echo '<main class="wrap block"><h1>404</h1><p><a class="btn btn--brand" href="' . e(u()) . '">'
    . e($S['cart.empty_cta'] ?? '') . '</a></p></main>';

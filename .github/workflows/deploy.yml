@@ -546,6 +546,52 @@ jobs:
           curl -skL "http://localhost/mrszoko/" | grep -q 'url=shop/' \
             && echo "  la racine renvoie vers la boutique : confirmé" \
             || { echo "  ^ NOT OK : la racine ne renvoie pas vers /shop/"; fail=1; }
+          echo "== SEO : nic prywatnego w indeksie, hreflang bezwzględne =="
+          # La page de suivi porte nom, adresse et détail d'achat. Un lien
+          # partagé, ou suivi par un robot depuis une boîte mail, et la
+          # commande de quelqu'un devient cherchable. Cette ligne passe avant
+          # tout le reste du référencement.
+          for pg in koszyk kasa zamowienie/MS-TEST; do
+            H=$(curl -skL "$SH/$pg")
+            case "$H" in
+              *'name="robots" content="noindex'*) echo "  /$pg : noindex — potwierdzone";;
+              *) echo "  ^ FUITE : /$pg może trafić do wyszukiwarki"; fail=1;;
+            esac
+          done
+          # Un hreflang relatif est ignoré en bloc par Google, sans un mot dans
+          # la Search Console : la grappe entière ne sert alors à rien.
+          HOME_HTML=$(curl -skL "$SH/")
+          if echo "$HOME_HTML" | grep -q 'hreflang=' ; then
+            if echo "$HOME_HTML" | grep -oE 'hreflang="[a-z-]+" href="[^"]+"' | grep -qv 'href="http'; then
+              echo "  ^ ATTENTION : hreflang względny — Google zignoruje całą grupę"; fail=1
+            else
+              echo "  hreflang bezwzględne : potwierdzone"
+            fi
+            echo "$HOME_HTML" | grep -q 'hreflang="x-default"' \
+              && echo "  x-default obecny" \
+              || { echo "  ^ ATTENTION : brak x-default — grupa jest niekompletna"; fail=1; }
+          else
+            echo "  ^ ATTENTION : sklep nie emituje hreflang"; fail=1
+          fi
+          echo "$HOME_HTML" | grep -q 'rel="canonical" href="http' \
+            && echo "  kanoniczny bezwzględny : potwierdzone" \
+            || { echo "  ^ ATTENTION : brak kanonicznego albo względny"; fail=1; }
+          # Chaque langue doit être une VRAIE page (200), pas une redirection :
+          # sinon toute la grappe pointe vers une seule adresse et le
+          # multilingue ne référence rien.
+          for L in en uk; do
+            C=$(curl -sk -o /dev/null -w '%{http_code}' "$SH/?lang=$L")
+            [ "$C" = "200" ] && echo "  /?lang=$L → 200 (strona, nie przekierowanie)" \
+              || { echo "  ^ ATTENTION : /?lang=$L odpowiada $C — grupa hreflang wskazuje przekierowania"; fail=1; }
+          done
+          run "$SH/robots.txt" 20
+          run "$SH/sitemap.xml" 200
+          curl -skL "$SH/sitemap.xml" | grep -q 'xmlns:xhtml' \
+            && echo "  sitemap deklaruje alternates" \
+            || { echo "  ^ ATTENTION : sitemap bez xhtml:link"; fail=1; }
+          curl -skL "$SH/sitemap.xml" | grep -qE '/(koszyk|kasa|zamowienie)' \
+            && { echo "  ^ FUITE : sitemap wymienia stronę prywatną"; fail=1; } \
+            || echo "  sitemap nie wymienia stron prywatnych"
           if [ "$fail" = "0" ]; then echo "ALL WEB CHECKS OK"; else echo "WEB CHECK FAILED"; exit 1; fi
           REMOTE
 
