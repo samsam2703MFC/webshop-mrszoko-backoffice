@@ -118,6 +118,7 @@ function wsm_bootstrap(bool $seed = true): PDO {
     wsm_ensure_stock($pdo);
     require_once __DIR__ . '/brand.php';
     wsm_ensure_brands($pdo);
+    wsm_ensure_nouvelles_tables($pdo);
     // En dernier : les réglages saisis en console entrent en vigueur une fois
     // que leur table existe, et seulement là où le fichier serveur se tait.
     require_once __DIR__ . '/settings.php';
@@ -162,6 +163,33 @@ function wsm_ensure_columns(PDO $pdo, string $table, array $cols): void {
 }
 
 /** Colonnes d'authentification (voir auth.php). */
+/**
+ * Les tables ajoutées APRÈS la mise en route.
+ *
+ * TROISIÈME FOIS QUE CETTE LEÇON SE PAIE. Les modèles de mail n'arrivaient
+ * pas ; les libellés de la boutique non plus ; et wsm_langs n'existait pas
+ * encore sur le serveur parce qu'elle n'est créée que par un écran
+ * authentifié — que ni un visiteur ni le déploiement n'ouvrent jamais.
+ *
+ * Le schéma est idempotent (CREATE TABLE IF NOT EXISTS) : le rejouer quand
+ * une table manque ne coûte qu'une fois et répare tout seul. Une base déjà
+ * complète ne paie qu'un test d'existence.
+ */
+function wsm_ensure_nouvelles_tables(PDO $pdo): void {
+    // Pas de garde statique : elle rendrait la fonction non idempotente dans
+    // un même processus — une table supprimée entre deux appels ne reviendrait
+    // pas, et c'est exactement ce qu'un test a attrapé. Six SHOW TABLES ne
+    // valent pas ce risque, et les autres wsm_ensure_* n'en ont pas non plus.
+    foreach (['wsm_langs', 'wsm_i18n_history', 'wsm_message_tr',
+              'wsm_client_notes', 'wsm_platform_terms', 'wsm_platform_periods'] as $t) {
+        if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
+    }
+    // Le registre des langues doit exister ET reprendre ce qui était servi
+    // hier : sans cette reprise, la vitrine perdrait l'ukrainien et l'anglais.
+    $i18n = __DIR__ . '/i18n.php';
+    if (is_file($i18n)) { require_once $i18n; wsm_i18n_ensure($pdo); }
+}
+
 function wsm_ensure_auth_columns(PDO $pdo): void {
     wsm_ensure_columns($pdo, 'wsm_users', [
         'password_hash'   => ['VARCHAR(255) NULL DEFAULT NULL', 'TEXT DEFAULT NULL'],
