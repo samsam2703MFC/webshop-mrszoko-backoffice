@@ -345,6 +345,18 @@ jobs:
                    /img/logo.png; do
             run "$BO$f" 1
           done
+          # Une seule source de polices : tokens/fonts.css. global.css déclarait
+          # douze @font-face pointant sur des fichiers absents — des consignes
+          # mortes que le prochain lecteur aurait suivies. Elles ne doivent pas
+          # revenir par une resynchro de l'export de design.
+          # On cherche « @font-face » et non un nom de famille : le commentaire
+          # qui explique le retrait cite forcément les familles retirées, et un
+          # contrôle qui se déclenche sur sa propre documentation ne vaut rien.
+          if curl -skL "$BO/$DS/global.css" | grep -q "@font-face"; then
+            echo "  ^ ATTENTION : global.css redéclare des polices — source unique rompue"; fail=1
+          else
+            echo "  global.css ne déclare aucune police : source unique respectée"
+          fi
           echo "== landing : fusionnée dans la boutique, ne doit plus que rediriger =="
           run "$LP/" 100
           LP_HTML=$(curl -skL "$LP/")
@@ -682,6 +694,25 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
+          echo "== wycena : la formule tourne sur le serveur, pas seulement ici =="
+          # Un chiffre de valorisation part dans un business plan. On vérifie sur
+          # la machine qui l'affiche que la fonction existe, que l'objectif vaut
+          # bien CA × 15 % × 4,5, et surtout qu'une couverture insuffisante sort
+          # MARQUÉE théorique — c'est cette marque qui empêche de présenter un
+          # chiffre postulé comme un chiffre mesuré.
+          VOUT=$(php -r '
+            require "'"$DIR_API"'/analytics.php";
+            $t = wsm_valuation([["revenue_costed"=>10000]], ["revenue"=>100000,"result"=>9000]);
+            $m = wsm_valuation([["revenue_costed"=>80000]], ["revenue"=>100000,"result"=>16000]);
+            echo ($t["target_value"] === (int) round(100000*0.15*4.5) ? "cel-ok" : "cel-ZLE"), " ",
+                 ($t["theoretical"] === true ? "teor-ok" : "teor-ZLE"), " ",
+                 ($m["theoretical"] === false && abs($m["actual_rate"]-0.20) < 1e-9 ? "real-ok" : "real-ZLE");
+          ' 2>&1) || VOUT="php-ZLE"
+          echo "  $VOUT"
+          case "$VOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la valorisation ne se calcule pas juste sur le serveur"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
           REMOTE
 

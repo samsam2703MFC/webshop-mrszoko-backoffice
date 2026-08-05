@@ -17,74 +17,21 @@
 
 
 /* --------------------------------------------------------------------------
-   Polices historiques (Gotham/Vank) — REMPLACÉES par brand.css :
-   les @font-face ci-dessous ne sont plus référencées et les fichiers ont
-   été retirés du dépôt
-   Self-hosted from /fonts.
-   --------------------------------------------------------------------------
+   POLICES — IL N'Y EN A AUCUNE ICI, ET C'EST VOLONTAIRE.
 
-   Note: the Gotham family shipped for this back office is the full-glyph
-   subset actually used by the admin UI (Light 300 · Book 400 · Medium 500).
-   Weights without a dedicated file are mapped to the closest available cut so
-   `font-weight` still resolves predictably — the same practice documented in
-   the source design system. The display face is Vank. */
+   Cet export déclarait autrefois douze polices pour deux familles
+   ('Gotham', 'Vank') dont les fichiers .otf/.ttf ne sont plus dans le dépôt.
+   Elles ne servaient plus à rien depuis que brand.css réaffecte --font-ui et
+   --font-accent aux jetons du design system : aucune propriété ne résolvait
+   plus vers ces noms, et les douze règles restaient là à décrire des fichiers
+   absents. Une déclaration morte n'est pas neutre — elle se lit comme une
+   consigne, et le premier qui écrira `font-family: Gotham` obtiendra la police
+   par défaut du système sans comprendre pourquoi.
 
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Light.otf') format('opentype');
-  font-weight: 100; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Light.otf') format('opentype');
-  font-weight: 200; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Light.otf') format('opentype');
-  font-weight: 300; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Book.otf') format('opentype');
-  font-weight: 400; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Medium.otf') format('opentype');
-  font-weight: 500; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  /* No dedicated Gotham Bold file shipped — mapping 600 to Medium (closest cut). */
-  src: url('fonts/Gotham_Medium.otf') format('opentype');
-  font-weight: 600; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Medium.otf') format('opentype');
-  font-weight: 700; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Medium.otf') format('opentype');
-  font-weight: 800; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'Gotham';
-  src: url('fonts/Gotham_Medium.otf') format('opentype');
-  font-weight: 900; font-style: normal; font-display: swap;
-}
-
-/* --- Vank (display) — stylized glyphs limited to base ASCII;
-       Latin-1 accented characters intentionally fall through to Gotham
-       so words like "Châtelain" render with a clean accent. --- */
-@font-face {
-  font-family: 'Vank';
-  src: url('fonts/GC_Vank.ttf') format('truetype');
-  font-weight: 400; font-style: normal; font-display: swap;
-  unicode-range: U+0020-007E;
-}
+   LA SOURCE UNIQUE EST tokens/fonts.css : Plus Jakarta Sans (titres),
+   Mulish (texte), DM Mono (chiffres), hébergées sur notre domaine. Aucun
+   fichier de ce dépôt ne doit déclarer sa propre police ailleurs.
+   -------------------------------------------------------------------------- */
 
 
 /* ==========================================================================
@@ -119,13 +66,16 @@
   --color-ink:                var(--ink-900);   /* Illustration stroke ink */
 
   /* --- Typography -------------------------------------------------------- */
-  /* Brand typography — strict. No system fallback allowed.
-     Vank ships full Latin so accents render natively; Gotham is the
-     last-resort fallback for any remaining missing glyph (e.g. € in
-     Regular/Italic, which falls through to Book/Medium). */
-  --font-display:             'Vank', 'Gotham';          /* informational / display */
-  --font-ui:                   'Gotham';                  /* body / UI */
-  --font-accent:               'Playwrite DEVA', 'Gotham'; /* script informational accent */
+  /* Aucun nom de famille n'est écrit ici : les trois jetons pointent vers
+     ceux du design system (tokens/typography.css, chargé par brand.css).
+     Le repli `system-ui` ne sert que si cette feuille était ouverte seule —
+     mieux vaut la police du système qu'un nom de famille qui n'existe nulle
+     part, lequel donne exactement le même rendu en le cachant.
+     Chaîne de résolution : --font-sans / --font-display (design system)
+     → réaffectés par brand.css → utilisés par les composants. */
+  --font-display:             var(--font-sans, system-ui, sans-serif);  /* informational / display */
+  --font-ui:                  var(--font-sans, system-ui, sans-serif);  /* body / UI */
+  --font-accent:              var(--font-sans, system-ui, sans-serif);  /* script informational accent */
 
   /* Type scale (px) */
   --font-size-page-title:     32px;   /* Page title / brand name (display) */
@@ -241,7 +191,7 @@ body {
 
 /* Strict typography — native form controls inherit the brand font.
    Browsers default <input>, <textarea>, <select>, <button> to a system UA
-   font; force them onto Gotham so there is zero visual drift. */
+   font; force them onto --font-ui so there is zero visual drift. */
 input,
 textarea,
 select,

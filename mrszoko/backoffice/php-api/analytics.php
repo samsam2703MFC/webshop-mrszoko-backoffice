@@ -34,6 +34,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
 
+/** Le taux de marge nette visé — la cible du plan, pas une observation. */
+const WSM_VAL_TARGET_RATE = 0.15;
+
+/** Le multiple appliqué au résultat annuel. Convention de place pour une
+ *  petite boutique en ligne rentable : à discuter, jamais à croire sur parole. */
+const WSM_VAL_MULTIPLE = 4.5;
+
 /**
  * Ce que le transporteur nous facture pour chaque mode, en grosze HT.
  * À défaut de coût saisi, on prend le tarif vendu : le rapport vaut alors
@@ -198,6 +205,57 @@ function wsm_forecast(PDO $pdo, array $series): array {
         'delta_pct' => $delta,
         'label_prev' => date('m/y', strtotime($ymPrev . '-01')),
         'label_curr' => date('m/y', strtotime($ymCurr . '-01')),
+    ];
+}
+
+/**
+ * Ce que vaut l'affaire, selon deux lectures — et le détail du calcul.
+ *
+ * Deux chiffres, une seule formule :
+ *
+ *   Objectif = CA annuel × 15 %  × 4,5      ← ce que ça vaudrait à la cible
+ *   Actuelle = CA annuel × taux × 4,5      ← ce que ça vaut au taux observé
+ *
+ * Le taux « actuel » est la marge nette moyenne des douze mois : le résultat
+ * après coût de la marchandise ET après la part du port non couverte par le
+ * client, rapporté à la vente sur laquelle on a pu le mesurer. C'est le même
+ * chiffre que le cartouche « wynik po dostawie », pas une variante maison.
+ *
+ * L'HONNÊTETÉ QUI COMPTE. Tant que le prix de revient manque sur la moitié du
+ * catalogue, cette marge n'est pas mesurée, elle est devinée. Dans ce cas on
+ * ne bricole pas une moyenne sur un échantillon trop mince : on prend le taux
+ * cible de 15 % et on MARQUE le chiffre comme théorique. Une valorisation
+ * présentée comme mesurée alors qu'elle est postulée est pire qu'une absence
+ * de valorisation — elle se retrouve dans un business plan, puis en face
+ * d'un investisseur.
+ *
+ * Le multiple de 4,5 est une convention de place pour une petite boutique en
+ * ligne rentable ; il est ici pour être discuté, pas pour être cru.
+ *
+ * @return array ['revenue','target_rate','actual_rate','multiple',
+ *                'target_value','actual_value','theoretical','coverage']
+ */
+function wsm_valuation(array $series, array $totals): array {
+    $revenue = (int) ($totals['revenue'] ?? 0);          // CA net sur 12 mois
+
+    // La part du CA sur laquelle la marge a réellement pu se calculer.
+    $costed = 0;
+    foreach ($series as $r) $costed += (int) ($r['revenue_costed'] ?? 0);
+    $coverage = $revenue > 0 ? $costed / $revenue : 0.0;
+
+    // Sous la moitié du chiffre d'affaires, la moyenne ne moyenne rien.
+    $mesurable = $coverage >= 0.5 && $costed > 0;
+    $rate = $mesurable ? ((int) ($totals['result'] ?? 0)) / $costed : WSM_VAL_TARGET_RATE;
+
+    return [
+        'revenue'      => $revenue,
+        'target_rate'  => WSM_VAL_TARGET_RATE,
+        'actual_rate'  => $rate,
+        'multiple'     => WSM_VAL_MULTIPLE,
+        'target_value' => (int) round($revenue * WSM_VAL_TARGET_RATE * WSM_VAL_MULTIPLE),
+        'actual_value' => (int) round($revenue * $rate * WSM_VAL_MULTIPLE),
+        'theoretical'  => !$mesurable,
+        'coverage'     => round($coverage * 100, 1),
     ];
 }
 
