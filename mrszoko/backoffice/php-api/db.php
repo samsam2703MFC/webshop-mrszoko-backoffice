@@ -373,13 +373,21 @@ function wsm_ensure_shop(PDO $pdo): void {
         'badge'        => $txt(40),
     ]);
 
-    // Contenu minimal de la boutique : modes de livraison + textes 3 langues.
-    // Seedé une seule fois ; ensuite la base fait foi et l'admin peut éditer.
+    // Contenu de la boutique : modes de livraison + libellés traduits.
     try {
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_shipping_methods")->fetchColumn()
             || !(int) $pdo->query("SELECT COUNT(*) FROM wsm_shop_i18n")->fetchColumn()) {
             require_once __DIR__ . '/seed.php';
-            wsm_seed_shop($pdo);
+            wsm_seed_shop($pdo);           // base neuve : semis complet
+        } else {
+            // BASE DÉJÀ EN SERVICE : on ajoute UNIQUEMENT les libellés
+            // nouveaux. Sans ça, une page livrée après la mise en route
+            // s'afficherait en production avec des champs sans étiquette —
+            // et ça marcherait parfaitement en développement, où la base est
+            // refaite. C'est exactement l'omission qui avait rendu muets les
+            // modèles de mail ajoutés après le démarrage.
+            require_once __DIR__ . '/cms.php';
+            wsm_cms_topup_all($pdo);
         }
     } catch (Throwable $e) { /* tables absentes : le schéma vient d'échouer, on n'aggrave pas */ }
 }

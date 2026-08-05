@@ -37,6 +37,9 @@ const WSM_MAIL_EVENTS = [
     'wysylka'          => 'Przesyłka nadana',
     'zadanie_zaplaty'  => 'Prośba o płatność (proforma)',
     'przypomnienie'    => 'Przypomnienie o płatności',
+    // Le formulaire public. L'accusé part dans la langue du visiteur ;
+    // sans modèle dans sa langue, on retombe sur le polonais (contact.php).
+    'formularz'        => 'Formularz kontaktowy — potwierdzenie',
     // Les changements d'état saisis à la main dans la console. Ils portent le
     // nom du statut : le back-office n'a alors rien à traduire, il passe le
     // statut et le modèle correspondant est trouvé — ou il n'y en a pas, et

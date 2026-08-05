@@ -895,6 +895,42 @@ Mister Szoko", 'anulowane'];
 
 Mister Szoko", 'anulowane'];
 
+    // ---- Formulaire de contact : l'accusé de réception ----------------------
+    //  Court, et il ne promet pas de délai qu'on ne tiendrait pas. Il rappelle
+    //  le sujet choisi : quelqu'un qui écrit trois fois sait laquelle il lit.
+    $t[] = ['formularz', 'pl', 'Potwierdzenie kontaktu', 'Otrzymaliśmy Twoją wiadomość',
+"Dzień dobry {{imie}},
+
+dziękujemy za wiadomość — temat: {{temat}}. Zapisaliśmy ją i odpowiemy
+tak szybko, jak to możliwe.
+
+Ten e-mail jest tylko potwierdzeniem: nie trzeba na niego odpowiadać.
+
+Mister Szoko
+{{sklep}}", 'formularz'];
+
+    $t[] = ['formularz', 'en', 'Contact confirmation', 'We have received your message',
+"Hello {{imie}},
+
+thank you for writing — subject: {{temat}}. Your message has been saved and
+we will get back to you as soon as we can.
+
+This e-mail is a confirmation only; there is no need to reply to it.
+
+Mister Szoko
+{{sklep}}", 'formularz'];
+
+    $t[] = ['formularz', 'uk', 'Підтвердження звернення', 'Ми отримали ваше повідомлення',
+"Доброго дня, {{imie}}!
+
+Дякуємо за звернення — тема: {{temat}}. Ми зберегли ваше повідомлення
+й відповімо якнайшвидше.
+
+Цей лист — лише підтвердження, відповідати на нього не потрібно.
+
+Mister Szoko
+{{sklep}}", 'formularz'];
+
     // ---- Modèle libre, sans événement : la réponse écrite à la main --------
     $t[] = ['kontakt', 'pl', 'Odpowiedź do klienta (pusty)', 'W sprawie zamówienia {{numer}}',
 "Dzień dobry {{imie}},

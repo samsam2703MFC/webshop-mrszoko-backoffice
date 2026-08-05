@@ -104,7 +104,8 @@ if ($page === 'sitemap.xml') {
     // Le catalogue, puis chaque produit visible. Les pages personnelles n'y
     // sont pas : elles portent un `noindex`, et les lister ici reviendrait à
     // signaler leur existence à un robot pour lui demander de les ignorer.
-    $urls = [['path' => '/', 'priority' => '1.0']];
+    $urls = [['path' => '/', 'priority' => '1.0'],
+             ['path' => '/kontakt', 'priority' => '0.5']];
     foreach (wsm_shop_products($pdo, $lang) as $prod) {
         if (($prod['slug'] ?? '') === '') continue;
         $urls[] = ['path' => '/p/' . $prod['slug'], 'priority' => '0.8'];
@@ -370,6 +371,117 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
       <?php endforeach; ?>
     </div>
   </section>
+  <?php endif; ?>
+</main>
+<?php
+    layout_footer($S);
+    exit;
+}
+
+// ------------------------------------------------------------------ CONTACT -
+//  Le message entre dans la MESSAGERIE, pas dans un e-mail : même écran, même
+//  recherche, même statuts que le courrier reçu — et rien n'est perdu si le
+//  SMTP est muet. Voir php-api/contact.php pour les trois filtres anti-robot.
+if ($page === 'kontakt') {
+    require_once dirname(__DIR__) . '/backoffice/php-api/contact.php';
+
+    $envoye = false; $cErr = []; $v = [];
+    if ($method === 'POST') {
+        $v = $_POST;
+        [$cid, $cErr] = wsm_contact_submit($pdo, $_POST, $lang);
+        if ($cid) { $envoye = true; $v = []; }
+    }
+
+    layout_head($S, $lang, $langs, $S['contact.title'] ?? '', $S['contact.lead'] ?? '', 'kontakt');
+    layout_header($S, $lang, $langs, $cartCount);
+
+    // Même fabrique de champ que la caisse : un formulaire de ce site doit se
+    // ressembler d'une page à l'autre, jusqu'aux messages d'erreur.
+    $cField = function (string $name, string $label, array $opt = []) use ($v, $cErr) {
+        $err = $cErr[$name] ?? '';
+        $id  = 'k-' . $name;
+        $req = $opt['required'] ?? true;
+        echo '<p class="field' . ($err ? ' has-error' : '') . ($opt['wide'] ?? false ? ' wide' : '') . '">';
+        echo '<label for="' . e($id) . '">' . e($label) . ($req ? ' <span aria-hidden="true">*</span>' : '') . '</label>';
+        if (($opt['type'] ?? '') === 'textarea') {
+            echo '<textarea id="' . e($id) . '" name="' . e($name) . '" rows="7" maxlength="5000"'
+               . ($req ? ' required' : '') . ($err ? ' aria-invalid="true" aria-describedby="' . e($id) . '-e"' : '')
+               . '>' . e((string) ($v[$name] ?? '')) . '</textarea>';
+        } else {
+            echo '<input id="' . e($id) . '" name="' . e($name) . '" type="' . e($opt['type'] ?? 'text') . '"'
+               . ' value="' . e((string) ($v[$name] ?? '')) . '"'
+               . ' maxlength="' . (int) ($opt['maxlength'] ?? 190) . '"'
+               . ($req ? ' required' : '')
+               . (isset($opt['autocomplete']) ? ' autocomplete="' . e($opt['autocomplete']) . '"' : '')
+               . (isset($opt['inputmode']) ? ' inputmode="' . e($opt['inputmode']) . '"' : '')
+               . ($err ? ' aria-invalid="true" aria-describedby="' . e($id) . '-e"' : '') . '>';
+        }
+        if ($err) echo '<small class="err" id="' . e($id) . '-e">' . e($err) . '</small>';
+        echo '</p>';
+    };
+    ?>
+<main class="wrap block">
+  <?php layout_crumbs([
+      ($S['nav.shop'] ?? 'Sklep') => u(),
+      ($S['contact.title'] ?? 'Kontakt') => null,
+  ]); ?>
+  <h1><?= e($S['contact.title'] ?? '') ?></h1>
+  <p class="lead"><?= e($S['contact.lead'] ?? '') ?></p>
+
+  <?php if ($envoye): ?>
+    <?php notice('ok', $S['contact.sent'] ?? ''); ?>
+    <p><a class="btn btn--brand" href="<?= e(u()) ?>"><?= e($S['cart.empty_cta'] ?? '') ?></a></p>
+  <?php else: ?>
+    <?php
+    // Un robot repéré reçoit la MÊME page qu'une erreur de saisie : lui dire
+    // « piège » ou « trop rapide » lui apprendrait exactement quoi corriger.
+    // Le plafond par IP, lui, s'affiche — c'est peut-être un client insistant.
+    if (isset($cErr['_limit']))     notice('error', $cErr['_limit']);
+    elseif (isset($cErr['_db']))    notice('error', $cErr['_db']);
+    elseif ($cErr)                  notice('error', $S['contact.error'] ?? '');
+    ?>
+    <form method="post" class="checkout-form" novalidate>
+      <?= csrf_field() ?>
+      <input type="hidden" name="_ts" value="<?= e(wsm_contact_stamp()) ?>">
+      <?php // Le piège. Hors de la tabulation et masqué à la synthèse vocale :
+            // aucun humain ne peut le remplir par accident, un robot qui lit le
+            // HTML le remplit presque toujours. ?>
+      <div class="hp" aria-hidden="true">
+        <label for="firma_www">Nie wypełniaj tego pola</label>
+        <input type="text" id="firma_www" name="firma_www" tabindex="-1" autocomplete="off" value="">
+      </div>
+
+      <fieldset>
+        <p class="hint"><?= e($S['contact.required'] ?? '') ?></p>
+        <div class="row">
+          <?php $cField('name',  $S['contact.name'] ?? '',  ['autocomplete' => 'name', 'maxlength' => 120]); ?>
+          <?php $cField('email', $S['contact.email'] ?? '', ['type' => 'email', 'autocomplete' => 'email']); ?>
+        </div>
+        <div class="row">
+          <?php $cField('phone', $S['contact.phone'] ?? '', ['required' => false, 'autocomplete' => 'tel',
+                                                             'inputmode' => 'tel', 'maxlength' => 24]); ?>
+          <p class="field">
+            <label for="k-topic"><?= e($S['contact.topic'] ?? '') ?></label>
+            <select id="k-topic" name="topic">
+              <?php foreach (WSM_CONTACT_SUJETS as $code): ?>
+              <option value="<?= e($code) ?>"<?= ($v['topic'] ?? '') === $code ? ' selected' : '' ?>><?= e($S['contact.topic.' . $code] ?? $code) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </p>
+        </div>
+        <?php $cField('message', $S['contact.message'] ?? '', ['type' => 'textarea', 'wide' => true]); ?>
+
+        <p class="field<?= isset($cErr['consent']) ? ' has-error' : '' ?>">
+          <label class="check" for="k-consent">
+            <input type="checkbox" id="k-consent" name="consent" value="1"<?= !empty($v['consent']) ? ' checked' : '' ?>>
+            <span><?= e($S['contact.consent'] ?? '') ?></span>
+          </label>
+          <?php if (isset($cErr['consent'])): ?><small class="err"><?= e($cErr['consent']) ?></small><?php endif; ?>
+        </p>
+      </fieldset>
+
+      <p class="pay-info"><button class="btn btn--brand" type="submit"><?= e($S['contact.submit'] ?? '') ?></button></p>
+    </form>
   <?php endif; ?>
 </main>
 <?php
