@@ -715,3 +715,14 @@ CREATE TABLE IF NOT EXISTS wsm_message_tr (
   created_at TEXT NOT NULL,
   UNIQUE (message_id, lang)
 );
+
+-- Notes sur les clients : la clé est l'adresse e-mail, parce que le client de
+-- la boutique n'a pas de fiche — il a des commandes. Signée et datée.
+CREATE TABLE IF NOT EXISTS wsm_client_notes (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  email      TEXT NOT NULL,
+  note       TEXT,
+  actor      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wsm_client_notes_email ON wsm_client_notes (email);

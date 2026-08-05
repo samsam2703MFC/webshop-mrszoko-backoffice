@@ -91,6 +91,7 @@ jobs:
              mrszoko/backoffice/audyt.php mrszoko/backoffice/zamowienie_druk.php \
              mrszoko/backoffice/etykieta_druk.php mrszoko/backoffice/tresci.php \
              mrszoko/backoffice/etykieta_inpost.php mrszoko/backoffice/superadmin.php \
+             mrszoko/backoffice/klienci.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -430,7 +431,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php superadmin.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php superadmin.php klienci.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -753,6 +754,32 @@ jobs:
               *) echo "  ^ ATTENTION : sklep nie serwuje już języka $L (kod $EFF)"; fail=1;;
             esac
           done
+          echo "== CRM : klienci widoczni, plakietki liczone =="
+          # Cent czterdziestu kupujących było niewidocznych w konsoli: ich
+          # zamówienia niosły tylko adres e-mail. Ta kontrola pilnuje, żeby
+          # agregacja działała na PRAWDZIWEJ bazie, nie tylko na testowej.
+          COUT=$(php -r '
+            require_once "'"$DIR_API"'/crm.php";
+            $pdo = wsm_bootstrap();
+            $t0 = microtime(true);
+            $l = wsm_crm_list($pdo);
+            $ms = (int) round((microtime(true) - $t0) * 1000);
+            $tot = wsm_crm_totaux($l);
+            $notes = wsm_table_exists($pdo, "wsm_client_notes");
+            // Suma obrotu klientów musi się zgadzać z zapłaconymi zamówieniami:
+            // rozjazd znaczy, że ktoś liczy inaczej niż Audyt.
+            $ca = (int) $pdo->query("SELECT COALESCE(SUM(total_gross),0) FROM wsm_orders
+                                      WHERE status <> \"anulowane\" AND payment_status = \"oplacone\"
+                                        AND email <> \"\"")->fetchColumn();
+            echo "klientow=", count($l), " kupujacych=", $tot["acheteurs"],
+                 " ms=", $ms, " ", ($notes ? "notatki-ok" : "notatki-ZLE"),
+                 " ", ($tot["revenue"] === $ca ? "obrot-zgodny" : "obrot-ROZJAZD");
+          ' 2>&1); [ $? -eq 0 ] || COUT="php-ZLE :: $COUT"
+          echo "  $COUT"
+          case "$COUT" in
+            *ZLE*|*ROZJAZD*|*Error*|*error*) echo "  ^ ATTENTION : CRM nie zgadza się z zamówieniami"; fail=1;;
+            *) ;;
+          esac
           echo "== tłumaczenie poczty : wykrywanie i nienaruszalny oryginał =="
           MOUT=$(php -r '
             require_once "'"$DIR_API"'/translate.php";

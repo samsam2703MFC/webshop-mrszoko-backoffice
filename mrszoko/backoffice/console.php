@@ -79,6 +79,7 @@ function console_menu(?array $me = null): array {
         'produkty.php'    => 'Produkty',
         'magazyn.php'     => 'Magazyn',
         'tresci.php'      => 'Treści',
+        'klienci.php'     => 'Klienci',
         'kontrahenci.php' => 'Kontrahenci',
         'kraje.php'       => 'Kraje',
         'rabaty.php'      => 'Rabaty',
