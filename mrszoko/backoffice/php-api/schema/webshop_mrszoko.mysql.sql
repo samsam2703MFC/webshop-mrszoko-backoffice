@@ -830,3 +830,54 @@ CREATE TABLE IF NOT EXISTS `wsm_brands` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_brands_slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Plateforme : ce que la boutique doit à son propriétaire.
+--
+--  wsm_platform_terms est en AJOUT SEUL. Modifier le contrat écrit une ligne
+--  valable à partir d'un mois ; elle n'écrase jamais la précédente. On peut
+--  donc relire deux ans plus tard à quelles conditions un décompte a été fait.
+--
+--  wsm_platform_periods FIGE tout : volume, taux, loyer, TVA. Changer le taux
+--  en mars ne réécrit pas la note de février — même règle que les factures.
+--  L'index UNIQUE sur ym est le garde-fou : un mois ne se facture qu'une fois.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_platform_terms` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `rent_net`   INT NOT NULL DEFAULT 0,                    -- czynsz w groszach, netto
+  `rate`       DECIMAL(6,4) NOT NULL DEFAULT 0.1500,      -- prowizja, np. 0.1500 = 15 %
+  `basis`      VARCHAR(16) NOT NULL DEFAULT 'brutto',     -- brutto | towar
+  `vat_rate`   DECIMAL(5,4) NOT NULL DEFAULT 0.2300,
+  `from_ym`    CHAR(7) NOT NULL,                          -- obowiązuje od YYYY-MM
+  `note`       VARCHAR(255) NOT NULL DEFAULT '',
+  `created_by` VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `ix_wsm_platform_terms_from` (`from_ym`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_platform_periods` (
+  `id`             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ym`             CHAR(7) NOT NULL,
+  `status`         VARCHAR(16) NOT NULL DEFAULT 'szkic',  -- szkic | wystawione | oplacone
+  `gross_volume`   BIGINT NOT NULL DEFAULT 0,
+  `goods_gross`    BIGINT NOT NULL DEFAULT 0,
+  `shipping_gross` BIGINT NOT NULL DEFAULT 0,
+  `orders_count`   INT NOT NULL DEFAULT 0,
+  `basis`          VARCHAR(16) NOT NULL DEFAULT 'brutto',
+  `rate`           DECIMAL(6,4) NOT NULL DEFAULT 0.1500,
+  `base_amount`    BIGINT NOT NULL DEFAULT 0,
+  `commission_net` BIGINT NOT NULL DEFAULT 0,
+  `rent_net`       BIGINT NOT NULL DEFAULT 0,
+  `total_net`      BIGINT NOT NULL DEFAULT 0,
+  `vat_rate`       DECIMAL(5,4) NOT NULL DEFAULT 0.2300,
+  `total_vat`      BIGINT NOT NULL DEFAULT 0,
+  `total_gross`    BIGINT NOT NULL DEFAULT 0,
+  `issued_at`      DATETIME NULL,
+  `issued_by`      VARCHAR(120) NOT NULL DEFAULT '',
+  `paid_at`        DATETIME NULL,
+  `note`           VARCHAR(255) NOT NULL DEFAULT '',
+  `created_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_platform_periods_ym` (`ym`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

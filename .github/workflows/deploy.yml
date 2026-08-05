@@ -90,7 +90,7 @@ jobs:
              mrszoko/backoffice/magazyn_druk.php mrszoko/backoffice/uzytkownicy.php \
              mrszoko/backoffice/audyt.php mrszoko/backoffice/zamowienie_druk.php \
              mrszoko/backoffice/etykieta_druk.php mrszoko/backoffice/tresci.php \
-             mrszoko/backoffice/etykieta_inpost.php \
+             mrszoko/backoffice/etykieta_inpost.php mrszoko/backoffice/superadmin.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -430,7 +430,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php superadmin.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -694,6 +694,33 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
+          echo "== platforma : brama superadmina i rachunek =="
+          # La porte AVANT l'arithmétique : ce module chiffre ce que la boutique
+          # doit à son propriétaire. Sans liste configurée il doit être FERMÉ, et
+          # un compte Centrala ne doit jamais l'ouvrir — sinon le locataire lit,
+          # et pourrait réécrire, sa propre facture.
+          POUT=$(php -r '
+            putenv("WSM_SUPERADMIN_EMAILS=");
+            require "'"$DIR_API"'/platform.php";
+            $ferme = !wsm_platform_enabled()
+                  && !wsm_is_superadmin(["email"=>"ktos@example.com","role"=>"Centrala"]);
+            wsm_config_overlay(["superadmin_emails"=>"wl@example.com"]);
+            $ouvert = wsm_is_superadmin(["email"=>"wl@example.com"]);
+            $centrala = wsm_is_superadmin(["email"=>"szef@example.com","role"=>"Centrala"]);
+            $jeton = wsm_is_superadmin(["email"=>"wl@example.com","service"=>true]);
+            $c = wsm_platform_compute("2026-01",
+                   ["gross"=>100000,"goods_gross"=>90000,"shipping_gross"=>10000,"orders"=>1],
+                   ["rent_net"=>20000,"rate"=>0.15,"basis"=>"brutto","vat_rate"=>0.23]);
+            echo ($ferme ? "zamkn-ok" : "zamkn-ZLE"), " ",
+                 ($ouvert ? "wlasc-ok" : "wlasc-ZLE"), " ",
+                 (!$centrala && !$jeton ? "izolacja-ok" : "izolacja-ZLE"), " ",
+                 ($c["commission_net"] === 15000 && $c["total_net"] === 35000 ? "rachunek-ok" : "rachunek-ZLE");
+          ' 2>&1) || POUT="php-ZLE"
+          echo "  $POUT"
+          case "$POUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la brama superadmina lub rachunek nie działa poprawnie"; fail=1;;
+            *) ;;
+          esac
           echo "== wycena : la formule tourne sur le serveur, pas seulement ici =="
           # Un chiffre de valorisation part dans un business plan. On vérifie sur
           # la machine qui l'affiche que la fonction existe, que l'objectif vaut

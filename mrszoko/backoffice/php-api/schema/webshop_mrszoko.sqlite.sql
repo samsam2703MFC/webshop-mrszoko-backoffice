@@ -637,3 +637,45 @@ CREATE TABLE IF NOT EXISTS wsm_brands (
   created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (slug)
 );
+
+-- Plateforme : ce que la boutique doit à son propriétaire.
+-- wsm_platform_terms est en ajout seul (historique du contrat) ;
+-- wsm_platform_periods fige volume, taux, loyer et TVA à l'émission.
+-- L'UNIQUE sur ym est le garde-fou : un mois ne se facture qu'une fois.
+CREATE TABLE IF NOT EXISTS wsm_platform_terms (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  rent_net    INTEGER NOT NULL DEFAULT 0,
+  rate        REAL NOT NULL DEFAULT 0.15,
+  basis       TEXT NOT NULL DEFAULT 'brutto',
+  vat_rate    REAL NOT NULL DEFAULT 0.23,
+  from_ym     TEXT NOT NULL,
+  note        TEXT NOT NULL DEFAULT '',
+  created_by  TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS ix_wsm_platform_terms_from ON wsm_platform_terms (from_ym);
+
+CREATE TABLE IF NOT EXISTS wsm_platform_periods (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  ym             TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'szkic',
+  gross_volume   INTEGER NOT NULL DEFAULT 0,
+  goods_gross    INTEGER NOT NULL DEFAULT 0,
+  shipping_gross INTEGER NOT NULL DEFAULT 0,
+  orders_count   INTEGER NOT NULL DEFAULT 0,
+  basis          TEXT NOT NULL DEFAULT 'brutto',
+  rate           REAL NOT NULL DEFAULT 0.15,
+  base_amount    INTEGER NOT NULL DEFAULT 0,
+  commission_net INTEGER NOT NULL DEFAULT 0,
+  rent_net       INTEGER NOT NULL DEFAULT 0,
+  total_net      INTEGER NOT NULL DEFAULT 0,
+  vat_rate       REAL NOT NULL DEFAULT 0.23,
+  total_vat      INTEGER NOT NULL DEFAULT 0,
+  total_gross    INTEGER NOT NULL DEFAULT 0,
+  issued_at      TEXT,
+  issued_by      TEXT NOT NULL DEFAULT '',
+  paid_at        TEXT,
+  note           TEXT NOT NULL DEFAULT '',
+  created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (ym)
+);

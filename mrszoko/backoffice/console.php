@@ -61,9 +61,17 @@ function h(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTES
 /** Grosze → « 129,90 zł » avec espaces insécables : un prix ne se coupe pas. */
 function pln(int $g): string { return number_format($g / 100, 2, ',', "\u{202F}") . "\u{202F}zł"; }
 
-/** Les écrans PHP, dans l'ordre du travail réel. */
-function console_menu(): array {
-    return [
+/**
+ * Les écrans PHP, dans l'ordre du travail réel.
+ *
+ * « Superadmin » n'apparaît que pour le propriétaire de la plateforme, et
+ * l'appartenance se lit dans la configuration du serveur — pas dans un rôle
+ * de la base, que la console saurait écrire. Ce n'est pas la protection : la
+ * page se garde elle-même. C'est simplement qu'un lien mort ou interdit dans
+ * le rail invite à essayer, et n'apprend rien à personne.
+ */
+function console_menu(?array $me = null): array {
+    $m = [
         'pulpit.php'      => 'Pulpit',
         'zamowienia.php'  => 'Zamówienia',
         'faktury.php'     => 'Faktury',
@@ -78,6 +86,12 @@ function console_menu(): array {
         'audyt.php'       => 'Audyt',
         'ustawienia.php'  => 'Ustawienia',
     ];
+    $plat = console_api_dir() . '/platform.php';
+    if ($me && is_file($plat)) {
+        require_once $plat;
+        if (wsm_is_superadmin($me)) $m['superadmin.php'] = 'Superadmin';
+    }
+    return $m;
 }
 
 /**
@@ -160,7 +174,7 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
 
     <nav class="menu">
       <span class="sep">Webshop</span>
-      <?php foreach (console_menu() as $f => $label): ?>
+      <?php foreach (console_menu($me) as $f => $label): ?>
       <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
 
