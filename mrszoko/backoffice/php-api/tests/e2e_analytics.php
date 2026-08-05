@@ -218,6 +218,61 @@ ok('un mois sans données donne zéro, pas une division par zéro',
     $vide['forecast']['revenue'] === 0 && $vide['delta_pct'] === 0.0, $vide['forecast']);
 ok('et sa fiabilité est basse', $vide['trust'] === 'niska');
 
+// ---- La valorisation : la formule, et le mot « théorique » -------------------------
+//  Le vrai risque de cet écran n'est pas une erreur d'arithmétique — c'est un
+//  chiffre postulé qui se présente comme mesuré. Il finit dans un business
+//  plan, puis en face de quelqu'un qui le prend au sérieux.
+echo "\n-- wycena --\n";
+
+// a) Couverture insuffisante : on retombe sur 15 %, et on le DIT.
+$vTheo = wsm_valuation(
+    [['revenue_costed' => 10_000]],                        // 10 % du CA seulement
+    ['revenue' => 100_000, 'result' => 9_000]              // un « taux » de 90 % si on l'écoutait
+);
+ok('sous 50 % de couverture la valorisation est marquée théorique', $vTheo['theoretical'] === true, $vTheo);
+ok('et le taux retenu est la cible, pas la moyenne du maigre échantillon',
+    abs($vTheo['actual_rate'] - 0.15) < 1e-9, $vTheo['actual_rate']);
+ok('les deux montants sont alors identiques — c\'est la même formule',
+    $vTheo['actual_value'] === $vTheo['target_value'], [$vTheo['actual_value'], $vTheo['target_value']]);
+ok('objectif = CA × 15 % × 4,5', $vTheo['target_value'] === (int) round(100_000 * 0.15 * 4.5),
+    $vTheo['target_value']);
+
+// b) Couverture suffisante : le taux observé prend la main, le drapeau tombe.
+$vReel = wsm_valuation(
+    [['revenue_costed' => 80_000]],                        // 80 % du CA
+    ['revenue' => 100_000, 'result' => 16_000]             // 20 % de marge nette mesurée
+);
+ok('au-dessus de 50 % la valorisation n\'est plus théorique', $vReel['theoretical'] === false, $vReel);
+ok('le taux est le résultat rapporté à la vente MESURÉE, pas au CA total',
+    abs($vReel['actual_rate'] - 0.20) < 1e-9, $vReel['actual_rate']);
+ok('actuelle = CA × taux observé × 4,5',
+    $vReel['actual_value'] === (int) round(100_000 * 0.20 * 4.5), $vReel['actual_value']);
+ok('mieux que la cible ⇒ actuelle au-dessus de l\'objectif',
+    $vReel['actual_value'] > $vReel['target_value'], [$vReel['actual_value'], $vReel['target_value']]);
+ok('la couverture est rendue en pourcentage lisible', $vReel['coverage'] === 80.0, $vReel['coverage']);
+
+// c) Une marge nette négative n'est pas ramenée à zéro en douce : une affaire
+//    qui perd de l'argent vaut moins que rien selon cette formule, et l'écran
+//    doit pouvoir le montrer plutôt que d'afficher un plancher rassurant.
+$vNeg = wsm_valuation([['revenue_costed' => 90_000]], ['revenue' => 100_000, 'result' => -9_000]);
+ok('une perte donne une valorisation négative, pas un zéro poli',
+    $vNeg['actual_value'] < 0, $vNeg['actual_value']);
+
+// d) Boutique vide : aucune division par zéro, aucun NaN.
+$vNul = wsm_valuation([], ['revenue' => 0, 'result' => 0]);
+ok('sans chiffre d\'affaires tout vaut zéro',
+    $vNul['target_value'] === 0 && $vNul['actual_value'] === 0, $vNul);
+ok('et c\'est déclaré théorique', $vNul['theoretical'] === true, $vNul);
+
+// e) Les constantes sont exposées : l'écran affiche « × 4,5 » depuis la source,
+//    il ne le réécrit pas à la main.
+ok('le multiple est celui de la source', abs($vNul['multiple'] - WSM_VAL_MULTIPLE) < 1e-9);
+ok('la cible aussi', abs($vNul['target_rate'] - WSM_VAL_TARGET_RATE) < 1e-9);
+
+// f) Sur les vraies données de la base, le calcul ne casse pas.
+$vLive = wsm_valuation($s, wsm_margin_totals($s));
+ok('la valorisation se calcule sur les séries réelles', is_int($vLive['actual_value']), $vLive);
+
 // ---- Nettoyage ---------------------------------------------------------------------
 foreach ([$avec, $sans] as $id) {
     $pdo->prepare("DELETE FROM wsm_order_items WHERE product_id = ?")->execute([$id]);

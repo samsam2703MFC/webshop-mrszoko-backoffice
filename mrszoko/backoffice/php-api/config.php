@@ -121,6 +121,25 @@ $cfg = [
         'sending_method'  => getenv('WSM_INPOST_SENDING_METHOD') ?: 'parcel_locker',
         'sandbox'         => (getenv('WSM_INPOST_SANDBOX') ?: '1') !== '0',
     ],
+
+    // ---- Superadmin : le propriétaire de la plateforme ---------------------
+    // Ce module calcule ce que la boutique DOIT au propriétaire (location +
+    // commission). Il ne peut donc pas être ouvert par un rôle attribuable
+    // depuis la console : un compte Centrala qui pourrait se hisser
+    // superadmin pourrait réécrire sa propre facture. L'identité vient d'ICI
+    // et de nulle part ailleurs — ni d'une colonne, ni d'une case à cocher.
+    //
+    // Liste d'adresses séparées par des virgules. VIDE = module entièrement
+    // fermé (fail-closed) : invisible dans le rail, et la page répond 404.
+    // En production, elle vit dans config.local.php, jamais ici.
+    'superadmin_emails' => getenv('WSM_SUPERADMIN_EMAILS') ?: '',
+
+    // ---- Claude : traduction automatique du contenu -------------------------
+    // Sert à remplir les traductions MANQUANTES du site (voir translate.php).
+    // AUCUN défaut : sans clé, le bouton n'apparaît pas et rien n'est à
+    // moitié fait. La clé vit dans config.local.php sur le serveur — ce dépôt
+    // est public, elle n'a rien à y faire.
+    'anthropic_api_key' => getenv('WSM_ANTHROPIC_API_KEY') ?: '',
 ];
 
 // Optional local override (untracked, gitignored): drop a config.local.php on the

@@ -217,6 +217,7 @@ $kpis    = wsm_shop_kpis($pdo);
 $marge   = wsm_margin_series($pdo);
 $mtot    = wsm_margin_totals($marge);
 $prev    = wsm_forecast($pdo, $marge);
+$wyc     = wsm_valuation($marge, $mtot);
 
 $clientsTotal = (int) ($clients[count($clients) - 1]['n'] ?? 0);
 $repeat = (int) $pdo->query("SELECT COUNT(*) FROM (SELECT LOWER(email) e FROM wsm_orders
@@ -294,6 +295,28 @@ console_head('Audyt', $me, <<<'CSS'
   .fc .col dl { margin: 8px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 12.5px; }
   .fc .col dt { color: var(--text-muted); margin: 0; }
   .fc .col dd { margin: 0; font-family: var(--font-mono); }
+  /* Valorisation : deux colonnes, et sous chacune le calcul en toutes lettres.
+     Un chiffre de valorisation sans sa formule sous les yeux finit recopié
+     dans un business plan sans que personne ne sache d'où il sort. */
+  .wyc { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 700px) { .wyc { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .wyc .box { border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .wyc .box.cel { border-color: var(--accent); }
+  .wyc .box h4 { margin: 0 0 6px; font-family: var(--font-mono); font-size: 11px;
+                 text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); }
+  /* `> b` et non ` b` : le montant est un enfant direct du cadre. Sans le
+     chevron, chaque mot en gras des explications héritait de ces 26 px en
+     display:block et découpait la phrase en une pile de titres. */
+  .wyc .box > b { display: block; font-family: var(--font-display); font-size: 26px;
+                  color: var(--text-strong); line-height: 1.15; }
+  /* La formule peut être longue : elle défile dans son cadre plutôt que de
+     pousser la page — même raison que les tableaux larges ailleurs. */
+  .wyc .calc { margin: 10px 0 0; font-family: var(--font-mono); font-size: 12px;
+               color: var(--text-muted); background: var(--surface-sunken);
+               border-radius: 8px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
+  .wyc .note { margin: 8px 0 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+  .tag { font-size: 12px; padding: 2px 9px; border-radius: 999px;
+         border: 1px solid var(--warning); color: var(--warning); white-space: nowrap; }
   .trust { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-default); }
   .trust.niska  { color: var(--danger);  border-color: var(--danger); }
   .trust.srednia{ color: var(--warning); border-color: var(--warning); }
@@ -338,6 +361,65 @@ $fiable = $mtot['cost_known_pct'] >= 50.0;
   a nowe zamówienia zapamiętają koszt z chwili sprzedaży.
 </p>
 <?php endif; ?>
+
+<?php
+// Le taux affiché : en pourcentage, avec une décimale, comme partout ailleurs.
+$pc = fn(float $r) => number_format($r * 100, 1, ',', ' ') . ' %';
+// Le multiple s'écrit « 4,5 » et non « 4.5 » : la console est polonaise.
+$mult = number_format((float) $wyc['multiple'], 1, ',', ' ');
+?>
+<div class="panel">
+  <h2>Wycena firmy
+    <?php if ($wyc['theoretical']): ?><span class="tag">teoretyczna — 15 %</span><?php endif; ?>
+  </h2>
+  <p class="why">
+    Wycena to obrót roczny pomnożony przez marżę netto i przez mnożnik <b><?= h($mult) ?></b>
+    — umowny dla małego, rentownego sklepu internetowego. Jest tu po to, żeby o niej
+    dyskutować, nie żeby w nią wierzyć. Obrót roczny to sprzedaż netto z ostatnich
+    dwunastu miesięcy: <b><?= h(pln((int) $wyc['revenue'])) ?></b>.
+  </p>
+
+  <div class="wyc">
+    <div class="box cel">
+      <h4>Wycena docelowa</h4>
+      <b><?= h(pln((int) $wyc['target_value'])) ?></b>
+      <p class="calc">CA roczny <?= h(pln((int) $wyc['revenue'])) ?>
+        × <?= h($pc((float) $wyc['target_rate'])) ?> × <?= h($mult) ?></p>
+      <p class="note">Ile firma byłaby warta, gdyby osiągała założoną marżę netto
+        <b><?= h($pc((float) $wyc['target_rate'])) ?></b>. To cel planu, nie pomiar.</p>
+    </div>
+
+    <div class="box">
+      <h4>Wycena aktualna</h4>
+      <b><?= h(pln((int) $wyc['actual_value'])) ?></b>
+      <p class="calc">CA roczny <?= h(pln((int) $wyc['revenue'])) ?>
+        × <?= h($pc((float) $wyc['actual_rate'])) ?> × <?= h($mult) ?></p>
+      <p class="note">
+        <?php if ($wyc['theoretical']): ?>
+          Średniej marży netto <b>nie da się dziś zmierzyć</b>: koszt własny znamy tylko na
+          <b><?= h(number_format((float) $wyc['coverage'], 1, ',', ' ')) ?> %</b> sprzedaży,
+          a średnia z tak wąskiej próbki nie jest średnią. Zamiast liczyć ją z niczego
+          przyjmujemy stawkę docelową <b>15 %</b> — dlatego obie kwoty są tu równe,
+          i dlatego ta jest oznaczona jako <b>teoretyczna</b>.
+        <?php else: ?>
+          Ta sama formuła, ale ze <b>zmierzoną</b> średnią marżą netto z dwunastu miesięcy:
+          wynik po koszcie towaru i po niepokrytej części dostawy, podzielony przez sprzedaż,
+          na której dało się go policzyć (<b><?= h(number_format((float) $wyc['coverage'], 1, ',', ' ')) ?> %</b>
+          obrotu). To ten sam wynik co w kafelku „Wynik po dostawie” — nie inny sposób liczenia.
+        <?php endif; ?>
+      </p>
+    </div>
+  </div>
+
+  <?php if ($wyc['theoretical']): ?>
+  <p class="why" style="margin:14px 0 0">
+    Żeby wycena aktualna zaczęła znaczyć cokolwiek, wystarczy uzupełnić
+    <b>koszt własny</b> w <a href="produkty.php">Produktach</a>. Powyżej połowy sprzedaży
+    liczba policzy się sama, znacznik „teoretyczna” zniknie, a obie kwoty się rozejdą —
+    i wtedy różnica między nimi będzie tym, co realnie zostało do odrobienia.
+  </p>
+  <?php endif; ?>
+</div>
 
 <div class="panel">
   <h2>Prognoza — <?= h($prev['label_curr']) ?> wobec <?= h($prev['label_prev']) ?>

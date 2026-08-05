@@ -65,9 +65,34 @@ function wsm_shop_lang(PDO $pdo, ?string $want): string {
     return in_array(WSM_SHOP_DEFAULT_LANG, $have, true) ? WSM_SHOP_DEFAULT_LANG : ($have[0] ?? WSM_SHOP_DEFAULT_LANG);
 }
 
+/**
+ * Les langues réellement proposées au visiteur.
+ *
+ * ELLES VIENNENT D'UNE DÉCISION, PAS D'UN EFFET DE BORD. Auparavant cette
+ * fonction faisait « SELECT DISTINCT lang » : traduire une seule clé en
+ * allemand suffisait à faire apparaître un drapeau DE menant à une boutique
+ * polonaise à 99 %. Un visiteur qui clique dessus ne revient pas. La liste
+ * publique est donc celle de wsm_langs, cochée à la main dans la console.
+ *
+ * Repli : si la table des langues manque — base neuve, migration en cours —
+ * on retombe sur l'ancien comportement plutôt que de servir une boutique
+ * monolingue par accident.
+ */
 function wsm_shop_available_langs(PDO $pdo): array {
     static $cache = null;
     if ($cache !== null) return $cache;
+
+    $i18n = __DIR__ . '/i18n.php';
+    if (is_file($i18n)) {
+        require_once $i18n;
+        try {
+            if (wsm_table_exists($pdo, 'wsm_langs')) {
+                $cache = wsm_lang_published($pdo);
+                return $cache;
+            }
+        } catch (Throwable $e) { /* on retombe plus bas */ }
+    }
+
     try {
         $rows = $pdo->query("SELECT DISTINCT lang FROM wsm_shop_i18n ORDER BY lang")->fetchAll();
         $cache = array_values(array_map(fn($r) => (string) $r['lang'], $rows));

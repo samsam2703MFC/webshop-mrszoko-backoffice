@@ -136,11 +136,28 @@ for ($n = 0; $n < 4; $n++) {
 }
 ok('cinq documents, cinq numéros distincts', count(array_unique($numbers)) === count($numbers), $numbers);
 
-$st = $pdo->query("SELECT seq FROM wsm_invoices WHERE kind_group = 'faktura' ORDER BY seq");
-$seqs = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+// La continuité s'apprécie DANS UNE SÉRIE, pas à travers toutes. Le rang
+// repart à 1 chaque mois (series = « 2026-08 ») : c'est le comportement voulu
+// et l'index UNIQUE porte sur le couple (série, rang). Comparer des rangs de
+// juillet à ceux d'août produisait un « trou » à chaque bascule de mois — ce
+// test passait tant que la base ne contenait qu'un seul mois, et tombait le
+// premier du suivant. En production il aurait crié tous les 1ᵉʳ du mois.
+$st = $pdo->query("SELECT series, seq FROM wsm_invoices WHERE kind_group = 'faktura'
+                    ORDER BY series, seq");
+$parSerie = [];
+foreach ($st->fetchAll() ?: [] as $r) $parSerie[(string) $r['series']][] = (int) $r['seq'];
+
 $gaps = [];
-for ($k = 1; $k < count($seqs); $k++) if ($seqs[$k] !== $seqs[$k - 1] + 1) $gaps[] = $seqs[$k];
-ok('la suite des rangs est sans trou', $gaps === [], $gaps);
+foreach ($parSerie as $serie => $seqs) {
+    if ($seqs[0] !== 1) $gaps[] = "$serie: commence à {$seqs[0]}";
+    for ($k = 1; $k < count($seqs); $k++) {
+        if ($seqs[$k] !== $seqs[$k - 1] + 1) $gaps[] = "$serie: {$seqs[$k - 1]} → {$seqs[$k]}";
+    }
+}
+ok('dans chaque série la suite des rangs est sans trou et part de 1', $gaps === [], $gaps);
+ok('et la série du mois courant a bien reçu les cinq émissions',
+    count($parSerie[(string) $inv['series']] ?? []) >= 5,
+    [$inv['series'], count($parSerie[(string) $inv['series']] ?? [])]);
 
 // L'index UNIQUE est le vrai garde-fou : on le met à l'épreuve.
 $dup = false;

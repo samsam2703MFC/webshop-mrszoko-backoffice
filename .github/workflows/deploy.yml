@@ -90,7 +90,7 @@ jobs:
              mrszoko/backoffice/magazyn_druk.php mrszoko/backoffice/uzytkownicy.php \
              mrszoko/backoffice/audyt.php mrszoko/backoffice/zamowienie_druk.php \
              mrszoko/backoffice/etykieta_druk.php mrszoko/backoffice/tresci.php \
-             mrszoko/backoffice/etykieta_inpost.php \
+             mrszoko/backoffice/etykieta_inpost.php mrszoko/backoffice/superadmin.php \
              mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
@@ -345,6 +345,18 @@ jobs:
                    /img/logo.png; do
             run "$BO$f" 1
           done
+          # Une seule source de polices : tokens/fonts.css. global.css déclarait
+          # douze @font-face pointant sur des fichiers absents — des consignes
+          # mortes que le prochain lecteur aurait suivies. Elles ne doivent pas
+          # revenir par une resynchro de l'export de design.
+          # On cherche « @font-face » et non un nom de famille : le commentaire
+          # qui explique le retrait cite forcément les familles retirées, et un
+          # contrôle qui se déclenche sur sa propre documentation ne vaut rien.
+          if curl -skL "$BO/$DS/global.css" | grep -q "@font-face"; then
+            echo "  ^ ATTENTION : global.css redéclare des polices — source unique rompue"; fail=1
+          else
+            echo "  global.css ne déclare aucune police : source unique respectée"
+          fi
           echo "== landing : fusionnée dans la boutique, ne doit plus que rediriger =="
           run "$LP/" 100
           LP_HTML=$(curl -skL "$LP/")
@@ -418,7 +430,7 @@ jobs:
           # .htaccess répond 301 AVANT que PHP soit atteint, et on prendrait ce
           # 301 pour la réponse de l'écran. On suit donc les redirections et on
           # regarde OÙ l'on atterrit : sans session, jamais sur la page elle-même.
-          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php; do
+          for pg in pulpit.php zamowienia.php faktury.php produkty.php magazyn.php tresci.php kontrahenci.php kraje.php rabaty.php poczta.php uzytkownicy.php audyt.php ustawienia.php etykieta_inpost.php superadmin.php; do
             eff=$(curl -skL -o /dev/null -w '%{url_effective}' "$BO/$pg")
             echo "  GET /backoffice/$pg  →  $eff"
             case "$eff" in
@@ -534,6 +546,52 @@ jobs:
           curl -skL "http://localhost/mrszoko/" | grep -q 'url=shop/' \
             && echo "  la racine renvoie vers la boutique : confirmé" \
             || { echo "  ^ NOT OK : la racine ne renvoie pas vers /shop/"; fail=1; }
+          echo "== SEO : nic prywatnego w indeksie, hreflang bezwzględne =="
+          # La page de suivi porte nom, adresse et détail d'achat. Un lien
+          # partagé, ou suivi par un robot depuis une boîte mail, et la
+          # commande de quelqu'un devient cherchable. Cette ligne passe avant
+          # tout le reste du référencement.
+          for pg in koszyk kasa zamowienie/MS-TEST; do
+            H=$(curl -skL "$SH/$pg")
+            case "$H" in
+              *'name="robots" content="noindex'*) echo "  /$pg : noindex — potwierdzone";;
+              *) echo "  ^ FUITE : /$pg może trafić do wyszukiwarki"; fail=1;;
+            esac
+          done
+          # Un hreflang relatif est ignoré en bloc par Google, sans un mot dans
+          # la Search Console : la grappe entière ne sert alors à rien.
+          HOME_HTML=$(curl -skL "$SH/")
+          if echo "$HOME_HTML" | grep -q 'hreflang=' ; then
+            if echo "$HOME_HTML" | grep -oE 'hreflang="[a-z-]+" href="[^"]+"' | grep -qv 'href="http'; then
+              echo "  ^ ATTENTION : hreflang względny — Google zignoruje całą grupę"; fail=1
+            else
+              echo "  hreflang bezwzględne : potwierdzone"
+            fi
+            echo "$HOME_HTML" | grep -q 'hreflang="x-default"' \
+              && echo "  x-default obecny" \
+              || { echo "  ^ ATTENTION : brak x-default — grupa jest niekompletna"; fail=1; }
+          else
+            echo "  ^ ATTENTION : sklep nie emituje hreflang"; fail=1
+          fi
+          echo "$HOME_HTML" | grep -q 'rel="canonical" href="http' \
+            && echo "  kanoniczny bezwzględny : potwierdzone" \
+            || { echo "  ^ ATTENTION : brak kanonicznego albo względny"; fail=1; }
+          # Chaque langue doit être une VRAIE page (200), pas une redirection :
+          # sinon toute la grappe pointe vers une seule adresse et le
+          # multilingue ne référence rien.
+          for L in en uk; do
+            C=$(curl -sk -o /dev/null -w '%{http_code}' "$SH/?lang=$L")
+            [ "$C" = "200" ] && echo "  /?lang=$L → 200 (strona, nie przekierowanie)" \
+              || { echo "  ^ ATTENTION : /?lang=$L odpowiada $C — grupa hreflang wskazuje przekierowania"; fail=1; }
+          done
+          run "$SH/robots.txt" 20
+          run "$SH/sitemap.xml" 200
+          curl -skL "$SH/sitemap.xml" | grep -q 'xmlns:xhtml' \
+            && echo "  sitemap deklaruje alternates" \
+            || { echo "  ^ ATTENTION : sitemap bez xhtml:link"; fail=1; }
+          curl -skL "$SH/sitemap.xml" | grep -qE '/(koszyk|kasa|zamowienie)' \
+            && { echo "  ^ FUITE : sitemap wymienia stronę prywatną"; fail=1; } \
+            || echo "  sitemap nie wymienia stron prywatnych"
           if [ "$fail" = "0" ]; then echo "ALL WEB CHECKS OK"; else echo "WEB CHECK FAILED"; exit 1; fi
           REMOTE
 
@@ -682,6 +740,89 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
+          echo "== języki : publikacja jest decyzją, znaczniki przeżywają =="
+          # La bascule la plus risquée de cette version : la liste publique des
+          # langues passe de « ce qui est en base » à « ce qui est coché ». Si
+          # la reprise ratait, l'ukrainien et l'anglais disparaîtraient de la
+          # vitrine sans une ligne de journal, sur des pages déjà indexées.
+          LOUT=$(php -r '
+            require "'"$DIR_API"'/i18n.php";
+            $pdo = wsm_bootstrap();
+            wsm_i18n_ensure($pdo);
+            $pub = wsm_lang_published($pdo);
+            $huit = count(WSM_LANGS) === 8;
+            $pl = in_array("pl", $pub, true);
+            [$okPl] = wsm_lang_publish($pdo, "pl", false);
+            require "'"$DIR_API"'/translate.php";
+            $ph = wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {qty}")
+              && !wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {ilosc}");
+            echo ($huit ? "osiem-ok" : "osiem-ZLE"), " ",
+                 ($pl ? "pl-ok" : "pl-ZLE"), " ",
+                 ($okPl === false ? "filet-ok" : "filet-ZLE"), " ",
+                 ($ph ? "znaczniki-ok" : "znaczniki-ZLE"), " ",
+                 "publiczne=", implode("/", $pub);
+          ' 2>&1) || LOUT="php-ZLE"
+          echo "  $LOUT"
+          case "$LOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : warstwa językowa nie działa poprawnie"; fail=1;;
+            *) ;;
+          esac
+          # Les langues servies hier doivent l'être encore. On le VÉRIFIE sur la
+          # vitrine, pas sur la table : c'est la page qui compte.
+          for L in pl uk en; do
+            EFF=$(curl -skL -o /dev/null -w '%{http_code}' "http://localhost/mrszoko/shop/?lang=$L")
+            HTML=$(curl -skL "http://localhost/mrszoko/shop/?lang=$L" | head -c 400)
+            case "$HTML" in
+              *"lang=\"$L\""*) echo "  sklep w $L : serwowany";;
+              *) echo "  ^ ATTENTION : sklep nie serwuje już języka $L (kod $EFF)"; fail=1;;
+            esac
+          done
+          echo "== platforma : brama superadmina i rachunek =="
+          # La porte AVANT l'arithmétique : ce module chiffre ce que la boutique
+          # doit à son propriétaire. Sans liste configurée il doit être FERMÉ, et
+          # un compte Centrala ne doit jamais l'ouvrir — sinon le locataire lit,
+          # et pourrait réécrire, sa propre facture.
+          POUT=$(php -r '
+            putenv("WSM_SUPERADMIN_EMAILS=");
+            require "'"$DIR_API"'/platform.php";
+            $ferme = !wsm_platform_enabled()
+                  && !wsm_is_superadmin(["email"=>"ktos@example.com","role"=>"Centrala"]);
+            wsm_config_overlay(["superadmin_emails"=>"wl@example.com"]);
+            $ouvert = wsm_is_superadmin(["email"=>"wl@example.com"]);
+            $centrala = wsm_is_superadmin(["email"=>"szef@example.com","role"=>"Centrala"]);
+            $jeton = wsm_is_superadmin(["email"=>"wl@example.com","service"=>true]);
+            $c = wsm_platform_compute("2026-01",
+                   ["gross"=>100000,"goods_gross"=>90000,"shipping_gross"=>10000,"orders"=>1],
+                   ["rent_net"=>20000,"rate"=>0.15,"basis"=>"brutto","vat_rate"=>0.23]);
+            echo ($ferme ? "zamkn-ok" : "zamkn-ZLE"), " ",
+                 ($ouvert ? "wlasc-ok" : "wlasc-ZLE"), " ",
+                 (!$centrala && !$jeton ? "izolacja-ok" : "izolacja-ZLE"), " ",
+                 ($c["commission_net"] === 15000 && $c["total_net"] === 35000 ? "rachunek-ok" : "rachunek-ZLE");
+          ' 2>&1) || POUT="php-ZLE"
+          echo "  $POUT"
+          case "$POUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la brama superadmina lub rachunek nie działa poprawnie"; fail=1;;
+            *) ;;
+          esac
+          echo "== wycena : la formule tourne sur le serveur, pas seulement ici =="
+          # Un chiffre de valorisation part dans un business plan. On vérifie sur
+          # la machine qui l'affiche que la fonction existe, que l'objectif vaut
+          # bien CA × 15 % × 4,5, et surtout qu'une couverture insuffisante sort
+          # MARQUÉE théorique — c'est cette marque qui empêche de présenter un
+          # chiffre postulé comme un chiffre mesuré.
+          VOUT=$(php -r '
+            require "'"$DIR_API"'/analytics.php";
+            $t = wsm_valuation([["revenue_costed"=>10000]], ["revenue"=>100000,"result"=>9000]);
+            $m = wsm_valuation([["revenue_costed"=>80000]], ["revenue"=>100000,"result"=>16000]);
+            echo ($t["target_value"] === (int) round(100000*0.15*4.5) ? "cel-ok" : "cel-ZLE"), " ",
+                 ($t["theoretical"] === true ? "teor-ok" : "teor-ZLE"), " ",
+                 ($m["theoretical"] === false && abs($m["actual_rate"]-0.20) < 1e-9 ? "real-ok" : "real-ZLE");
+          ' 2>&1) || VOUT="php-ZLE"
+          echo "  $VOUT"
+          case "$VOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la valorisation ne se calcule pas juste sur le serveur"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
           REMOTE
 

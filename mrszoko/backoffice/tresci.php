@@ -2,17 +2,19 @@
 // ============================================================================
 //  tresci.php — le CMS : tout le texte des deux sites publics, éditable ici.
 //
-//  Ce que cet écran pilote pour de vrai : les 699 chaînes qui composent la
-//  page d'accueil et la boutique, en trois langues, plus les quatre cartes
-//  produit de la page d'accueil. Il n'y a rien d'autre à piloter — aucun texte
-//  n'est écrit en dur dans les pages, et c'est précisément ce qui rend ce CMS
-//  possible sans toucher au code.
+//  Ce que cet écran pilote pour de vrai : toutes les chaînes qui composent la
+//  page d'accueil et la boutique, dans les huit langues du projet, plus les
+//  quatre cartes produit de la page d'accueil. Il n'y a rien d'autre à piloter
+//  — aucun texte n'est écrit en dur dans les pages, et c'est précisément ce
+//  qui rend ce CMS possible sans toucher au code.
 //
 //  Trois choix d'ergonomie, dans l'ordre où ils comptent :
 //
-//   • LES TROIS LANGUES CÔTE À CÔTE. Traduire en changeant d'écran, c'est
-//     traduire de mémoire. Ici la ligne montre le polonais, l'ukrainien et
-//     l'anglais ensemble : l'écart se voit sans le chercher.
+//   • ON TRADUIT PAR PAIRE, FACE AU POLONAIS. Traduire en changeant d'écran,
+//     c'est traduire de mémoire ; mais huit colonnes côte à côte ne tiennent
+//     sur aucun écran, et personne ne compare le hongrois au tchèque. La
+//     ligne montre donc la source et la langue en cours — l'écart se voit
+//     sans le chercher, à n'importe quel nombre de langues.
 //   • UNE SECTION À LA FOIS. Sept cents champs sur une page seraient
 //     illisibles et produiraient des enregistrements énormes. On ouvre la
 //     section qu'on veut corriger — nagłówek, koszyk, stopka — et on
@@ -30,13 +32,39 @@ require_once __DIR__ . '/console.php';
 [$pdo, $me, $isAdmin] = console_boot();
 $API = console_api_dir();
 require_once $API . '/cms.php';
+require_once $API . '/i18n.php';
+require_once $API . '/translate.php';
 
 wsm_ensure_landing($pdo);
+wsm_i18n_ensure($pdo);
+wsm_i18n_ensure_origin($pdo);
 
 $sites = wsm_cms_sites();
 $sk    = isset($_GET['site']) && isset($sites[$_GET['site']]) ? (string) $_GET['site'] : 'sklep';
 $site  = $sites[$sk];
-$langs = wsm_cms_langs($pdo, $site['table']);
+
+// À huit langues, les colonnes côte à côte ne tiennent plus : à trois c'était
+// déjà serré, à huit c'est illisible sur n'importe quel écran. On travaille
+// donc PAR PAIRE — le polonais source, et la langue qu'on traduit. C'est
+// aussi la façon dont on traduit vraiment : on ne compare pas le hongrois au
+// tchèque, on compare chacun à l'original.
+$registre = wsm_lang_registry($pdo);
+$cible = (string) ($_GET['jezyk'] ?? 'en');
+if (!isset($registre[$cible]) || $cible === WSM_CMS_BASE_LANG) {
+    $autres = array_values(array_diff(array_keys($registre), [WSM_CMS_BASE_LANG]));
+    $cible = $autres[0] ?? 'en';
+}
+$langs = [WSM_CMS_BASE_LANG, $cible];
+
+/**
+ * La langue de travail voyage avec tous les liens de l'écran.
+ *
+ * Sans ça, ouvrir une section — ou effacer un filtre — repart sur la langue
+ * par défaut : on choisit « français », on clique « meta », et on se retrouve
+ * à corriger l'anglais sans s'en apercevoir. Le genre d'erreur qu'on ne
+ * découvre qu'en relisant la boutique.
+ */
+function jez(string $cible): string { return '&amp;jezyk=' . rawurlencode($cible); }
 
 $flash = ''; $flashKind = 'ok';
 
@@ -53,6 +81,41 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $flash = 'Ten klucz nie ma tekstu pierwotnego w repozytorium — nie ma do czego wrócić.';
             $flashKind = 'err';
         }
+    } elseif (isset($_POST['publikuj'])) {
+        $code = (string) $_POST['publikuj'];
+        [$okp, $msg] = wsm_lang_publish($pdo, $code, !empty($_POST['wlacz']), !empty($_POST['mimo_to']));
+        $flash = $msg; $flashKind = $okp ? 'ok' : 'err';
+        if ($okp) wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Języki publiczne', $code, 'Sieć');
+
+    } elseif (isset($_POST['tlumacz'])) {
+        // Le remplissage ne touche QUE le vide : une traduction relue vaut
+        // mieux qu'une traduction fraîche, et l'écraser détruirait du travail.
+        $code = (string) $_POST['tlumacz'];
+        $res = wsm_tr_fill($pdo, $site['table'], $code, (string) ($me['nom'] ?? ''), 300);
+        if ($res['errors']) {
+            $flash = 'Tłumaczenie: ' . implode(' · ', $res['errors']); $flashKind = 'err';
+        } else {
+            $flash = 'Przetłumaczono ' . $res['written'] . ' tekstów na ' . wsm_lang_name($code)
+                   . ' — oznaczone jako automatyczne, do przejrzenia.';
+            if ($res['placeholder_rejected'] > 0) {
+                $flash .= ' Odrzucono ' . $res['placeholder_rejected']
+                        . ' (zgubiony znacznik typu {qty} — klient zobaczyłby surowy nawias).';
+            }
+            wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Tłumaczenie automatyczne',
+                      $code . ' — ' . $res['written'] . ' tekstów', 'Sieć');
+        }
+
+    } elseif (isset($_POST['cofnij_zmiane'])) {
+        [$okr, $msg] = wsm_i18n_revert($pdo, (int) $_POST['cofnij_zmiane'], (string) ($me['nom'] ?? ''));
+        $flash = $msg; $flashKind = $okr ? 'ok' : 'err';
+
+    } elseif (isset($_POST['zatwierdz'])) {
+        // « Relu par un humain » : le texte cesse de compter dans les
+        // traductions à vérifier, sans changer un caractère.
+        $ok2 = wsm_tr_approve($pdo, $site['table'], (string) $_POST['jezyk'], (string) $_POST['zatwierdz']);
+        $flash = $ok2 ? 'Oznaczono jako sprawdzone.' : 'Nie udało się oznaczyć.';
+        $flashKind = $ok2 ? 'ok' : 'err';
+
     } elseif (isset($_POST['dostawa'])) {
         // Le prix du port et le seuil de gratuité s'affichent sur la boutique
         // à chaque page : ce sont des valeurs de façade, et jusqu'ici elles
@@ -96,7 +159,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Kafelki strony głównej', $n . ' pozycji', 'Sieć');
         $flash = 'Zapisano kafelki (' . $n . ').';
     } else {
-        [$n, $keys] = wsm_cms_save($pdo, $site['table'], (array) ($_POST['t'] ?? []), $langs);
+        [$n, $keys] = wsm_cms_save($pdo, $site['table'], (array) ($_POST['t'] ?? []), $langs, (string) ($me['nom'] ?? ''));
         if ($n) {
             wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Treści — ' . $site['label'],
                       implode(', ', array_slice($keys, 0, 20)) . (count($keys) > 20 ? ' …' : ''), 'Sieć');
@@ -141,7 +204,9 @@ foreach ($groups as $prefix => $keys) {
 if (($q !== '' || $onlyGap) && $open === '' && $visible) $open = (string) array_key_first($visible);
 
 $found = array_sum(array_map('count', $visible));
-$langLabel = ['pl' => 'Polski', 'uk' => 'Українська', 'en' => 'English'];
+// Le nom est écrit DANS la langue : on cherche « Čeština », pas « tchèque ».
+$langLabel = [];
+foreach ($registre as $c => $l) $langLabel[$c] = $l['name'];
 
 $css = <<<'CSS'
   .sitepick { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -178,6 +243,18 @@ $css = <<<'CSS'
       padding: 12px 0 4px; border-top: 1px solid var(--border-default); margin-top: 6px;
       box-shadow: 0 -12px 18px -12px rgba(0,0,0,.28); }
   .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 8px; }
+  /* L'état d'une langue, et d'où vient un texte. La couleur porte le sens :
+     publié = servi au visiteur, auto = écrit par une machine et pas encore relu. */
+  /* Un texte de contenu peut être une longue chaîne sans espace — une clé
+     recopiée, un test, une URL. Sans coupure forcée elle sort de sa cellule
+     et passe SOUS le bouton d'à côté, qui devient intapable. */
+  .hist-v { max-width: 420px; overflow-wrap: anywhere; word-break: break-word; }
+  .st { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+        border: 1px solid var(--border-default); color: var(--text-muted); }
+  .st.pub    { color: var(--success); border-color: var(--success); }
+  .st.auto   { color: var(--warning); border-color: var(--warning); }
+  .st.revert { color: var(--info);    border-color: var(--info); }
+  .why { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0 0 12px; }
   .filters .field { margin-bottom: 0; }
 CSS;
 
@@ -189,7 +266,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
 
 <div class="sitepick">
   <?php foreach ($sites as $key => $s): ?>
-  <a href="tresci.php?site=<?= h($key) ?>"<?= $key === $sk ? ' class="on"' : '' ?>>
+  <a href="tresci.php?site=<?= h($key) ?><?= jez($cible) ?>"<?= $key === $sk ? ' class="on"' : '' ?>>
     <b><?= h($s['label']) ?></b>
     <span><?= h($s['about']) ?></span>
   </a>
@@ -206,7 +283,8 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
 </div>
 
 <div class="tabs">
-  <a href="tresci.php?site=<?= h($sk) ?>"<?= $tab === 'teksty' ? ' class="on"' : '' ?>>Teksty</a>
+  <a href="tresci.php?site=<?= h($sk) ?><?= jez($cible) ?>"<?= $tab === 'teksty' ? ' class="on"' : '' ?>>Teksty</a>
+  <a href="tresci.php?site=<?= h($sk) ?><?= jez($cible) ?>&amp;zakladka=jezyki"<?= $tab === 'jezyki' ? ' class="on"' : '' ?>>Języki</a>
   <?php if ($sk === 'strona'): ?>
   <a href="tresci.php?site=strona&amp;zakladka=kafelki"<?= $tab === 'kafelki' ? ' class="on"' : '' ?>>Kafelki gamy</a>
   <?php else: ?>
@@ -215,7 +293,156 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
   <a href="<?= h($site['url']) ?>" target="_blank" rel="noopener">Podgląd strony ↗</a>
 </div>
 
-<?php if ($tab === 'dostawa' && $sk === 'sklep'):
+<?php if ($tab === 'jezyki'):
+  $couv = [];
+  foreach ($registre as $c => $l) $couv[$c] = wsm_lang_coverage_all($pdo, $c);
+  $histo = wsm_i18n_history($pdo, [], 40);
+  $ia = wsm_tr_enabled();
+?>
+<div class="panel">
+  <h2>Języki sklepu</h2>
+  <p class="why">
+    Polski jest <b>źródłem i siatką bezpieczeństwa</b>: brakujący tekst w innym języku nie robi
+    dziury w stronie, tylko pokazuje polski. Dlatego pusta komórka to nie awaria — to sposób
+    powiedzenia „jeszcze nieprzetłumaczone”.
+  </p>
+  <p class="why">
+    <b>Publikacja jest decyzją, nie skutkiem ubocznym.</b> Wcześniej lista języków wynikała
+    z tego, co jest w bazie: jedno przetłumaczone zdanie po niemiecku wystawiłoby flagę DE
+    prowadzącą do sklepu w 99 % polskiego. Kto raz na to kliknie, nie wraca. Poniżej
+    <b><?= h(number_format(WSM_LANG_MIN_COVERAGE, 0, ',', ' ')) ?> %</b> publikacja jest
+    odmawiana — chyba że świadomie zaznaczysz „mimo to”.
+  </p>
+
+  <table class="rwd">
+    <thead><tr>
+      <th>Język</th><th class="num">Pokrycie</th><th class="num">Do przejrzenia</th>
+      <th>Stan</th><th></th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ($registre as $c => $l): $cv = $couv[$c]; $auto = wsm_tr_pending($pdo, $c); ?>
+      <tr>
+        <td data-l="Język"><b><?= h($l['name']) ?></b>
+          <span class="code" style="margin-left:6px"><?= h($l['short']) ?></span>
+          <?php if ($c === WSM_CMS_BASE_LANG): ?><br><small style="color:var(--text-muted)">źródło</small><?php endif; ?>
+        </td>
+        <td data-l="Pokrycie" class="num">
+          <?php if ($c === WSM_CMS_BASE_LANG): ?>—<?php else: ?>
+            <b><?= h(number_format((float) $cv['pct'], 1, ',', ' ')) ?> %</b><br>
+            <small style="color:var(--text-muted)"><?= (int) $cv['done'] ?> / <?= (int) $cv['total'] ?></small>
+          <?php endif; ?>
+        </td>
+        <td data-l="Do przejrzenia" class="num">
+          <?php if ($auto > 0): ?>
+            <span class="st auto" title="tłumaczenia maszynowe, jeszcze niesprawdzone"><?= (int) $auto ?></span>
+          <?php else: ?><span style="color:var(--text-muted)">—</span><?php endif; ?>
+        </td>
+        <td data-l="Stan">
+          <span class="st <?= $l['published'] ? 'pub' : '' ?>">
+            <?= $l['published'] ? 'publiczny' : 'ukryty' ?></span>
+        </td>
+        <td data-l="">
+          <?php if ($c !== WSM_CMS_BASE_LANG && $isAdmin): ?>
+          <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="hidden" name="publikuj" value="<?= h($c) ?>">
+            <?php if (!$l['published']): ?>
+              <input type="hidden" name="wlacz" value="1">
+              <button class="btn sm">Opublikuj</button>
+              <?php if ($cv['pct'] < WSM_LANG_MIN_COVERAGE): ?>
+              <label style="font-size:12px;color:var(--text-muted)">
+                <input type="checkbox" name="mimo_to" value="1"> mimo to</label>
+              <?php endif; ?>
+            <?php else: ?>
+              <button class="btn sm ghost">Wycofaj</button>
+            <?php endif; ?>
+          </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h2>Tłumaczenie automatyczne — <?= h($site['label']) ?></h2>
+  <?php if (!$ia): ?>
+    <p class="why">
+      Nie skonfigurowane. Klucz API żyje wyłącznie w <code>config.local.php</code> na serwerze —
+      to repozytorium jest publiczne. Bez klucza nic nie działa <b>połowicznie</b>: przycisku
+      po prostu nie ma.
+    </p>
+  <?php else: ?>
+    <p class="why">
+      Uzupełnia <b>tylko puste</b> pola. Tłumaczenie sprawdzone przez człowieka jest zawsze
+      warte więcej niż świeże maszynowe — nadpisanie go byłoby niszczeniem pracy bez pytania.
+      Wynik trafia jako <b>do przejrzenia</b>: maszyna myli się pewnym siebie tonem,
+      a źle przetłumaczony przycisk kosztuje zamówienia.
+    </p>
+    <p class="why">
+      Znaczniki takie jak <code>{qty}</code> muszą przejść <b>nietknięte</b>. Jeśli model je
+      zgubi, tłumaczenie jest <b>odrzucane</b>: pusta komórka pokaże polski, a zepsuty znacznik
+      pokazałby klientowi surowy nawias klamrowy.
+    </p>
+    <div class="filters">
+      <?php foreach ($registre as $c => $l): if ($c === WSM_CMS_BASE_LANG) continue;
+        $cv = $couv[$c]; if ($cv['pct'] >= 100.0) continue; ?>
+      <form method="post">
+        <button class="btn sm" name="tlumacz" value="<?= h($c) ?>">
+          <?= h($l['name']) ?> — uzupełnij <?= (int) ($cv['total'] - $cv['done']) ?></button>
+      </form>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
+<div class="panel">
+  <h2>Historia zmian treści</h2>
+  <p class="why">
+    Co, kto, kiedy — i poprzednia wersja. Tekst publiczny, który zmienia się bez autora,
+    daje się poprawić dopiero przez ponowne przeczytanie całej strony.
+    Cofnięcie też trafia do historii: da się cofnąć cofnięcie.
+  </p>
+  <?php if (!$histo): ?>
+    <p class="why">Jeszcze nic nie zmieniono.</p>
+  <?php else: ?>
+  <table class="rwd">
+    <thead><tr><th>Kiedy</th><th>Język</th><th>Klucz</th><th>Było → jest</th><th>Kto</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($histo as $h): ?>
+      <tr>
+        <td data-l="Kiedy"><span class="code"><?= h(substr((string) $h['created_at'], 0, 16)) ?></span></td>
+        <td data-l="Język"><?= h($langLabel[$h['lang']] ?? strtoupper((string) $h['lang'])) ?>
+          <?php if (($h['origin'] ?? '') !== 'human'): ?>
+            <br><span class="st <?= h((string) $h['origin']) ?>"><?= h((string) $h['origin']) ?></span>
+          <?php endif; ?>
+        </td>
+        <td data-l="Klucz"><span class="code"><?= h((string) $h['k']) ?></span></td>
+        <td data-l="Było → jest" class="hist-v">
+          <?php $old = (string) ($h['old_v'] ?? ''); ?>
+          <?php if ($old !== ''): ?>
+            <s style="color:var(--text-muted)"><?= h(mb_substr($old, 0, 90)) ?></s><br>
+          <?php else: ?>
+            <small style="color:var(--text-muted)">(puste)</small><br>
+          <?php endif; ?>
+          <?= h(mb_substr((string) ($h['new_v'] ?? ''), 0, 90)) ?>
+        </td>
+        <td data-l="Kto"><?= h((string) $h['actor']) ?></td>
+        <td data-l="">
+          <?php if ($isAdmin): ?>
+          <form method="post" style="display:inline">
+            <button class="btn sm ghost" name="cofnij_zmiane" value="<?= (int) $h['id'] ?>">Cofnij</button>
+          </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+</div>
+
+<?php elseif ($tab === 'dostawa' && $sk === 'sklep'):
   $ship = $pdo->query("SELECT * FROM wsm_shipping_methods ORDER BY sort_order, id")->fetchAll() ?: [];
   $zl2 = fn($g) => number_format(((int) $g) / 100, 2, ',', ''); ?>
 <div class="panel">
@@ -319,6 +546,18 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
 
   <form method="get" class="filters">
     <input type="hidden" name="site" value="<?= h($sk) ?>">
+    <!-- La langue de travail. On édite TOUJOURS face au polonais : c'est
+         ainsi qu'on traduit vraiment, et huit colonnes côte à côte ne
+         tiendraient sur aucun écran. -->
+    <label class="field"><span>Tłumaczę na</span>
+      <select name="jezyk" onchange="this.form.submit()">
+        <?php foreach ($registre as $c => $l): if ($c === WSM_CMS_BASE_LANG) continue;
+          $cv = wsm_lang_coverage_all($pdo, $c); ?>
+        <option value="<?= h($c) ?>"<?= $c === $cible ? ' selected' : '' ?>>
+          <?= h($l['name']) ?> — <?= h(number_format((float) $cv['pct'], 0, ',', ' ')) ?> %<?= $l['published'] ? '' : ' (ukryty)' ?>
+        </option>
+        <?php endforeach; ?>
+      </select></label>
     <label class="field" style="flex:1 1 240px"><span>Szukaj w kluczach i tekstach</span>
       <input type="search" name="q" value="<?= h($q) ?>" placeholder="np. paczkomat, koszyk, dostawa"></label>
     <label class="field"><span>&nbsp;</span>
@@ -327,7 +566,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
         <span style="font-size:14px">Tylko bez tłumaczenia</span>
       </label></label>
     <div class="actions" style="margin:0"><button type="submit">Filtruj</button>
-      <?php if ($q !== '' || $onlyGap): ?><a class="code" href="tresci.php?site=<?= h($sk) ?>">Wyczyść</a><?php endif; ?>
+      <?php if ($q !== '' || $onlyGap): ?><a class="code" href="tresci.php?site=<?= h($sk) ?><?= jez($cible) ?>">Wyczyść</a><?php endif; ?>
     </div>
   </form>
 
@@ -341,7 +580,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
         if ($l !== WSM_CMS_BASE_LANG && trim((string) $content[$k][$l]) === ''
             && trim((string) $content[$k][WSM_CMS_BASE_LANG]) !== '') $gap++;
       } ?>
-    <a href="tresci.php?site=<?= h($sk) ?>&amp;sekcja=<?= h($prefix) ?><?= $q !== '' ? '&amp;q=' . rawurlencode($q) : '' ?><?= $onlyGap ? '&amp;braki=1' : '' ?>"
+    <a href="tresci.php?site=<?= h($sk) ?><?= jez($cible) ?>&amp;sekcja=<?= h($prefix) ?><?= $q !== '' ? '&amp;q=' . rawurlencode($q) : '' ?><?= $onlyGap ? '&amp;braki=1' : '' ?>"
        class="<?= $prefix === $open ? 'on' : '' ?><?= $gap ? ' gap' : '' ?>">
       <?= h(wsm_cms_section_label($prefix)) ?>
       <i><?= count($keys) ?><?= $gap ? ' · ' . $gap . '△' : '' ?></i>

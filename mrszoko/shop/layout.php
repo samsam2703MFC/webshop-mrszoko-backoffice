@@ -13,10 +13,17 @@
 // ============================================================================
 
 
-function layout_head(array $S, string $lang, array $langs, string $title = '', string $desc = ''): void {
+/**
+ * @param string $page  premier segment de route ('' = catalogue) — décide si
+ *                      la page entre dans un index. Voir seo.php, règle 1 :
+ *                      panier, caisse et suivi de commande n'y entrent jamais.
+ * @param string $image adresse absolue d'une vignette de partage, si la page
+ *                      en a une (la photo du produit sur une fiche).
+ */
+function layout_head(array $S, string $lang, array $langs, string $title = '',
+                     string $desc = '', string $page = '', string $image = ''): void {
     $title = $title !== '' ? $title . ' — ' . ($S['brand'] ?? 'Mister Szoko') : ($S['meta.title'] ?? 'Mister Szoko');
     $desc  = $desc !== '' ? $desc : ($S['meta.desc'] ?? '');
-    $self  = strtok((string) ($_SERVER['REQUEST_URI'] ?? u()), '?');
     ?><!DOCTYPE html>
 <html lang="<?= e($lang) ?>">
 <head>
@@ -27,9 +34,12 @@ function layout_head(array $S, string $lang, array $langs, string $title = '', s
 <link rel="icon" type="image/png" href="<?= e(u('assets/logo.png')) ?>">
 <link rel="stylesheet" href="<?= e(asset('tokens.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset('shop.css')) ?>">
-<?php foreach ($langs as $l): ?>
-<link rel="alternate" hreflang="<?= e($l) ?>" href="<?= e($self . '?lang=' . $l) ?>">
-<?php endforeach; ?>
+<?php
+// Robots, canonique, grappe hreflang ABSOLUE et partage social. Les hreflang
+// émis ici auparavant étaient relatifs : Google les ignore en bloc, sans un
+// mot dans la Search Console. Ils n'ont donc jamais rien fait.
+seo_head($page, $lang, $langs, $title, $desc, WSM_SHOP_DEFAULT_LANG, $image);
+?>
 </head>
 <!-- La confirmation d'ajout est traduite en base (product.added) ; sans cet
      attribut, shop.js retombait sur un simple « ✓ » et la traduction ne
@@ -68,7 +78,10 @@ function layout_crumbs(array $items): void {
 }
 
 function layout_header(array $S, string $lang, array $langs, int $cartCount): void {
-    $codeLabel = ['pl' => 'PL', 'uk' => 'UA', 'en' => 'EN'];
+    // Les huit langues du projet. Le code court sert d'étiquette ; « UA »
+    // et non « UK », parce qu'un visiteur ukrainien lit UK comme britannique.
+    $codeLabel = ['pl' => 'PL', 'en' => 'EN', 'uk' => 'UA', 'de' => 'DE',
+                  'fr' => 'FR', 'cs' => 'CS', 'sk' => 'SK', 'hu' => 'HU'];
     $self = strtok((string) ($_SERVER['REQUEST_URI'] ?? u()), '?');
     ?>
 <header class="site-head">
