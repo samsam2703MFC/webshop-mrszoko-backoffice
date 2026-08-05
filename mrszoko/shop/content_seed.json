@@ -390,7 +390,10 @@
       "claim.left": "Na odstąpienie od umowy zostało Ci {n} dni.",
       "claim.over": "Termin odstąpienia od umowy minął, ale reklamację z tytułu wady możesz złożyć przez 2 lata.",
       "claim.done": "Przyjęliśmy zgłoszenie {numer}. Odpowiemy w ciągu 14 dni.",
-      "claim.open": "Zgłoszenie {numer} jest w toku."
+      "claim.open": "Zgłoszenie {numer} jest w toku.",
+      "stop.title": "Wypisano z wiadomości",
+      "stop.done": "Nie będziemy już wysyłać Ci wiadomości marketingowych. Potwierdzenia zamówień nadal dotrą — to nie to samo.",
+      "stop.bad": "Ten link jest nieprawidłowy lub wygasł. Napisz do nas, wypiszemy Cię ręcznie."
     },
     "uk": {
       "meta.title": "Mister Szoko — крамниця шоколаду",
@@ -604,7 +607,10 @@
       "claim.left": "На відмову від договору залишилось {n} днів.",
       "claim.over": "Строк відмови минув, але рекламацію щодо дефекту можна подати протягом 2 років.",
       "claim.done": "Ми прийняли звернення {numer}. Відповімо протягом 14 днів.",
-      "claim.open": "Звернення {numer} в опрацюванні."
+      "claim.open": "Звернення {numer} в опрацюванні.",
+      "stop.title": "Вас відписано",
+      "stop.done": "Ми більше не надсилатимемо вам маркетингових листів. Підтвердження замовлень надходитимуть далі — це інше.",
+      "stop.bad": "Це посилання недійсне або застаріло. Напишіть нам, і ми відпишемо вас вручну."
     },
     "en": {
       "meta.title": "Mister Szoko — chocolate shop",
@@ -818,7 +824,10 @@
       "claim.left": "You have {n} days left to withdraw from the contract.",
       "claim.over": "The withdrawal period has passed, but you can report a fault for 2 years.",
       "claim.done": "We have received request {numer}. We will answer within 14 days.",
-      "claim.open": "Request {numer} is being handled."
+      "claim.open": "Request {numer} is being handled.",
+      "stop.title": "You are unsubscribed",
+      "stop.done": "We will not send you marketing e-mails any more. Order confirmations still arrive — that is a different thing.",
+      "stop.bad": "This link is invalid or has expired. Write to us and we will remove you by hand."
     }
   }
 }

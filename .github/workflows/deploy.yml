@@ -1142,6 +1142,45 @@ jobs:
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : link do udostepnienia prowadzilby do konsoli"; fail=1;;
             *) ;;
           esac
+          echo "== kampanie : nic nie leci prosto do SMTP =="
+          # Cent messages pousses d un coup depuis une IP qui n en envoie
+          # jamais coutent la reputation du domaine — et avec elle les
+          # confirmations de commande, qui n ont rien demande. On verifie que
+          # le lien de sortie est ajoute PAR LE CODE, et que le jeton de
+          # desabonnement ne vaut que pour son adresse.
+          KAOUT=$(php -r '
+            require_once "'"$DIR_API"'/campaign.php";
+            $c = ["corps" => "Dzien dobry {{imie}}", "sujet" => "x"];
+            $b = wsm_camp_body($c, ["email" => "ala@example.pl", "nom" => "Ala"], "https://x.pl/shop");
+            $lien = str_contains($b, "stop=") && !str_contains($c["corps"], "stop=");
+            $imie = str_contains($b, "Ala") && !str_contains($b, "{{imie}}");
+            $t1 = wsm_camp_stop_token("ala@example.pl");
+            $sien = wsm_camp_stop_ok("ala@example.pl", $t1);
+            $voisin = wsm_camp_stop_ok("bob@example.pl", $t1);
+            $seg = count(WSM_CAMP_SEGMENTS) >= 5;
+            echo ($lien ? "wypis-ok" : "wypis-ZLE"), " ",
+                 ($imie ? "imie-ok" : "imie-ZLE"), " ",
+                 ($sien && !$voisin ? "token-ok" : "token-ZLE"), " ",
+                 ($seg ? "grupy-ok" : "grupy-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || KAOUT="php-ZLE :: $KAOUT"
+          echo "  $KAOUT"
+          case "$KAOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguly kampanii nie dzialaja"; fail=1;;
+            *) ;;
+          esac
+          # Une campagne dont les messages seraient partis d un coup se verrait
+          # ici : on compte ce qui reste EN FILE contre ce qui est deja parti.
+          QC2="SELECT CONCAT('kampanii=', (SELECT COUNT(*) FROM mrszoko.wsm_campaigns), ' w_kolejce=', (SELECT COUNT(*) FROM mrszoko.wsm_messages WHERE template_code='kampania' AND status='kolejka'), ' rezygnacji=', (SELECT COUNT(*) FROM mrszoko.wsm_clients WHERE no_mailing=1))"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            CV2=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QC2" 2>&1 || echo "sql-ZLE")
+          else
+            CV2=$(mysql -N -e "$QC2" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $CV2"
+          case "$CV2" in
+            *ZLE*) echo "  ^ ATTENTION : nie udalo sie policzyc kampanii"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 

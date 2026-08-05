@@ -113,6 +113,7 @@ function console_sections(?array $me = null): array {
             'klienci.php'     => 'Klienci',
             'kontrahenci.php' => 'Kontrahenci',
             'poczta.php'      => 'Poczta',
+            'kampanie.php'    => 'Kampanie',
         ],
 
         // Ce qu'on vend, et à quel prix.
