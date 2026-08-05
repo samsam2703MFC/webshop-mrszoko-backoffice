@@ -812,10 +812,18 @@ jobs:
             $nigdy = ["orders"=>2,"paid_orders"=>0,"revenue"=>0,"unpaid"=>2,
                       "nip"=>"","last_at"=>date("Y-m-d H:i:s", time()-400*86400)];
             $bn = wsm_crm_badges($nigdy, 10000);
+            // Une alerte doit nommer quelqu\'un ET dire quoi faire. Sans le
+            // nom elle oblige à chercher ; sans le geste elle culpabilise.
+            $al = [["type"=>"decroche","severite"=>3,"nom"=>"X","geste"=>"Y","href"=>"klienci.php?email=x"]];
+            $forme = ($al[0]["nom"] ?? "") !== "" && ($al[0]["geste"] ?? "") !== ""
+                  && str_contains($al[0]["href"], "klienci.php");
+            $conc = wsm_crm_concentration([], 5);
             echo (isset($b["staly"]) ? "staly-ok" : "staly-ZLE"), " ",
                  (isset($b["nieoplacone"]) ? "nieoplacone-ok" : "nieoplacone-ZLE"), " ",
                  (isset($bn["nowy"]) && !isset($bn["spiacy"]) ? "nigdy-ok" : "nigdy-ZLE"), " ",
-                 (isset($b["vip"]) && !str_contains($b["vip"], "%") ? "plakietka-bez-procentu-ok" : "plakietka-ZLE");
+                 (isset($b["vip"]) && !str_contains($b["vip"], "%") ? "plakietka-bez-procentu-ok" : "plakietka-ZLE"), " ",
+                 ($forme ? "alert-forma-ok" : "alert-forma-ZLE"), " ",
+                 ($conc["part"] === 0.0 ? "koncentracja-pusta-ok" : "koncentracja-ZLE");
           ' 2>&1); [ $? -eq 0 ] || BOUT="php-ZLE :: $BOUT"
           echo "  $BOUT"
           case "$BOUT" in

@@ -25,6 +25,12 @@ $kpis   = wsm_shop_kpis($pdo);
 $mail   = wsm_mail_kpis($pdo);
 $orders = wsm_orders_list($pdo, 8);
 
+// Ce qui attend quelqu'un DU CÔTÉ DES CLIENTS. Un tableau de bord qui ne
+// montre que les commandes du jour laisse partir les habitués en silence :
+// personne ne remarque une absence, on ne remarque qu'une présence.
+require_once $API . '/crm.php';
+$alertes = wsm_crm_alerts($pdo, 5);
+
 // Ce qui attend quelqu'un : commandes hors stock non encore traitées, et
 // paiements qui n'arrivent pas.
 $toConfirm = (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders WHERE backorder = 1 AND status IN ('nowe','oplacone')")->fetchColumn();
@@ -53,6 +59,29 @@ console_head('Pulpit', $me, <<<'CSS'
   }
 CSS);
 ?>
+
+<?php if ($alertes): ?>
+<div class="panel">
+  <h2>Klienci — co czeka na człowieka <span class="code"><?= count($alertes) ?></span></h2>
+  <p class="lead" style="margin-bottom:12px">
+    Nikt nie zauważa nieobecności — zauważa się tylko obecność. Dlatego stały klient,
+    który przestał kupować, znika po cichu, a jest droższy od nowego.
+  </p>
+  <table class="rwd">
+    <thead><tr><th>Klient</th><th>Co się dzieje</th><th>Co zrobić</th></tr></thead>
+    <tbody>
+    <?php foreach ($alertes as $a): ?>
+      <tr>
+        <td data-l="Klient"><a href="<?= h($a['href']) ?>"><b><?= h($a['nom']) ?></b></a></td>
+        <td data-l="Co się dzieje"><?= h($a['texte']) ?></td>
+        <td data-l="Co zrobić" style="color:var(--text-muted)"><?= h($a['geste']) ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <p style="margin-top:10px"><a class="code" href="klienci.php?widok=analiza">Cała analiza klientów →</a></p>
+</div>
+<?php endif; ?>
 
 <?php if ($missing): ?>
 <p class="warnbox">

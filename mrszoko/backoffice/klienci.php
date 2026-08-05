@@ -63,6 +63,7 @@ $mail = strtolower(trim((string) ($_GET['email'] ?? '')));
 $fiche = $mail !== '' ? wsm_crm_client($pdo, $mail) : null;
 
 $vus = wsm_crm_filtre($liste, $q, $seg, $seuil);
+$onglet = ($_GET['widok'] ?? '') === 'analiza' ? 'analiza' : 'lista';
 
 /** Les segments proposés, avec leur compte réel — un filtre vide se voit. */
 $segments = ['staly' => 'Stali', 'vip' => 'Wysoki obrót', 'spiacy' => 'Śpiący',
@@ -120,6 +121,29 @@ console_head('Klienci', $me, <<<'CSS'
               margin-bottom: 10px; list-style: none; }
   .notes .meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
   .notes { padding: 0; margin: 12px 0 0; }
+  /* Deux barres empilées côte à côte : la hauteur totale est le mois, la
+     séparation dit d'où vient l'argent. Une seule barre colorée n'aurait pas
+     répondu à la question. */
+  .chart { position: relative; padding-right: 70px; min-width: 0; margin-top: 12px; }
+  .chart .bars { display: flex; align-items: flex-end; gap: 3px; height: 150px; min-width: 0; }
+  .chart .bar { display: flex; flex-direction: column; justify-content: flex-end;
+                align-items: center; height: 100%; flex: 1 1 0; min-width: 0; }
+  .chart .fill { display: block; width: 70%; min-height: 0; }
+  .chart .fill.nou { background: var(--caramel-400); border-radius: 3px 3px 0 0; }
+  .chart .fill.fid { background: var(--brand); }
+  .chart .lbl { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted);
+                margin-top: 5px; white-space: nowrap; }
+  @media (max-width: 900px) {
+    .chart .lbl { display: none; }
+    .chart .bar:nth-child(2n+1) .lbl { display: block; }
+  }
+  .chart .scale { position: absolute; right: 0; top: 0; height: 150px;
+                  display: flex; flex-direction: column; justify-content: space-between;
+                  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-align: right; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px;
+            color: var(--text-muted); margin: 10px 0 0; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+              margin-right: 5px; vertical-align: -1px; }
 CSS);
 console_crumbs($fiche
     ? ['Pulpit' => 'pulpit.php', 'Klienci' => 'klienci.php',
@@ -130,6 +154,125 @@ console_crumbs($fiche
 <?php if ($flash !== '') console_flash($flash, $kind); ?>
 
 <?php if (!$fiche): ?>
+
+<div class="tabs">
+  <a href="klienci.php"<?= $onglet === 'lista' ? ' class="on"' : '' ?>>Lista</a>
+  <a href="klienci.php?widok=analiza"<?= $onglet === 'analiza' ? ' class="on"' : '' ?>>Analiza i alerty</a>
+</div>
+
+<?php if ($onglet === 'analiza'):
+  $alertes = wsm_crm_alerts($pdo);
+  $conc    = wsm_crm_concentration($liste, 5);
+  $coh     = wsm_crm_cohorts($pdo, 12);
+  $nvr     = wsm_crm_new_vs_returning($pdo, 12);
+  $maxNvr  = 0;
+  foreach ($nvr as $m) $maxNvr = max($maxNvr, (int) $m['nouveau'] + (int) $m['fidele']);
+?>
+
+<div class="panel">
+  <h2>Co czeka na człowieka <span class="code"><?= count($alertes) ?></span></h2>
+  <p class="why">
+    Alert to <b>rzecz do zrobienia</b>, nie statystyka. „47 klientów" nie jest alertem;
+    „Anna Nowak kupowała co miesiąc i milczy od 140 dni" jest — bo można podnieść słuchawkę.
+    Żadnych wymyślonych wskaźników: tylko liczby, które da się sprawdzić.
+  </p>
+  <?php if (!$alertes): ?>
+  <p class="why">Nic nie wymaga dziś uwagi.</p>
+  <?php else: ?>
+  <table class="rwd">
+    <thead><tr><th>Klient</th><th>Co się dzieje</th><th>Co zrobić</th></tr></thead>
+    <tbody>
+    <?php foreach ($alertes as $a): ?>
+      <tr>
+        <td data-l="Klient">
+          <a href="<?= h($a['href']) ?>"><b><?= h($a['nom']) ?></b></a><br>
+          <span class="bdg <?= $a['severite'] >= 3 ? 'nieoplacone' : ($a['severite'] === 2 ? 'spiacy' : '') ?>">
+            <?= h($a['type']) ?></span>
+        </td>
+        <td data-l="Co się dzieje"><?= h($a['texte']) ?></td>
+        <td data-l="Co zrobić" style="color:var(--text-muted)"><?= h($a['geste']) ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+</div>
+
+<div class="panel">
+  <h2>Skąd bierze się obrót</h2>
+  <p class="why">
+    Dwa sklepy mogą mieć tę samą krzywą sprzedaży: jeden zatrzymuje klientów, drugi ich
+    wymienia. <b>To nie jest ten sam interes</b> — i nie widać tego na żadnym wykresie obrotu.
+    Ciemny słupek to klienci, którzy wrócili; jasny to pierwszy zakup.
+  </p>
+  <?php if ($maxNvr <= 0): ?>
+  <p class="why">Brak zapłaconych zamówień w tym okresie.</p>
+  <?php else: ?>
+  <div class="chart"><div class="bars">
+    <?php foreach ($nvr as $m): $tot2 = (int) $m['nouveau'] + (int) $m['fidele']; ?>
+    <div class="bar" title="<?= h($m['label'] . ' · nowi ' . pln((int) $m['nouveau']) . ' · wracający ' . pln((int) $m['fidele'])) ?>">
+      <?php if ($tot2 > 0): ?>
+      <i class="fill fid" style="height:<?= max(1, (int) round((int) $m['fidele'] / $maxNvr * 100)) ?>%"></i>
+      <i class="fill nou" style="height:<?= max(1, (int) round((int) $m['nouveau'] / $maxNvr * 100)) ?>%"></i>
+      <?php endif; ?>
+      <span class="lbl"><?= h($m['label']) ?></span>
+    </div>
+    <?php endforeach; ?>
+  </div><div class="scale"><span><?= h(pln($maxNvr)) ?></span><span>0</span></div></div>
+  <p class="legend">
+    <span><i style="background:var(--brand)"></i>Wracający klienci</span>
+    <span><i style="background:var(--caramel-400)"></i>Pierwszy zakup</span>
+  </p>
+  <?php endif; ?>
+
+  <h3 style="margin-top:22px;font-size:15px">Koncentracja</h3>
+  <p class="why">
+    Pięciu największych klientów to <b><?= h(number_format((float) $conc['part'], 1, ',', ' ')) ?> %</b>
+    całego obrotu.
+    <?php if ($conc['part'] >= 50): ?>
+    To dużo: odejście jednego z nich nie byłoby incydentem, tylko rokiem.
+    <?php endif; ?>
+  </p>
+  <?php if ($conc['top']): ?>
+  <table class="rwd">
+    <thead><tr><th>Klient</th><th class="num">Obrót</th><th class="num">Udział</th></tr></thead>
+    <tbody>
+    <?php foreach ($conc['top'] as $c): ?>
+      <tr>
+        <td data-l="Klient"><a href="klienci.php?email=<?= rawurlencode($c['email']) ?>"><?= h($c['name'] ?: $c['email']) ?></a></td>
+        <td data-l="Obrót" class="num"><?= h(pln((int) $c['revenue'])) ?></td>
+        <td data-l="Udział" class="num"><?= h(number_format((int) $c['revenue'] / max(1, (int) $conc['total']) * 100, 1, ',', ' ')) ?> %</td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+</div>
+
+<div class="panel">
+  <h2>Czy klienci wracają</h2>
+  <p class="why">
+    Kohorty: z klientów, których <b>pierwszy</b> zakup przypadł na dany miesiąc, ilu kupiło
+    ponownie. To jedyna miara, która mówi, czy sklep buduje bazę, czy co miesiąc zaczyna
+    od zera. Ostatnie miesiące zawsze wyglądają gorzej — ci klienci po prostu nie mieli
+    jeszcze czasu wrócić.
+  </p>
+  <table class="rwd">
+    <thead><tr><th>Pierwszy zakup</th><th class="num">Klientów</th><th class="num">Wróciło</th><th class="num">Odsetek</th></tr></thead>
+    <tbody>
+    <?php foreach (array_reverse($coh) as $r): if ((int) $r['clients'] === 0) continue; ?>
+      <tr>
+        <td data-l="Pierwszy zakup"><?= h($r['label']) ?></td>
+        <td data-l="Klientów" class="num"><?= (int) $r['clients'] ?></td>
+        <td data-l="Wróciło" class="num"><?= (int) $r['revenus'] ?></td>
+        <td data-l="Odsetek" class="num"><b><?= h(number_format((float) $r['pct'], 1, ',', ' ')) ?> %</b></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+
+<?php else: ?>
 
 <div class="kpis">
   <div class="kpi"><b><?= (int) $tot['acheteurs'] ?></b><span>Kupili choć raz</span></div>
@@ -212,6 +355,8 @@ console_crumbs($fiche
   <?php endif; ?>
   <?php endif; ?>
 </div>
+
+<?php endif; /* fin onglet */ ?>
 
 <?php else: /* ---------------------------- LA FICHE ---------------------------- */ ?>
 

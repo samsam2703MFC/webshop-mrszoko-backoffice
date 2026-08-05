@@ -315,3 +315,187 @@ function wsm_crm_filtre(array $liste, string $q = '', string $seg = '', int $seu
     }
     return $out;
 }
+
+// ============================================================================
+//  ANALYSE ET ALERTES (§7)
+//
+//  UNE ALERTE EST UNE CHOSE À FAIRE, PAS UNE STATISTIQUE. « 47 clients » n'est
+//  pas une alerte ; « Anna Nowak achetait tous les mois et n'a rien commandé
+//  depuis 140 jours » en est une, parce qu'on peut décrocher le téléphone.
+//
+//  Trois règles :
+//
+//   1. CHAQUE ALERTE PORTE UN NOM ET UN GESTE. Sans le nom du client, elle
+//      oblige à chercher ; sans le geste, elle culpabilise sans servir.
+//   2. AUCUN SCORE INVENTÉ. Pas de « probabilité de départ à 73 % ». Les
+//      chiffres sont ceux qui se vérifient : combien d'achats, quand, combien.
+//   3. UNE ALERTE QUI NE S'ÉTEINT JAMAIS EST DU BRUIT. Chacune a une
+//      condition de sortie évidente — le client recommande, ou paie.
+// ============================================================================
+
+/** Un client qui achetait régulièrement et s'est tu : la perte la plus chère. */
+const WSM_CRM_DECROCHE_JOURS = 90;
+
+/** Fenêtre pendant laquelle un premier acheteur se transforme — ou pas. */
+const WSM_CRM_SECOND_ACHAT_JOURS = 60;
+
+/**
+ * Ce qui attend quelqu'un, du plus coûteux au moins urgent.
+ *
+ * @return array [['type','severite','email','nom','texte','geste','href'], …]
+ */
+function wsm_crm_alerts(PDO $pdo, int $max = 40): array {
+    $liste = wsm_crm_list($pdo);
+    $seuil = wsm_crm_seuil_vip($liste);
+    $out = [];
+
+    foreach ($liste as $c) {
+        $qui = $c['name'] !== '' ? $c['name'] : $c['email'];
+        $lien = 'klienci.php?email=' . rawurlencode($c['email']);
+        $jours = ($c['last_at'] ?? '') !== ''
+            ? (int) floor((time() - strtotime((string) $c['last_at'])) / 86400) : 0;
+
+        // 1. Un habitué qui décroche. C'est l'alerte qui vaut le plus : il a
+        //    prouvé qu'il achète, et il s'arrête. On perd un client acquis.
+        if ((int) $c['paid_orders'] >= WSM_CRM_FIDELE_MIN && $jours >= WSM_CRM_DECROCHE_JOURS) {
+            $out[] = [
+                'type' => 'decroche', 'severite' => 3, 'email' => $c['email'], 'nom' => $qui,
+                'texte' => 'Kupował ' . (int) $c['paid_orders'] . ' razy (' . pln_crm((int) $c['revenue'])
+                         . '), cisza od ' . $jours . ' dni.',
+                'geste' => 'Napisz — zapytaj, czy czegoś zabrakło.',
+                'href' => $lien,
+            ];
+        }
+
+        // 2. Un client qui pèse et qui laisse des impayés. L'ordre compte :
+        //    relancer un gros compte n'est pas la même conversation.
+        if ((int) $c['unpaid'] > 0 && $seuil > 0 && (int) $c['revenue'] >= $seuil) {
+            $out[] = [
+                'type' => 'nieoplacone_duzy', 'severite' => 3, 'email' => $c['email'], 'nom' => $qui,
+                'texte' => (int) $c['unpaid'] . ' nieopłaconych zamówień u klienta z obrotem '
+                         . pln_crm((int) $c['revenue']) . '.',
+                'geste' => 'Sprawdź zamówienia — może czeka na fakturę proforma.',
+                'href' => $lien,
+            ];
+        }
+
+        // 3. Un premier acheteur qui n'est pas revenu, dans la fenêtre où il
+        //    peut encore le faire. Passé ce délai, il ne reviendra pas parce
+        //    qu'on a écrit — il faudra une vraie raison.
+        if ((int) $c['paid_orders'] === 1 && $jours >= 21 && $jours <= WSM_CRM_SECOND_ACHAT_JOURS) {
+            $out[] = [
+                'type' => 'drugi_zakup', 'severite' => 1, 'email' => $c['email'], 'nom' => $qui,
+                'texte' => 'Kupił raz ' . $jours . ' dni temu i nie wrócił.',
+                'geste' => 'Dobry moment na jedną wiadomość — potem będzie za późno.',
+                'href' => $lien,
+            ];
+        }
+    }
+
+    // 4. Le risque de concentration : si un seul client fait le quart du
+    //    chiffre, son départ n'est pas un incident, c'est une année.
+    $conc = wsm_crm_concentration($liste, 1);
+    if ($conc['part'] >= 25.0 && $conc['top'] !== []) {
+        $p = $conc['top'][0];
+        $out[] = [
+            'type' => 'koncentracja', 'severite' => 2,
+            'email' => $p['email'], 'nom' => $p['name'] !== '' ? $p['name'] : $p['email'],
+            'texte' => 'Jeden klient to ' . number_format($conc['part'], 1, ',', ' ')
+                     . ' % obrotu. Jego odejście nie byłoby incydentem, tylko rokiem.',
+            'geste' => 'Warto wiedzieć — nie ma tu nic do naprawienia dziś.',
+            'href' => 'klienci.php?email=' . rawurlencode($p['email']),
+        ];
+    }
+
+    usort($out, fn($a, $b) => [$b['severite'], $b['type']] <=> [$a['severite'], $a['type']]);
+    return array_slice($out, 0, $max);
+}
+
+/** Le formatage monétaire, local pour ne pas dépendre de la console. */
+function pln_crm(int $g): string {
+    return number_format($g / 100, 2, ',', "\u{202F}") . "\u{202F}zł";
+}
+
+/**
+ * Quelle part du chiffre d'affaires tient à combien de clients.
+ *
+ * @return array ['part' => % du CA fait par les $n premiers, 'top' => [clients]]
+ */
+function wsm_crm_concentration(array $liste, int $n = 5): array {
+    $total = array_sum(array_map(fn($c) => (int) $c['revenue'], $liste));
+    if ($total <= 0) return ['part' => 0.0, 'top' => [], 'total' => 0];
+    $tri = $liste;
+    usort($tri, fn($a, $b) => (int) $b['revenue'] <=> (int) $a['revenue']);
+    $top = array_slice($tri, 0, max(1, $n));
+    $somme = array_sum(array_map(fn($c) => (int) $c['revenue'], $top));
+    return ['part' => round($somme / $total * 100, 1), 'top' => $top, 'total' => $total];
+}
+
+/**
+ * Rétention par cohorte : sur les clients dont le PREMIER achat est de tel
+ * mois, combien ont racheté depuis.
+ *
+ * C'est la seule mesure qui dit si la boutique fidélise ou si elle recommence
+ * chaque mois à zéro — un chiffre d'affaires en hausse porté uniquement par
+ * des nouveaux venus est une fuite, pas une croissance.
+ *
+ * @return array [['ym','clients','revenus','pct'], …] du plus ancien au récent
+ */
+function wsm_crm_cohorts(PDO $pdo, int $months = 12): array {
+    $liste = wsm_crm_list($pdo);
+    $out = [];
+    for ($i = $months - 1; $i >= 0; $i--) {
+        $ym = date('Y-m', strtotime("first day of -$i month"));
+        $out[$ym] = ['ym' => $ym, 'label' => date('m/y', strtotime($ym . '-01')),
+                     'clients' => 0, 'revenus' => 0, 'pct' => 0.0];
+    }
+    foreach ($liste as $c) {
+        if ((int) $c['paid_orders'] < 1 || ($c['first_at'] ?? '') === '') continue;
+        $ym = substr((string) $c['first_at'], 0, 7);
+        if (!isset($out[$ym])) continue;
+        $out[$ym]['clients']++;
+        if ((int) $c['paid_orders'] >= 2) $out[$ym]['revenus']++;
+    }
+    foreach ($out as $ym => $r) {
+        $out[$ym]['pct'] = $r['clients'] > 0 ? round($r['revenus'] / $r['clients'] * 100, 1) : 0.0;
+    }
+    return array_values($out);
+}
+
+/**
+ * Le chiffre d'affaires mois par mois, séparé entre NOUVEAUX clients et
+ * clients qui reviennent.
+ *
+ * Deux boutiques peuvent afficher la même courbe de ventes : l'une garde ses
+ * clients, l'autre les remplace. Ce n'est pas la même affaire, et ça ne se
+ * voit sur aucun graphique de chiffre d'affaires.
+ *
+ * @return array [['label','ym','nouveau','fidele'], …]
+ */
+function wsm_crm_new_vs_returning(PDO $pdo, int $months = 12): array {
+    $out = [];
+    for ($i = $months - 1; $i >= 0; $i--) {
+        $t = strtotime("first day of -$i month");
+        $out[date('Y-m', $t)] = ['ym' => date('Y-m', $t), 'label' => date('m/y', $t),
+                                 'nouveau' => 0, 'fidele' => 0];
+    }
+
+    $cols = wsm_table_columns($pdo, 'wsm_orders');
+    $quand = in_array('paid_at', $cols, true)
+        ? "COALESCE(NULLIF(paid_at, ''), created_at)" : "created_at";
+    $rows = $pdo->query("SELECT LOWER(email) AS em, total_gross, $quand AS q
+                           FROM wsm_orders
+                          WHERE status <> 'anulowane' AND payment_status = 'oplacone'
+                            AND email <> '' ORDER BY q")->fetchAll() ?: [];
+
+    $vus = [];
+    foreach ($rows as $r) {
+        $ym = substr((string) $r['q'], 0, 7);
+        $em = (string) $r['em'];
+        $premier = !isset($vus[$em]);
+        $vus[$em] = true;
+        if (!isset($out[$ym])) continue;
+        $out[$ym][$premier ? 'nouveau' : 'fidele'] += (int) $r['total_gross'];
+    }
+    return array_values($out);
+}
