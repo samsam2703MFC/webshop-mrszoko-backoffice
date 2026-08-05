@@ -380,6 +380,27 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
     }
 
     [$discountPct, $tier] = wsm_discount_for_weight($pdo, $weight);
+
+    // La remise du COMPTE PROFESSIONNEL, si l'acheteur en a un.
+    //
+    // LES DEUX NE S'EMPILENT PAS. Le palier au poids et le tarif pro répondent
+    // à la même question — « combien vous prenez » — et cumuler 20 % et 12 %
+    // donnerait 30 %, soit toute la marge, sur une commande que personne
+    // n'aurait relue. On garde la MEILLEURE des deux, exactement comme deux
+    // paliers entre eux ne se cumulent jamais.
+    //
+    // Ces colonnes existaient depuis le début et n'étaient lues nulle part :
+    // un client « B2B » payait le prix de tout le monde.
+    $b2bFile = __DIR__ . '/b2b.php';
+    $b2b = ['remise' => 0.0, 'franco' => 0, 'b2b' => false, 'source' => ''];
+    if (is_file($b2bFile) && trim((string) ($opts['email'] ?? '')) !== '') {
+        require_once $b2bFile;
+        $b2b = wsm_b2b_conditions($pdo, (string) $opts['email']);
+        if ($b2b['remise'] > $discountPct) {
+            $discountPct = $b2b['remise'];
+            $tier = ['label' => $b2b['source'], 'percent' => $b2b['remise'], 'b2b' => true];
+        }
+    }
     $backorder = false;
 
     // ---- Deuxième passe : les montants -------------------------------------
@@ -440,7 +461,15 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
         if ($weight > $method['max_weight_g']) {
             $e['weight_g'] = 'przesyłka za ciężka: ' . $weight . ' g';
         }
-        $freeShipping = $method['free_from'] > 0 && $itemsGross >= $method['free_from'];
+        // Le seuil de franco du COMPTE PROFESSIONNEL prime quand il est plus
+        // bas : c'est une condition accordée à quelqu'un, elle ne peut pas
+        // être moins bonne que le seuil public. Plus haut, on l'ignore —
+        // sinon un réglage maladroit retirerait un avantage déjà donné.
+        $seuil = (int) $method['free_from'];
+        if ((int) $b2b['franco'] > 0 && ((int) $b2b['franco'] < $seuil || $seuil === 0)) {
+            $seuil = (int) $b2b['franco'];
+        }
+        $freeShipping = $seuil > 0 && $itemsGross >= $seuil;
         if (!$freeShipping) {
             $shipNet   = $method['price_net'];
             $shipGross = $shipNet + (int) round($shipNet * $method['vat_rate']);
@@ -719,7 +748,8 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     $method = (string) ($body['delivery_method'] ?? 'inpost_locker');
     $invoice = !empty($body['invoice']);
 
-    [$quote, $qErr] = wsm_shop_quote($pdo, (array) ($body['items'] ?? []), $method, $lang);
+    [$quote, $qErr] = wsm_shop_quote($pdo, (array) ($body['items'] ?? []), $method, $lang,
+                                     ['email' => (string) ($body['email'] ?? '')]);
     [$buyer, $bErr] = wsm_validate_buyer($body, $method, $invoice);
     $errors = $qErr + $bErr;
     if ($errors) return [null, $errors];
@@ -736,7 +766,7 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     // foi, pas celui qu'a vu le navigateur.
     $shipCountry = (string) ($buyer['ship_country'] ?: WSM_SHOP_HOME_COUNTRY);
     [$quote, $qErr2] = wsm_shop_quote($pdo, (array) ($body['items'] ?? []), $method, $lang,
-        ['country' => $shipCountry, 'vies' => $vies]);
+        ['country' => $shipCountry, 'vies' => $vies, 'email' => (string) ($buyer['email'] ?? '')]);
     if ($qErr2) return [null, $qErr2];
 
     $pdo->beginTransaction();

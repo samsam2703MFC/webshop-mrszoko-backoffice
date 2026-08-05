@@ -754,7 +754,7 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
           fail=0
           # Rien ici n'ouvre la base : le php-cli de ce serveur n'a pas de
           # pilote MySQL (voir la sonde de l'étape précédente). Ce sont les
@@ -895,6 +895,63 @@ jobs:
           case "$VOUT" in
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la valorisation ne se calcule pas juste sur le serveur"; fail=1;;
             *) ;;
+          esac
+          echo "== konta firmowe : rabaty się NIE kumulują =="
+          # Le palier au poids et la remise pro répondent à la même question.
+          # Les cumuler donne 32 % — toute la marge. On vérifie sur le serveur
+          # que le fichier livré applique bien LA MEILLEURE DES DEUX, et qu'il
+          # lit l'adresse du client : sans elle, le prix affiché au devis n'est
+          # pas celui facturé à la caisse, et le panier est abandonné.
+          B2OUT=$(php -r '
+            require_once "'"$DIR_API"'/b2b.php";
+            $prog = WSM_B2B_KG === 100 && WSM_B2B_MOIS === 3 && WSM_B2B_SEG === "B2B";
+            $gr = wsm_b2b_grosze("400,00") === 40000 && wsm_b2b_grosze("400") === 40000;
+            $src = (string) @file_get_contents("'"$DIR_API"'/shop.php");
+            $max = str_contains($src, "\$b2b[\x27remise\x27] > \$discountPct")
+                && !str_contains($src, "\$discountPct += ");
+            $mail = str_contains($src, "\$opts[\x27email\x27]");
+            $karta = "n/d";
+            if (in_array("sqlite", PDO::getAvailableDrivers(), true)) {
+              $p = new PDO("sqlite::memory:", null, null,
+                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+              $p->exec("CREATE TABLE wsm_clients (id INTEGER PRIMARY KEY, email TEXT, seg TEXT, remise TEXT, franco TEXT)");
+              $p->exec("INSERT INTO wsm_clients (email,seg,remise,franco) VALUES
+                          (\x27absurd@x.pl\x27,\x27\x27,\x2790\x27,\x270\x27),
+                          (\x27rabat@x.pl\x27,\x27\x27,\x2710\x27,\x270\x27),
+                          (\x27firma@x.pl\x27,\x27B2B\x27,\x2712\x27,\x27400,00\x27)");
+              $a = wsm_b2b_conditions($p, "absurd@x.pl");
+              $r = wsm_b2b_conditions($p, "rabat@x.pl");
+              $f = wsm_b2b_conditions($p, "firma@x.pl");
+              $karta = ($a["remise"] === 0.0 && $r["remise"] === 10.0 && !$r["b2b"]
+                     && $f["b2b"] && $f["remise"] === 12.0 && $f["franco"] === 40000)
+                     ? "ok" : "ZLE";
+            }
+            echo ($prog ? "progi-ok" : "progi-ZLE"), " ",
+                 ($gr ? "grosze-ok" : "grosze-ZLE"), " ",
+                 ($max ? "bez-kumulacji-ok" : "bez-kumulacji-ZLE"), " ",
+                 ($mail ? "adres-w-wycenie-ok" : "adres-w-wycenie-ZLE"), " ",
+                 "karta-", $karta;
+          ' 2>&1); [ $? -eq 0 ] || B2OUT="php-ZLE :: $B2OUT"
+          echo "  $B2OUT"
+          case "$B2OUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguły konta firmowego nie działają"; fail=1;;
+            *) ;;
+          esac
+          # Une remise hors bornes en base est une SAISIE FAUTIVE : le code la
+          # neutralise, mais elle doit se voir, parce que quelqu'un croit
+          # l'avoir accordée.
+          QB="SELECT CONCAT('firmowych=', COALESCE(SUM(seg='B2B'),0), ' rabatow=', COALESCE(SUM(remise>0),0), ' poza_zakresem=', COALESCE(SUM(remise<0 OR remise>50),0)) FROM mrszoko.wsm_clients"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            BV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QB" 2>&1 || echo "sql-ZLE")
+          else
+            BV=$(mysql -N -e "$QB" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $BV"
+          case "$BV" in
+            *ZLE*) echo "  ^ ATTENTION : nie udało się policzyć kont firmowych"; fail=1;;
+            *poza_zakresem=0) ;;
+            *) echo "  ^ UWAGA : rabat poza zakresem 0-50 % na karcie klienta — jest ignorowany przez sklep, popraw go ręcznie";;
           esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
