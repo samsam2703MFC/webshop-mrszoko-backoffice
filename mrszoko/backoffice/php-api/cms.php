@@ -84,6 +84,7 @@ const WSM_CMS_SECTIONS = [
     'story' => 'O nas',
     'contact' => 'Formularz kontaktowy',
     'sub' => 'Subskrypcja na stronie potwierdzenia',
+    'upsell' => 'Propozycje produktów',
     'seller' => 'Dane sprzedawcy w stopce',
     'footer' => 'Stopka',
     // Page d'accueil

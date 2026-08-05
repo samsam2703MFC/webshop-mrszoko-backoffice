@@ -114,6 +114,51 @@ if ($page === 'sitemap.xml') {
     exit;
 }
 
+/**
+ * Le bloc « może się przydać ».
+ *
+ * CHAQUE CARTE PORTE SA SOURCE : « często kupowane razem » n'est écrit que
+ * sous des produits réellement vus dans les mêmes commandes payées. Le repli
+ * dit « z tej samej półki », ce qui est exact et n'invente aucune
+ * statistique. Une suggestion est une affirmation ; une affirmation fausse
+ * décrédibilise toute la page le jour où quelqu'un s'en aperçoit.
+ */
+function upsell_block(PDO $pdo, array $ids, string $lang, array $S): void {
+    global $WSM_API_DIR;
+    $f = $WSM_API_DIR . '/upsell.php';
+    if (!is_file($f)) return;
+    require_once $f;
+    $sug = wsm_upsell_for($pdo, $ids, $lang);
+    if (!$sug) return;                       // rien d'honnête à proposer : rien
+    ?>
+  <section class="wrap block upsell" style="padding-top:0">
+    <h2><?= e($S['upsell.title'] ?? '') ?></h2>
+    <div class="grid">
+      <?php foreach ($sug as $x): $p = $x['product']; ?>
+      <article class="card">
+        <a class="card-media" href="<?= e(u('p/' . $p['slug'])) ?>">
+          <?= product_visual($p, 'card-photo') ?>
+        </a>
+        <div class="card-body">
+          <p class="card-meta mono"><?= e($S[wsm_upsell_cle($x['source'])] ?? '') ?></p>
+          <h3><a href="<?= e(u('p/' . $p['slug'])) ?>"><?= e($p['name']) ?></a></h3>
+          <div class="card-buy">
+            <span class="price"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></span>
+            <form method="post" action="<?= e(u('koszyk')) ?>" data-add>
+              <?= csrf_field() ?>
+              <input type="hidden" name="add" value="<?= e($p['id']) ?>">
+              <input type="hidden" name="qty" value="1">
+              <button class="btn btn--brand btn--sm" type="submit"><?= e($S['product.add'] ?? '') ?></button>
+            </form>
+          </div>
+        </div>
+      </article>
+      <?php endforeach; ?>
+    </div>
+  </section>
+    <?php
+}
+
 // ============================ ACTIONS (POST) ================================
 if ($method === 'POST') {
     if (!csrf_ok()) { http_response_code(400); exit('Bad request.'); }
@@ -675,6 +720,10 @@ if ($page === 'koszyk') {
       <a class="btn btn--accent btn--lg btn--block" href="<?= e(u('kasa', ['dostawa' => $m['id'] ?? 'inpost_locker'])) ?>"><?= e($S['cart.checkout'] ?? '') ?></a>
     </aside>
   </div>
+  <?php // Les suggestions vivent ICI et pas sur la fiche produit, qui a déjà
+        // sa rangée « podobne ». Deux blocs de propositions sur la même page
+        // se neutralisent : on ne choisit plus, on fait défiler.
+        upsell_block($pdo, array_keys($cart), $lang, $S); ?>
   <?php endif; ?>
 </main>
 <?php
