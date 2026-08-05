@@ -185,8 +185,15 @@ foreach (http('GET', "$BASE/shop/catalog")[1]['products'] as $p) if ($p['id'] ==
 ok('poprawne zamówienie → 201', $co === 201 && !empty($order['code']), [$co, $order]);
 $code = $order['code'] ?? ''; $tok = $order['token'] ?? '';
 ok('numer zamówienia w formacie MS-RRMMDD-NNNN', preg_match('/^MS-\d{6}-\d{4}$/', $code) === 1, $code);
-ok('kwota zamówienia == kwota z wyceny', ($order['total_gross'] ?? 0) === ($qPaid['items_gross'] * 2 + $qPaid['shipping_gross']),
-    [$order['total_gross'] ?? null, $qPaid['items_gross'] * 2 + $qPaid['shipping_gross']]);
+// On compare à un devis de la MÊME quantité, jamais à une extrapolation.
+// Multiplier le devis d'une unité par deux suppose que la livraison reste
+// payante — or franchir le seuil de franco la rend gratuite, et l'assertion
+// accusait alors la commande d'un écart que le client, lui, appelle un cadeau.
+[, $qDeux] = http('POST', "$BASE/shop/quote",
+                  ['items' => [['id' => $prod['id'], 'qty' => 2]], 'delivery_method' => 'inpost_locker']);
+ok('kwota zamówienia == kwota z wyceny dla tej samej ilości',
+    ($order['total_gross'] ?? 0) === (int) ($qDeux['total_gross'] ?? -1),
+    [$order['total_gross'] ?? null, $qDeux['total_gross'] ?? null]);
 
 $stockAfter = null;
 foreach (http('GET', "$BASE/shop/catalog")[1]['products'] as $p) if ($p['id'] === $prod['id']) $stockAfter = $p['stock'];

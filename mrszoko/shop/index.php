@@ -492,7 +492,11 @@ if ($page === 'kontakt') {
 // -------------------------------------------------------------------- PANIER -
 if ($page === 'koszyk') {
     $shipId = (string) ($_GET['dostawa'] ?? 'inpost_locker');
-    [$q, $qErr] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang);
+    // L'adresse déjà saisie sert au devis : sans elle, un client professionnel
+    // verrait le prix public jusqu'au dernier écran, puis un autre montant sur
+    // sa facture. Un prix qui change en cours de route fait abandonner.
+    [$q, $qErr] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang,
+                                 ['email' => (string) ($_POST['email'] ?? $_GET['email'] ?? '')]);
 
     layout_head($S, $lang, $langs, $S['cart.title'] ?? '', '', 'koszyk');
     layout_header($S, $lang, $langs, $cartCount);
@@ -599,7 +603,8 @@ if ($page === 'kasa') {
     $shipId  = (string) ($v['delivery_method'] ?? ($_GET['dostawa'] ?? 'inpost_locker'));
     $shipCty = (string) ($v['ship_country'] ?? ($_GET['kraj'] ?? ''));
     [$q, ] = wsm_shop_quote($pdo, cart_items($cart), $shipId, $lang,
-        ['country' => $shipCty, 'vat_eu' => (string) ($v['vat_eu'] ?? '')]);
+        ['country' => $shipCty, 'vat_eu' => (string) ($v['vat_eu'] ?? ''),
+         'email' => (string) ($v['email'] ?? '')]);
 
     /** Champ de formulaire : valeur réaffichée, erreur montrée sous le champ. */
     $field = function (string $name, string $label, array $opt = []) use ($v, $errors, $S) {

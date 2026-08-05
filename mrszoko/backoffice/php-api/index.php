@@ -176,7 +176,11 @@ if ($sroute !== '') {
         $b = wsm_body();
         [$q, $e] = wsm_shop_quote($pdo, (array) ($b['items'] ?? []),
             (string) ($b['delivery_method'] ?? ''), $lang,
-            ['country' => (string) ($b['country'] ?? ''), 'vat_eu' => (string) ($b['vat_eu'] ?? '')]);
+            // L'adresse compte : sans elle, un client professionnel verrait le
+            // prix public à l'écran et un autre montant sur sa facture. Un prix
+            // qui change entre le devis et la caisse fait abandonner le panier.
+            ['country' => (string) ($b['country'] ?? ''), 'vat_eu' => (string) ($b['vat_eu'] ?? ''),
+             'email' => (string) ($b['email'] ?? '')]);
         if ($e) wsm_send(['error' => 'validation', 'fields' => $e, 'quote' => $q], 422);
         wsm_send($q);
     }

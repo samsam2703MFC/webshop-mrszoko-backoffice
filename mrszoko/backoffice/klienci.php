@@ -25,6 +25,7 @@ $API = console_api_dir();
 require_once $API . '/shop.php';
 require_once $API . '/crm.php';
 require_once $API . '/i18n.php';
+require_once $API . '/b2b.php';
 
 $csrf = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
 if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {
@@ -47,6 +48,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Notatka o kliencie',
                       (string) ($_POST['email'] ?? ''), 'Sieć');
         } else { $flash = $err; $kind = 'err'; }
+    } elseif (isset($_POST['otworz_b2b'])) {
+        [$okB, $msgB] = wsm_b2b_activer($pdo, (string) $_POST['otworz_b2b'], (string) ($me['nom'] ?? ''));
+        $flash = $msgB; $kind = $okB ? 'ok' : 'err';
+    } elseif (isset($_POST['zamknij_b2b'])) {
+        [$okB, $msgB] = wsm_b2b_fermer($pdo, (string) $_POST['zamknij_b2b'], (string) ($me['nom'] ?? ''));
+        $flash = $msgB; $kind = $okB ? 'ok' : 'err';
+    } elseif (isset($_POST['skan_b2b'])) {
+        $r = wsm_b2b_scan($pdo, (string) ($me['nom'] ?? ''));
+        $flash = $r['ouverts'] > 0
+            ? 'Otwarto ' . $r['ouverts'] . ' kont firmowych.'
+            : 'Nikt nowy nie przekroczył progu.';
     } elseif (isset($_POST['usun_notatke'])) {
         wsm_crm_note_delete($pdo, (int) $_POST['usun_notatke']);
         $flash = 'Usunięto notatkę.';
@@ -63,7 +75,7 @@ $mail = strtolower(trim((string) ($_GET['email'] ?? '')));
 $fiche = $mail !== '' ? wsm_crm_client($pdo, $mail) : null;
 
 $vus = wsm_crm_filtre($liste, $q, $seg, $seuil);
-$onglet = ($_GET['widok'] ?? '') === 'analiza' ? 'analiza' : 'lista';
+$onglet = in_array($_GET['widok'] ?? '', ['analiza', 'b2b'], true) ? (string) $_GET['widok'] : 'lista';
 
 /** Les segments proposés, avec leur compte réel — un filtre vide se voit. */
 $segments = ['staly' => 'Stali', 'vip' => 'Wysoki obrót', 'spiacy' => 'Śpiący',
@@ -158,9 +170,85 @@ console_crumbs($fiche
 <div class="tabs">
   <a href="klienci.php"<?= $onglet === 'lista' ? ' class="on"' : '' ?>>Lista</a>
   <a href="klienci.php?widok=analiza"<?= $onglet === 'analiza' ? ' class="on"' : '' ?>>Analiza i alerty</a>
+  <a href="klienci.php?widok=b2b"<?= $onglet === 'b2b' ? ' class="on"' : '' ?>>Konta firmowe</a>
 </div>
 
-<?php if ($onglet === 'analiza'):
+<?php if ($onglet === 'b2b'):
+  $cands = wsm_b2b_candidats($pdo);
+  $nbElig = 0;
+  foreach ($cands as $c) if ($c['eligible'] && !$c['actif']) $nbElig++;
+?>
+<div class="panel">
+  <h2>Konta firmowe <span class="code"><?= count($cands) ?></span></h2>
+  <p class="why">
+    Konto firmowe otwiera się po przekroczeniu <b><?= WSM_B2B_KG ?> kg</b> w ciągu
+    <b><?= WSM_B2B_MOIS ?> miesięcy</b>, liczonych z <b>zapłaconych</b> zamówień: niezapłacone
+    nie dowodzi niczego o zdolności zakupowej.
+  </p>
+  <p class="why">
+    <b>Otwarcie daje CENĘ, nigdy KREDYTU.</b> Rabat <?= h(number_format(WSM_B2B_REMISE, 0, ',', ' ')) ?> %
+    wchodzi od razu; termin płatności i limit kredytowy zostają puste, dopóki człowiek ich nie
+    ustawi. Rabat kosztuje część marży — linia kredytowa kosztuje całą fakturę.
+  </p>
+  <p class="why">
+    Rabaty się <b>nie sumują</b>: próg wagowy i rabat firmowy odpowiadają na to samo pytanie,
+    a 20 % + 12 % dałoby 30 %, czyli całą marżę. Stosuje się <b>lepszy z dwóch</b>.
+  </p>
+
+  <?php if ($isAdmin): ?>
+  <form method="post" style="margin-bottom:14px">
+    <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+    <button class="btn" name="skan_b2b" value="1">Otwórz konta wszystkim uprawnionym
+      <?= $nbElig > 0 ? '(' . $nbElig . ')' : '' ?></button>
+  </form>
+  <?php endif; ?>
+
+  <?php if (!$cands): ?>
+  <p class="why">Nikt nie zbliżył się do progu w ostatnich <?= WSM_B2B_MOIS ?> miesiącach.</p>
+  <?php else: ?>
+  <table class="rwd">
+    <thead><tr>
+      <th>Klient</th><th class="num">Waga (<?= WSM_B2B_MOIS ?> mies.)</th>
+      <th class="num">Rabat</th><th>Stan</th><th></th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ($cands as $c): ?>
+      <tr>
+        <td data-l="Klient">
+          <a href="klienci.php?email=<?= rawurlencode($c['email']) ?>"><b><?= h($c['name'] ?: $c['email']) ?></b></a>
+          <?php if ($c['company'] !== '' && $c['company'] !== $c['name']): ?><br><span style="font-size:12px;color:var(--text-muted)"><?= h($c['company']) ?></span><?php endif; ?>
+        </td>
+        <td data-l="Waga" class="num"><b><?= h(number_format((float) $c['kg'], 1, ',', ' ')) ?> kg</b></td>
+        <td data-l="Rabat" class="num"><?= $c['remise'] > 0 ? h(number_format((float) $c['remise'], 1, ',', ' ')) . ' %' : '—' ?></td>
+        <td data-l="Stan">
+          <?php if ($c['actif']): ?><span class="bdg b2b">konto firmowe</span>
+          <?php elseif ($c['eligible']): ?><span class="bdg spiacy">uprawniony</span>
+          <?php else: ?><span class="bdg">poniżej progu</span><?php endif; ?>
+        </td>
+        <td data-l="">
+          <?php if ($isAdmin): ?>
+          <form method="post" style="display:inline">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <?php if (!$c['actif']): ?>
+              <button class="btn sm" name="otworz_b2b" value="<?= h($c['email']) ?>">Otwórz</button>
+            <?php else: ?>
+              <button class="btn sm ghost" name="zamknij_b2b" value="<?= h($c['email']) ?>">Zamknij</button>
+            <?php endif; ?>
+          </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <p class="why" style="margin-top:12px">
+    Konto zamyka się <b>ręcznie</b>. Gdy wolumen spadnie, ekran to pokaże — ale odcięcie
+    ceny bez uprzedzenia to najlepszy sposób, żeby stracić klienta.
+  </p>
+  <?php endif; ?>
+</div>
+
+<?php elseif ($onglet === 'analiza'):
   $alertes = wsm_crm_alerts($pdo);
   $conc    = wsm_crm_concentration($liste, 5);
   $coh     = wsm_crm_cohorts($pdo, 12);
