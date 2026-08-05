@@ -383,7 +383,12 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
 //  recherche, même statuts que le courrier reçu — et rien n'est perdu si le
 //  SMTP est muet. Voir php-api/contact.php pour les trois filtres anti-robot.
 if ($page === 'kontakt') {
-    require_once dirname(__DIR__) . '/backoffice/php-api/contact.php';
+    // $WSM_API_DIR, PAS un chemin en dur : le déploiement renomme php-api en
+    // api. Écrit en dur, ce require passait en local et TUAIT la page sur le
+    // serveur — 500, corps vide, aucun message dans le navigateur. Le
+    // formulaire de contact a été injoignable en production tant que cette
+    // ligne a nommé un dossier qui n existe que dans le dépôt.
+    require_once $WSM_API_DIR . '/contact.php';
 
     $envoye = false; $cErr = []; $v = [];
     if ($method === 'POST') {
