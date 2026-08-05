@@ -68,7 +68,10 @@ function layout_crumbs(array $items): void {
 }
 
 function layout_header(array $S, string $lang, array $langs, int $cartCount): void {
-    $codeLabel = ['pl' => 'PL', 'uk' => 'UA', 'en' => 'EN'];
+    // Les huit langues du projet. Le code court sert d'étiquette ; « UA »
+    // et non « UK », parce qu'un visiteur ukrainien lit UK comme britannique.
+    $codeLabel = ['pl' => 'PL', 'en' => 'EN', 'uk' => 'UA', 'de' => 'DE',
+                  'fr' => 'FR', 'cs' => 'CS', 'sk' => 'SK', 'hu' => 'HU'];
     $self = strtok((string) ($_SERVER['REQUEST_URI'] ?? u()), '?');
     ?>
 <header class="site-head">

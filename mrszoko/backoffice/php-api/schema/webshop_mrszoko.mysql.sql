@@ -881,3 +881,37 @@ CREATE TABLE IF NOT EXISTS `wsm_platform_periods` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_platform_periods_ym` (`ym`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Langues et historique du contenu traduit.
+--
+--  wsm_langs porte UNE décision : cette langue est-elle servie au public.
+--  Avant, la liste publique se déduisait de « SELECT DISTINCT lang » : une
+--  seule clé traduite en allemand faisait apparaître un drapeau DE menant à
+--  une boutique polonaise à 99 %. La publication est donc explicite.
+--
+--  wsm_i18n_history garde avant → après, qui et quand. Un texte public qui
+--  change sans auteur ne se corrige qu'en relisant tout le site.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_langs` (
+  `code`       VARCHAR(5) NOT NULL,
+  `published`  TINYINT(1) NOT NULL DEFAULT 0,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_i18n_history` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `tbl`        VARCHAR(40) NOT NULL,
+  `lang`       VARCHAR(5) NOT NULL,
+  `k`          VARCHAR(120) NOT NULL,
+  `old_v`      TEXT,
+  `new_v`      TEXT,
+  `origin`     VARCHAR(10) NOT NULL DEFAULT 'human',  -- human | auto | revert
+  `actor`      VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_wsm_i18n_history_lookup` (`tbl`, `lang`, `k`),
+  KEY `ix_wsm_i18n_history_time` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

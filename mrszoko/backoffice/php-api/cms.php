@@ -181,8 +181,15 @@ function wsm_cms_source(string $seedFile): array {
  * @param array $vals ['clé' => ['pl' => '…', 'en' => '…']]
  * @return array [nombre de valeurs changées, liste des clés touchées]
  */
-function wsm_cms_save(PDO $pdo, string $table, array $vals, array $langs): array {
+function wsm_cms_save(PDO $pdo, string $table, array $vals, array $langs, string $actor = ''): array {
     $now = wsm_cms_load($pdo, $table, $langs);
+    // Ce qui part sur un site public a un auteur et une date. On les note ici
+    // parce que c'est le seul endroit qui connaît l'AVANT et l'APRÈS ; le
+    // reconstituer plus tard demanderait de relire la page pour s'apercevoir
+    // qu'un texte a changé.
+    $journal = is_file(__DIR__ . '/i18n.php');
+    if ($journal) require_once __DIR__ . '/i18n.php';
+    $avants = [];
     $upd = $pdo->prepare("UPDATE $table SET v = ? WHERE lang = ? AND k = ?");
     $ins = $pdo->prepare("INSERT INTO $table (lang, k, v) VALUES (?,?,?)");
     $n = 0; $touched = [];
@@ -203,6 +210,16 @@ function wsm_cms_save(PDO $pdo, string $table, array $vals, array $langs): array
                 $st->execute([$lang, $k]);
                 if ((int) $st->fetchColumn()) $upd->execute([$v, $lang, $k]);
                 else                          $ins->execute([$lang, $k, $v]);
+                // Une saisie humaine cesse d'être « à relire » : quelqu'un
+                // vient précisément de la relire, en la tapant.
+                if ($journal && function_exists('wsm_i18n_put')) {
+                    $cols = wsm_table_columns($pdo, $table);
+                    if (in_array('origin', $cols, true)) {
+                        $pdo->prepare("UPDATE $table SET origin = 'human' WHERE lang = ? AND k = ?")
+                            ->execute([$lang, $k]);
+                    }
+                }
+                $avants[] = [$lang, $k, (string) ($now[$k][$lang] ?? ''), $v];
                 $n++;
                 $touched[$k] = true;
             }
@@ -211,6 +228,13 @@ function wsm_cms_save(PDO $pdo, string $table, array $vals, array $langs): array
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         return [0, []];
+    }
+    // Après le commit seulement : un historique qui garderait la trace d'une
+    // transaction annulée raconterait un changement qui n'a pas eu lieu.
+    if ($journal && function_exists('wsm_i18n_log')) {
+        foreach ($avants as [$lang, $k, $old, $new]) {
+            wsm_i18n_log($pdo, $table, $lang, $k, $old, $new, $actor, 'human');
+        }
     }
     return [$n, array_keys($touched)];
 }

@@ -694,6 +694,43 @@ jobs:
           else
             echo "  mysql injoignable (ni secrets ni socket) — pas de preuve directe"
           fi
+          echo "== języki : publikacja jest decyzją, znaczniki przeżywają =="
+          # La bascule la plus risquée de cette version : la liste publique des
+          # langues passe de « ce qui est en base » à « ce qui est coché ». Si
+          # la reprise ratait, l'ukrainien et l'anglais disparaîtraient de la
+          # vitrine sans une ligne de journal, sur des pages déjà indexées.
+          LOUT=$(php -r '
+            require "'"$DIR_API"'/i18n.php";
+            $pdo = wsm_bootstrap();
+            wsm_i18n_ensure($pdo);
+            $pub = wsm_lang_published($pdo);
+            $huit = count(WSM_LANGS) === 8;
+            $pl = in_array("pl", $pub, true);
+            [$okPl] = wsm_lang_publish($pdo, "pl", false);
+            require "'"$DIR_API"'/translate.php";
+            $ph = wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {qty}")
+              && !wsm_tr_placeholders_ok("Koszyk {qty}", "Panier {ilosc}");
+            echo ($huit ? "osiem-ok" : "osiem-ZLE"), " ",
+                 ($pl ? "pl-ok" : "pl-ZLE"), " ",
+                 ($okPl === false ? "filet-ok" : "filet-ZLE"), " ",
+                 ($ph ? "znaczniki-ok" : "znaczniki-ZLE"), " ",
+                 "publiczne=", implode("/", $pub);
+          ' 2>&1) || LOUT="php-ZLE"
+          echo "  $LOUT"
+          case "$LOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : warstwa językowa nie działa poprawnie"; fail=1;;
+            *) ;;
+          esac
+          # Les langues servies hier doivent l'être encore. On le VÉRIFIE sur la
+          # vitrine, pas sur la table : c'est la page qui compte.
+          for L in pl uk en; do
+            EFF=$(curl -skL -o /dev/null -w '%{http_code}' "http://localhost/mrszoko/shop/?lang=$L")
+            HTML=$(curl -skL "http://localhost/mrszoko/shop/?lang=$L" | head -c 400)
+            case "$HTML" in
+              *"lang=\"$L\""*) echo "  sklep w $L : serwowany";;
+              *) echo "  ^ ATTENTION : sklep nie serwuje już języka $L (kod $EFF)"; fail=1;;
+            esac
+          done
           echo "== platforma : brama superadmina i rachunek =="
           # La porte AVANT l'arithmétique : ce module chiffre ce que la boutique
           # doit à son propriétaire. Sans liste configurée il doit être FERMÉ, et

@@ -679,3 +679,25 @@ CREATE TABLE IF NOT EXISTS wsm_platform_periods (
   created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (ym)
 );
+
+-- Langues servies au public (décision explicite, pas effet de bord d'une
+-- traduction partielle) et historique avant → après du contenu traduit.
+CREATE TABLE IF NOT EXISTS wsm_langs (
+  code       TEXT PRIMARY KEY,
+  published  INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wsm_i18n_history (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  tbl        TEXT NOT NULL,
+  lang       TEXT NOT NULL,
+  k          TEXT NOT NULL,
+  old_v      TEXT,
+  new_v      TEXT,
+  origin     TEXT NOT NULL DEFAULT 'human',
+  actor      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wsm_i18n_history_lookup ON wsm_i18n_history (tbl, lang, k);
