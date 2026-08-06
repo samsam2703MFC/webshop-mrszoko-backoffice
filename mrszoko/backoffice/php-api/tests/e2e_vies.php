@@ -213,9 +213,19 @@ $pdo->prepare("UPDATE wsm_shipping_methods SET countries = 'PL,DE' WHERE id = 'i
 
 $plMethods = wsm_shipping_methods($pdo, 'pl', 'PL');
 $deMethods = wsm_shipping_methods($pdo, 'pl', 'DE');
-ok('le Paczkomat n\'est pas proposé à l\'étranger',
-    count($plMethods) === 2 && count($deMethods) === 1
-    && $deMethods[0]['id'] === 'inpost_courier', [count($plMethods), count($deMethods)]);
+// ON VÉRIFIE LA RÈGLE, PAS UN NOMBRE. Cette ligne exigeait « la Pologne a
+// exactement 2 méthodes » : elle est devenue rouge le jour où l'on a ajouté
+// DPD, alors que rien n'était cassé. Un test qui fige un compte se casse à
+// chaque enrichissement du catalogue et n'apprend rien sur la règle — qui
+// est, elle, la seule chose à protéger : un Paczkomat est polonais.
+$punkt = fn(array $ms): array => array_values(array_filter($ms, fn($m) => ($m['kind'] ?? '') === 'punkt'));
+ok('la Pologne se voit bien proposer un point de retrait', $punkt($plMethods) !== [],
+    array_column($plMethods, 'id'));
+ok('le Paczkomat n\'est PAS proposé à l\'étranger', $punkt($deMethods) === [],
+    array_column($punkt($deMethods), 'id'));
+ok('et l\'Allemagne ne voit que ce qui la dessert vraiment',
+    $deMethods !== [] && !in_array('inpost_locker', array_column($deMethods, 'id'), true),
+    array_column($deMethods, 'id'));
 
 // On referme l'Allemagne : l'état de départ est la Pologne seule.
 $pdo->prepare("UPDATE wsm_countries SET active = 0 WHERE code = 'DE'")->execute();

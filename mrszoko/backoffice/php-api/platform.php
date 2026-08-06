@@ -100,6 +100,62 @@ function wsm_superadmin_emails(): array {
     return $out;
 }
 
+// ---------------------------------------------------------------------------
+//  LE CODE DU JOUR — un second verrou sur l'écran de la plateforme
+//
+//  L'écran est déjà derrière la connexion ET le rôle Superadmin. Ce code est
+//  un verrou de PLUS, demandé pour que la facturation de la plateforme ne
+//  s'ouvre pas d'un simple clic sur une session restée ouverte.
+//
+//  LE NOMBRE DE BASE NE VIT PAS DANS CE DÉPÔT, et ce n'est pas négociable :
+//  le dépôt est PUBLIC. Un code écrit ici serait lisible par n'importe qui
+//  sur GitHub dans la minute — il ne verrouillerait donc rien du tout. Il se
+//  règle par WSM_SUPERADMIN_CODE, comme tous les autres secrets.
+//
+//  CE QUE CE CODE VAUT, DIT FRANCHEMENT. Six chiffres fixes plus un chiffre
+//  qui suit le jour de la semaine, ce n'est pas un secret fort : la partie
+//  qui tourne ne rajoute que sept possibilités, et qui voit le code un lundi
+//  connaît celui du mardi. C'est un verrou contre l'ouverture distraite et
+//  contre l'écran laissé sans surveillance — pas contre quelqu'un qui
+//  cherche. D'où le comptage des essais : sans lui, sept chiffres se
+//  devinent en quelques secondes.
+//
+//  SANS CODE CONFIGURÉ, LE VERROU NE S'APPLIQUE PAS. Le fermer par défaut
+//  rendrait l'écran inatteignable pour toujours — exactement l'impasse qu'on
+//  vient de réparer sur superadmin_emails.
+// ---------------------------------------------------------------------------
+const WSM_SUPER_CODE_MAX  = 5;      // essais avant pause
+const WSM_SUPER_CODE_LOCK = 900;    // 15 min, comme la page de connexion
+
+/** Le nombre de base, ou '' s'il n'est pas configuré. */
+function wsm_super_code_base(): string {
+    $v = trim((string) (wsm_config()['superadmin_code'] ?? ''));
+    if ($v === '' || strtolower($v) === 'xxxx') return '';
+    return preg_match('/^[0-9]{4,12}$/', $v) ? $v : '';
+}
+
+/** Le verrou est-il en service ? */
+function wsm_super_code_actif(): bool { return wsm_super_code_base() !== ''; }
+
+/**
+ * Le code attendu AUJOURD'HUI : la base, suivie du jour de la semaine.
+ * Lundi = 1 … dimanche = 7 (norme ISO, celle de `date('N')`).
+ */
+function wsm_super_code_attendu(?int $quand = null): string {
+    $base = wsm_super_code_base();
+    return $base === '' ? '' : $base . date('N', $quand ?? time());
+}
+
+/**
+ * La comparaison. hash_equals plutôt que === : un test qui s'arrête au
+ * premier chiffre faux laisse mesurer combien de chiffres sont bons.
+ */
+function wsm_super_code_ok(string $saisi): bool {
+    $attendu = wsm_super_code_attendu();
+    if ($attendu === '') return true;                 // verrou non configuré
+    return hash_equals($attendu, preg_replace('/[^0-9]/', '', $saisi) ?? '');
+}
+
 /** Le module est-il configuré du tout ? */
 function wsm_platform_enabled(): bool {
     return wsm_superadmin_emails() !== [];

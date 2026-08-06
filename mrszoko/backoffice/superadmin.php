@@ -40,6 +40,103 @@ if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {
         'httponly' => true, 'samesite' => 'Lax', 'secure' => wsm_is_https()]);
 }
 
+// ============================================================================
+//  LE CODE DU JOUR — second verrou, et rien d'autre ne s'exécute avant lui.
+//
+//  L'écran est déjà derrière la connexion et le rôle Superadmin. Celui-ci
+//  ferme le cas de la session laissée ouverte : on ne tombe pas sur la
+//  facturation de la plateforme d'un clic distrait.
+//
+//  IL SE RETIENT POUR LA JOURNÉE, pas pour toujours. Redemander le code à
+//  chaque clic ferait écrire le nombre sur un papier collé à l'écran — ce qui
+//  vaut moins que pas de code du tout. Il expire au changement de jour,
+//  puisque c'est le jour qui le fabrique.
+//
+//  ON COMPTE LES ESSAIS. Sept chiffres dont six fixes se devinent en quelques
+//  secondes si l'on peut essayer sans fin. Même règle que la page de
+//  connexion : cinq essais, puis un quart d'heure.
+// ============================================================================
+if (wsm_super_code_actif()) {
+    $jour = date('Y-m-d');
+    $codeErr = '';
+
+    if (($_SESSION['wsm_super_code_jour'] ?? '') !== $jour) {
+        $bloque = (int) ($_SESSION['wsm_super_code_lock'] ?? 0) > time();
+
+        if (!$bloque && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['kod_dnia'])) {
+            if (!hash_equals($csrf, (string) ($_POST['_t'] ?? ''))) {
+                $codeErr = 'Sesja formularza wygasła. Spróbuj jeszcze raz.';
+            } elseif (wsm_super_code_ok((string) $_POST['kod_dnia'])) {
+                // Régénération : le code ouvre une session privilégiée, et une
+                // session privilégiée ne garde pas l'identifiant d'avant.
+                session_regenerate_id(true);
+                $_SESSION['wsm_super_code_jour'] = $jour;
+                unset($_SESSION['wsm_super_code_try'], $_SESSION['wsm_super_code_lock']);
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Kod dnia — wejście', 'superadmin.php', 'Platforma');
+                header('Location: superadmin.php', true, 303);
+                exit;
+            } else {
+                $n = (int) ($_SESSION['wsm_super_code_try'] ?? 0) + 1;
+                $_SESSION['wsm_super_code_try'] = $n;
+                // Le refus ne dit RIEN du code : ni sa longueur, ni combien de
+                // chiffres étaient bons. Il dit seulement qu'il est faux.
+                $codeErr = 'Nieprawidłowy kod.';
+                if ($n >= WSM_SUPER_CODE_MAX) {
+                    $_SESSION['wsm_super_code_lock'] = time() + WSM_SUPER_CODE_LOCK;
+                    $_SESSION['wsm_super_code_try'] = 0;
+                    $bloque = true;
+                    // Une rafale d'essais sur CET écran mérite une trace
+                    // nominative : c'est la facturation de la plateforme.
+                    wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Kod dnia — zablokowany',
+                              'superadmin.php', 'Platforma');
+                }
+            }
+        }
+
+        if ($bloque) {
+            $codeErr = 'Za dużo prób. Spróbuj za '
+                     . max(1, (int) ceil(((int) $_SESSION['wsm_super_code_lock'] - time()) / 60)) . ' min.';
+        }
+
+        console_head('Superadmin', $me, <<<'CSS'
+          .gate { max-width: 380px; }
+          .gate p { font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin: 0 0 16px; }
+          .gate input { width: 100%; box-sizing: border-box; min-height: 46px; padding: 0 13px;
+                        font-family: var(--font-mono); font-size: 19px; letter-spacing: .22em;
+                        text-align: center; border: 1px solid var(--border-default);
+                        border-radius: var(--radius-md); background: var(--bg-page); color: inherit; }
+          .gate button { width: 100%; min-height: 46px; margin-top: 12px; }
+          .gate .err { border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+                       color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent);
+                       border-radius: var(--radius-md); padding: 10px 12px; font-size: 13.5px;
+                       margin-bottom: 14px; }
+        CSS);
+        console_crumbs(['Pulpit' => 'pulpit.php', 'Superadmin' => null]);
+        ?>
+        <div class="panel gate">
+          <h2>Kod dnia</h2>
+          <?php if ($codeErr !== ''): ?><p class="err" role="alert"><?= h($codeErr) ?></p><?php endif; ?>
+          <p>Ten ekran pokazuje rozliczenie platformy. Poza logowaniem wymaga kodu,
+             który zmienia się każdego dnia.</p>
+          <form method="post" action="superadmin.php">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <?php // inputmode=numeric : le clavier numérique s'ouvre sur un
+                  // téléphone. autocomplete=off : ce code ne se retient pas
+                  // dans un gestionnaire de mots de passe, il change chaque jour. ?>
+            <input type="password" name="kod_dnia" inputmode="numeric" pattern="[0-9]*"
+                   autocomplete="off" autofocus aria-label="Kod dnia"
+                   <?= isset($_SESSION['wsm_super_code_lock']) && (int) $_SESSION['wsm_super_code_lock'] > time() ? 'disabled' : '' ?>>
+            <button class="btn btn--brand" type="submit">Dalej</button>
+          </form>
+          <p style="margin:14px 0 0">Po <?= (int) WSM_SUPER_CODE_MAX ?> błędnych próbach
+             ekran zamyka się na <?= (int) (WSM_SUPER_CODE_LOCK / 60) ?> minut.</p>
+        </div>
+        <?php
+        console_foot();
+        exit;
+    }
+}
+
 $flash = ''; $kind = 'ok'; $errors = [];
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {

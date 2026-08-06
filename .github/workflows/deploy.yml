@@ -276,7 +276,7 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' ADM_EMAIL='${{ secrets.WSM_ADMIN_EMAIL }}' ADM_PASS='${{ secrets.WSM_ADMIN_PASSWORD }}' SUPER_MAILS='${{ secrets.WSM_SUPERADMIN_EMAILS }}' DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
+            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' ADM_EMAIL='${{ secrets.WSM_ADMIN_EMAIL }}' ADM_PASS='${{ secrets.WSM_ADMIN_PASSWORD }}' SUPER_MAILS='${{ secrets.WSM_SUPERADMIN_EMAILS }}' SUPER_CODE='${{ secrets.WSM_SUPERADMIN_CODE }}' DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
           set -e
           DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
           API="$DIR/backoffice/api"
@@ -299,29 +299,41 @@ jobs:
           # toucher au reste du fichier. Celui qui détient ce secret peut déjà
           # déployer le code qu'il veut sur ce serveur : ça n'ouvre aucun
           # pouvoir nouveau, ça rend seulement joignable ce qui était prévu.
-          if [ -n "${SUPER_MAILS:-}" ] && [ -f "$API/config.local.php" ]; then
-            if grep -q "superadmin_emails" "$API/config.local.php"; then
-              echo "superadmin : déjà réglé dans config.local.php — laissé tel quel"
-            elif grep -q "^\s*\];\s*$" "$API/config.local.php"; then
+          # Une seule mécanique pour les deux réglages : déposer une clé dans
+          # config.local.php si elle n'y est pas, sans toucher au reste, et
+          # annuler si le fichier ne se parse plus après coup.
+          poser_cle() {   # poser_cle <clé> <valeur> <phrase si posée> <phrase si absente>
+            if [ -z "${2:-}" ]; then echo "$4"; return; fi
+            if [ ! -f "$API/config.local.php" ]; then
+              echo "  ^ ATTENTION : config.local.php absent — $1 non posé"; return
+            fi
+            if grep -q "$1" "$API/config.local.php"; then
+              echo "$1 : déjà réglé dans config.local.php — laissé tel quel"; return
+            fi
+            if ! grep -q "^\s*\];\s*$" "$API/config.local.php"; then
               # On n'insère QUE dans un fichier de la forme attendue, celle que
               # write_conf() produit. Un fichier édité à la main garde la
               # priorité sur nous : on préfère ne rien faire et le dire.
-              ESC=$(printf '%s' "$SUPER_MAILS" | sed "s/'/\\\\'/g")
-              sed -i "0,/^\s*\];\s*$/s##    'superadmin_emails' => '$ESC',\n];#" "$API/config.local.php"
-              if php -l "$API/config.local.php" >/dev/null 2>&1; then
-                echo "superadmin : adresse(s) déposée(s) dans config.local.php"
-              else
-                echo "  ^ ATTENTION : config.local.php ne se parse plus — annulation"
-                sed -i "/superadmin_emails/d" "$API/config.local.php"
-              fi
-            else
-              echo "  ^ ATTENTION : config.local.php n'a pas la forme attendue — rien touché"
+              echo "  ^ ATTENTION : config.local.php n'a pas la forme attendue — rien touché"; return
             fi
-          elif [ -z "${SUPER_MAILS:-}" ]; then
-            # On le DIT. Sans cette ligne, l'écran Superadmin reste invisible
-            # et on cherche la panne dans le rail, où elle n'est pas.
-            echo "superadmin : aucun secret WSM_SUPERADMIN_EMAILS — écran Platforma invisible pour tout le monde"
-          fi
+            ESC=$(printf '%s' "$2" | sed "s/'/\\\\'/g")
+            sed -i "0,/^\s*\];\s*$/s##    '$1' => '$ESC',\n];#" "$API/config.local.php"
+            if php -l "$API/config.local.php" >/dev/null 2>&1; then
+              echo "$3"
+            else
+              echo "  ^ ATTENTION : config.local.php ne se parse plus — annulation"
+              sed -i "/$1/d" "$API/config.local.php"
+            fi
+          }
+          poser_cle superadmin_emails "${SUPER_MAILS:-}" \
+            "superadmin : adresse(s) déposée(s) dans config.local.php" \
+            "superadmin : aucun secret WSM_SUPERADMIN_EMAILS — écran Platforma invisible pour tout le monde"
+          # Le CODE DU JOUR. Le second verrou de l'écran plateforme. Sa valeur
+          # ne doit jamais apparaître dans un journal : on n'imprime que le
+          # fait qu'il est posé, jamais ce qu'il vaut.
+          poser_cle superadmin_code "${SUPER_CODE:-}" \
+            "kod dnia : liczba bazowa zapisana w config.local.php" \
+            "kod dnia : brak sekretu WSM_SUPERADMIN_CODE — ekran Platforma bez drugiego zamka"
 
           # ── Rebranding et contenu éditorial, PAR DU SQL ÉMIS.
           #
