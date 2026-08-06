@@ -66,6 +66,79 @@ if (in_array('--rebrand', $args, true)) {
     exit(0);
 }
 
+// ---- Retrait des boutiques belges de démonstration (sortie immédiate) ------
+// La maquette d'origine peuplait cinq boutiques belges avec leur chiffre
+// d'affaires et leur taux d'adoption. C'était le décor d'une démonstration de
+// franchise ; l'affaire réelle est UNE boutique à Wrocław. Des chiffres de
+// démonstration qui ressemblent à des vrais sont pires que pas de chiffres :
+// on lit « 29 800 » sur un tableau de bord et on en tire une conclusion.
+//
+// TROIS PRUDENCES, parce qu'une suppression ne se rejoue pas :
+//
+//  1. ON NE SUPPRIME QUE LES CINQ IDENTIFIANTS CONNUS. Pas de TRUNCATE : le
+//     jour où quelqu'un ouvre un second point de vente, ce passage ne doit pas
+//     l'effacer. Il est idempotent — rejoué, il ne trouve plus rien.
+//  2. ON NE TOUCHE PAS À L'AUDIT. Cinq lignes y nomment ces boutiques. Un
+//     journal d'audit est le récit de ce qui s'est passé ; le réécrire pour
+//     faire propre est exactement ce qu'un journal d'audit existe pour
+//     empêcher.
+//  3. ON NE SUPPRIME AUCUN COMPTE. Les liens portée→boutique partent, parce
+//     qu'un lien vers une boutique absente est un compte qui ne voit rien ;
+//     les comptes eux-mêmes ne nous appartiennent pas.
+if (in_array('--purge-demo-shops', $args, true)) {
+    $pdo = wsm_bootstrap();
+    $demo = ['bxl', 'and', 'ucc', 'sch', 'lv'];
+    $in = implode(',', array_fill(0, count($demo), '?'));
+
+    $avant = $pdo->prepare("SELECT id, nom FROM wsm_shops WHERE id IN ($in)");
+    $avant->execute($demo);
+    $trouve = $avant->fetchAll();
+
+    if (!$trouve) {
+        echo "rien à retirer — aucune boutique de démonstration en base\n";
+    } else {
+        $pdo->beginTransaction();
+        try {
+            $l = $pdo->prepare("DELETE FROM wsm_user_shops WHERE shop_id IN ($in)");
+            $l->execute($demo);
+            $liens = $l->rowCount();
+
+            // La portée écrite en toutes lettres sur le compte est un libellé,
+            // pas une clé : sans ce passage, l'écran Użytkownicy afficherait
+            // encore « Bruxelles-Centre » pour un compte qui ne voit plus rien.
+            $p = $pdo->prepare("UPDATE wsm_users SET portee = 'Cała sieć'
+                                 WHERE portee IN ('Bruxelles-Centre','Anderlecht, Uccle','Louvain',
+                                                  'Anderlecht','Uccle','Schaerbeek')");
+            $p->execute();
+            $portees = $p->rowCount();
+
+            $s = $pdo->prepare("DELETE FROM wsm_shops WHERE id IN ($in)");
+            $s->execute($demo);
+            $pdo->commit();
+
+            foreach ($trouve as $t) echo "  retirée : {$t['id']} — {$t['nom']}\n";
+            echo "  liens portée→boutique retirés : $liens\n";
+            echo "  portées ramenées au réseau     : $portees\n";
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            fwrite(STDERR, "échec du retrait : " . $e->getMessage() . "\n");
+            exit(1);
+        }
+    }
+
+    // Ce qui reste et qu'on n'a PAS touché, dit à voix haute. Un nettoyage qui
+    // tait ce qu'il laisse derrière lui se lit comme un nettoyage complet.
+    $reste = (int) $pdo->query("SELECT COUNT(*) FROM wsm_shops")->fetchColumn();
+    echo "  boutiques restantes            : $reste\n";
+    try {
+        $aud = (int) $pdo->query("SELECT COUNT(*) FROM wsm_audit
+                                   WHERE shop IN ('Bruxelles-Centre','Anderlecht','Uccle','Schaerbeek','Louvain')")
+                         ->fetchColumn();
+        if ($aud > 0) echo "  NON TOUCHÉ — $aud ligne(s) d'audit nomment encore ces villes (c'est l'histoire, elle reste)\n";
+    } catch (Throwable $e) { /* table absente : rien à dire */ }
+    exit(0);
+}
+
 // ---- Gestion des comptes (sortie immédiate) --------------------------------
 $idx = array_search('--set-password', $args, true);
 $ensure = array_search('--ensure-admin', $args, true);

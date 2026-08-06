@@ -251,6 +251,16 @@ jobs:
           # dans le code resterait vide sur une base déjà seedée.
           (cd "$API" && php migrate.php --sync-content) || echo 'synchronisation du contenu ignorée'
 
+          # ── Boutiques belges de démonstration. La maquette en peuplait cinq,
+          # avec chiffre d'affaires et taux d'adoption : le décor d'une démo de
+          # franchise, alors que l'affaire réelle est UNE boutique à Wrocław.
+          # Des chiffres de démonstration qui ressemblent à des vrais sont pires
+          # que pas de chiffres — on lit « 29 800 » sur un tableau de bord et on
+          # en tire une conclusion. Ne supprime que les cinq identifiants connus
+          # (jamais un TRUNCATE : un second point de vente réel doit survivre),
+          # ne touche ni à l'audit ni aux comptes. Idempotent.
+          (cd "$API" && php migrate.php --purge-demo-shops) || echo 'retrait des boutiques de démonstration ignoré'
+
           # ── Compte administrateur : créé UNE SEULE FOIS. --ensure-admin ne fait
           # rien si un compte capable de se connecter existe déjà, donc les
           # mots de passe changés par la suite ne sont jamais réécrasés.

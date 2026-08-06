@@ -35,6 +35,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!hash_equals($csrf, (string) ($_POST['_t'] ?? ''))) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może nadawać przesyłki.'; $kind = 'err';
+    } elseif (!wsm_inpost_enabled()) {
+        // LE TRANSPORTEUR FERMÉ SE DIT AVANT D'ESSAYER, PAS APRÈS.
+        // « Prêt » qualifiait la COMMANDE — téléphone, adresse, poids — et
+        // ignorait si le canal était seulement ouvert. Le bouton annonçait
+        // donc « Nadaj wszystkie gotowe (146) », lançait cent quarante-six
+        // appels voués à l'échec, et rendait « Utworzono 0 przesyłek.
+        // Zablokowanych: 146 ». Un compteur qui promet ce qu'il ne peut pas
+        // tenir est la même faute que le bouton qui annonçait 300 sous une
+        // liste de 200.
+        $flash = 'Kanał InPost jest zamknięty — bez tokenu i identyfikatora organizacji '
+               . 'żadna przesyłka nie powstanie. Uzupełnij je w Ustawieniach.';
+        $kind = 'err';
     } elseif (isset($_POST['nadaj'])) {
         $ids = array_map('intval', (array) ($_POST['zam'] ?? []));
         if (!$ids) {
@@ -174,7 +186,18 @@ if ($detail) {
         </label>
         <?php endforeach; ?>
       </div>
-      <?php if ($isAdmin): ?>
+      <?php if ($isAdmin && !$configure): ?>
+      <?php // Canal fermé : pas de bouton qui promette. La raison est ICI, à
+            // l'endroit où l'on allait cliquer, et pas seulement dans le
+            // bandeau du haut — c'est la même règle que l'écran KSeF. ?>
+      <div class="barre">
+        <span class="hint" style="margin:0">
+          <b>Nic stąd nie wyjdzie</b>, dopóki kanał InPost jest zamknięty — dlatego nie ma
+          tu przycisku, który by to obiecywał. Lista poniżej pozostaje listą pracy: te paczki
+          nadaje się na razie ręcznie.
+        </span>
+      </div>
+      <?php elseif ($isAdmin): ?>
       <div class="barre">
         <button type="submit" name="nadaj" value="1">Nadaj zaznaczone</button>
         <?php // Le compte est ÉCRIT SUR LE BOUTON : « nadaj wszystkie » sans
