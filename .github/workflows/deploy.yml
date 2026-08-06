@@ -773,6 +773,20 @@ jobs:
             *ZLE*|"") echo "  ^ ATTENTION : nie udało się odczytać bazy"; fail=1;;
           esac
 
+          # ── Boutiques de démonstration : parties, et VÉRIFIÉ.
+          # Le retrait tourne à l'étape d'amorçage, dans un `(…) || echo` qui
+          # avale son propre échec pour ne pas bloquer un déploiement. Une
+          # étape verte ne prouve donc PAS que le nettoyage a eu lieu — c'est
+          # exactement le genre de vert qu'on croit sur parole et qui n'a rien
+          # fait. On mesure le RÉSULTAT en base, là où il compte.
+          DEMO=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT COUNT(*) FROM wsm_shops WHERE id IN ('bxl','and','ucc','sch','lv');" 2>/dev/null || echo ZLE)
+          case "$DEMO" in
+            0)   echo "  boutiques belges de démonstration : aucune (retrait confirmé)" ;;
+            ZLE) echo "  ^ ATTENTION : nie udało się sprawdzić wsm_shops"; fail=1 ;;
+            *)   echo "  ^ ZLE : $DEMO boutique(s) de démonstration encore en base — le retrait n'a pas tourné"; fail=1 ;;
+          esac
+
           if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
           REMOTE
 
