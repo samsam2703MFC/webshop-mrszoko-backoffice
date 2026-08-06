@@ -43,12 +43,29 @@ jobs:
 
           # -- Back-office → /mrszoko/backoffice --------------------------------
           BO=mrszoko/backoffice
-          cp "$BO"/back_office_ws_franchisor.dc.html "$BO"/api-config.js "$BO"/support.js \
-             "$BO"/bo_server.js "$BO"/menu_api.js "$BO"/menu_seed.js "$BO"/auth-gate.js site/backoffice/
-          cp "$BO"/back_office_ws_franchisor.dc.html site/backoffice/index.html
+          # LA CONSOLE DE FRANCHISE EXPORTÉE N'EST PLUS DÉPLOYÉE.
+          #
+          # Elle pesait 1,2 Mo de React plus six fichiers de script, et une
+          # fois identifié son portier JavaScript renvoyait aussitôt vers
+          # pulpit.php : l'application entière ne servait qu'à porter un
+          # formulaire de connexion. Ce formulaire est désormais login.php,
+          # rendu par le serveur — donc la porte ne dépend plus qu'un script
+          # veuille bien se charger.
+          #
+          # Ce qui reste est ce dont les écrans PHP se servent VRAIMENT : les
+          # feuilles du design system et le logo.
           cp -r "$BO"/_ds site/backoffice/
-          cp -r "$BO"/vendor site/backoffice/
           mkdir -p site/backoffice/img && cp "$BO"/img/logo.png site/backoffice/img/
+          # Une adresse partagée ou mise en favori pointe encore sur index.html.
+          # On la garde donc, réduite à ce qu'elle doit faire : renvoyer vers la
+          # porte. Sans JavaScript, pour la même raison que login.php.
+          cat > site/backoffice/index.html <<'HTML'
+          <!doctype html><html lang="pl"><head><meta charset="utf-8">
+          <meta name="robots" content="noindex, nofollow">
+          <meta http-equiv="refresh" content="0; url=login.php">
+          <title>Konsola Mister Szoko</title></head>
+          <body><p><a href="login.php">Przejdź do logowania</a></p></body></html>
+          HTML
           # webshop_mrszoko API — deployed as ./api/ because the app (served at
           # /mrszoko/backoffice/) derives its API base as <same-origin>/mrszoko/backoffice/api.
           # The local SQLite database (data/) is regenerated on the server, never shipped.
@@ -113,16 +130,16 @@ jobs:
             echo "rail vérifié : chaque entrée du menu a son fichier\n";
           '
 
-          # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
-          # on n'édite pas l'export à la main. On INJECTE une ligne de <script>
-          # dans la copie déployée — l'export du dépôt reste intact.
-          cp mrszoko/backoffice/console-nav.js site/backoffice/
-          if ! grep -q 'console-nav.js' site/backoffice/index.html; then
-            sed -i 's#<script src="auth-gate.js"></script>#&\n<script src="console-nav.js" defer></script>#' \
-                site/backoffice/index.html
-          fi
-          grep -q 'console-nav.js' site/backoffice/index.html \
-            || { echo "le lanceur n'a pas pu être injecté dans index.html"; exit 1; }
+          # Le lanceur console-nav.js n'existe plus : il injectait la navigation
+          # des écrans PHP dans la console exportée, qui n'est plus déployée.
+
+          # La porte doit être là, et elle doit mener quelque part. Une console
+          # sans page de connexion, c'est un back-office inaccessible — et rien
+          # d'autre dans le déploiement ne s'en apercevrait.
+          test -s site/backoffice/login.php \
+            || { echo "login.php absent de l'assemblage : personne ne pourrait entrer"; exit 1; }
+          grep -q 'login.php' site/backoffice/index.html \
+            || { echo "index.html ne renvoie pas vers login.php"; exit 1; }
 
           # Dossier des photos envoyées depuis la console. Il ne contient que
           # son .htaccess : rsync tourne sans --delete, donc les photos déjà
@@ -226,6 +243,29 @@ jobs:
           sshpass -e rsync -rltDz --omit-dir-times \
             -e "ssh -p ${{ vars.SSH_PORT || '22' }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             site/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/"
+
+          # LA CONSOLE DE FRANCHISE, RETIRÉE DU SERVEUR.
+          #
+          # rsync tourne SANS --delete — volontairement, pour que les photos
+          # envoyées depuis la console survivent au déploiement. Conséquence :
+          # cesser de copier un fichier ne le retire pas de là-bas. Les 1,2 Mo
+          # de React continueraient d'être servis, et l'ancienne porte avec eux.
+          #
+          # Liste blanche explicite, jamais un rm générique : ce répertoire
+          # contient aussi tous les écrans PHP. C'est fait ICI, avec le
+          # déploiement, et pas dans le nettoyage de fin — les vérifications
+          # qui suivent doivent voir le serveur tel qu'il sera.
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+          set -u
+          for f in back_office_ws_franchisor.dc.html support.js bo_server.js \
+                   menu_api.js menu_seed.js auth-gate.js console-nav.js api-config.js vendor; do
+            if [ -e "$BO/$f" ]; then rm -rf "${BO:?}/$f" && echo "  retiré : $f"; fi
+          done
+          echo "  console : $(ls -1 "$BO" | wc -l) entrées restantes"
+          REMOTE
 
       # Amorçage du compte de connexion + HTTPS. Après le rsync : migrate.php et
       # config.local.php doivent être en place.
@@ -437,12 +477,14 @@ jobs:
           LP="http://localhost/mrszoko/landing"
           DS="_ds/mister-szoko"
           echo "== backoffice =="
-          for f in / /api-config.js /support.js /bo_server.js /menu_api.js /menu_seed.js \
-                   /vendor/react.js /vendor/react-dom.js \
-                   "/$DS/global.css" "/$DS/brand.css" "/$DS/_ds_bundle.js" \
+          # La console de franchise exportée n'est plus déployée : plus de
+          # support.js, bo_server.js, menu_*.js ni vendor/react*. Ne restent
+          # que la porte et ce dont les écrans PHP se servent.
+          for f in / /login.php "/$DS/global.css" "/$DS/brand.css" "/$DS/_ds_bundle.js" \
                    /img/logo.png; do
             run "$BO$f" 1
           done
+
           # Une seule source de polices : tokens/fonts.css. global.css déclarait
           # douze @font-face pointant sur des fichiers absents — des consignes
           # mortes que le prochain lecteur aurait suivies. Elles ne doivent pas
@@ -550,15 +592,9 @@ jobs:
           curl -skL "$BO/console.css" | grep -q -- '--wsm-bar-h' \
             && echo "  bandeau supérieur d'une seule hauteur : confirmé" \
             || { echo "  ^ NOT OK : le bandeau du haut va se désaligner"; fail=1; }
-          run "$BO/console-nav.js" 1000
-          curl -skL "$BO/" | grep -q 'console-nav.js' \
-            && echo "  la console porte la navigation des écrans : confirmé" \
-            || { echo "  ^ NOT OK : aucun accès aux écrans depuis la console"; fail=1; }
-          # Les libellés de la barre exportée sont la CLÉ des liens profonds
-          # (#ekran=…) : s'ils changent, les renvois depuis les écrans PHP
-          # retombent sur l'accueil sans rien dire. On le voit ici.
-          # Plus aucun lien profond vers la console héritée : nos écrans la
-          # couvrent entièrement. Rien à vérifier de ce côté.
+          # console-nav.js injectait la navigation des écrans PHP dans la
+          # console exportée. Celle-ci n'existe plus : le rail est rendu par
+          # console.php, sur chaque écran, par le serveur.
 
           # Le dossier des photos doit être inscriptible par le serveur web,
           # sinon l'envoi échoue au moment où le client en a besoin.
@@ -1613,6 +1649,34 @@ jobs:
           # La liste n'est PAS écrite ici : elle est DEMANDÉE au rail déployé.
           # Une seconde liste à tenir à jour reproduirait exactement la panne
           # qu'on vient de réparer, avec un cran de retard supplémentaire.
+          # LA PORTE, POUR DE VRAI. Une page de connexion qui répond 200 mais
+          # ne porte pas de formulaire est une console inaccessible, et rien
+          # d'autre ici ne s'en apercevrait.
+          LH=$(curl -skL "$BO/login.php")
+          echo "$LH" | grep -q 'name="password"' \
+            && echo "  formularz logowania: obecny" \
+            || { echo "  ^ NOT OK : brak pola hasła — nikt się nie zaloguje"; fail=1; }
+          echo "$LH" | grep -q 'name="_t"' \
+            && echo "  token CSRF: obecny" \
+            || { echo "  ^ NOT OK : formularz bez tokenu CSRF"; fail=1; }
+          # Sans JavaScript, et c'est le sujet : un script qui ne charge pas ne
+          # doit plus pouvoir fermer la porte.
+          echo "$LH" | grep -q '<script' \
+            && { echo "  ^ ATTENTION : strona logowania zależy od JavaScriptu"; fail=1; } \
+            || echo "  logowanie bez JavaScriptu: potwierdzone"
+          # L'ancienne adresse doit continuer de mener quelque part.
+          curl -skL "$BO/index.html" | grep -q 'login.php' \
+            && echo "  index.html kieruje na login.php" \
+            || { echo "  ^ NOT OK : stary adres prowadzi donikąd"; fail=1; }
+          # Et les 1,2 Mo doivent avoir disparu du serveur.
+          for mort in /support.js /bo_server.js /menu_api.js /menu_seed.js /vendor/react-dom.js; do
+            MC=$(curl -sk -o /dev/null -w '%{http_code}' "$BO$mort")
+            case "$MC" in
+              404|403) echo "  $MC  $mort (retiré)" ;;
+              *) echo "  ^ ZLE : $mort répond encore $MC — l'ancienne console est toujours servie"; fail=1 ;;
+            esac
+          done
+
           ECRANS=$(php -r '
             require_once "'"$DIR_BO"'/console.php";
             foreach (console_sections(["role" => "Centrala"]) as $i)
