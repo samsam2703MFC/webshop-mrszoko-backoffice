@@ -121,6 +121,24 @@ function wsm_role_de(?array $u): string {
  * est fermé. C'est le sens de la liste — on énumère ce qu'on ouvre, jamais ce
  * qu'on ferme, sinon chaque écran livré serait ouvert à tous par défaut.
  */
+/**
+ * Cet écran doit-il NIER SON EXISTENCE plutôt que se dire interdit ?
+ *
+ * Un refus ordinaire se dit : « cet écran n'est pas de ton métier » est un
+ * 403, il aide, et on sait à qui demander. L'écran de la plateforme est d'une
+ * autre nature — il chiffre ce que la boutique doit à qui la lui loue. Un 403
+ * confirmerait à un locataire curieux qu'il y a quelque chose derrière, et
+ * c'est déjà la moitié du travail de qui cherche.
+ *
+ * La règle vit ici, et pas dans la page : la page ne s'exécute jamais, le
+ * garde de console_boot() répond avant elle. Elle y était écrite en
+ * commentaire et n'était plus appliquée depuis que les écrans sont gardés en
+ * amont — un 403 partait à sa place.
+ */
+function wsm_ecran_cache(string $ecran): bool {
+    return strtolower(basename($ecran)) === 'superadmin.php';
+}
+
 function wsm_droit_ecran(?array $u, string $ecran): string {
     $role = wsm_role_de($u);
     $def  = wsm_roles()[$role] ?? [];

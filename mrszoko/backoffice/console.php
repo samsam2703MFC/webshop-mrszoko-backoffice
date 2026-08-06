@@ -60,6 +60,25 @@ function console_boot(): array {
     $ecran = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
     $droit = wsm_droit_ecran($me, $ecran);
     if ($droit === '') {
+        // DEUX REFUS QUI NE DISENT PAS LA MÊME CHOSE.
+        //
+        // « Cet écran n'est pas de ton métier » est un 403 : il existe, il ne
+        // t'est pas ouvert, et le dire aide — on sait à qui demander.
+        //
+        // L'écran de la plateforme, lui, chiffre ce que la boutique doit à
+        // qui la lui loue. Un 403 confirmerait à un locataire curieux qu'il y
+        // a quelque chose derrière ; superadmin.php écrit d'ailleurs cette
+        // règle en toutes lettres et rend un 404. Sauf que depuis que
+        // console_boot() garde les écrans, c'est le 403 générique qui partait
+        // en premier — la règle était écrite, plus appliquée. Elle l'est de
+        // nouveau ici, avant que le reste ne s'exécute. Le « qui » est dans
+        // auth.php (wsm_ecran_cache) pour qu'une suite puisse le tenir.
+        if (wsm_ecran_cache($ecran)) {
+            http_response_code(404);
+            header('Content-Type: text/html; charset=utf-8');
+            exit('<!doctype html><meta charset="utf-8"><title>404</title>'
+               . '<p style="font:16px system-ui;padding:2rem">Nie znaleziono strony.</p>');
+        }
         // Cacher le lien dans le rail n'est pas une protection : l'adresse se
         // devine, se retient et se partage. La page se garde elle-même.
         http_response_code(403);
@@ -72,7 +91,47 @@ function console_boot(): array {
            . 'Jeśli powinien być, poproś administratora o zmianę roli.<br>'
            . '<a href="pulpit.php">← Wróć na pulpit</a></p>');
     }
+    wsm_console_mesure($pdo, $me, $ecran);
     return [$pdo, $me, $droit === 'w'];
+}
+
+/**
+ * L'ENREGISTREUR DE PAGES, branché au seul endroit par lequel tout passe.
+ *
+ * Il est posé ICI et nulle part ailleurs : chaque écran de la console démarre
+ * par console_boot(), donc aucun ne peut être oublié — et un écran ajouté
+ * demain est mesuré sans que personne ait à y penser. C'est la même raison
+ * qui a fait dériver la liste du rail depuis console_sections() plutôt que de
+ * la recopier : une seconde liste à tenir à jour est une liste qui ment.
+ *
+ * ON MESURE À L'EXTINCTION, pas maintenant. À cette ligne la page n'est pas
+ * rendue, donc sa durée n'existe pas encore. register_shutdown_function()
+ * s'exécute quoi qu'il arrive — y compris pour les écrans qui se terminent
+ * par un exit(), comme les impressions et les étiquettes, qui autrement
+ * n'auraient jamais été comptés.
+ *
+ * Ce qui part en base est décidé dans usage.php : l'écran, le rôle, la durée.
+ * Ni l'adresse complète, ni la personne. Les raisons y sont écrites.
+ */
+function wsm_console_mesure(PDO $pdo, array $me, string $ecran): void {
+    // Règle 5 : un POST est un geste, pas une visite. Il est déjà au journal
+    // d'audit, et le compter ici doublerait chaque envoi de formulaire.
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') return;
+
+    $u = console_api_dir() . '/usage.php';
+    if (!is_file($u)) return;                       // déploiement partiel : on se tait
+    require_once $u;
+
+    $ecran = wsm_usage_ecran($ecran);
+    if ($ecran === '') return;
+    $rola  = function_exists('wsm_role_de') ? wsm_role_de($me) : '';
+    $skad  = wsm_usage_skad((string) ($_SERVER['HTTP_REFERER'] ?? ''), $ecran);
+    $debut = (float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
+
+    register_shutdown_function(static function () use ($pdo, $ecran, $rola, $skad, $debut) {
+        $ms = (int) round((microtime(true) - $debut) * 1000);
+        wsm_usage_record($pdo, $ecran, $rola, $ms, $skad);
+    });
 }
 
 /** Le répertoire de l'API, quel que soit le nom du dossier déployé. */
@@ -260,7 +319,21 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
       <?php // Le rail est rangé par métier (console_sections). Une section
             // sans titre — le Pulpit — s'affiche sans en-tête : c'est le point
             // de départ, pas une catégorie. ?>
-      <?php foreach (console_sections($me) as $titre => $items): ?>
+      <?php
+      // « Platforma » sort du rang et descend TOUT EN BAS, sous le lien vers
+      // la boutique. Ce n'est pas un écran de la boutique : il chiffre ce que
+      // la boutique doit à qui la lui loue. Le laisser au milieu des sections
+      // métier le fait lire comme un réglage de plus, et sa place dans la
+      // liste bougeait avec les droits de celui qui regardait. Tout en bas,
+      // il est toujours au même endroit et ne se confond avec rien.
+      //
+      // Il reste dans console_sections() : c'est de là que le déploiement
+      // tire la liste des écrans à vérifier. Une seconde liste mentirait.
+      $sections = console_sections($me);
+      $plateforme = $sections['Platforma'] ?? [];
+      unset($sections['Platforma']);
+      ?>
+      <?php foreach ($sections as $titre => $items): ?>
         <?php if ($titre !== ''): ?><span class="sep"><?= h($titre) ?></span><?php endif; ?>
         <?php foreach ($items as $f => $label): ?>
         <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
@@ -269,6 +342,13 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
 
       <span class="sep">Publiczne</span>
       <a href="../shop/" target="_blank" rel="noopener">Sklep ↗</a>
+
+      <?php if ($plateforme): ?>
+      <span class="sep">Platforma</span>
+      <?php foreach ($plateforme as $f => $label): ?>
+      <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
+      <?php endforeach; ?>
+      <?php endif; ?>
     </nav>
 
     <form class="side-foot" method="post" action="?wyloguj=1">

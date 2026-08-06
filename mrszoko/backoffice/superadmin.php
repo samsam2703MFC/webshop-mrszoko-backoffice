@@ -23,6 +23,7 @@ require_once __DIR__ . '/console.php';
 [$pdo, $me, $isAdmin] = console_boot();
 $API = console_api_dir();
 require_once $API . '/platform.php';
+require_once $API . '/usage.php';
 
 // La porte. Rien au-delà de cette ligne ne s'exécute pour quelqu'un d'autre.
 if (!wsm_is_superadmin($me)) {
@@ -179,6 +180,23 @@ console_head('Superadmin', $me, <<<'CSS'
   .fld input.bad, .fld select.bad { border-color: var(--danger); }
   .hist { font-size: 12.5px; color: var(--text-muted); margin: 14px 0 0; }
   .hist li { margin-bottom: 4px; }
+  /* Une barre DANS la cellule plutôt qu'un graphique à côté : la comparaison
+     entre écrans se fait d'un coup d'œil, sans quitter la ligne qu'on lit. */
+  .use-bar { display: block; height: 6px; border-radius: 3px; background: var(--brand);
+             min-width: 2px; margin-top: 4px; }
+  .use-bar.cold { background: var(--border-default); }
+  .dead { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 0; padding: 0; list-style: none; }
+  .dead li { font-family: var(--font-mono); font-size: 11.5px; padding: 3px 9px;
+             border: 1px solid var(--border-default); border-radius: 999px;
+             color: var(--text-muted); }
+  .flow { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; }
+  .flow li { display: flex; align-items: baseline; gap: 8px; padding: 5px 0;
+             border-bottom: 1px solid var(--border-subtle); }
+  .flow li:last-child { border-bottom: 0; }
+  .flow .f { font-family: var(--font-mono); font-size: 12px; color: var(--text-strong); }
+  .flow .n { margin-left: auto; font-family: var(--font-mono); font-size: 12px;
+             color: var(--text-muted); }
+  .slow { color: var(--warning); font-weight: 600; }
 CSS);
 console_crumbs(['Pulpit' => 'pulpit.php', 'Superadmin' => null]);
 ?>
@@ -407,6 +425,122 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Superadmin' => null]);
       <?php endforeach; ?>
     </ul>
     <?php endif; ?>
+  </div>
+</div>
+
+<?php
+// ============================================================================
+//  L'ENREGISTREUR DE PAGES — ce qu'on mesure pour ranger la console ensuite.
+//
+//  Le rail a été rangé « par métier » d'après l'idée qu'on se faisait du
+//  travail réel. Personne n'a jamais vérifié. Ces quatre tableaux disent ce
+//  qui se passe vraiment, et chacun répond à une question qu'on ne peut pas
+//  deviner en regardant le code.
+//
+//  Il n'y a NI nom NI adresse là-dedans, et ce n'est pas un oubli : on
+//  enregistre l'écran et le rôle, jamais la personne ni la query string. Les
+//  raisons sont écrites en tête de usage.php.
+// ============================================================================
+$uJours   = 30;
+$uEcrans  = wsm_usage_par_ecran($pdo, $uJours);
+$uRoles   = wsm_usage_par_role($pdo, $uJours);
+$uChemins = wsm_usage_chemins($pdo, 10);
+$uMorts   = wsm_usage_morts($pdo, console_menu($me), $uJours);
+$uDepuis  = wsm_usage_depuis($pdo);
+$uTotal   = array_sum(array_column($uEcrans, 'n'));
+$uMax     = $uEcrans ? max(array_column($uEcrans, 'n')) : 0;
+?>
+
+<div class="panel" style="margin-top:20px">
+  <h2>Użycie konsoli — <?= (int) $uJours ?> dni</h2>
+  <p class="why">
+    <?php if ($uDepuis === ''): ?>
+      Rejestrator dopiero ruszył — nie ma jeszcze ani jednej odsłony. Wróć tu za kilka dni:
+      dopóki nie ma pomiarów, <b>zero nic nie znaczy</b>.
+    <?php else: ?>
+      Zapisujemy <b>ekran</b>, <b>rolę</b> i <b>czas serwera</b> — nigdy osoby i nigdy adresu
+      z parametrami (numery zamówień, wyszukiwane nazwiska). Pomiar od
+      <?= h($uDepuis) ?>, <?= (int) $uTotal ?> odsłon.
+      Zapisy osób pozostają tam, gdzie ich miejsce: w Audycie.
+    <?php endif; ?>
+  </p>
+
+  <div class="split" style="margin-top:14px">
+    <div>
+      <h3 style="font-size:14px;margin:0 0 4px">Które ekrany pracują</h3>
+      <?php if (!$uEcrans): ?>
+        <p class="why" style="margin:0">Brak danych.</p>
+      <?php else: ?>
+      <table class="rwd">
+        <thead><tr><th>Ekran</th><th class="num">Odsłony</th><th class="num">Śr. czas</th><th class="num">Najgorszy</th></tr></thead>
+        <tbody>
+          <?php foreach ($uEcrans as $e): ?>
+          <tr>
+            <td data-l="Ekran"><?= h($e['ekran']) ?>
+              <?php // La barre se lit par rapport à l'écran le plus ouvert. ?>
+              <i class="use-bar<?= $e['n'] * 8 < $uMax ? ' cold' : '' ?>"
+                 style="width:<?= $uMax > 0 ? max(2, (int) round($e['n'] / $uMax * 100)) : 2 ?>%"></i></td>
+            <td data-l="Odsłony" class="num"><?= (int) $e['n'] ?></td>
+            <?php // Au-delà de 800 ms on ne « charge » plus une page, on attend. ?>
+            <td data-l="Śr. czas" class="num<?= $e['ms_moy'] >= 800 ? ' slow' : '' ?>"><?= (int) $e['ms_moy'] ?> ms</td>
+            <td data-l="Najgorszy" class="num"><?= (int) $e['ms_max'] ?> ms</td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php endif; ?>
+    </div>
+
+    <div>
+      <h3 style="font-size:14px;margin:0 0 4px">Czego nikt nie otwiera</h3>
+      <p class="why" style="margin:0">
+        <?php // LA sortie la plus utile, et la seule qu'un tableau de compteurs
+              // ne donne pas : un écran jamais ouvert ne produit aucune ligne,
+              // donc ne s'affiche nulle part. On part du rail — ce qui est
+              // LIVRÉ — et on retire ce qui a été vu. Six écrans livrés étaient
+              // morts en production sans que personne le remarque. ?>
+        Ekrany z menu, których w tym okresie nikt nie otworzył.
+        Albo są niepotrzebne, albo nie da się ich znaleźć — jedno i drugie warto wiedzieć.
+      </p>
+      <?php if (!$uMorts): ?>
+        <p class="why" style="margin:8px 0 0"><b>Każdy ekran był używany.</b></p>
+      <?php else: ?>
+        <ul class="dead">
+          <?php foreach ($uMorts as $f => $label): ?>
+          <li title="<?= h($f) ?>"><?= h($label) ?></li>
+          <?php endforeach; ?>
+        </ul>
+      <?php endif; ?>
+
+      <h3 style="font-size:14px;margin:18px 0 4px">Kto pracuje gdzie</h3>
+      <?php if (!$uRoles): ?>
+        <p class="why" style="margin:0">Brak danych.</p>
+      <?php else: ?>
+      <ul class="flow">
+        <?php foreach ($uRoles as $r): ?>
+        <li><span class="f"><?= h($r['rola'] !== '' ? $r['rola'] : '—') ?></span>
+          <span class="n"><?= (int) $r['n'] ?></span></li>
+        <?php endforeach; ?>
+      </ul>
+      <?php endif; ?>
+
+      <h3 style="font-size:14px;margin:18px 0 4px">Co po czym</h3>
+      <p class="why" style="margin:0">
+        <?php // C'est cette liste qui dira comment ranger le rail : deux écrans
+              // qui s'enchaînent tout le temps devraient être voisins. ?>
+        Najczęstsze przejścia. To one mówią, co powinno sąsiadować w menu.
+      </p>
+      <?php if (!$uChemins): ?>
+        <p class="why" style="margin:8px 0 0">Brak danych.</p>
+      <?php else: ?>
+      <ul class="flow">
+        <?php foreach ($uChemins as $c): ?>
+        <li><span class="f"><?= h($c['skad']) ?> → <?= h($c['dokad']) ?></span>
+          <span class="n"><?= (int) $c['n'] ?></span></li>
+        <?php endforeach; ?>
+      </ul>
+      <?php endif; ?>
+    </div>
   </div>
 </div>
 

@@ -183,7 +183,8 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
     foreach (['wsm_langs', 'wsm_i18n_history', 'wsm_message_tr',
               'wsm_client_notes', 'wsm_platform_terms', 'wsm_platform_periods',
               'wsm_voucher_uses', 'wsm_subscriptions', 'wsm_subscription_items',
-              'wsm_claims', 'wsm_links', 'wsm_campaigns'] as $t) {
+              'wsm_claims', 'wsm_links', 'wsm_campaigns',
+              'wsm_page_views', 'wsm_page_paths'] as $t) {
         if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
     }
     $links = __DIR__ . '/links.php';

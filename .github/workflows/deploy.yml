@@ -276,10 +276,52 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' ADM_EMAIL='${{ secrets.WSM_ADMIN_EMAIL }}' ADM_PASS='${{ secrets.WSM_ADMIN_PASSWORD }}' DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
+            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' ADM_EMAIL='${{ secrets.WSM_ADMIN_EMAIL }}' ADM_PASS='${{ secrets.WSM_ADMIN_PASSWORD }}' SUPER_MAILS='${{ secrets.WSM_SUPERADMIN_EMAILS }}' DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
           set -e
           DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
           API="$DIR/backoffice/api"
+
+          # ── QUI EST SUPERADMIN — et pourquoi ça ne marchait pas ───────────
+          #
+          # config.php lit `superadmin_emails` dans getenv('WSM_SUPERADMIN_EMAILS').
+          # Un secret GitHub n'existe QUE pendant le déploiement : PHP-FPM ne
+          # le voit jamais. Et config.local.php, où le réglage aurait sa
+          # place, est écrit une seule fois puis jamais réécrit — il ne
+          # contenait donc pas la clé, et ne l'aurait jamais contenue.
+          #
+          # Résultat : personne ne pouvait devenir superadmin. Le rôle en base
+          # n'aide pas — seul un Superadmin en désigne un autre (règle voulue,
+          # pour qu'un compte Administrator compromis ne se hisse pas jusqu'à
+          # sa propre facturation). Sans amorçage, la porte n'avait plus de
+          # clé du tout, et l'écran de la plateforme était inatteignable.
+          #
+          # On dépose donc la clé DANS config.local.php, une fois, sans
+          # toucher au reste du fichier. Celui qui détient ce secret peut déjà
+          # déployer le code qu'il veut sur ce serveur : ça n'ouvre aucun
+          # pouvoir nouveau, ça rend seulement joignable ce qui était prévu.
+          if [ -n "${SUPER_MAILS:-}" ] && [ -f "$API/config.local.php" ]; then
+            if grep -q "superadmin_emails" "$API/config.local.php"; then
+              echo "superadmin : déjà réglé dans config.local.php — laissé tel quel"
+            elif grep -q "^\s*\];\s*$" "$API/config.local.php"; then
+              # On n'insère QUE dans un fichier de la forme attendue, celle que
+              # write_conf() produit. Un fichier édité à la main garde la
+              # priorité sur nous : on préfère ne rien faire et le dire.
+              ESC=$(printf '%s' "$SUPER_MAILS" | sed "s/'/\\\\'/g")
+              sed -i "0,/^\s*\];\s*$/s##    'superadmin_emails' => '$ESC',\n];#" "$API/config.local.php"
+              if php -l "$API/config.local.php" >/dev/null 2>&1; then
+                echo "superadmin : adresse(s) déposée(s) dans config.local.php"
+              else
+                echo "  ^ ATTENTION : config.local.php ne se parse plus — annulation"
+                sed -i "/superadmin_emails/d" "$API/config.local.php"
+              fi
+            else
+              echo "  ^ ATTENTION : config.local.php n'a pas la forme attendue — rien touché"
+            fi
+          elif [ -z "${SUPER_MAILS:-}" ]; then
+            # On le DIT. Sans cette ligne, l'écran Superadmin reste invisible
+            # et on cherche la panne dans le rail, où elle n'est pas.
+            echo "superadmin : aucun secret WSM_SUPERADMIN_EMAILS — écran Platforma invisible pour tout le monde"
+          fi
 
           # ── Rebranding et contenu éditorial, PAR DU SQL ÉMIS.
           #
@@ -1763,7 +1805,96 @@ jobs:
               *) echo "  $EC  $e  ^ NOT OK"; fail=1 ;;
             esac
           done
+          # ── L'ÉCRAN DE LA PLATEFORME NIE SON EXISTENCE ────────────────────
+          # Il chiffre ce que la boutique doit à qui la lui loue. Un 403
+          # confirmerait à un locataire curieux qu'il y a quelque chose
+          # derrière. Sans session on est redirigé vers la connexion (302),
+          # ce qui est correct ; ce qu'on refuse ici, c'est un 200 en clair.
+          SA=$(curl -skL -o /dev/null -w "%{http_code}" "$BO/superadmin.php")
+          case "$SA" in
+            200) echo "  ^ ZLE : superadmin.php otwiera się BEZ logowania"; fail=1 ;;
+            *)   echo "  superadmin.php bez sesji: $SA — nie otwiera się" ;;
+          esac
+
+          # ── LE REJESTRATOR STRON ──────────────────────────────────────────
+          # Il tourne sur CHAQUE écran de la console. Deux choses peuvent
+          # rater sans bruit : le branchement peut disparaître d'un
+          # console.php réécrit, et les tables peuvent ne pas être créées sur
+          # une base déjà existante — CREATE TABLE IF NOT EXISTS ne rattrape
+          # que les bases neuves. Dans les deux cas l'écran Superadmin
+          # afficherait des zéros, ce qui se lit comme « personne ne travaille »
+          # au lieu de « on ne mesure rien ». On vérifie donc les deux.
+          echo "== rejestrator stron =="
+          grep -q 'wsm_console_mesure' "$DIR_BO/console.php" \
+            && echo "  pomiar wpięty w console_boot: tak" \
+            || { echo "  ^ NOT OK : konsola nie mierzy niczego"; fail=1; }
+          [ -f "$DIR_BO/api/usage.php" ] \
+            && echo "  usage.php dojechał" \
+            || { echo "  ^ NOT OK : brak api/usage.php"; fail=1; }
+          # La règle qui compte : ni adresse complète, ni personne. On la lit
+          # dans le code déployé, pas dans le dépôt — c'est le code déployé qui
+          # écrit en base.
+          grep -q 'HTTP_REFERER' "$DIR_BO/console.php" \
+            && grep -q 'wsm_usage_skad' "$DIR_BO/api/usage.php" \
+            && echo "  referer filtrowany przez usage.php: tak" \
+            || { echo "  ^ ATTENTION : referer trafia gdzie indziej"; fail=1; }
           if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
+          REMOTE
+
+
+      - name: Verify the page recorder writes, and writes nothing personal
+        run: |
+          sshpass -e ssh -p ${{ vars.DEPLOY_PORT || 22 }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
+          fail=0
+          q() { mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e "$1" 2>/dev/null || echo ""; }
+
+          echo "== tabele rejestratora =="
+          # php-cli de ce serveur n'a pas pdo_mysql : on passe par le client
+          # mysql, comme partout ailleurs dans ce déploiement.
+          for t in wsm_page_views wsm_page_paths; do
+            N=$(q "SELECT COUNT(*) FROM information_schema.tables
+                   WHERE table_schema='mrszoko' AND table_name='$t';")
+            [ "${N:-0}" = "1" ] \
+              && echo "  $t : obecna" \
+              || { echo "  ^ ZLE : brak tabeli $t — Superadmin pokaże same zera"; fail=1; }
+          done
+
+          echo "== czego w nich NIE MA =="
+          # LE contrôle qui vaut le déplacement. Un enregistreur qui ramasse
+          # l'adresse complète ou l'identité de la personne devient un fichier
+          # nominatif que personne n'a déclaré — et ça ne se voit pas à l'œil,
+          # parce que la page a exactement la même allure dans les deux cas.
+          # On interroge donc le SCHÉMA RÉEL, pas le fichier .sql du dépôt.
+          COLS=$(q "SELECT GROUP_CONCAT(column_name ORDER BY column_name)
+                    FROM information_schema.columns
+                    WHERE table_schema='mrszoko' AND table_name='wsm_page_views';")
+          echo "  wsm_page_views : ${COLS:-?}"
+          case "$COLS" in
+            *user*|*email*|*imie*|*nazwisko*|*url*|*query*|*ip*)
+              echo "  ^ ZLE : kolumna wskazuje na osobę albo pełny adres"; fail=1 ;;
+            *) echo "  brak kolumny z osobą i z pełnym adresem — potwierdzone" ;;
+          esac
+          # Et par les VALEURS, parce qu'une colonne bien nommée peut très bien
+          # contenir « faktury.php?klient=Kowalski ».
+          SALE=$(q "SELECT COUNT(*) FROM wsm_page_views WHERE ekran LIKE '%?%' OR ekran LIKE '%=%';")
+          [ "${SALE:-0}" = "0" ] \
+            && echo "  żaden zapis nie zawiera parametrów adresu" \
+            || { echo "  ^ ZLE : $SALE zapisów z query stringiem"; fail=1; }
+          SALE2=$(q "SELECT COUNT(*) FROM wsm_page_paths WHERE skad LIKE '%?%' OR dokad LIKE '%?%';")
+          [ "${SALE2:-0}" = "0" ] \
+            && echo "  przejścia też są czyste" \
+            || { echo "  ^ ZLE : $SALE2 przejść z query stringiem"; fail=1; }
+
+          # Combien de mesures ? Zéro n'est PAS une faute sur un déploiement
+          # neuf — personne ne s'est encore connecté. On le dit sans accuser.
+          VUES=$(q "SELECT COALESCE(SUM(n), 0) FROM wsm_page_views;")
+          echo "  odsłon w bazie: ${VUES:-0}"
+          [ "${VUES:-0}" = "0" ] && echo "  (jeszcze nikt nie wszedł po tym wdrożeniu — to nie jest usterka)"
+
+          if [ "$fail" = "0" ]; then echo "ALL RECORDER CHECKS OK"; else echo "RECORDER CHECK FAILED"; exit 1; fi
           REMOTE
 
 
