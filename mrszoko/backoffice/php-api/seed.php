@@ -453,47 +453,125 @@ function wsm_seed_shop(PDO $pdo): void {
  * @return array [clés i18n ajoutées, méthodes de livraison ajoutées]
  */
 function wsm_sync_content(PDO $pdo): array {
+    $livre = wsm_content_livre();
     $added = 0; $ship = 0;
 
-    $sync = function (string $table, string $file) use ($pdo, &$added): void {
-        if (!is_file($file)) return;
-        $doc = json_decode((string) file_get_contents($file), true);
-        if (!is_array($doc) || empty($doc['strings'])) return;
-        $have = [];
+    // Ce qui est DÉJÀ là, lu une fois par table : on n'écrase jamais un
+    // libellé retouché depuis la console.
+    $have = [];
+    foreach (array_unique(array_column($livre['i18n'], 0)) as $table) {
         foreach ($pdo->query("SELECT lang, k FROM $table")->fetchAll() as $r) {
-            $have[$r['lang'] . "\0" . $r['k']] = true;
+            $have[$table . "\0" . $r['lang'] . "\0" . $r['k']] = true;
         }
-        $ins = $pdo->prepare("INSERT INTO $table (lang, k, v) VALUES (?,?,?)");
-        foreach ($doc['strings'] as $lang => $pairs) {
-            foreach ($pairs as $k => $v) {
-                if (isset($have[$lang . "\0" . $k])) continue;
-                $ins->execute([$lang, $k, (string) $v]);
-                $added++;
-            }
-        }
-    };
-
-    $sync('wsm_landing_i18n', __DIR__ . '/../../landing/content_seed.json');
-    $sync('wsm_shop_i18n',    __DIR__ . '/../../shop/content_seed.json');
+    }
+    $ins = [];
+    foreach ($livre['i18n'] as [$table, $lang, $k, $v]) {
+        if (isset($have[$table . "\0" . $lang . "\0" . $k])) continue;
+        $ins[$table] ??= $pdo->prepare("INSERT INTO $table (lang, k, v) VALUES (?,?,?)");
+        $ins[$table]->execute([$lang, $k, $v]);
+        $added++;
+    }
 
     // Modes de livraison : ajoutés s'ils manquent, jamais retarifés d'office —
     // un prix de port se décide en console, pas au déploiement.
-    $shopFile = __DIR__ . '/../../shop/content_seed.json';
-    if (is_file($shopFile)) {
-        $doc = json_decode((string) file_get_contents($shopFile), true);
-        $ins = $pdo->prepare('INSERT INTO wsm_shipping_methods
-            (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
-            VALUES (?,?,?,?,?,?,?,?)');
-        foreach ($doc['shipping'] ?? [] as $m) {
-            $st = $pdo->prepare('SELECT 1 FROM wsm_shipping_methods WHERE id = ?');
-            $st->execute([$m['id']]);
-            if ($st->fetchColumn()) continue;
-            $ins->execute([$m['id'], $m['carrier'] ?? 'inpost', $m['sort_order'] ?? 0, $m['active'] ?? 1,
-                $m['price_net'] ?? 0, $m['vat_rate'] ?? 0.23, $m['free_from'] ?? 0, $m['max_weight_g'] ?? 25000]);
-            $ship++;
-        }
+    $sel = $pdo->prepare('SELECT 1 FROM wsm_shipping_methods WHERE id = ?');
+    $insS = $pdo->prepare('INSERT INTO wsm_shipping_methods
+        (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
+        VALUES (?,?,?,?,?,?,?,?)');
+    foreach ($livre['ship'] as $m) {
+        $sel->execute([$m['id']]);
+        if ($sel->fetchColumn()) continue;
+        $insS->execute([$m['id'], $m['carrier'], $m['sort_order'], $m['active'],
+                        $m['price_net'], $m['vat_rate'], $m['free_from'], $m['max_weight_g']]);
+        $ship++;
     }
     return [$added, $ship];
+}
+
+/**
+ * CE QUE LES FICHIERS DE CONTENU LIVRENT, sans toucher à la base.
+ *
+ * Extrait de wsm_sync_content() pour qu'il existe UNE seule lecture des
+ * fichiers, partagée par la voie « j'exécute » (développement) et la voie
+ * « j'émets du SQL » (déploiement). Deux lectures séparées auraient dérivé au
+ * premier champ ajouté, et la version de production est justement celle que
+ * personne ne relit.
+ *
+ * @return array{i18n: list<array{0:string,1:string,2:string,3:string}>, ship: list<array>}
+ */
+function wsm_content_livre(): array {
+    $out = ['i18n' => [], 'ship' => []];
+    $fichiers = [
+        'wsm_landing_i18n' => __DIR__ . '/../../landing/content_seed.json',
+        'wsm_shop_i18n'    => __DIR__ . '/../../shop/content_seed.json',
+    ];
+    foreach ($fichiers as $table => $file) {
+        if (!is_file($file)) continue;
+        $doc = json_decode((string) file_get_contents($file), true);
+        if (!is_array($doc) || empty($doc['strings'])) continue;
+        foreach ($doc['strings'] as $lang => $pairs) {
+            foreach ((array) $pairs as $k => $v) {
+                $out['i18n'][] = [$table, (string) $lang, (string) $k, (string) $v];
+            }
+        }
+    }
+    $shopFile = $fichiers['wsm_shop_i18n'];
+    if (is_file($shopFile)) {
+        $doc = json_decode((string) file_get_contents($shopFile), true);
+        foreach ((array) ($doc['shipping'] ?? []) as $m) {
+            $out['ship'][] = [
+                'id' => (string) ($m['id'] ?? ''), 'carrier' => (string) ($m['carrier'] ?? 'inpost'),
+                'sort_order' => (int) ($m['sort_order'] ?? 0), 'active' => (int) ($m['active'] ?? 1),
+                'price_net' => (int) ($m['price_net'] ?? 0), 'vat_rate' => (float) ($m['vat_rate'] ?? 0.23),
+                'free_from' => (int) ($m['free_from'] ?? 0), 'max_weight_g' => (int) ($m['max_weight_g'] ?? 25000),
+            ];
+        }
+    }
+    return $out;
+}
+
+/**
+ * Un littéral texte pour MySQL, écrit en HEXADÉCIMAL.
+ *
+ * Pas par goût de l'obscurité : ces chaînes sont du contenu éditorial en trois
+ * langues, pleines d'apostrophes, de guillemets, d'accents et de retours à la
+ * ligne. Les échapper à la main, c'est une famille de bogues — et une famille
+ * d'injections. En hexadécimal il n'y a plus rien à échapper : les octets
+ * passent tels quels, et l'introducteur `_utf8mb4` dit à MySQL comment les
+ * lire. La chaîne vide n'a pas d'hexadécimal, d'où le cas à part.
+ */
+function wsm_sql_txt(string $s): string {
+    return $s === '' ? "''" : '_utf8mb4 0x' . bin2hex($s);
+}
+
+/**
+ * LE MÊME TRAVAIL, ÉMIS EN SQL AU LIEU D'ÊTRE EXÉCUTÉ.
+ *
+ * Pourquoi cette voie existe : le php en ligne de commande du serveur de
+ * production n'a pas pdo_mysql. `php migrate.php --sync-content` n'y a donc
+ * JAMAIS rien fait, et l'échec était avalé par un `|| echo` — trois
+ * déploiements verts n'ont rien synchronisé. Émettre du SQL ne demande aucune
+ * base : le serveur peut le faire, et le client mysql, lui, marche.
+ *
+ * `INSERT IGNORE` porte exactement la règle du mode exécuté : la clé primaire
+ * est (lang, k), donc un libellé déjà présent — y compris retouché depuis la
+ * console — est laissé intact.
+ */
+function wsm_sync_content_sql(): string {
+    $livre = wsm_content_livre();
+    $out = [];
+    foreach ($livre['i18n'] as [$table, $lang, $k, $v]) {
+        $out[] = "INSERT IGNORE INTO $table (lang, k, v) VALUES ("
+               . wsm_sql_txt($lang) . ', ' . wsm_sql_txt($k) . ', ' . wsm_sql_txt($v) . ');';
+    }
+    foreach ($livre['ship'] as $m) {
+        $out[] = 'INSERT IGNORE INTO wsm_shipping_methods'
+               . ' (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g) VALUES ('
+               . wsm_sql_txt($m['id']) . ', ' . wsm_sql_txt($m['carrier']) . ', '
+               . $m['sort_order'] . ', ' . $m['active'] . ', ' . $m['price_net'] . ', '
+               . $m['vat_rate'] . ', ' . $m['free_from'] . ', ' . $m['max_weight_g'] . ');';
+    }
+    return $out ? implode("\n", $out) . "\n" : '';
 }
 
 /**
