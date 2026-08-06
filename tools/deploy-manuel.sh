@@ -190,9 +190,17 @@ distant bash -s <<'REMOTE'
       *)   echo "  ^ ZLE : $e odpowiada $C"; fail=1;;
     esac
   done
-  curl -skL "$BOU/console.css" | grep -q '\.etap' \
-    && echo "  console.css ze stylem etapów: dojechał" \
-    || { echo "  ^ ZLE : console.css bez stylu etapów — przyciski będą za małe"; fail=1; }
+  # Sans tube, comme les contrôles voisins. Écrit « curl … | grep -q », celui-ci
+  # a déclaré le style ABSENT alors qu'il était parfaitement servi : grep -q
+  # s'arrête au premier motif, curl a encore 26 Ko à écrire, SIGPIPE, 141. Ici
+  # le bloc distant ne pose pas pipefail, donc la panne ne s'y déclencherait
+  # pas — mais un `set -o pipefail` ajouté un jour la réveillerait, et ce
+  # jour-là personne ne ferait le lien.
+  CSS=$(curl -skL "$BOU/console.css" || true)
+  case "$CSS" in
+    *".etap"*) echo "  console.css ze stylem etapów: dojechał";;
+    *) echo "  ^ ZLE : console.css bez stylu etapów — przyciski będą za małe"; fail=1;;
+  esac
 
   [ "$fail" = 0 ] && echo "  ── TOUT EST VERT" || { echo "  ── DES CONTRÔLES ONT ÉCHOUÉ"; exit 1; }
 REMOTE
