@@ -245,7 +245,10 @@ function wsm_invoice_issue(PDO $pdo, array $order, string $actor = ''): array {
     $existing = wsm_invoice_for_order($pdo, (int) $order['id']);
     if ($existing) return [$existing, null];
 
-    $kind = !empty($order['invoice']) && trim((string) ($order['nip'] ?? '')) !== '' ? 'faktura' : 'paragon';
+    // LA RÈGLE VIT DANS UNE SEULE FONCTION. Elle était écrite ici en une ligne
+    // — « facture si la case est cochée et qu'un NIP est saisi » — ce qui
+    // donnait une facture à un numéro de TVA que VIES venait de REFUSER.
+    $kind = wsm_invoice_kind_for($order)['kind'];
 
     if ($kind === 'faktura') {
         $miss = wsm_invoice_blockers();
@@ -502,4 +505,152 @@ function wsm_invoice_reminders_run(PDO $pdo): int {
         if (wsm_mail_for_invoice($pdo, $inv, 'przypomnienie', 'automat')) $n++;
     }
     return $n;
+}
+
+// ---------------------------------------------------------------------------
+//  QUEL DOCUMENT POUR CETTE COMMANDE — ET LE PIÈGE QU'IL Y A DERRIÈRE
+//
+//  La règle demandée est simple à dire : facture si le numéro de TVA est
+//  confirmé par VIES, e-paragon sinon. Elle l'est moins à écrire, parce que
+//  « pas confirmé par VIES » recouvre deux situations qui n'ont rien à voir :
+//
+//   · un numéro REFUSÉ par VIES — le client n'est pas l'entreprise qu'il dit
+//     être. Facturer en autoliquidation serait une erreur qui coûte la TVA ;
+//   · une entreprise POLONAISE avec son NIP. VIES ne sert à rien ici : la
+//     vente est domestique, la TVA polonaise s'applique, et une société qui
+//     demande une facture avec son NIP y a droit. Lui rendre un e-paragon
+//     parce qu'aucun appel VIES n'a eu lieu, c'est refuser un document dû.
+//
+//  Le repli sur l'e-paragon est donc le DÉFAUT, pas la punition : il vaut
+//  pour le particulier, pour le numéro refusé, et pour tout ce qu'on ne sait
+//  pas. La facture demande une preuve — VIES pour l'étranger, un NIP valide
+//  pour la Pologne.
+//
+//  ON NE DEVINE JAMAIS DEPUIS L'ÉTAT COURANT DE VIES. Le statut est FIGÉ sur
+//  la commande au moment de la vente (vat_status). Un numéro valable en mars
+//  et révoqué en juin ne doit pas changer le document de mars.
+// ---------------------------------------------------------------------------
+
+/**
+ * Le document dû, et pourquoi. Fonction PURE : c'est elle qu'on teste, et
+ * c'est elle qui décide de ce qui part au fisc.
+ *
+ * @return array{kind:string, raison:string}
+ */
+function wsm_invoice_kind_for(array $order): array {
+    // DEUX FORMES POUR LA MÊME COMMANDE, et c'est un piège qui coûte cher.
+    // La ligne brute de la base porte « vat_status » ; la commande HYDRATÉE
+    // par wsm_order_by_id() range la même chose sous « vat.status ». Ne lire
+    // que la première faisait retomber un numéro REFUSÉ par VIES sur la règle
+    // du NIP — donc sur une facture. Les tests passaient : ils lisaient des
+    // tableaux bruts. C'est en faisant l'aller-retour par la base que ça se voit.
+    $vat = strtolower(trim((string) ($order['vat_status'] ?? ($order['vat']['status'] ?? ''))));
+    $vatEu  = trim((string) ($order['vat_eu'] ?? ''));
+    $nip    = trim((string) ($order['nip'] ?? ''));
+    $veut   = !empty($order['invoice']);
+
+    // 1. La preuve la plus forte : VIES a confirmé le numéro, et il est écrit.
+    if ($vat === 'valid' && $vatEu !== '') {
+        return ['kind' => 'faktura', 'raison' => 'numer VAT UE potwierdzony w VIES'];
+    }
+    // 2. Un numéro EXPLICITEMENT refusé ne donne pas de facture, même si le
+    //    client en a coché la case : le repli est là pour ça.
+    if ($vat === 'invalid') {
+        return ['kind' => 'paragon', 'raison' => 'numer VAT odrzucony przez VIES — paragon'];
+    }
+    // 3. La Pologne. VIES ne prouve rien d'utile pour une vente domestique ;
+    //    le NIP se vérifie par sa clé de contrôle, ce que fait wsm_valid_nip().
+    if ($veut && $nip !== '') {
+        if (!function_exists('wsm_valid_nip')) require_once __DIR__ . '/commerce.php';
+        if (wsm_valid_nip($nip)) {
+            return ['kind' => 'faktura', 'raison' => 'NIP poprawny — faktura krajowa'];
+        }
+        return ['kind' => 'paragon', 'raison' => 'NIP niepoprawny — paragon'];
+    }
+    // 4. Tout le reste : le particulier, et ce qu'on ne sait pas.
+    return ['kind' => 'paragon', 'raison' => $veut
+        ? 'brak numeru do faktury — paragon'
+        : 'klient nie prosił o fakturę — paragon'];
+}
+
+/**
+ * LE DOCUMENT D'UNE COMMANDE, DE BOUT EN BOUT : émis, envoyé, déposé.
+ *
+ * Appelée quand la commande passe à « wysłane », et par le bouton de l'écran
+ * Zamówienia. IDEMPOTENTE dans les trois étages — c'est la seule façon de
+ * pouvoir l'appeler depuis quatre endroits sans compter les documents :
+ *
+ *   · l'émission : wsm_invoice_issue() rend le document existant s'il y en a ;
+ *   · le courrier : la file refuse une clé d'événement déjà vue ;
+ *   · KSeF : un document qui porte déjà un numéro n'y retourne pas.
+ *
+ * ELLE NE LÈVE JAMAIS. Une commande expédiée dont le mail échoue reste une
+ * commande expédiée : faire échouer l'expédition parce que le SMTP est en
+ * panne mettrait le colis en attente pour une raison sans rapport.
+ *
+ * @return array{doc:?array, kind:string, raison:string, mail:bool, ksef:string}
+ */
+function wsm_order_document(PDO $pdo, array $order, string $actor = ''): array {
+    $r = wsm_invoice_kind_for($order);
+    $out = ['doc' => null, 'kind' => $r['kind'], 'raison' => $r['raison'],
+            'mail' => false, 'ksef' => ''];
+
+    [$doc, $err] = wsm_invoice_issue($pdo, $order, $actor);
+    if (!$doc) { $out['raison'] = (string) $err; return $out; }
+    $out['doc']  = $doc;
+    $out['kind'] = (string) $doc['kind'];
+
+    // --- Le courrier ---------------------------------------------------------
+    // La clé d'événement porte le NUMÉRO du document, pas l'identifiant de la
+    // commande : un avoir émis plus tard doit pouvoir partir à son tour.
+    $mail = trim((string) ($order['email'] ?? ''));
+    if ($mail !== '') {
+        try {
+            $lien = wsm_invoice_lien_public($pdo, $order, $doc);
+            $est  = $out['kind'] === 'faktura' ? 'Faktura' : 'Paragon';
+            $id = wsm_mail_queue($pdo, [
+                'order_id'      => (int) $order['id'],
+                'email'         => $mail,
+                'subject'       => $est . ' ' . $doc['number'] . ' — Mister Szoko',
+                'body'          => $est . " do zamówienia " . (string) $order['code'] . ".\n\n"
+                                 . ($lien !== '' ? "Dokument: " . $lien . "\n\n" : '')
+                                 . "Dziękujemy za zakupy.\nMister Szoko",
+                'template_code' => 'dokument',
+                'event_key'     => 'dok:' . $doc['number'],
+                'actor'         => $actor !== '' ? $actor : 'system',
+            ]);
+            $out['mail'] = $id > 0;
+        } catch (Throwable $e) { /* règle : le colis part quand même */ }
+    }
+
+    // --- KSeF ----------------------------------------------------------------
+    // Un e-paragon N'EST PAS une facture : le déposer au registre national y
+    // inscrirait un document qui n'existe pas pour le fisc. wsm_ksef_blockers()
+    // le refuse déjà ; on ne l'appelle même pas.
+    if ($out['kind'] === 'faktura') {
+        $k = __DIR__ . '/ksef.php';
+        if (is_file($k)) {
+            require_once $k;
+            if (function_exists('wsm_ksef_enabled') && wsm_ksef_enabled()) {
+                try {
+                    [$num, $kerr] = wsm_ksef_wyslij($pdo, wsm_invoice_hydrate($pdo, $doc), $actor);
+                    $out['ksef'] = $num !== null && $num !== '' ? (string) $num : (string) $kerr;
+                } catch (Throwable $e) { $out['ksef'] = 'błąd wysyłki do KSeF'; }
+            } else {
+                // Pas une panne : le canal n'est pas ouvert. L'écran KSeF tient
+                // la file, et le document y attendra son tour.
+                $out['ksef'] = 'kanał KSeF zamknięty — dokument czeka w kolejce';
+            }
+        }
+    }
+    return $out;
+}
+
+/** Le lien public du document, s'il en existe un. Jamais de secret dedans. */
+function wsm_invoice_lien_public(PDO $pdo, array $order, array $doc): string {
+    $base = trim((string) (wsm_config()['shop_url'] ?? ''));
+    $tok  = trim((string) ($order['access_token'] ?? ''));
+    if ($base === '' || $tok === '') return '';
+    return rtrim($base, '/') . '/zamowienie/' . rawurlencode((string) $order['code'])
+         . '?t=' . rawurlencode($tok);
 }

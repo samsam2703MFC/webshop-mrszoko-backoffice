@@ -293,8 +293,10 @@ function wsm_dpd_create(PDO $pdo, array $order): array {
                       SET shipment_id = ?, tracking_number = ?, status = 'utworzona'
                     WHERE order_id = ?")
         ->execute([$tracking, $tracking, $order['id']]);
-    $pdo->prepare("UPDATE wsm_orders SET status = 'wyslane' WHERE id = ? AND status <> 'anulowane'")
-        ->execute([$order['id']]);
+    // Passe par le point unique : c'est LUI qui émet la facture ou l'e-paragon,
+    // les envoie et les dépose au KSeF. Écrire l'état à la main ici ferait
+    // partir le colis sans document, et sans une erreur nulle part.
+    wsm_order_status_set($pdo, (int) $order['id'], 'wyslane', 'system');
     wsm_order_event($pdo, (int) $order['id'], 'wysylka_utworzona', $tracking, 'dpd');
 
     // Le client apprend le départ par la messagerie, pas en regardant un

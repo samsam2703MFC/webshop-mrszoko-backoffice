@@ -43,9 +43,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             } elseif ($new === (string) $order['status']) {
                 $flash = 'Zamówienie już ma ten status — nic nie zmieniono.';
             } else {
-                $pdo->prepare("UPDATE wsm_orders SET status = ? WHERE id = ?")->execute([$new, $id]);
+                // Le point unique : passer à « wysłane » émet la facture ou
+                // l'e-paragon, l'envoie et le dépose au KSeF.
+                $chg = wsm_order_status_set($pdo, (int) $id, $new, (string) ($me['nom'] ?? ''));
                 wsm_order_event($pdo, $id, 'status', $new, (string) ($me['nom'] ?? ''));
                 $flash = $order['code'] . ' → ' . ($statusLabel[$new] ?? $new);
+                // CE QUI VIENT D'ÊTRE ÉMIS, DIT TOUT DE SUITE. Un document part
+                // au client et au registre national sur ce clic : le passer sous
+                // silence, c'est le découvrir un mois plus tard dans Faktury.
+                if (($chg['note'] ?? '') !== '') $flash .= ' · ' . $chg['note'];
 
                 // Le client apprend le changement s'il y a un modèle pour cet
                 // état ET si l'opérateur ne l'a pas décoché. Un changement de
