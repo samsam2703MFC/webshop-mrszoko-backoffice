@@ -22,6 +22,7 @@ $API = console_api_dir();
 require_once $API . '/settings.php';
 require_once $API . '/tpay.php';
 require_once $API . '/inpost.php';
+require_once $API . '/dpd.php';
 require_once $API . '/mail.php';
 require_once $API . '/shop.php';
 require_once $API . '/invoice.php';
@@ -69,6 +70,7 @@ $view = wsm_settings_view($pdo);
 $groups = [
     'tpay'   => ['tpay.com — płatności', 'Bez client_id i client_secret nie powstanie żadna transakcja; bez kodu bezpieczeństwa żadne powiadomienie o płatności nie zostanie przyjęte.'],
     'inpost' => ['InPost ShipX — wysyłka', 'Token serwerowy służy do tworzenia etykiet. Token Geowidget trafia do strony sklepu — to token przeglądarkowy.'],
+    'dpd'    => ['DPD Polska — wysyłka pod adres', 'Login, hasło i numer klienta (FID) z panelu DPD. Adres nadawcy jest drukowany na etykiecie: bez niego paczka odrzucona w doręczeniu nie ma dokąd wrócić. API DPD to SOAP — serwer musi mieć rozszerzenie php-soap.'],
     'mail'   => ['Poczta — wiadomości do klientów', 'Bez adresu nadawcy wiadomości czekają w kolejce w zakładce Poczta i nic nie ginie.'],
     'faktura' => ['Faktury', 'Te dane trafiają na każdy wystawiony dokument. Zmiana nie przepisuje faktur już wystawionych — każda z nich trzyma własną kopię.'],
     'sklep'  => ['Sklep', ''],
@@ -77,6 +79,7 @@ $groups = [
 $state = [
     'tpay'    => wsm_tpay_enabled(),
     'inpost'  => wsm_inpost_enabled(),
+    'dpd'     => function_exists('wsm_dpd_enabled') && wsm_dpd_enabled(),
     'mail'    => wsm_mail_enabled(),
     'faktura' => wsm_invoice_blockers() === [],
 ];
@@ -99,6 +102,31 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Ustawienia' => null]);
   Zapisane hasła i tokeny nie są nigdy pokazywane ponownie; puste pole hasła oznacza
   „nie zmieniaj”.
 </p>
+
+<?php
+// UN CHAMP SANS PANNEAU DISPARAÎT SANS UN MOT.
+//
+// Les champs sont déclarés dans settings.php ; les panneaux, ici. Deux listes,
+// et rien ne les appariait : les dix champs DPD ont été déclarés, enregistrés,
+// documentés — et jamais affichés, parce qu'aucun panneau ne portait leur
+// groupe. array_filter() les écartait en silence, et l'écran avait l'air
+// parfaitement normal.
+//
+// On ne peut pas fusionner les deux listes : un panneau porte un titre et une
+// explication, un champ porte un libellé et un type. Mais on peut refuser de
+// se taire.
+$orphelins = [];
+foreach ($view as $k => $f) {
+    if (!isset($groups[$f['group']])) $orphelins[$f['group']] = true;
+}
+if ($orphelins): ?>
+<p class="warnbox">
+  <b>Uwaga dla wdrażającego :</b> pola z grup
+  <b><?= h(implode(', ', array_keys($orphelins))) ?></b> są zadeklarowane,
+  ale żaden panel ich nie pokazuje — nikt ich tu nie ustawi.
+  Dopisz grupę w <code>ustawienia.php</code>.
+</p>
+<?php endif; ?>
 
 <form method="post">
 <?php foreach ($groups as $g => [$title, $intro]):

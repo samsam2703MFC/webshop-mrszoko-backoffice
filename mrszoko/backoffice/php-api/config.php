@@ -181,6 +181,10 @@ $cfg = [
     // fermé (fail-closed) : invisible dans le rail, et la page répond 404.
     // En production, elle vit dans config.local.php, jamais ici.
     'superadmin_emails' => getenv('WSM_SUPERADMIN_EMAILS') ?: '',
+    // Le nombre de BASE du code du jour de l'écran plateforme. Le chiffre du
+    // jour de la semaine s'ajoute tout seul (voir platform.php). Vide = pas de
+    // second verrou. JAMAIS de valeur ici : ce dépôt est public.
+    'superadmin_code'   => getenv('WSM_SUPERADMIN_CODE') ?: '',
 
     // ---- Claude : traduction automatique du contenu -------------------------
     // Sert à remplir les traductions MANQUANTES du site (voir translate.php).
