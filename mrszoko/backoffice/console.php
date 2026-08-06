@@ -123,6 +123,7 @@ function console_sections(?array $me = null): array {
             'magazyn.php'  => 'Magazyn',
             'rabaty.php'   => 'Rabaty',
             'tresci.php'   => 'Treści',
+            'allegro.php'  => 'Allegro',
         ],
 
         // Ce qu'on règle une fois et qu'on ne rouvre presque jamais.

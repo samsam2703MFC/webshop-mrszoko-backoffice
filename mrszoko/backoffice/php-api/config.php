@@ -122,6 +122,21 @@ $cfg = [
         'sandbox'         => (getenv('WSM_INPOST_SANDBOX') ?: '1') !== '0',
     ],
 
+    // ---- Allegro : le second canal de vente --------------------------------
+    //  FERMÉ TANT QUE CES CHAMPS SONT VIDES, et « xxxx » compte pour vide :
+    //  c'est la valeur d'un champ de démonstration, et la prendre pour un
+    //  identifiant ouvrirait une intégration sur du vent.
+    //  Le secret et le jeton de rafraîchissement ne vivent QUE côté serveur
+    //  (config.local.php ou variables d'environnement) — jamais dans le dépôt,
+    //  qui est public.
+    'allegro' => [
+        'client_id'     => getenv('WSM_ALLEGRO_CLIENT_ID') ?: '',
+        'client_secret' => getenv('WSM_ALLEGRO_CLIENT_SECRET') ?: '',
+        'refresh_token' => getenv('WSM_ALLEGRO_REFRESH_TOKEN') ?: '',
+        'seller_id'     => getenv('WSM_ALLEGRO_SELLER_ID') ?: '',
+        'sandbox'       => (getenv('WSM_ALLEGRO_SANDBOX') ?: '1') !== '0',
+    ],
+
     // ---- Superadmin : le propriétaire de la plateforme ---------------------
     // Ce module calcule ce que la boutique DOIT au propriétaire (location +
     // commission). Il ne peut donc pas être ouvert par un rôle attribuable
