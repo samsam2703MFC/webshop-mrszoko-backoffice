@@ -691,14 +691,100 @@ function wsm_invoice_lien_public(PDO $pdo, array $order, array $doc): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Les quatre voyants d'une commande : VIES, document, expédition, envoi.
+ * LE CHEMIN D'UNE COMMANDE, EN BOUTONS.
+ *
+ * Changer un statut était le geste le plus fréquent de la maison et le plus
+ * cher à faire : ouvrir la commande, descendre jusqu'à une liste déroulante,
+ * choisir, valider, revenir à la liste. Cinq écrans pour un mot, répétés
+ * quarante fois par jour, au téléphone, debout dans la réserve.
+ *
+ * Le statut devient donc l'étape elle-même, et l'étape est un bouton. La
+ * suite EST le chemin : Nowe · Opłacone · W realizacji · Wysłane ·
+ * Dostarczone. On lit où en est la commande, et on avance d'un doigt.
+ *
+ * TROIS RÈGLES QUI FONT LA DIFFÉRENCE ENTRE UN OUTIL ET UN PIÈGE :
+ *
+ *  1. L'ÉTAPE SUIVANTE EST MISE EN AVANT. C'est le geste de 95 % des cas ;
+ *     il doit se toucher sans viser.
+ *  2. ON PEUT REVENIR EN ARRIÈRE. Une étape déjà passée reste touchable —
+ *     un doigt qui glisse doit pouvoir se corriger sur place, sinon on
+ *     appelle le patron.
+ *  3. CE QUI ÉMET UN DOCUMENT SE DIT AVANT, PAS APRÈS. L'étape configurée
+ *     dans le Superadmin écrit une facture ou un e-paragon, l'envoie au
+ *     client et le dépose au registre national. Elle porte donc un repère
+ *     et une question qui NOMME le document — pas un « Czy na pewno? »
+ *     que personne ne lit.
+ *
+ * « Anulowane » est mis à l'écart, en rouge : c'est une sortie, pas une
+ * étape. Et une commande annulée ne repart pas — wsm_order_status_set()
+ * refuse, donc on n'affiche pas des boutons qui ne feraient rien.
+ *
+ * @return list<array{code:string, txt:string, etat:string, doc:bool, pyt:string}>
+ *         etat : 'przeszly' passée · 'teraz' actuelle · 'nastepny' la suivante
+ *                · 'dalszy' plus loin · 'zly' l'annulation · 'niemozliwy' figée
+ *         pyt  : la question à poser avant d'agir, ou '' s'il n'y a rien à
+ *                confirmer
+ */
+function wsm_order_etapy(PDO $pdo, array $o): array {
+    $st   = (string) ($o['status'] ?? '');
+    $reg  = wsm_orders_cfg();
+    $flux = ['nowe' => 'Nowe', 'oplacone' => 'Opłacone', 'w_realizacji' => 'W realizacji',
+             'wyslane' => 'Wysłane', 'dostarczone' => 'Dostarczone'];
+    $ordre  = array_keys($flux);
+    $rang   = array_search($st, $ordre, true);
+    $annule = $st === 'anulowane';
+    $code   = (string) ($o['code'] ?? '');
+
+    // Le document n'est promis qu'une fois : s'il existe déjà, ce clic ne
+    // fabrique plus rien et il n'y a rien à confirmer. Demander quand même
+    // apprendrait à cliquer « oui » sans lire.
+    $dejaDoc = wsm_invoice_for_order($pdo, (int) ($o['id'] ?? 0)) !== null;
+
+    $out = [];
+    foreach ($ordre as $k => $c) {
+        if ($annule)                              $etat = 'niemozliwy';
+        elseif ($c === $st)                       $etat = 'teraz';
+        elseif ($rang !== false && $k === $rang + 1) $etat = 'nastepny';
+        elseif ($rang !== false && $k < $rang)    $etat = 'przeszly';
+        else                                      $etat = 'dalszy';
+
+        $emet = ($c === $reg['doc_status'] && $reg['doc_status'] !== 'nigdy');
+        $pyt  = '';
+        if ($emet && !$dejaDoc && $etat !== 'teraz' && $etat !== 'niemozliwy') {
+            $kind = wsm_invoice_kind_for($o);
+            $quoi = ($kind['kind'] ?? '') === 'faktura' ? 'FAKTURĘ' : 'PARAGON';
+            $ou   = [];
+            if ($reg['doc_mail']) $ou[] = 'mailem do klienta';
+            if ($reg['doc_ksef'] && ($kind['kind'] ?? '') === 'faktura') $ou[] = 'do KSeF';
+            $pyt = $code . ' → ' . $flux[$c] . '. Wystawi to ' . $quoi
+                 . ($ou ? ' i wyśle ' . implode(' oraz ', $ou) : '') . '. Kontynuować?';
+        }
+        $out[] = ['code' => $c, 'txt' => $flux[$c], 'etat' => $etat, 'doc' => $emet, 'pyt' => $pyt];
+    }
+
+    // « Anuluj » est un ordre, « Anulowane » est un état. Écrit à l'impératif
+    // sur une commande DÉJÀ annulée, le mot se lit comme un bouton qu'on aurait
+    // désactivé par erreur — on cherche pourquoi il ne répond pas.
+    $out[] = ['code' => 'anulowane', 'txt' => $annule ? 'Anulowane' : 'Anuluj',
+              'etat' => $annule ? 'teraz' : 'zly', 'doc' => false,
+              'pyt'  => $annule ? '' : 'Anulować ' . $code . '? Anulowanego zamówienia nie da się cofnąć.'];
+    return $out;
+}
+
+/**
+ * Les deux voyants d'une commande : VIES et le document.
+ *
+ * Les deux gestes d'expédition vivaient ici aussi — « Do wysyłki » et
+ * « Wysłane » étaient des boutons de cette colonne. Ils faisaient exactement
+ * ce que font maintenant les étapes, à côté, sur la même ligne : le même
+ * geste offert deux fois, sous deux noms, dont un seul dit où l'on va. On
+ * garde les voyants qui INFORMENT, et le chemin qui AGIT.
  *
  * @return array<string, array{etat:string, txt:string, quoi:string, agir:string}>
  *         etat : '' neutre · 'ok' vert · 'no' rouge · 'wait' orange
  *         agir : le nom du bouton à poster, ou '' s'il n'y a rien à faire
  */
 function wsm_order_voyants(PDO $pdo, array $o): array {
-    $st  = (string) ($o['status'] ?? '');
     $vs  = strtolower((string) ($o['vat_status'] ?? ($o['vat']['status'] ?? '')));
     $ve  = trim((string) ($o['vat_eu'] ?? ''));
     $doc = wsm_invoice_for_order($pdo, (int) $o['id']);
@@ -737,19 +823,7 @@ function wsm_order_voyants(PDO $pdo, array $o): array {
                'agir' => 'ksef'];
     }
 
-    // --- Les deux gestes d'expédition ---------------------------------------
-    // On ne propose que ce qui a du sens depuis l'état courant : un bouton qui
-    // ne fera rien est pire qu'un bouton absent — on clique, rien ne bouge, et
-    // on cherche la panne.
-    $vers = ['etat' => '', 'txt' => 'Do wysyłki', 'quoi' => 'Ustaw „W realizacji"', 'agir' => ''];
-    if (in_array($st, ['nowe', 'oplacone'], true)) $vers['agir'] = 'do_wysylki';
-
-    $env = ['etat' => '', 'txt' => 'Wysłane', 'agir' => '',
-            'quoi' => 'Ustaw „Wysłane" — wystawi dokument, wyśle go i zgłosi do KSeF'];
-    if (in_array($st, ['nowe', 'oplacone', 'w_realizacji'], true)) $env['agir'] = 'wyslane';
-    if ($st === 'wyslane') { $env['etat'] = 'ok'; $env['quoi'] = 'Zamówienie wysłane'; }
-
-    return ['vies' => $vies, 'dok' => $d, 'wysylka' => $vers, 'wyslane' => $env];
+    return ['vies' => $vies, 'dok' => $d];
 }
 
 /**

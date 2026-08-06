@@ -150,6 +150,24 @@ header.bar h1 .badge {
 .kpi b { display: block; font-family: var(--font-mono); font-size: 22px; color: var(--text-strong); }
 .kpi span { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
 
+/* SUR TÉLÉPHONE, LES CHIFFRES NE DOIVENT PAS MANGER L'ÉCRAN. Empilés en
+   grandes cartes, les cinq indicateurs de Zamówienia occupaient 322 px des
+   844 px de l'écran : avec le bandeau et le fil d'Ariane, on ouvrait l'écran
+   le plus utilisé de la maison sur zéro commande. Ils sont des repères, pas
+   le travail — valeur et intitulé sur une seule ligne, et le travail commence
+   deux fois plus haut. */
+@media (max-width: 760px) {
+  .kpis { gap: 8px; margin-bottom: 14px; }
+  /* flex-wrap, et pas seulement flex : un indicateur long — « 47 728,70 zł »
+     suivi de son intitulé — poussait la carte hors de l'écran et faisait
+     défiler toute la page en travers. Sur une ligne quand ça tient, sur deux
+     quand il le faut ; jamais plus large que le téléphone. */
+  .kpi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+         padding: 9px 12px; border-radius: 11px; }
+  .kpi b { font-size: 17px; min-width: 0; }
+  .kpi span { font-size: 10px; letter-spacing: .05em; min-width: 0; overflow-wrap: anywhere; }
+}
+
 .panel {
   background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
   padding: 18px 16px; margin-bottom: 20px; box-shadow: var(--shadow-xs);
@@ -208,6 +226,61 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
   table.rwd td:empty { display: none; }
   table.rwd td.wide { display: block; }
   table.rwd td.wide::before { display: block; margin-bottom: 4px; }
+
+  /* ═══ ZAMÓWIENIA : UNE FICHE DE TRAVAIL, PAS UN FORMULAIRE ═══════════════
+     La pile générique convient à un tableau qu'on consulte. Celui-ci, on ne
+     le consulte pas : on travaille dedans, debout, quarante fois par jour.
+     Avec neuf intitulés empilés et une colonne de libellés qui mange 40 % de
+     la largeur, UNE commande remplissait l'écran d'un téléphone — il fallait
+     faire défiler pour passer à la suivante, une par une.
+
+     Ici les cellules se rangent en grille. Ce qu'on cherche des yeux — le
+     numéro, le montant, le client — passe en haut, sans intitulé : personne
+     n'a besoin qu'on lui dise qu'un prix est un prix. Le reste tient sur deux
+     lignes serrées, et le chemin des étapes récupère la place. Trois
+     commandes par écran au lieu d'une. */
+  table.zam tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1px 10px; padding: 12px 14px 14px;
+  }
+  table.zam td { padding: 0; display: block; }
+  /* Les évidences perdent leur étiquette ; le reste garde un mot, en petit. */
+  table.zam td[data-l="Numer"]::before, table.zam td[data-l="Brutto"]::before,
+  table.zam td[data-l="Klient"]::before, table.zam td[data-l="Data"]::before,
+  table.zam td[data-l="Dostawa"]::before, table.zam td[data-l="Płatność"]::before,
+  table.zam td[data-l="Status"]::before, table.zam td[data-l="Kontrolki"]::before,
+  table.zam td[data-l="Pozycje"]::before { display: none; }
+  table.zam td small { margin-left: 0; }
+
+  /* CHAQUE CELLULE À SA PLACE, NOMMÉE. Sans grid-row explicite, les cellules
+     se rangent dans l'ordre du HTML : le chemin des étapes se retrouvait
+     AVANT le mode de paiement, parce que la colonne Status vient avant la
+     colonne Płatność dans le tableau. L'ordre d'un tableau sert le bureau ;
+     la fiche du téléphone a le sien. */
+  table.zam td[data-l="Numer"]  { grid-area: 1 / 1; font-size: 15px; }
+  table.zam td[data-l="Brutto"] { grid-area: 1 / 2; font-weight: 700;
+                                  font-size: 15px; text-align: right; white-space: nowrap; }
+  table.zam td[data-l="Numer"] a.code { font-size: 15px; }
+  table.zam td[data-l="Klient"] { grid-area: 2 / 1 / 3 / -1; font-size: 14px; margin-top: 3px; }
+  table.zam td[data-l="Klient"] small { display: block; font-size: 12px; }
+  /* Le point de retrait tient sur la même ligne que le mode : deux lignes pour
+     « Paczkomat » et « WRO01A » sur une fiche qu'on veut courte, non. */
+  table.zam td[data-l="Dostawa"] { grid-area: 3 / 1; font-size: 13px; color: var(--text-muted); }
+  table.zam td[data-l="Dostawa"] br { display: none; }
+  table.zam td[data-l="Dostawa"] small::before { content: " · "; }
+  /* Sur la fiche, la place ne manque pas sur cette ligne : date et heure
+     restent côte à côte. */
+  table.zam td[data-l="Data"]    { grid-area: 3 / 2; font-size: 12px; color: var(--text-muted);
+                                   text-align: right; white-space: nowrap; }
+  table.zam td[data-l="Data"] .tm { display: inline; }
+  table.zam td[data-l="Płatność"] { grid-area: 4 / 1; margin: 6px 0 0; }
+  /* « 2 » tout seul ne veut rien dire une fois l'intitulé retiré. */
+  table.zam td[data-l="Pozycje"]  { grid-area: 4 / 2; font-size: 13px; text-align: right;
+                                    color: var(--text-muted); margin-top: 6px; }
+  table.zam td[data-l="Pozycje"]::after { content: " poz."; }
+  /* Le chemin et les voyants prennent toute la largeur : c'est le travail. */
+  table.zam td[data-l="Status"]    { grid-area: 5 / 1 / 6 / -1; margin-top: 10px; }
+  table.zam td[data-l="Kontrolki"] { grid-area: 6 / 1 / 7 / -1; margin-top: 8px; }
 }
 
 /* --- Étiquettes et bandeaux ---------------------------------------------- */
@@ -219,6 +292,111 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 .tag.wait { background: color-mix(in srgb, var(--warning) 20%, transparent); color: var(--caramel-600); }
 .tag.bad  { background: color-mix(in srgb, var(--danger) 15%, transparent);  color: var(--danger); }
 .tag.no   { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--caramel-600); }
+
+/* --- Le chemin d'une commande, en boutons ---------------------------------
+   L'écran Zamówienia est celui qu'on ouvre quarante fois par jour, souvent au
+   téléphone, une main prise par un colis. Le statut y est donc une SUITE
+   D'ÉTAPES touchables : on lit où en est la commande, et on avance d'un doigt.
+
+   44 px de haut sur mobile, pas 24 : c'est la taille au-dessous de laquelle
+   un pouce rate sa cible. L'étape SUIVANTE porte la couleur de la marque —
+   c'est le geste de la quasi-totalité des cas, il doit se toucher sans viser.
+   Les étapes déjà franchies restent touchables mais s'effacent : un doigt qui
+   glisse doit pouvoir se corriger sur place. */
+/* Un tableau de NEUF colonnes se serre les coudes. Le rembourrage courant
+   (12 px de chaque côté) coûte 216 px rien qu'en marges : de quoi pousser
+   l'écran Zamówienia hors de la page, quelle que soit la taille de l'écran —
+   la zone de travail est plafonnée à 1180 px. Réservé aux tableaux qui le
+   demandent : ailleurs, l'air fait la lisibilité. */
+@media (min-width: 700px) {
+  table.dense th, table.dense td { padding-left: 7px; padding-right: 7px; }
+  table.dense th:first-child, table.dense td:first-child { padding-left: 12px; }
+  table.dense th:last-child,  table.dense td:last-child  { padding-right: 12px; }
+  /* « 2026-08-06 17:01 » cassé en trois lignes se lit comme trois données.
+     Date et heure gardent chacune leur bloc, et la seconde passe dessous : la
+     colonne tient en 90 px au lieu de 144, et rien n'est en escalier. */
+  table.zam td[data-l="Data"] .dt,
+  table.zam td[data-l="Data"] .tm { white-space: nowrap; }
+  table.zam td[data-l="Data"] .tm { display: block; color: var(--text-muted); }
+}
+
+/* Après une action on revient à la ligne par son ancre. Sans cette marge le
+   navigateur la colle en haut de la fenêtre — c'est-à-dire SOUS la barre de
+   titre, qui est fixe : on retrouve sa commande amputée de sa première ligne,
+   et on doit remonter à la main juste après avoir cliqué. */
+table.rwd tr[id], table tr[id] { scroll-margin-top: 88px; }
+
+.etapy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; }
+/* LE GESTE DE TOUS LES JOURS PREND TOUTE LA LARGEUR. Sur un téléphone tenu à
+   une main, la cible qu'on vise sans regarder doit être la plus grande de la
+   fiche — pas une pastille parmi six, alignée avec celle qui annule la
+   commande. 52 px : au-dessus du minimum tactile, sous la hauteur d'un bloc. */
+/* Sur la MÊME ligne que l'étape actuelle : « [Nowe] [→ Opłacone] » se lit
+   comme une phrase — où l'on est, ce qu'on va faire — et économise une ligne
+   entière sur une fiche qu'on veut courte. Sous 180 px de place restante le
+   grand bouton repasse à la ligne plutôt que de se comprimer. */
+.etap.glowny { flex: 1 1 180px; min-height: 52px; font-size: 15px; justify-content: center; }
+.etap.glowny::before { content: "→"; margin-right: 8px; font-weight: 400; opacity: .8; }
+
+/* Le reste du chemin, replié. <details> : pas une ligne de JavaScript, donc
+   ça s'ouvre aussi quand le réseau de la réserve avale un script. */
+.etapy-wiecej { flex: 1 0 100%; margin-top: 2px; }
+.etapy-wiecej > summary {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  min-height: 36px; padding: 0 4px; font-size: 13px; color: var(--text-muted);
+  list-style: none; width: max-content;
+}
+.etapy-wiecej > summary::-webkit-details-marker { display: none; }
+.etapy-wiecej > summary::before { content: "▸"; font-size: 11px; }
+.etapy-wiecej[open] > summary::before { content: "▾"; }
+.etapy-lista { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 4px; }
+.etap {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 44px; padding: 0 14px; border-radius: 999px;
+  font-family: var(--font-sans); font-size: 14px; font-weight: 600; line-height: 1;
+  border: 1px solid var(--border-subtle); background: var(--surface-card);
+  color: var(--text-strong); cursor: pointer; white-space: nowrap;
+}
+span.etap { cursor: default; }
+/* OÙ L'ON EST : chocolat plein. CE QU'ON VA FAIRE : caramel.
+   Écrit d'abord `teraz` en --choco-700 et `nastepny` en --brand, les deux
+   pastilles sortaient IDENTIQUES — --brand EST --choco-700. L'état actuel et
+   le geste suivant ne se distinguaient plus, et c'était tout l'intérêt.
+   Le texte du caramel est chocolat, pas crème : crème sur #C68A3C tombe à
+   3:1, sous le seuil lisible ; chocolat tient 5,3:1. */
+.etap.teraz    { background: var(--choco-700); border-color: var(--choco-700); color: var(--cream-50); }
+.etap.nastepny { background: var(--accent);    border-color: var(--accent);    color: var(--choco-900); }
+/* Une étape franchie s'efface SANS devenir illisible : on y revient pour
+   corriger un doigt qui a glissé, il faut donc pouvoir la lire. */
+.etap.przeszly { color: var(--text-muted); font-weight: 500; background: var(--cream-100, transparent); }
+/* ANNULER N'EST PAS UNE ÉTAPE, c'est une sortie. Dessinée comme les autres —
+   même pastille, même bordure — elle se ramassait au pouce à côté de
+   « Dostarczone », et une commande annulée ne repart pas. Elle garde donc sa
+   hauteur touchable et perd son cadre : présente, jamais au premier plan. */
+.etap.zly      { border-color: transparent; color: var(--danger); background: transparent;
+                 font-weight: 500; padding: 0 8px; text-decoration: underline;
+                 text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.etap.niemozliwy { opacity: .45; cursor: not-allowed; }
+/* Commande annulée : un état, pas une action. Plein, dans la couleur du
+   refus, et sans soulignement — on ne clique pas dessus. */
+.etap.teraz.anulowana { background: var(--danger); border-color: var(--danger); color: var(--cream-50); }
+/* Le repère de l'étape qui ÉMET un document fiscal. Discret, mais présent
+   avant le clic — pas après, quand la facture est déjà partie au registre. */
+.etap .doc { font-size: 18px; line-height: 0; opacity: .75; }
+@media (min-width: 700px) {
+  .etap { min-height: 34px; font-size: 12.5px; padding: 0 10px; }
+  /* La colonne doit RÉCLAMER sa place, sinon la mise en page automatique du
+     tableau la comprime jusqu'à une pastille par ligne. Il ne lui faut plus
+     que de quoi tenir « [Nowe] [→ Opłacone] » : le reste du chemin est
+     replié. */
+  .etapy { gap: 5px; min-width: 15rem; }
+  /* À la souris, pas besoin des 52 px du pouce — et le repli tient sur la
+     même ligne : toute la colonne se lit en une rangée. */
+  .etap.glowny { min-height: 38px; font-size: 13.5px; flex: 1 1 auto; }
+  .etapy-wiecej { flex: 0 0 auto; margin-top: 0; }
+  .etapy-wiecej > summary { min-height: 30px; font-size: 12px; }
+  .etapy-lista { flex-basis: 100%; }
+}
 
 .flash { border-radius: 10px; padding: 11px 15px; margin: 0 0 16px; font-size: 14px; }
 .flash.ok  { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
@@ -284,6 +462,12 @@ a.btn--brand { background: var(--brand); color: var(--cream-50); border-color: v
 }
 .tabs a.on { background: var(--brand); border-color: var(--brand); color: var(--cream-50); }
 
-a.code { font-family: var(--font-mono); color: var(--brand); font-weight: 600; text-decoration: none; }
+/* UN NUMÉRO DE COMMANDE NE SE COUPE PAS. La colonne des étapes a repris de la
+   largeur, et « MS-260806-1022 » s'est mis à tomber sur trois lignes — c'est
+   la référence qu'on lit au téléphone à un client, qu'on cherche des yeux dans
+   la liste, et qu'on recopie sur un colis. Le tableau défile déjà
+   horizontalement (.tablewrap) : il vaut mieux ça qu'un numéro en escalier. */
+a.code { font-family: var(--font-mono); color: var(--brand); font-weight: 600; text-decoration: none;
+         white-space: nowrap; }
 a.code:hover { text-decoration: underline; }
 a.back { display: inline-block; margin-top: 16px; }
