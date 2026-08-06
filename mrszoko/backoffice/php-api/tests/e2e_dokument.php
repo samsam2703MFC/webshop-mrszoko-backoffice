@@ -245,6 +245,62 @@ $d1b = wsm_order_document($pdo, $o1, 'test');
 ok('pour une facture, le canal est nommé (ouvert ou fermé)',
    ($d1b['ksef'] ?? '') !== '', $d1b['ksef'] ?? '');
 
+// ---- 8. Les quatre interrupteurs -------------------------------------------
+echo "\n-- cztery wyzwalacze --\n";
+// LE DÉFAUT DOIT ÊTRE « TOUT ACTIVÉ », et lu dans le code. Une base vide, une
+// table absente, un déploiement à moitié fait : le comportement doit rester
+// celui d'hier. Un réglage manquant ne peut pas éteindre une obligation légale.
+wsm_config_overlay(['orders' => []]);
+$d0 = wsm_orders_cfg();
+ok('sans rien de configuré, tout est activé',
+   $d0['doc_status'] === 'wyslane' && $d0['doc_mail'] && $d0['doc_ksef'] && $d0['vies_recheck'], $d0);
+// Seul un « 0 » explicite coupe : ni le vide, ni « xxxx », ni un mot inconnu.
+foreach (['', 'xxxx', 'tak', 'zzz'] as $v) {
+    wsm_config_overlay(['orders' => ['doc_ksef' => $v]]);
+    ok("« $v » ne coupe PAS le KSeF — seul un refus explicite coupe", wsm_orders_cfg()['doc_ksef'], $v);
+}
+foreach (['0', 'nie', 'false', 'off'] as $v) {
+    wsm_config_overlay(['orders' => ['doc_ksef' => $v]]);
+    ok("« $v » coupe bien", !wsm_orders_cfg()['doc_ksef'], $v);
+}
+// Un état inconnu retombe sur « wysłane », jamais sur « rien ».
+wsm_config_overlay(['orders' => ['doc_status' => 'jakiś-stan']]);
+ok('un état inconnu retombe sur « wysłane », pas sur le silence',
+   wsm_orders_cfg()['doc_status'] === 'wyslane', wsm_orders_cfg()['doc_status']);
+
+// L'ÉTAT QUI ÉMET SE DÉPLACE VRAIMENT.
+wsm_config_overlay(['orders' => ['doc_status' => 'dostarczone']]);
+$oA = $mk(['invoice' => 0]);
+wsm_order_status_set($pdo, (int) $oA['id'], 'wyslane', 'test');
+ok('avec « dostarczone » réglé, « wysłane » n\'émet plus rien',
+   wsm_invoice_for_order($pdo, (int) $oA['id']) === null);
+wsm_order_status_set($pdo, (int) $oA['id'], 'dostarczone', 'test');
+ok('… et c\'est « dostarczone » qui émet',
+   (wsm_invoice_for_order($pdo, (int) $oA['id'])['number'] ?? '') !== '');
+
+// « nigdy » coupe l'automat entièrement.
+wsm_config_overlay(['orders' => ['doc_status' => 'nigdy']]);
+$oB = $mk(['invoice' => 0]);
+foreach (['wyslane', 'dostarczone', 'oplacone'] as $st2) wsm_order_status_set($pdo, (int) $oB['id'], $st2, 'test');
+ok('« nigdy » n\'émet sur AUCUN état', wsm_invoice_for_order($pdo, (int) $oB['id']) === null);
+
+// Le courrier coupé n'empêche pas le document — il ne l'envoie pas.
+wsm_config_overlay(['orders' => ['doc_status' => 'wyslane', 'doc_mail' => '0']]);
+$oC = $mk(['invoice' => 0]);
+$dC = wsm_order_document($pdo, $oC, 'test');
+ok('courrier coupé : le document existe quand même', ($dC['doc']['number'] ?? '') !== '');
+ok('… mais rien n\'est parti', $dC['mail'] === false);
+
+// KSeF coupé : la facture existe, et l'écran DIT que c'est volontaire.
+wsm_config_overlay(['orders' => ['doc_status' => 'wyslane', 'doc_ksef' => '0']]);
+$oD = $mk(['company' => 'Kowalski sp. z o.o.', 'nip' => $NIP_OK, 'invoice' => 1]);
+$dD = wsm_order_document($pdo, $oD, 'test');
+ok('KSeF coupé : la facture est bien émise', ($dD['doc']['number'] ?? '') !== '');
+ok('… et le message dit que l\'automat est éteint, pas qu\'il est cassé',
+   str_contains((string) $dD['ksef'], 'wyłączony'), $dD['ksef']);
+
+wsm_config_overlay(['orders' => []]);
+
 // ---- ménage ---------------------------------------------------------------
 $ids = $pdo->query("SELECT id FROM wsm_orders WHERE code LIKE '" . strtoupper($sfx) . "%'")
            ->fetchAll(PDO::FETCH_COLUMN) ?: [];

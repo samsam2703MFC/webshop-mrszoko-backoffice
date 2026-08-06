@@ -198,6 +198,38 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             exit;
         } else { $flash = $msg; $kind = 'err'; }
 
+    } elseif (isset($_POST['wyzwalacze'])) {
+        // CES QUATRE INTERRUPTEURS DÉCIDENT DE CE QUI PART AU FISC. Chaque
+        // changement laisse une trace NOMINATIVE : « personne n'a touché à
+        // rien » doit pouvoir se vérifier, pas se croire.
+        require_once $API . '/settings.php';
+        $avant = wsm_orders_cfg();
+        $st = (string) ($_POST['doc_status'] ?? 'wyslane');
+        if (!in_array($st, ['wyslane', 'oplacone', 'dostarczone', 'nigdy'], true)) $st = 'wyslane';
+        // wsm_settings_save() attend ses clés avec « __ » à la place du point :
+        // c'est la forme que porte un nom de champ HTML. Lui passer la forme
+        // pointée ne lève rien — elle est simplement IGNORÉE, et l'écran
+        // annonce « enregistré » sans avoir rien enregistré.
+        wsm_settings_save($pdo, [
+            'orders__doc_status'   => $st,
+            'orders__doc_mail'     => empty($_POST['doc_mail'])     ? '0' : '1',
+            'orders__doc_ksef'     => empty($_POST['doc_ksef'])     ? '0' : '1',
+            'orders__vies_recheck' => empty($_POST['vies_recheck']) ? '0' : '1',
+        ], $actor);
+        wsm_settings_apply($pdo);
+        $apres = wsm_orders_cfg();
+        $diff = [];
+        foreach ($apres as $k => $v) {
+            if (($avant[$k] ?? null) !== $v) {
+                $diff[] = $k . ': ' . (is_bool($avant[$k] ?? null) ? ($avant[$k] ? 'tak' : 'nie') : (string) ($avant[$k] ?? '?'))
+                        . ' → ' . (is_bool($v) ? ($v ? 'tak' : 'nie') : (string) $v);
+            }
+        }
+        wsm_audit($pdo, $actor, 'Wyzwalacze zamówień',
+                  $diff ? implode(' · ', $diff) : 'bez zmian', 'Platforma');
+        $flash = $diff ? 'Zapisano: ' . implode(' · ', $diff) : 'Nic się nie zmieniło.';
+        $kind  = 'ok';
+
     } elseif (isset($_POST['wystaw'])) {
         [$p, $err] = wsm_platform_issue($pdo, (string) $_POST['wystaw'], $actor);
         if ($p) {
@@ -1001,6 +1033,56 @@ $trig = wsm_status_triggers($pdo);
     szablon albo zamknął kanał KSeF, widać to tutaj tego samego dnia.
     Same szablony zmienia się w <a href="poczta.php">Poczcie</a>.
   </p>
+  <?php $reg = wsm_orders_cfg(); ?>
+  <form method="post" style="margin:0 0 18px">
+    <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+    <input type="hidden" name="wyzwalacze" value="1">
+    <div class="cards">
+      <div class="c<?= $reg['doc_status'] === 'nigdy' ? ' hot' : '' ?>">
+        <h4>Który stan wystawia dokument</h4>
+        <?php // Le <h4> de la carte n'est pas une étiquette : la synthèse
+              // vocale annonçait « menu déroulant, Wysłane » sans dire de quoi
+              // il s'agit — sur l'interrupteur qui décide quand un document
+              // fiscal est émis. ?>
+        <select name="doc_status" aria-label="Który stan zamówienia wystawia dokument">
+          <?php foreach (['wyslane' => 'Wysłane (domyślnie)', 'oplacone' => 'Opłacone',
+                          'dostarczone' => 'Dostarczone', 'nigdy' => 'Nigdy — tylko ręcznie'] as $k => $lbl): ?>
+          <option value="<?= h($k) ?>"<?= $reg['doc_status'] === $k ? ' selected' : '' ?>><?= h($lbl) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <small>„Opłacone" wystawia wcześniej — ale zamówienie opłacone można jeszcze
+          anulować, a dokumentu już nie cofniesz.</small>
+      </div>
+      <div class="c">
+        <h4>Dokument mailem</h4>
+        <label class="check"><input type="checkbox" name="doc_mail" value="1"
+          <?= $reg['doc_mail'] ? ' checked' : '' ?>><span>wysyłaj do klienta</span></label>
+        <small>Wyłączenie nie kasuje dokumentu — tylko go nie wysyła.</small>
+      </div>
+      <div class="c">
+        <h4>KSeF</h4>
+        <label class="check"><input type="checkbox" name="doc_ksef" value="1"
+          <?= $reg['doc_ksef'] ? ' checked' : '' ?>><span>zgłaszaj faktury</span></label>
+        <small>Wyłączone: faktura czeka w kolejce i wysyła się ręcznie. Paragon nigdy tam nie idzie.</small>
+      </div>
+      <div class="c<?= $reg['vies_recheck'] ? '' : ' hot' ?>">
+        <h4>VIES przed wystawieniem</h4>
+        <label class="check"><input type="checkbox" name="vies_recheck" value="1"
+          <?= $reg['vies_recheck'] ? ' checked' : '' ?>><span>sprawdzaj ponownie</span></label>
+        <small>Wyłączenie zostawia status z chwili zamówienia. Przy WDT to ryzyko podatkowe —
+          numer mógł zostać w międzyczasie cofnięty.</small>
+      </div>
+    </div>
+    <div class="actions"><button class="btn btn--brand" type="submit">Zapisz wyzwalacze</button></div>
+    <?php // On ne cache pas ce qu'un interrupteur coupé implique : ces quatre
+          // cases décident de ce qui part au fisc, et chaque changement est
+          // tracé nominativement dans l'Audyt. ?>
+    <p class="why" style="margin:10px 0 0">
+      Każda zmiana tutaj trafia do <a href="audyt.php">Audytu</a> z nazwiskiem —
+      „nikt nic nie ruszał" ma dać się sprawdzić, a nie tylko powiedzieć.
+    </p>
+  </form>
+
   <table class="rwd">
     <thead><tr><th>Stan</th><th>Kto go ustawia</th><th>Co wyzwala</th><th>Wiadomość do klienta</th></tr></thead>
     <tbody>

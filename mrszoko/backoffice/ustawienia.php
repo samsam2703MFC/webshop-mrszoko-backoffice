@@ -115,9 +115,15 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Integracje' => null]);
 // On ne peut pas fusionner les deux listes : un panneau porte un titre et une
 // explication, un champ porte un libellé et un type. Mais on peut refuser de
 // se taire.
+// Un groupe peut être réglé AILLEURS à dessein. « zamowienia » — ce qu'un
+// changement d'état déclenche — vit derrière la porte du Superadmin, avec le
+// tableau qui explique chaque interrupteur : ces cases décident de ce qui part
+// au fisc, elles n'ont pas leur place à côté d'un mot de passe SMTP. On le
+// déclare ici pour que la garde continue d'attraper les VRAIS orphelins.
+$ailleurs = ['zamowienia' => 'Superadmin → Statusy i wyzwalacze'];
 $orphelins = [];
 foreach ($view as $k => $f) {
-    if (!isset($groups[$f['group']])) $orphelins[$f['group']] = true;
+    if (!isset($groups[$f['group']]) && !isset($ailleurs[$f['group']])) $orphelins[$f['group']] = true;
 }
 if ($orphelins): ?>
 <p class="warnbox">
