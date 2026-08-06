@@ -104,6 +104,7 @@ function console_sections(?array $me = null): array {
             'zamowienia.php'  => 'Zamówienia',
             'subskrypcje.php' => 'Subskrypcje',
             'faktury.php'     => 'Faktury',
+            'ksef.php'        => 'KSeF',
             'wysylka.php'     => 'Wysyłka',
             'zgloszenia.php'  => 'Zgłoszenia',
         ],

@@ -137,6 +137,21 @@ $cfg = [
         'sandbox'       => (getenv('WSM_ALLEGRO_SANDBOX') ?: '1') !== '0',
     ],
 
+    // ---- KSeF : le registre national des factures --------------------------
+    //  FERMÉ TANT QUE CES CHAMPS SONT VIDES, et « xxxx » compte pour vide.
+    //  Le jeton d'autorisation est délivré par l'application KSeF au NIP du
+    //  vendeur : il vaut signature sur toutes nos factures, et n'a donc rien
+    //  à faire dans ce dépôt, qui est public. `public_key` est le CHEMIN sur
+    //  le serveur du fichier de clé publique du ministère — sans lui le
+    //  jeton ne peut pas être chiffré, donc aucune session ne s'ouvre.
+    //  `env` : test (défaut) | demo | prod.
+    'ksef' => [
+        'nip'        => getenv('WSM_KSEF_NIP') ?: '',
+        'token'      => getenv('WSM_KSEF_TOKEN') ?: '',
+        'public_key' => getenv('WSM_KSEF_PUBLIC_KEY') ?: '',
+        'env'        => getenv('WSM_KSEF_ENV') ?: 'test',
+    ],
+
     // ---- Superadmin : le propriétaire de la plateforme ---------------------
     // Ce module calcule ce que la boutique DOIT au propriétaire (location +
     // commission). Il ne peut donc pas être ouvert par un rôle attribuable

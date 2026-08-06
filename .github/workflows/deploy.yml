@@ -1406,6 +1406,156 @@ jobs:
           REMOTE
 
 
+      - name: Verify tax rules (KSeF FA(2))
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+          fail=0
+          echo "== pliki dojechały =="
+          # Le déploiement renomme php-api en api. Un require qui nomme
+          # « php-api » marche en développement et tombe en 500 ici. On ouvre
+          # donc le fichier depuis SON emplacement réel, pas depuis une copie.
+          for f in "$DIR_API/ksef.php" "$DIR_BO/ksef.php"; do
+            [ -f "$f" ] && echo "  obecny: $f" || { echo "  ^ BRAK: $f"; fail=1; }
+          done
+          grep -q "php-api" "$DIR_BO/ksef.php" \
+            && { echo "  ^ ZLE : ekran nazywa katalog php-api, którego tu nie ma"; fail=1; } \
+            || echo "  ekran nie nazywa php-api"
+
+          echo "== kanał jest ZAMKNIĘTY dopóki nie ma poświadczeń =="
+          # Le dépôt est public : aucun jeton KSeF ne doit y vivre. Si le canal
+          # est ouvert ici, il ne peut lêtre que par config.local.php — et on
+          # veut le voir écrit, pas le supposer.
+          KO=$(php -r '
+            require_once "'"$DIR_API"'/ksef.php";
+            $ouvert = wsm_ksef_enabled();
+            $manque = wsm_ksef_manquants();
+            echo $ouvert ? "OTWARTY" : "zamkniety", " brakuje=", count($manque);
+          ' 2>&1)
+          echo "  $KO"
+          case "$KO" in
+            zamkniety*) echo "  ok — nic nie wyjdzie bez poświadczeń z serwera" ;;
+            OTWARTY*)   echo "  UWAGA : kanał otwarty. Sprawdź, że token pochodzi z config.local.php, nie z repozytorium." ;;
+            *)          echo "  ^ ZLE : ksef.php nie ładuje się"; fail=1 ;;
+          esac
+
+          echo "== rozbicie VAT : pomyłka tutaj nie zgłasza się sama =="
+          # LE danger du format. Un montant rangé dans le mauvais champ passe
+          # la validation du schéma et fausse la déclaration. En particulier :
+          # le 0 % intérieur et le 0 % intracommunautaire s'écrivent tous deux
+          # « 0 » sur le papier et vont dans DEUX champs différents.
+          VOUT=$(php -r '
+            require_once "'"$DIR_API"'/ksef.php";
+            $mk = function (array $l, int $rc = 0): array {
+              return ["kind" => "faktura", "number" => "FV/1", "issued_at" => "2026-08-06",
+                      "sold_at" => "2026-08-06", "due_at" => "2026-08-20", "currency" => "PLN",
+                      "seller_name" => "X", "seller_nip" => "8971902620",
+                      "seller_address" => "ul. Polna 1, 00-002 Wroclaw, PL",
+                      "buyer_name" => "Y", "buyer_nip" => "5252248481", "buyer_vat_eu" => $rc ? "DE811569869" : "",
+                      "buyer_address" => "ul. Kwiatowa 7, 00-001 Warszawa, PL",
+                      "iban" => "", "bank" => "", "paid" => 0, "note" => "", "ksef_number" => "",
+                      "reverse_charge" => $rc, "total_net" => 0, "total_vat" => 0,
+                      "total_gross" => 20000, "items" => $l];
+            };
+            $li = function (float $r, int $net, int $vat): array {
+              return ["name" => "A", "qty" => 1, "unit_net" => $net, "unit_gross" => $net + $vat,
+                      "vat_rate" => $r, "line_net" => $net, "line_vat" => $vat,
+                      "line_gross" => $net + $vat];
+            };
+            $p23 = wsm_ksef_pola_vat($mk([$li(0.23, 16260, 3740)]));
+            $p8  = wsm_ksef_pola_vat($mk([$li(0.08, 10000, 800)]));
+            $p5  = wsm_ksef_pola_vat($mk([$li(0.05, 10000, 500)]));
+            $pw  = wsm_ksef_pola_vat($mk([$li(0.0, 20000, 0)], 1));
+            $p0  = wsm_ksef_pola_vat($mk([$li(0.0, 20000, 0)]));
+            $ok23 = ($p23["P_13_1"] ?? "") === "162.60" && ($p23["P_14_1"] ?? "") === "37.40";
+            $ok8  = ($p8["P_13_2"] ?? "") === "100.00" && ($p8["P_14_2"] ?? "") === "8.00";
+            $ok5  = ($p5["P_13_3"] ?? "") === "100.00" && ($p5["P_14_3"] ?? "") === "5.00";
+            $okW  = ($pw["P_13_6_2"] ?? "") === "200.00" && !isset($pw["P_13_6_1"]);
+            $ok0  = ($p0["P_13_6_1"] ?? "") === "200.00" && !isset($p0["P_13_6_2"]);
+            $okN  = wsm_ksef_nip("PL 897-190-26-20") === "8971902620" && wsm_ksef_nip("897190262") === "";
+            $okK  = wsm_ksef_kwota(5) === "0.05" && wsm_ksef_kwota(123456789) === "1234567.89";
+            echo ($ok23 ? "23-ok" : "23-ZLE"), " ", ($ok8 ? "8-ok" : "8-ZLE"), " ",
+                 ($ok5 ? "5-ok" : "5-ZLE"), " ", ($okW ? "wdt-ok" : "wdt-ZLE"), " ",
+                 ($ok0 ? "zero-krajowe-ok" : "zero-krajowe-ZLE"), " ",
+                 ($okN ? "nip-ok" : "nip-ZLE"), " ", ($okK ? "grosze-ok" : "grosze-ZLE");
+          ' 2>&1)
+          echo "  $VOUT"
+          case "$VOUT" in *ZLE*|*Error*|*error*) echo "  ^ NOT OK"; fail=1 ;; esac
+
+          echo "== dokument i odmowy =="
+          # Le XML doit être BIEN FORMÉ — un parseur strict, pas un grep — et
+          # les documents qui ne sont pas des factures doivent être refusés :
+          # déposer un e-paragon inscrirait au registre national un document
+          # qui nexiste pas pour le fisc.
+          DOUT=$(php -r '
+            require_once "'"$DIR_API"'/ksef.php";
+            if (!in_array("sqlite", PDO::getAvailableDrivers(), true)) { echo "nie-sprawdzono-brak-sqlite"; exit; }
+            $p = new PDO("sqlite::memory:", null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            $inv = ["kind" => "faktura", "number" => "FV/001/08/26", "issued_at" => "2026-08-06",
+                    "sold_at" => "2026-08-05", "due_at" => "2026-08-20", "currency" => "PLN",
+                    "seller_name" => "ATELIER WRO01 sp. z o.o.", "seller_nip" => "8971902620",
+                    "seller_address" => "ul. Polna 1, 00-002 Wroclaw, PL",
+                    "buyer_name" => "Kowalski & Synowie", "buyer_nip" => "5252248481",
+                    "buyer_vat_eu" => "", "buyer_address" => "ul. Kwiatowa 7, 00-001 Warszawa, PL",
+                    "iban" => "PL61 1090 1014 0000 0712 1981 2874", "bank" => "Test",
+                    "paid" => 0, "note" => "", "ksef_number" => "", "reverse_charge" => 0,
+                    "total_net" => 16260, "total_vat" => 3740, "total_gross" => 20000,
+                    "items" => [["name" => "Czekolada", "qty" => 2, "unit_net" => 8130,
+                                 "unit_gross" => 10000, "vat_rate" => 0.23, "line_net" => 16260,
+                                 "line_vat" => 3740, "line_gross" => 20000]]];
+            $xml = wsm_ksef_xml($p, $inv, "2026-08-06T10:00:00+02:00");
+            libxml_use_internal_errors(true);
+            $doc = simplexml_load_string($xml);
+            $bien = $doc !== false && $doc->getName() === "Faktura";
+            $ns   = str_contains($xml, WSM_KSEF_NS);
+            $tot  = str_contains($xml, "<P_15>200.00</P_15>");
+            $esc  = str_contains($xml, "Kowalski &amp; Synowie");
+            $wolne = wsm_ksef_blockers($p, $inv) === [];
+            $par  = wsm_ksef_blockers($p, ["kind" => "paragon"] + $inv);
+            $pro  = wsm_ksef_blockers($p, ["kind" => "proforma"] + $inv);
+            $juz  = wsm_ksef_blockers($p, ["ksef_number" => "X-1"] + $inv);
+            echo ($bien ? "xml-ok" : "xml-ZLE"), " ", ($ns ? "ns-ok" : "ns-ZLE"), " ",
+                 ($tot ? "suma-ok" : "suma-ZLE"), " ", ($esc ? "escape-ok" : "escape-ZLE"), " ",
+                 ($wolne ? "czysta-ok" : "czysta-ZLE"), " ",
+                 (count($par) === 1 ? "paragon-odmowa-ok" : "paragon-ZLE"), " ",
+                 (count($pro) === 1 ? "proforma-odmowa-ok" : "proforma-ZLE"), " ",
+                 ($juz !== [] ? "duplikat-odmowa-ok" : "duplikat-ZLE");
+          ' 2>&1)
+          echo "  $DOUT"
+          case "$DOUT" in
+            nie-sprawdzono*) echo "  nie sprawdzono (brak sqlite w php-cli) — nie liczy się jako zielone" ;;
+            *ZLE*|*Error*|*error*) echo "  ^ NOT OK"; fail=1 ;;
+          esac
+
+          echo "== kolumny KSeF w bazie =="
+          # Sans ces colonnes, le numéro renvoyé par le registre nirait nulle
+          # part — et lidempotence, qui repose sur ksef_number, nexisterait pas.
+          COLS=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT COUNT(*) FROM information_schema.columns
+              WHERE table_schema='mrszoko' AND table_name='wsm_invoices'
+                AND column_name IN ('ksef_number','ksef_status','ksef_at');" 2>/dev/null || echo 0)
+          [ "${COLS:-0}" = "3" ] \
+            && echo "  ksef_number / ksef_status / ksef_at : obecne" \
+            || { echo "  ^ ZLE : brakuje kolumn KSeF (znaleziono ${COLS:-0}/3)"; fail=1; }
+
+          echo "== ekran odpowiada =="
+          # Sans session, la console redirige vers sa page de connexion. Ce
+          # qui compte ici : pas de 500. Une page qui explose ne redirige pas.
+          KCODE=$(curl -sk -o /dev/null -w "%{http_code}" "http://localhost/mrszoko/backoffice/ksef.php")
+          echo "  ksef.php → $KCODE"
+          case "$KCODE" in
+            200|302|303) echo "  ok" ;;
+            *) echo "  ^ NOT OK"; fail=1 ;;
+          esac
+
+          if [ "$fail" = "0" ]; then echo "ALL KSEF CHECKS OK"; else echo "KSEF CHECK FAILED"; exit 1; fi
+          REMOTE
+
+
       # Nettoyage transitoire : avant cette version, le back-office était servi À
       # PLAT sous /mrszoko/ (index.html, support.js, api/…). rsync tourne sans
       # --delete, donc ces fichiers resteraient servis à côté du nouveau layout
