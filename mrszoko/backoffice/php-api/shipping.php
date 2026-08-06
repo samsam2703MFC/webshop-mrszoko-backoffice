@@ -93,6 +93,44 @@ const WSM_SHIP_ADAPTERS = [
     'dpd'    => ['fichier' => 'dpd.php',    'blockers' => 'wsm_dpd_blockers',    'create' => 'wsm_dpd_create'],
 ];
 
+// ---------------------------------------------------------------------------
+//  LES TRANSPORTEURS QU'ON CONNAÎT ET QU'ON NE PILOTE PAS
+//
+//  Fresh Logistic prend des palettes à partir de 200 kg. On n'a pas son API —
+//  et même avec, une palette ne s'expédie pas d'un clic : il y a un créneau à
+//  convenir, un hayon à demander, une température à déclarer.
+//
+//  Sans cette liste, un tel transporteur retombait sur « przewoznik » —
+//  « Nieznany przewoźnik ». C'est FAUX et ça envoie chercher la panne dans la
+//  configuration : on croit à un identifiant mal saisi alors que la commande
+//  est parfaitement normale et attend simplement un coup de téléphone.
+//
+//  Une commande chez eux passe donc les MÊMES contrôles de données que les
+//  autres — un destinataire sans téléphone bloque une palette comme un colis —
+//  et s'arrête juste avant l'envoi automatique, en le disant.
+// ---------------------------------------------------------------------------
+const WSM_SHIP_MANUELS = ['fresh' => 'Fresh Logistic'];
+
+/**
+ * Les contrôles de données communs à toute expédition vers une ADRESSE.
+ *
+ * Recopiés de wsm_dpd_blockers() une première fois, puis mis en commun : deux
+ * listes identiques dérivent, et celle qu'on oublie de corriger est celle qui
+ * laisse passer une commande incomplète.
+ */
+function wsm_ship_blockers_adresse(array $order): array {
+    if (!function_exists('wsm_valid_phone')) require_once __DIR__ . '/shop.php';
+    $out = [];
+    if (($order['phone'] ?? '') === '' || !wsm_valid_phone((string) $order['phone'])) $out[] = 'telefon';
+    if (($order['email'] ?? '') === '') $out[] = 'e-mail';
+    if (($order['first_name'] ?? '') === '' && ($order['company'] ?? '') === '') $out[] = 'odbiorca';
+    if (($order['weight_g'] ?? 0) <= 0) $out[] = 'waga';
+    foreach (['street', 'building', 'postcode', 'city'] as $k) {
+        if (($order['ship'][$k] ?? '') === '') $out[] = 'adres.' . $k;
+    }
+    return $out;
+}
+
 /** Charge les adaptateurs. Un fichier absent n'explose pas : il manque, c'est tout. */
 function wsm_ship_adapters(): void {
     foreach (WSM_SHIP_ADAPTERS as $a) {
@@ -117,19 +155,32 @@ function wsm_ship_adapter(PDO $pdo, array $order): ?array {
  */
 function wsm_ship_blockers(PDO $pdo, array $order): array {
     $a = wsm_ship_adapter($pdo, $order);
-    if (!$a || !function_exists($a['blockers'])) {
-        return ['przewoznik'];
-    }
-    return ($a['blockers'])($order);
+    if ($a && function_exists($a['blockers'])) return ($a['blockers'])($order);
+    // Connu mais piloté à la main : les données se vérifient quand même, et
+    // c'est l'ENVOI qui s'arrête, pas la commande.
+    if (wsm_ship_manuel($pdo, $order) !== '') return wsm_ship_blockers_adresse($order);
+    return ['przewoznik'];
+}
+
+/** Le nom du transporteur manuel de cette commande, ou '' si elle est pilotée. */
+function wsm_ship_manuel(PDO $pdo, array $order): string {
+    if (!function_exists('wsm_ship_carrier')) require_once __DIR__ . '/shop.php';
+    $c = wsm_ship_carrier($pdo, (string) ($order['delivery_method'] ?? ''));
+    return WSM_SHIP_MANUELS[$c] ?? '';
 }
 
 /** Crée l'expédition chez le bon transporteur. */
 function wsm_ship_create(PDO $pdo, array $order): array {
     $a = wsm_ship_adapter($pdo, $order);
-    if (!$a || !function_exists($a['create'])) {
-        return [null, 'brak_przewoznika: ' . wsm_ship_carrier($pdo, (string) ($order['delivery_method'] ?? ''))];
+    if ($a && function_exists($a['create'])) return ($a['create'])($pdo, $order);
+    // UN REFUS QUI DIT LA VÉRITÉ. « brak_przewoznika » pour Fresh Logistic
+    // ferait chercher une erreur de configuration là où il n'y en a pas : la
+    // commande est bonne, c'est l'expédition qui se fait au téléphone.
+    $manuel = wsm_ship_manuel($pdo, $order);
+    if ($manuel !== '') {
+        return [null, 'nadanie_reczne: ' . $manuel . ' — umów odbiór i wpisz numer listu ręcznie'];
     }
-    return ($a['create'])($pdo, $order);
+    return [null, 'brak_przewoznika: ' . wsm_ship_carrier($pdo, (string) ($order['delivery_method'] ?? ''))];
 }
 
 /**

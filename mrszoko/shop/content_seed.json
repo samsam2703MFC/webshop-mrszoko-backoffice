@@ -37,8 +37,19 @@
       "vat_rate": 0.23,
       "free_from": 30000,
       "max_weight_g": 31500
-    }
-  ],
+    },
+    {
+      "id": "fresh_logistic",
+      "carrier": "fresh",
+      "kind": "adres",
+      "sort_order": 4,
+      "active": 0,
+      "price_net": 0,
+      "vat_rate": 0.23,
+      "free_from": 0,
+      "min_weight_g": 200000,
+      "max_weight_g": 1500000
+    }  ],
   "products": [
     {
       "id": "s-dark70-1kg",
@@ -309,6 +320,8 @@
       "ship.inpost_courier.note": "Dostawa pod wskazany adres, zwykle następnego dnia roboczego.",
       "ship.dpd_courier.label": "Kurier DPD",
       "ship.dpd_courier.note": "Dostawa pod wskazany adres, zwykle następnego dnia roboczego.",
+      "ship.fresh_logistic.label": "Fresh Logistic — paleta",
+      "ship.fresh_logistic.note": "Transport paletowy w kontrolowanej temperaturze, od 200 kg. Termin ustalamy mailowo.",
       "footer.rights": "Wszelkie prawa zastrzeżone.",
       "footer.console": "Panel marki",
       "footer.landing": "Strona manufaktury",
@@ -531,6 +544,8 @@
       "ship.inpost_courier.note": "Доставка на вказану адресу, зазвичай наступного робочого дня.",
       "ship.dpd_courier.label": "Кур'єр DPD",
       "ship.dpd_courier.note": "Доставка на вказану адресу, зазвичай наступного робочого дня.",
+      "ship.fresh_logistic.label": "Fresh Logistic — паллета",
+      "ship.fresh_logistic.note": "Палетне перевезення з контролем температури, від 200 кг. Термін узгоджуємо електронною поштою.",
       "footer.rights": "Усі права застережено.",
       "footer.console": "Панель бренду",
       "footer.landing": "Сторінка мануфактури",
@@ -753,6 +768,8 @@
       "ship.inpost_courier.note": "To your address, usually the next working day.",
       "ship.dpd_courier.label": "DPD courier",
       "ship.dpd_courier.note": "Delivery to the address you give, usually the next working day.",
+      "ship.fresh_logistic.label": "Fresh Logistic — pallet",
+      "ship.fresh_logistic.note": "Temperature-controlled pallet transport, from 200 kg. We agree the date by e-mail.",
       "footer.rights": "All rights reserved.",
       "footer.console": "Brand console",
       "footer.landing": "Workshop site",

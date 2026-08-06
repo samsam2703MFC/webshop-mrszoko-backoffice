@@ -347,6 +347,9 @@ CREATE TABLE IF NOT EXISTS wsm_shipping_methods (
   price_net    INTEGER NOT NULL DEFAULT 0,
   vat_rate     REAL NOT NULL DEFAULT 0.23,
   free_from    INTEGER NOT NULL DEFAULT 0,
+  -- Les deux bornes de poids. Voir le schema MySQL : un transporteur de
+  -- palettes commence a 200 kg, un Paczkomat s'arrete a 25.
+  min_weight_g INTEGER NOT NULL DEFAULT 0,
   max_weight_g INTEGER NOT NULL DEFAULT 25000
 );
 

@@ -354,8 +354,14 @@ function wsm_ship_codes(PDO $pdo, string $saisie): array {
             'fermes' => array_keys($fermes)];
 }
 
-/** Modes de livraison actifs, tarifs compris — pilotés par la base. */
-function wsm_shipping_methods(PDO $pdo, string $lang, string $country = ''): array {
+/**
+ * Modes de livraison actifs, tarifs compris — pilotés par la base.
+ *
+ * @param int $poids  poids du panier en grammes, ou -1 pour ne pas filtrer.
+ *                    Passer le poids RETIRE les modes qui ne peuvent pas le
+ *                    prendre — voir la note sur les deux bornes plus bas.
+ */
+function wsm_shipping_methods(PDO $pdo, string $lang, string $country = '', int $poids = -1): array {
     $S = wsm_shop_strings($pdo, $lang);
     $rows = $pdo->query("SELECT * FROM wsm_shipping_methods WHERE active = 1 ORDER BY sort_order")->fetchAll();
     // Un transporteur ne dessert que les pays qu'on lui a déclarés : proposer
@@ -368,6 +374,27 @@ function wsm_shipping_methods(PDO $pdo, string $lang, string $country = ''): arr
             return in_array($country, array_map('trim', explode(',', strtoupper($list))), true);
         }));
     }
+    // LES DEUX BORNES DE POIDS FILTRENT LA LISTE, elles ne se contentent pas de
+    // refuser après coup.
+    //
+    // Avant, un panier de 30 kg voyait quand même « Paczkomat » (25 kg max) :
+    // le client le choisissait, et la caisse refusait — sans lui dire que DPD,
+    // juste au-dessus, l'aurait pris. Un aller-retour au moment le plus fragile
+    // du parcours, sur une commande qui était pourtant livrable.
+    //
+    // Et depuis qu'un transporteur de palettes existe, l'inverse compte autant :
+    // proposer « Fresh Logistic — à partir de 200 kg » pour une tablette de
+    // chocolat n'est pas une option, c'est un piège.
+    if ($poids >= 0) {
+        $rows = array_values(array_filter($rows, function ($r) use ($poids) {
+            $min = (int) ($r['min_weight_g'] ?? 0);
+            $max = (int) ($r['max_weight_g'] ?? 0);
+            if ($min > 0 && $poids < $min) return false;
+            if ($max > 0 && $poids > $max) return false;
+            return true;
+        }));
+    }
+
     return array_map(function ($r) use ($S) {
         $net   = (int) $r['price_net'];
         $vat   = (float) $r['vat_rate'];
@@ -382,6 +409,7 @@ function wsm_shipping_methods(PDO $pdo, string $lang, string $country = ''): arr
             'vat_rate'  => $vat,
             'price'     => $gross,
             'free_from' => (int) $r['free_from'],
+            'min_weight_g' => (int) ($r['min_weight_g'] ?? 0),
             'max_weight_g' => (int) $r['max_weight_g'],
         ];
     }, $rows);
@@ -623,7 +651,15 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
     }
 
     // --- Livraison ----------------------------------------------------------
-    $methods = wsm_shipping_methods($pdo, $lang, $country);
+    // On demande DEUX listes, et ce n'est pas un gaspillage : leur différence
+    // est ce qui permet de dire au client CE QUI cloche.
+    //   · $tousPays  — ce qui dessert son pays, quel que soit le poids ;
+    //   · $methods   — ce qui peut vraiment prendre SON panier.
+    // Sans la première, un panier de 40 kg vers la Pologne lirait « nie
+    // dowozimy do tego kraju », ce qui est faux et envoie chercher la panne à
+    // l'autre bout.
+    $tousPays = wsm_shipping_methods($pdo, $lang, $country);
+    $methods  = wsm_shipping_methods($pdo, $lang, $country, $weight);
     $method = null;
     foreach ($methods as $m) if ($m['id'] === $methodId) $method = $m;
 
@@ -637,19 +673,43 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
     // le problème est son PAYS et pas son clic.
     //
     // L'ordre compte donc : le pays d'abord, et on ne l'écrase plus.
-    if (!$methods) {
+    if (!$methods && !$tousPays) {
         $e['delivery_method'] = $country !== ''
             ? 'nie dowozimy jeszcze do tego kraju (' . $country . ')'
             : 'brak dostawy do tego kraju';
+    } elseif (!$methods) {
+        // TROISIÈME REFUS, ajouté avec le transporteur de palettes : le pays
+        // est desservi, c'est le POIDS qui ne passe nulle part. On donne les
+        // bornes, sinon la phrase ne dit pas quoi faire.
+        $bornes = [];
+        foreach ($tousPays as $m) {
+            $bornes[] = ($m['min_weight_g'] > 0 ? (int) round($m['min_weight_g'] / 1000) . '–' : 'do ')
+                      . (int) round($m['max_weight_g'] / 1000) . ' kg';
+        }
+        $e['delivery_method'] = 'żaden przewoźnik nie weźmie ' . (int) round($weight / 1000)
+                              . ' kg — dostępne zakresy: ' . implode(', ', array_unique($bornes));
     } elseif ($methodId !== '' && !$method) {
-        $e['delivery_method'] = 'nieznana metoda dostawy';
+        // La méthode existe peut-être, mais pas pour CE panier : le dire.
+        $ailleurs = false;
+        foreach ($tousPays as $m) if ($m['id'] === $methodId) $ailleurs = true;
+        $e['delivery_method'] = $ailleurs
+            ? 'ta metoda nie przyjmie ' . (int) round($weight / 1000) . ' kg'
+            : 'nieznana metoda dostawy';
     }
     if (!$method && $methods) $method = $methods[0];
 
     $shipNet = 0; $shipVat = 0; $shipGross = 0; $freeShipping = false;
     if ($method) {
-        if ($weight > $method['max_weight_g']) {
+        // LA CEINTURE, après les bretelles. La liste est déjà filtrée par
+        // poids ; ce contrôle reste parce qu'une méthode peut arriver ici par
+        // un autre chemin — une commande rejouée, un identifiant forcé — et
+        // qu'un colis hors gabarit se refuse au dépôt, pas à la caisse.
+        if ($method['max_weight_g'] > 0 && $weight > $method['max_weight_g']) {
             $e['weight_g'] = 'przesyłka za ciężka: ' . $weight . ' g';
+        }
+        if ($method['min_weight_g'] > 0 && $weight < $method['min_weight_g']) {
+            $e['weight_g'] = 'przesyłka za lekka dla tej metody: ' . $weight . ' g (od '
+                           . (int) round($method['min_weight_g'] / 1000) . ' kg)';
         }
         // Le seuil de franco du COMPTE PROFESSIONNEL prime quand il est plus
         // bas : c'est une condition accordée à quelqu'un, elle ne peut pas

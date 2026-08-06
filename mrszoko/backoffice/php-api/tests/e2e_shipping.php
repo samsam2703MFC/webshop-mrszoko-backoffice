@@ -396,5 +396,78 @@ ok('une chaîne quelconque ne casse pas la lecture', wsm_jwt_charge('nawet.nie.j
 ok('une chaîne vide non plus', wsm_jwt_charge('') === []);
 $pose('');
 
+// ---------------------------------------------------------------------------
+//  LES DEUX BORNES DE POIDS, ET LE TRANSPORTEUR QU'ON NE PILOTE PAS
+//
+//  Un transporteur de palettes commence à 200 kg. Deux erreurs symétriques, et
+//  aucune ne lève quoi que ce soit :
+//
+//   · proposer « Fresh Logistic — à partir de 200 kg » pour une tablette de
+//     chocolat : le client le choisit, et la palette est refusée APRÈS la
+//     vente ;
+//   · continuer à proposer un Paczkomat pour 30 kg — ce que la caisse faisait
+//     jusqu'ici — alors que DPD, juste au-dessus, l'aurait pris. Un
+//     aller-retour au moment le plus fragile du parcours, sur une commande
+//     pourtant livrable.
+//
+//  La liste se filtre donc AVANT d'être montrée, et le refus dit laquelle des
+//  trois choses cloche : le pays, le poids, ou la méthode.
+// ---------------------------------------------------------------------------
+echo "\n-- dwie granice wagi --\n";
+require_once dirname(__DIR__) . '/shipping.php';
+$sfxW = 'test-wg-' . bin2hex(random_bytes(3));
+$pdo->prepare("INSERT INTO wsm_shipping_methods
+   (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from,
+    min_weight_g, max_weight_g, countries)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+   ->execute([$sfxW . '-pal', 'fresh', 'adres', 90, 1, 89000, 0.23, 0, 200000, 1500000, 'PL']);
+$pdo->prepare("INSERT INTO wsm_shipping_methods
+   (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from,
+    min_weight_g, max_weight_g, countries)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+   ->execute([$sfxW . '-mal', 'inpost', 'punkt', 91, 1, 1130, 0.23, 0, 0, 25000, 'PL']);
+
+$ids = fn(int $g) => array_column(wsm_shipping_methods($pdo, 'pl', 'PL', $g), 'id');
+ok('un panier léger ne voit PAS le transport de palettes',
+   !in_array($sfxW . '-pal', $ids(500), true), $ids(500));
+ok('mais voit bien le petit colis', in_array($sfxW . '-mal', $ids(500), true));
+ok('un panier de 300 kg voit le transport de palettes',
+   in_array($sfxW . '-pal', $ids(300000), true), $ids(300000));
+ok('et ne voit plus le petit colis — il ne le prendrait pas',
+   !in_array($sfxW . '-mal', $ids(300000), true));
+ok('au-dessus du plafond du palettier, plus rien de lui',
+   !in_array($sfxW . '-pal', $ids(2000000), true));
+// Sans poids, la liste n'est PAS filtrée : c'est ce dont l'écran Dostawa et
+// la page d'accueil ont besoin — montrer ce qui existe, pas ce qui s'applique.
+ok('sans poids, rien n\'est filtré',
+   in_array($sfxW . '-pal', array_column(wsm_shipping_methods($pdo, 'pl', 'PL'), 'id'), true));
+// La borne est INCLUSIVE des deux côtés : à 200 kg pile, la palette passe.
+ok('à la borne exacte, la méthode est proposée',
+   in_array($sfxW . '-pal', $ids(200000), true));
+ok('un gramme en dessous, elle ne l\'est pas',
+   !in_array($sfxW . '-pal', $ids(199999), true));
+
+// Le transporteur connu mais NON PILOTÉ ne doit pas passer pour inconnu.
+echo "\n-- przewoźnik znany, ale nadawany ręcznie --\n";
+$cmd = ['delivery_method' => $sfxW . '-pal', 'phone' => '600100200', 'email' => 'a@b.pl',
+        'first_name' => 'Jan', 'company' => '', 'weight_g' => 250000,
+        'ship' => ['street' => 'Polna', 'building' => '1', 'postcode' => '00-001', 'city' => 'Wrocław']];
+ok('il est reconnu comme manuel', wsm_ship_manuel($pdo, $cmd) === 'Fresh Logistic',
+   wsm_ship_manuel($pdo, $cmd));
+ok('une commande complète ne bloque sur RIEN', wsm_ship_blockers($pdo, $cmd) === [],
+   wsm_ship_blockers($pdo, $cmd));
+// LE point : il ne doit surtout pas répondre « Nieznany przewoźnik », qui
+// enverrait chercher une faute de configuration là où il n'y en a pas.
+ok('et surtout pas « przewoznik » — la commande est bonne, pas la config',
+   !in_array('przewoznik', wsm_ship_blockers($pdo, $cmd), true));
+$sansTel = $cmd; $sansTel['phone'] = '';
+ok('les contrôles de données s\'appliquent quand même',
+   in_array('telefon', wsm_ship_blockers($pdo, $sansTel), true));
+[$exp, $err] = wsm_ship_create($pdo, $cmd);
+ok('la création s\'arrête, et le dit en clair', $exp === null && str_contains($err, 'nadanie_reczne'), $err);
+ok('le message NOMME le transporteur', str_contains($err, 'Fresh Logistic'), $err);
+
+$pdo->exec("DELETE FROM wsm_shipping_methods WHERE id LIKE '" . $sfxW . "%'");
+
 echo "\n" . ($fail === 0 ? "OK — $pass assertions" : "ÉCHEC — $fail sur " . ($pass + $fail)) . "\n";
 exit($fail === 0 ? 0 : 1);
