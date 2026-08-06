@@ -526,9 +526,24 @@ function wsm_invoice_reminders_run(PDO $pdo): int {
 //  pas. La facture demande une preuve — VIES pour l'étranger, un NIP valide
 //  pour la Pologne.
 //
-//  ON NE DEVINE JAMAIS DEPUIS L'ÉTAT COURANT DE VIES. Le statut est FIGÉ sur
-//  la commande au moment de la vente (vat_status). Un numéro valable en mars
-//  et révoqué en juin ne doit pas changer le document de mars.
+//  QUAND VIES EST CONSULTÉ — CORRECTION D'UNE ERREUR DE RAISONNEMENT.
+//
+//  J'avais d'abord écrit que le statut restait FIGÉ à la vente, et qu'on ne
+//  relisait jamais VIES. C'est faux là où ça compte : pour une livraison
+//  intracommunautaire en autoliquidation, le vendeur doit avoir vérifié le
+//  numéro AU MOMENT DE LA LIVRAISON, et pouvoir le prouver — c'est le numéro
+//  de consultation qui sert de preuve en contrôle. Un numéro valable au
+//  moment de la commande et révoqué avant l'expédition rend la facture
+//  fausse, et la TVA reste due par le vendeur.
+//
+//  VIES est donc reconsulté au passage à « wysłane », juste avant d'émettre,
+//  et le résultat frais est écrit sur la commande avec sa date et son numéro
+//  de consultation. Ce qui reste figé, c'est le DOCUMENT une fois émis : lui
+//  ne se réécrit pas, il se corrige par un avoir.
+//
+//  SI VIES NE RÉPOND PAS, on garde ce qu'on avait : refuser d'expédier parce
+//  qu'un service européen est en panne arrêterait la boutique pour une raison
+//  qui ne la regarde pas.
 // ---------------------------------------------------------------------------
 
 /**

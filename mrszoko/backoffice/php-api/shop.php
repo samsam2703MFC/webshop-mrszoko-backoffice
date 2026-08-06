@@ -1408,6 +1408,12 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
             require_once $inv;
             $order = wsm_order_by_id($pdo, $id);
             if ($order) {
+                // VIES D'ABORD, DOCUMENT ENSUITE. Le numéro doit être vérifié
+                // au moment de la LIVRAISON, pas à celui de la commande : il a
+                // pu être révoqué entre les deux, et c'est le vendeur qui
+                // paierait la TVA d'une facture en autoliquidation devenue
+                // fausse. La consultation datée reste sur la commande.
+                $order = wsm_order_vies_refresh($pdo, $order);
                 // Elle ne lève jamais : une commande expédiée dont le document
                 // échoue reste expédiée. Le colis est parti, on ne le rattrape
                 // pas en refusant d'écrire un état.
@@ -1427,4 +1433,49 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
         }
     }
     return $out;
+}
+
+/**
+ * RECONSULTER VIES AVANT D'ÉMETTRE, et garder la preuve.
+ *
+ * Pour une livraison intracommunautaire en autoliquidation, le vendeur doit
+ * avoir vérifié le numéro AU MOMENT DE LA LIVRAISON — et pouvoir le montrer.
+ * Le numéro de consultation rendu par VIES est cette preuve. Un numéro valable
+ * à la commande et révoqué avant l'expédition rend la facture fausse, et la
+ * TVA reste due par le vendeur.
+ *
+ * ELLE NE BLOQUE JAMAIS L'EXPÉDITION. Si VIES ne répond pas, on garde ce qui
+ * était écrit : arrêter la boutique parce qu'un service européen est en panne
+ * serait lui faire porter une panne qui ne la regarde pas.
+ *
+ * @return array la commande, rechargée si quelque chose a changé
+ */
+function wsm_order_vies_refresh(PDO $pdo, array $order): array {
+    $vat = trim((string) ($order['vat_eu'] ?? ''));
+    if ($vat === '') return $order;                    // rien à vérifier
+
+    $v = __DIR__ . '/vies.php';
+    if (!is_file($v)) return $order;
+    require_once $v;
+    if (!function_exists('wsm_vies_check')) return $order;
+
+    try {
+        // `force` : on veut une consultation DATÉE D'AUJOURD'HUI, pas une
+        // réponse en cache d'il y a trois semaines. C'est la date qui fait la
+        // preuve, autant que le résultat.
+        $r = wsm_vies_check($pdo, $vat, true);
+        $st = (string) ($r['status'] ?? '');
+        // Une panne ne doit pas EFFACER une réponse obtenue avant : on
+        // n'écrit que si VIES a tranché.
+        if ($st !== 'valid' && $st !== 'invalid') return $order;
+
+        $cols = wsm_vies_columns($r);
+        $pdo->prepare("UPDATE wsm_orders SET vat_status = ?, vat_checked_at = ?,
+                              vat_name = ?, vat_consultation = ? WHERE id = ?")
+            ->execute([$cols['vat_status'], $cols['vat_checked_at'],
+                       $cols['vat_name'], $cols['vat_consultation'], (int) $order['id']]);
+        return wsm_order_by_id($pdo, (int) $order['id']) ?: $order;
+    } catch (Throwable $e) {
+        return $order;
+    }
 }
