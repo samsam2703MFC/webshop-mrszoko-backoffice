@@ -669,3 +669,145 @@ function wsm_invoice_lien_public(PDO $pdo, array $order, array $doc): string {
     return rtrim($base, '/') . '/zamowienie/' . rawurlencode((string) $order['code'])
          . '?t=' . rawurlencode($tok);
 }
+
+// ---------------------------------------------------------------------------
+//  L'ÉTAT D'UNE COMMANDE, VU DEPUIS LA LISTE
+//
+//  La liste disait le statut et rien d'autre. Pour savoir si une commande
+//  partirait avec une facture ou un e-paragon, si son numéro de TVA tenait
+//  toujours, ou si son document était bien arrivé au registre national, il
+//  fallait ouvrir la fiche — une par une. On ne le faisait donc pas, et on
+//  découvrait le problème après coup, quand le document était déjà figé.
+//
+//  Ces quatre voyants se lisent d'un coup d'œil sur la ligne, et chacun porte
+//  le geste qui le débloque. La couleur ne décore pas : elle dit s'il y a
+//  quelque chose à faire.
+// ---------------------------------------------------------------------------
+
+/**
+ * Les quatre voyants d'une commande : VIES, document, expédition, envoi.
+ *
+ * @return array<string, array{etat:string, txt:string, quoi:string, agir:string}>
+ *         etat : '' neutre · 'ok' vert · 'no' rouge · 'wait' orange
+ *         agir : le nom du bouton à poster, ou '' s'il n'y a rien à faire
+ */
+function wsm_order_voyants(PDO $pdo, array $o): array {
+    $st  = (string) ($o['status'] ?? '');
+    $vs  = strtolower((string) ($o['vat_status'] ?? ($o['vat']['status'] ?? '')));
+    $ve  = trim((string) ($o['vat_eu'] ?? ''));
+    $doc = wsm_invoice_for_order($pdo, (int) $o['id']);
+    $va  = wsm_invoice_kind_for($o);
+
+    // --- VIES ---------------------------------------------------------------
+    // Le bouton reste proposé même quand c'est vert : c'est le contrôle du
+    // JOUR qui compte, et on peut vouloir le refaire avant d'expédier.
+    if ($ve === '') {
+        $vies = ['etat' => '', 'txt' => 'VIES —', 'quoi' => 'Brak numeru VAT UE', 'agir' => ''];
+    } else {
+        $vies = match ($vs) {
+            'valid'   => ['etat' => 'ok',   'txt' => 'VIES ✓', 'quoi' => 'Numer potwierdzony w VIES'],
+            'invalid' => ['etat' => 'no',   'txt' => 'VIES ✗', 'quoi' => 'Numer odrzucony — będzie paragon'],
+            default   => ['etat' => 'wait', 'txt' => 'VIES ?', 'quoi' => 'Niesprawdzony albo usługa niedostępna'],
+        };
+        $vies['agir'] = 'vies';
+    }
+
+    // --- Le document --------------------------------------------------------
+    if (!$doc) {
+        $dk = $va['kind'] === 'faktura' ? 'Faktura' : 'Paragon';
+        $d = ['etat' => '', 'txt' => $dk . ' →', 'quoi' => 'Powstanie przy „Wysłane": ' . $va['raison'],
+              'agir' => ''];
+    } elseif ((string) $doc['kind'] !== 'faktura') {
+        // Un e-paragon n'a rien à faire au registre national : ce n'est pas un
+        // manque, c'est le bon état. Vert.
+        $d = ['etat' => 'ok', 'txt' => 'Paragon ' . (string) $doc['number'],
+              'quoi' => 'Paragon nie idzie do KSeF — tak ma być', 'agir' => ''];
+    } else {
+        $ks = trim((string) ($doc['ksef_number'] ?? ''));
+        $d = $ks !== ''
+            ? ['etat' => 'ok',   'txt' => 'KSeF ✓', 'quoi' => 'W rejestrze: ' . $ks, 'agir' => '']
+            : ['etat' => 'no',   'txt' => 'KSeF ✗',
+               'quoi' => 'Faktura ' . (string) $doc['number'] . ' nie jest jeszcze w rejestrze',
+               'agir' => 'ksef'];
+    }
+
+    // --- Les deux gestes d'expédition ---------------------------------------
+    // On ne propose que ce qui a du sens depuis l'état courant : un bouton qui
+    // ne fera rien est pire qu'un bouton absent — on clique, rien ne bouge, et
+    // on cherche la panne.
+    $vers = ['etat' => '', 'txt' => 'Do wysyłki', 'quoi' => 'Ustaw „W realizacji"', 'agir' => ''];
+    if (in_array($st, ['nowe', 'oplacone'], true)) $vers['agir'] = 'do_wysylki';
+
+    $env = ['etat' => '', 'txt' => 'Wysłane', 'agir' => '',
+            'quoi' => 'Ustaw „Wysłane" — wystawi dokument, wyśle go i zgłosi do KSeF'];
+    if (in_array($st, ['nowe', 'oplacone', 'w_realizacji'], true)) $env['agir'] = 'wyslane';
+    if ($st === 'wyslane') { $env['etat'] = 'ok'; $env['quoi'] = 'Zamówienie wysłane'; }
+
+    return ['vies' => $vies, 'dok' => $d, 'wysylka' => $vers, 'wyslane' => $env];
+}
+
+/**
+ * CE QUE CHAQUE ÉTAT DÉCLENCHE — DÉRIVÉ DU CODE, PAS RECOPIÉ.
+ *
+ * Un état de commande n'est plus un mot : « wysłane » émet un document
+ * fiscal, l'envoie et le dépose au registre national. Ce qui se déclenche
+ * n'était écrit nulle part — il fallait lire quatre fichiers pour le savoir,
+ * et personne ne le faisait.
+ *
+ * CETTE TABLE NE SE MAINTIENT PAS À LA MAIN. Chaque ligne est calculée à
+ * partir des sources qui décident vraiment : les modèles de courrier en base,
+ * la liste des états qui préviennent le client, l'état des canaux KSeF et
+ * transporteur. Une seconde liste écrite à côté aurait divergé au premier
+ * changement — et une table de déclencheurs fausse est pire qu'aucune.
+ *
+ * @return array<int, array{statut:string, kto:string, wyzwala:string[], mail:string}>
+ */
+function wsm_status_triggers(PDO $pdo): array {
+    $modeles = [];
+    if (function_exists('wsm_mail_templates')) {
+        foreach (wsm_mail_templates($pdo) as $t) {
+            $modeles[(string) ($t['code'] ?? '')] = !empty($t['active']);
+        }
+    }
+    $ksefOuvert = function_exists('wsm_ksef_enabled') && wsm_ksef_enabled();
+    $manqueVendeur = wsm_invoice_blockers();
+
+    $mail = function (string $code) use ($modeles): string {
+        if (!array_key_exists($code, $modeles)) return 'brak szablonu — nic nie wychodzi';
+        return $modeles[$code] ? 'szablon czynny — klient dostaje wiadomość'
+                               : 'szablon wyłączony — nic nie wychodzi';
+    };
+
+    $doc = ['Wystawia FAKTURĘ albo PARAGON (reguła VIES/NIP)',
+            'Wysyła dokument mailem do klienta'];
+    $doc[] = $ksefOuvert
+        ? 'Zgłasza fakturę do KSeF (paragon nigdy)'
+        : 'KSeF: kanał zamknięty — faktura czeka w kolejce';
+    if ($manqueVendeur) {
+        // LE point qu'il faut voir avant de découvrir qu'aucune facture n'est
+        // sortie depuis trois semaines.
+        $doc[] = 'UWAGA: brak danych sprzedawcy (' . implode(', ', $manqueVendeur)
+               . ') — żaden dokument nie powstanie';
+    }
+    $doc[] = 'Sprawdza VIES na nowo, tuż przed wystawieniem';
+
+    return [
+        ['statut' => 'nowe', 'kto' => 'Złożenie zamówienia w sklepie',
+         'wyzwala' => ['Rezerwuje stan magazynowy', 'Potwierdzenie do klienta'],
+         'mail' => $mail('zamowienie')],
+        ['statut' => 'oplacone', 'kto' => 'Powiadomienie tpay albo ręcznie',
+         'wyzwala' => ['Zamówienie wchodzi do kolejki wysyłki'],
+         'mail' => $mail('platnosc')],
+        ['statut' => 'w_realizacji', 'kto' => 'Przycisk „Do wysyłki" albo lista rozwijana',
+         'wyzwala' => ['Nic poza powiadomieniem — to stan przygotowania'],
+         'mail' => $mail('w_realizacji')],
+        ['statut' => 'wyslane', 'kto' => 'Przycisk „Wysłane", lista rozwijana, albo nadanie u przewoźnika',
+         'wyzwala' => $doc, 'mail' => $mail('wyslane')],
+        ['statut' => 'dostarczone', 'kto' => 'Ręcznie',
+         'wyzwala' => ['Otwiera bieg terminu na reklamację'],
+         'mail' => $mail('dostarczone')],
+        ['statut' => 'anulowane', 'kto' => 'Ręcznie',
+         'wyzwala' => ['Zamyka zamówienie — nie da się go już wysłać'],
+         'mail' => $mail('anulowane')],
+    ];
+}
