@@ -26,6 +26,17 @@
       "vat_rate": 0.23,
       "free_from": 30000,
       "max_weight_g": 25000
+    },
+    {
+      "id": "dpd_courier",
+      "carrier": "dpd",
+      "kind": "adres",
+      "sort_order": 3,
+      "active": 1,
+      "price_net": 1707,
+      "vat_rate": 0.23,
+      "free_from": 30000,
+      "max_weight_g": 31500
     }
   ],
   "products": [
@@ -296,6 +307,8 @@
       "ship.inpost_locker.note": "Odbiór 24/7 w wybranym paczkomacie.",
       "ship.inpost_courier.label": "Kurier InPost",
       "ship.inpost_courier.note": "Dostawa pod wskazany adres, zwykle następnego dnia roboczego.",
+      "ship.dpd_courier.label": "Kurier DPD",
+      "ship.dpd_courier.note": "Dostawa pod wskazany adres, zwykle następnego dnia roboczego.",
       "footer.rights": "Wszelkie prawa zastrzeżone.",
       "footer.console": "Panel marki",
       "footer.landing": "Strona manufaktury",
@@ -515,6 +528,8 @@
       "ship.inpost_locker.note": "Отримання 24/7 у вибраному поштоматі.",
       "ship.inpost_courier.label": "Кур'єр InPost",
       "ship.inpost_courier.note": "Доставка на вказану адресу, зазвичай наступного робочого дня.",
+      "ship.dpd_courier.label": "Кур'єр DPD",
+      "ship.dpd_courier.note": "Доставка на вказану адресу, зазвичай наступного робочого дня.",
       "footer.rights": "Усі права застережено.",
       "footer.console": "Панель бренду",
       "footer.landing": "Сторінка мануфактури",
@@ -734,6 +749,8 @@
       "ship.inpost_locker.note": "Pick up 24/7 from the locker you choose.",
       "ship.inpost_courier.label": "InPost courier",
       "ship.inpost_courier.note": "To your address, usually the next working day.",
+      "ship.dpd_courier.label": "DPD courier",
+      "ship.dpd_courier.note": "Delivery to the address you give, usually the next working day.",
       "footer.rights": "All rights reserved.",
       "footer.console": "Brand console",
       "footer.landing": "Workshop site",

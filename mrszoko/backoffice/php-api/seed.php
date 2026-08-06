@@ -477,12 +477,12 @@ function wsm_sync_content(PDO $pdo): array {
     // un prix de port se décide en console, pas au déploiement.
     $sel = $pdo->prepare('SELECT 1 FROM wsm_shipping_methods WHERE id = ?');
     $insS = $pdo->prepare('INSERT INTO wsm_shipping_methods
-        (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
-        VALUES (?,?,?,?,?,?,?,?)');
+        (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
+        VALUES (?,?,?,?,?,?,?,?,?)');
     foreach ($livre['ship'] as $m) {
         $sel->execute([$m['id']]);
         if ($sel->fetchColumn()) continue;
-        $insS->execute([$m['id'], $m['carrier'], $m['sort_order'], $m['active'],
+        $insS->execute([$m['id'], $m['carrier'], $m['kind'], $m['sort_order'], $m['active'],
                         $m['price_net'], $m['vat_rate'], $m['free_from'], $m['max_weight_g']]);
         $ship++;
     }
@@ -522,6 +522,10 @@ function wsm_content_livre(): array {
         foreach ((array) ($doc['shipping'] ?? []) as $m) {
             $out['ship'][] = [
                 'id' => (string) ($m['id'] ?? ''), 'carrier' => (string) ($m['carrier'] ?? 'inpost'),
+                // 'punkt' ou 'adres'. Sans ce champ, une méthode livrée
+                // arriverait en base sur le défaut de la colonne — « adres » —
+                // et un Paczkomat réclamerait une rue au client.
+                'kind' => (string) ($m['kind'] ?? 'adres'),
                 'sort_order' => (int) ($m['sort_order'] ?? 0), 'active' => (int) ($m['active'] ?? 1),
                 'price_net' => (int) ($m['price_net'] ?? 0), 'vat_rate' => (float) ($m['vat_rate'] ?? 0.23),
                 'free_from' => (int) ($m['free_from'] ?? 0), 'max_weight_g' => (int) ($m['max_weight_g'] ?? 25000),
@@ -567,8 +571,9 @@ function wsm_sync_content_sql(): string {
     }
     foreach ($livre['ship'] as $m) {
         $out[] = 'INSERT IGNORE INTO wsm_shipping_methods'
-               . ' (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g) VALUES ('
+               . ' (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from, max_weight_g) VALUES ('
                . wsm_sql_txt($m['id']) . ', ' . wsm_sql_txt($m['carrier']) . ', '
+               . wsm_sql_txt($m['kind']) . ', '
                . $m['sort_order'] . ', ' . $m['active'] . ', ' . $m['price_net'] . ', '
                . $m['vat_rate'] . ', ' . $m['free_from'] . ', ' . $m['max_weight_g'] . ');';
     }

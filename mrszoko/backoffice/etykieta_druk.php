@@ -85,8 +85,10 @@ $labelUrl = (string) ($ship['label_url'] ?? '');
   <div class="to">
     <div class="cap">Odbiorca</div>
     <div class="name"><?= h(trim(($o['company'] ?: $o['first_name'] . ' ' . $o['last_name']))) ?></div>
-    <?php if ($o['delivery_method'] === 'inpost_locker'): ?>
-      <div class="addr">Paczkomat InPost</div>
+    <?php // Le TYPE de service, pas le nom : « ce n'est pas inpost_locker »
+          // ne veut pas dire « c'est une adresse ». ?>
+    <?php if (wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'): ?>
+      <div class="addr">Punkt odbioru</div>
       <div class="locker"><?= h($o['inpost_point']) ?></div>
       <div class="addr"><?= h($o['phone']) ?></div>
     <?php else: ?>

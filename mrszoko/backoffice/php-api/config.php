@@ -122,6 +122,24 @@ $cfg = [
         'sandbox'         => (getenv('WSM_INPOST_SANDBOX') ?: '1') !== '0',
     ],
 
+    // ---- DPD Polska : expédition à l'adresse, Pologne et Europe ------------
+    //  FERMÉ tant que ces champs sont vides, et « xxxx » compte pour vide.
+    //  L'adresse d'expéditeur n'est pas décorative : DPD l'imprime sur
+    //  l'étiquette, et un colis refusé à l'arrivée sans adresse de retour ne
+    //  revient jamais. L'API est du SOAP — l'extension php-soap doit être là.
+    'dpd' => [
+        'login'    => getenv('WSM_DPD_LOGIN') ?: '',
+        'password' => getenv('WSM_DPD_PASSWORD') ?: '',
+        'fid'      => getenv('WSM_DPD_FID') ?: '',
+        'sandbox'  => (getenv('WSM_DPD_SANDBOX') ?: '1') !== '0',
+        'sender_name'     => getenv('WSM_DPD_SENDER_NAME') ?: '',
+        'sender_address'  => getenv('WSM_DPD_SENDER_ADDRESS') ?: '',
+        'sender_city'     => getenv('WSM_DPD_SENDER_CITY') ?: '',
+        'sender_postcode' => getenv('WSM_DPD_SENDER_POSTCODE') ?: '',
+        'sender_country'  => getenv('WSM_DPD_SENDER_COUNTRY') ?: 'PL',
+        'sender_phone'    => getenv('WSM_DPD_SENDER_PHONE') ?: '',
+    ],
+
     // ---- Allegro : le second canal de vente --------------------------------
     //  FERMÉ TANT QUE CES CHAMPS SONT VIDES, et « xxxx » compte pour vide :
     //  c'est la valeur d'un champ de démonstration, et la prendre pour un

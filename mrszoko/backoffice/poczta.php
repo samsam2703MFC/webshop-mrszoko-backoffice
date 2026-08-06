@@ -398,9 +398,14 @@ console_crumbs($detail
       <p class="muted small">Bez adresu zamówienia nie da się utworzyć. Sprawdź, co klient napisał w mailu.</p>
       <div class="grid2">
         <label class="field"><span>Sposób dostawy</span>
+          <?php // LA LISTE VIENT DE LA BASE. Écrite en dur, elle ne proposait
+                // que les deux services d'origine : une commande saisie ici à
+                // la main ne pouvait donc jamais partir par un transporteur
+                // ajouté ensuite, sans que rien ne l'explique. ?>
           <select name="delivery_method" id="dm">
-            <option value="inpost_locker">Paczkomat InPost</option>
-            <option value="inpost_courier">Kurier InPost</option>
+            <?php foreach (wsm_shipping_methods($pdo, 'pl') as $sm): ?>
+            <option value="<?= h((string) $sm['id']) ?>"><?= h((string) $sm['label']) ?></option>
+            <?php endforeach; ?>
           </select></label>
         <label class="field"><span>Telefon</span>
           <input type="text" name="phone" value="<?= $pre('phone') ?>" placeholder="600 100 200"></label>
