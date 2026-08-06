@@ -156,11 +156,14 @@ function wsm_seed(PDO $pdo): void {
     // boutique absente n'est pas une donnée, c'est un compte qui ne voit rien.
     // Les comptes eux-mêmes restent — l'écran Użytkownicy a besoin de montrer
     // autre chose qu'une seule ligne — mais leur portée redevient le réseau.
+    // Un compte par rôle : c'est ce qui rend l'écran Użytkownicy lisible dès la
+    // première ouverture, et ce qui permet de VOIR ce que chaque rôle ouvre
+    // sans créer quatre comptes à la main.
     $users = [
-        ['Sophie Renard', 'sophie.renard@misterszoko.com', 'Centrala', 'Cała sieć', 1, []],
-        ['Thomas Legrand', 'thomas.legrand@misterszoko.com', 'Franczyza', 'Cała sieć', 1, []],
-        ['Marek Kowalski', 'm.kowalski@misterszoko.com', 'Franczyza', 'Cała sieć', 1, []],
-        ['Julie Peeters', 'j.peeters@misterszoko.com', 'Franczyza', 'Cała sieć', 0, []],
+        ['Sophie Renard', 'sophie.renard@misterszoko.com', WSM_ROLE_ADMIN, 'Cała sieć', 1, []],
+        ['Thomas Legrand', 'thomas.legrand@misterszoko.com', 'Sprzedaż', 'Cała sieć', 1, []],
+        ['Marek Kowalski', 'm.kowalski@misterszoko.com', 'Magazyn', 'Cała sieć', 1, []],
+        ['Julie Peeters', 'j.peeters@misterszoko.com', 'Księgowość', 'Cała sieć', 0, []],
     ];
     foreach ($users as $u) {
         $uid = $ins('wsm_users', ['nom' => $u[0], 'email' => $u[1], 'role' => $u[2], 'portee' => $u[3], 'act' => $u[4]]);

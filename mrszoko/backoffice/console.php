@@ -48,7 +48,31 @@ function console_boot(): array {
         header('Location: index.html', true, 302);
         exit;
     }
-    return [$pdo, $me, ($me['role'] ?? '') === WSM_ROLE_ADMIN];
+
+    // LE DROIT SE CALCULE ICI, UNE FOIS, POUR L'ÉCRAN COURANT.
+    //
+    // Le troisième élément rendu s'appelait « isAdmin » et voulait dire « le
+    // rôle est Centrala ». Il veut maintenant dire « ce compte peut ÉCRIRE sur
+    // CET écran » — ce que les cent trente endroits qui s'en servent testaient
+    // déjà en pratique. Le sens change, pas les appels : c'est ce qui permet
+    // de passer d'un modèle binaire à cinq rôles sans réécrire chaque écran,
+    // et donc sans risquer d'en oublier un ouvert.
+    $ecran = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $droit = wsm_droit_ecran($me, $ecran);
+    if ($droit === '') {
+        // Cacher le lien dans le rail n'est pas une protection : l'adresse se
+        // devine, se retient et se partage. La page se garde elle-même.
+        http_response_code(403);
+        header('Content-Type: text/html; charset=utf-8');
+        $r = h(wsm_role_de($me));
+        exit('<!doctype html><meta charset="utf-8"><title>Brak dostępu</title>'
+           . '<p style="font:16px/1.6 system-ui;max-width:60ch;margin:12vh auto;padding:0 20px">'
+           . '<b>Ten ekran nie należy do roli ' . $r . '.</b><br>'
+           . 'Nie chodzi o pomyłkę — po prostu nie jest częścią Twojej pracy. '
+           . 'Jeśli powinien być, poproś administratora o zmianę roli.<br>'
+           . '<a href="pulpit.php">← Wróć na pulpit</a></p>');
+    }
+    return [$pdo, $me, $droit === 'w'];
 }
 
 /** Le répertoire de l'API, quel que soit le nom du dossier déployé. */
@@ -95,6 +119,18 @@ function console_menu(?array $me = null): array {
  * @return array<string, array<string,string>>  titre de section => fichier => libellé
  */
 function console_sections(?array $me = null): array {
+    // CETTE FONCTION S'APPELLE AUSSI SEULE, sans passer par console_boot() :
+    // le déploiement lui demande la liste des écrans à vérifier, et les deux
+    // harnais d'audit aussi. Les règles de rôles vivent dans auth.php, que
+    // seul console_boot() chargeait — appelée de l'extérieur, elle tombait
+    // donc en « undefined function ». La garde du déploiement l'a vu (liste
+    // vide = échec), mais mieux vaut que la fonction se suffise.
+    if (!function_exists('wsm_droit_ecran')) {
+        $api = console_api_dir();
+        require_once $api . '/db.php';
+        require_once $api . '/delivery.php';      // wsm_audit(), utilisé par auth.php
+        require_once $api . '/auth.php';
+    }
     $s = [
         // Le tableau de bord n'appartient à aucune section : il les résume.
         '' => ['pulpit.php' => 'Pulpit'],
@@ -137,13 +173,26 @@ function console_sections(?array $me = null): array {
         ],
     ];
 
-    // « Superadmin » n'apparaît que pour le propriétaire de la plateforme, et
-    // l'appartenance se lit dans la configuration du serveur — pas dans un
-    // rôle de la base, que la console saurait écrire.
+    // « Superadmin » s'ouvre à deux titres : le rôle Superadmin en base, et
+    // l'appartenance déclarée côté serveur (superadmin_emails). La seconde
+    // reste, et n'est pas décorative — c'est elle qui permet de désigner le
+    // PREMIER superadmin, avant qu'aucun compte ne porte le rôle. Sans elle,
+    // personne ne pourrait jamais entrer.
     $plat = console_api_dir() . '/platform.php';
     if ($me && is_file($plat)) {
         require_once $plat;
         if (wsm_is_superadmin($me)) $s['Platforma'] = ['superadmin.php' => 'Superadmin'];
+    }
+
+    // ON NE MONTRE QUE CE QUI S'OUVRE. Un rail qui propose un écran interdit
+    // envoie quelqu'un contre une porte fermée plusieurs fois par jour, et
+    // finit par faire croire que l'outil est cassé. Une section vidée de tous
+    // ses écrans disparaît avec eux.
+    if ($me) {
+        foreach ($s as $titre => $items) {
+            $s[$titre] = array_filter($items, fn($f) => wsm_droit_ecran($me, $f) !== '', ARRAY_FILTER_USE_KEY);
+            if (!$s[$titre]) unset($s[$titre]);
+        }
     }
     return $s;
 }

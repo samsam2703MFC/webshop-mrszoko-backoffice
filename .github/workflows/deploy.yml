@@ -263,6 +263,15 @@ jobs:
               && echo 'rebranding : joué' \
               || echo 'ATTENTION : rebranding échoué'
 
+            # Rôles : « Centrala »/« Franczyza » venaient de la maquette de
+            # franchise. Le nouveau vocabulaire décrit une boutique en ligne,
+            # et surtout il n'est plus binaire — quelqu'un qui imprime des
+            # étiquettes n'a plus besoin des clés de la facturation.
+            (cd "$API" && php migrate.php --roles-sql) \
+              | mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko \
+              && echo 'rôles : migrés' \
+              || echo 'ATTENTION : migration des rôles échouée'
+
             # Contenu : PAS de --force. Une erreur ici doit se voir, sinon on
             # retombe exactement dans le silence qu'on vient de réparer.
             # INSERT IGNORE porte la règle : la clé primaire est (lang, k),
@@ -866,6 +875,17 @@ jobs:
             0)   echo "  libellés L'Atelier restants : aucun (rebranding confirmé)" ;;
             ZLE) echo "  ^ ATTENTION : rebranding non vérifiable"; fail=1 ;;
             *)   echo "  ^ ZLE : $RESTE ligne(s) portent encore L'Atelier — le rebranding n'a pas tourné"; fail=1 ;;
+          esac
+
+          # Plus aucun compte ne doit porter l'ancien vocabulaire : un rôle
+          # inconnu retombe sur « Podgląd », donc un compte oublié perdrait
+          # silencieusement ses droits au lieu de refuser bruyamment.
+          VIEUX=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT COUNT(*) FROM wsm_users WHERE role IN ('Centrala','Franczyza');" 2>/dev/null || echo ZLE)
+          case "$VIEUX" in
+            0)   echo "  rôles : aucun compte en ancien vocabulaire" ;;
+            ZLE) echo "  ^ ATTENTION : rôles non vérifiables"; fail=1 ;;
+            *)   echo "  ^ ZLE : $VIEUX compte(s) encore en Centrala/Franczyza"; fail=1 ;;
           esac
 
           # Le contenu livré par les fichiers doit être EN BASE. Le nombre

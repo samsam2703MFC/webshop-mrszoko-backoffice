@@ -115,6 +115,22 @@ function wsm_platform_enabled(): bool {
  */
 function wsm_is_superadmin(?array $user): bool {
     if (!$user || !empty($user['service'])) return false;
+
+    // DEUX PORTES, ET LA SECONDE N'EST PAS UN CONFORT.
+    //
+    // La liste du serveur (superadmin_emails) désigne le PREMIER superadmin :
+    // sans elle, aucun compte ne porterait le rôle et personne ne pourrait
+    // jamais entrer — ni l'attribuer, puisque seul un Superadmin fabrique un
+    // Superadmin. Elle reste donc l'amorçage, et le recours si le dernier
+    // compte superadmin est perdu.
+    //
+    // Le rôle en base, lui, a été demandé pour pouvoir gérer ça depuis la
+    // console. Le risque assumé est nommé à côté de wsm_peut_donner_role() :
+    // seul un Superadmin peut en désigner un autre, de sorte qu'un compte
+    // Administrator compromis ne se hisse pas tout seul jusqu'à la
+    // facturation de la plateforme.
+    if (function_exists('wsm_role_de') && wsm_role_de($user) === WSM_ROLE_SUPERADMIN) return true;
+
     $mails = wsm_superadmin_emails();
     if (!$mails) return false;
     return in_array(strtolower(trim((string) ($user['email'] ?? ''))), $mails, true);
