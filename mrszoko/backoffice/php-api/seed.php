@@ -474,6 +474,10 @@ function wsm_sync_content(PDO $pdo): array {
         $added++;
     }
 
+    // Les rares textes qu'on impose, et ceux qu'on retire : voir
+    // wsm_content_forces() pour la règle, identique côté SQL de déploiement.
+    [$maj, $sup] = wsm_content_applique_forces($pdo, $livre);
+
     // Modes de livraison : ajoutés s'ils manquent, jamais retarifés d'office —
     // un prix de port se décide en console, pas au déploiement.
     $sel = $pdo->prepare('SELECT 1 FROM wsm_shipping_methods WHERE id = ?');
@@ -488,7 +492,72 @@ function wsm_sync_content(PDO $pdo): array {
                         $m['min_weight_g'], $m['max_weight_g']]);
         $ship++;
     }
-    return [$added, $ship];
+    return [$added, $ship, $maj, $sup];
+}
+
+/**
+ * LES TEXTES QU'ON FORCE, ET CEUX QU'ON RETIRE.
+ *
+ * La synchronisation est un INSERT IGNORE, et c'est la bonne règle par défaut :
+ * un libellé retouché depuis Treści ne doit pas être écrasé au déploiement
+ * suivant. Elle a un revers exact, et il est silencieux — un texte MODIFIÉ
+ * dans le fichier n'atteint jamais une base qui connaît déjà sa clé. On croit
+ * avoir changé la vitrine, le déploiement passe au vert, et le site affiche
+ * toujours l'ancienne phrase. Rien ne le signale.
+ *
+ * D'où cette liste, courte par construction : les clés dont la version du
+ * dépôt fait autorité, et celles qui n'ont plus de lecteur. Elle vit ICI et
+ * pas dans les deux fonctions de synchronisation, parce que la voie SQLite
+ * (développement, tests) et la voie SQL (production) auraient divergé au
+ * premier ajout — et c'est la version de production que personne ne relit.
+ *
+ * Y inscrire une clé, c'est décider qu'on reprend la main dessus : ce qui a
+ * pu être écrit en console sera remplacé. On le fait pour un bloc réécrit, pas
+ * pour du confort.
+ *
+ * @return array<string, array{force: list<string>, purge: list<string>}>
+ */
+function wsm_content_forces(): array {
+    return [
+        'wsm_shop_i18n' => [
+            // Bloc B2B de l'accueil, réécrit : « Strefa pro / Przerabiasz
+            // ponad 40 kg… » → « B2B ? Mamy dla Ciebie lepsze ceny », et le
+            // bouton mène au formulaire au lieu d'un mailto.
+            'force' => ['story.pro.'],
+            // Le sujet du mailto ne sert plus à rien depuis. Laissé en base, il
+            // resterait éditable dans Treści : quelqu'un le retoucherait un
+            // jour, en soignerait la traduction, et rien ne changerait sur le
+            // site. Un texte sans lecteur, on l'enlève.
+            'purge' => ['story.pro.mail_subject'],
+        ],
+    ];
+}
+
+/** Applique wsm_content_forces() sur une base ouverte. @return array{0:int,1:int} */
+function wsm_content_applique_forces(PDO $pdo, array $livre): array {
+    $forces = wsm_content_forces();
+    $maj = 0; $sup = 0; $st = [];
+
+    foreach ($livre['i18n'] as [$table, $lang, $k, $v]) {
+        $force = false;
+        foreach ($forces[$table]['force'] ?? [] as $p) {
+            if (str_starts_with($k, $p)) { $force = true; break; }
+        }
+        if (!$force) continue;
+        // `v <> ?` : on ne compte QUE les lignes réellement changées. Un
+        // compteur qui gonfle à chaque déploiement ne dit plus rien.
+        $st[$table] ??= $pdo->prepare("UPDATE $table SET v = ? WHERE lang = ? AND k = ? AND v <> ?");
+        $st[$table]->execute([$v, $lang, $k, $v]);
+        $maj += $st[$table]->rowCount();
+    }
+    foreach ($forces as $table => $regle) {
+        foreach ($regle['purge'] ?? [] as $k) {
+            $d = $pdo->prepare("DELETE FROM $table WHERE k = ?");
+            $d->execute([$k]);
+            $sup += $d->rowCount();
+        }
+    }
+    return [$maj, $sup];
 }
 
 /**
@@ -610,6 +679,27 @@ function wsm_sync_content_sql(): string {
     // l'INSERT de Fresh Logistic nomme une colonne inconnue et TOUT le lot
     // tombe — y compris les libellés des autres transporteurs.
     $ajoute('wsm_shipping_methods', 'min_weight_g', 'INT NOT NULL DEFAULT 0');
+
+    // ─── LES TEXTES QU'INSERT IGNORE N'AURAIT JAMAIS LIVRÉS ──────────────
+    //
+    // Même liste que la voie SQLite, lue au même endroit : wsm_content_forces().
+    // Deux listes séparées auraient divergé au premier ajout, et la seule qui
+    // compte pour le client est celle qui tourne ici.
+    $forces = wsm_content_forces();
+    foreach ($livre['i18n'] as [$table, $lang, $k, $v]) {
+        $force = false;
+        foreach ($forces[$table]['force'] ?? [] as $p) {
+            if (str_starts_with($k, $p)) { $force = true; break; }
+        }
+        if (!$force) continue;
+        $out[] = "UPDATE `$table` SET v = " . wsm_sql_txt($v)
+               . ' WHERE lang = ' . wsm_sql_txt($lang) . ' AND k = ' . wsm_sql_txt($k) . ';';
+    }
+    foreach ($forces as $table => $regle) {
+        foreach ($regle['purge'] ?? [] as $k) {
+            $out[] = "DELETE FROM `$table` WHERE k = " . wsm_sql_txt($k) . ';';
+        }
+    }
     // Et les deux services historiques prennent le type qu'ils ont toujours eu.
     // Sans cette ligne, le Paczkomat hérite du défaut « adres » et la caisse
     // réclame une rue pour une skrytka.

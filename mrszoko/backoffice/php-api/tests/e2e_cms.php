@@ -213,6 +213,101 @@ if (isset($lc[$lk])) {
 $cards = (int) $pdo->query("SELECT COUNT(*) FROM wsm_landing_products")->fetchColumn();
 ok('les cartes de la gamme sont éditables', $cards > 0, $cards);
 
+// ---- CE QUE LE DÉPÔT IMPOSE, ET CE QU'INSERT IGNORE N'AURAIT PAS LIVRÉ -----------------
+//
+// La synchronisation de contenu est un INSERT IGNORE : elle protège le travail
+// fait en console, et elle avale en silence tout texte MODIFIÉ dans le dépôt.
+// Le déploiement passe au vert, le site affiche l'ancienne phrase, rien ne le
+// signale. wsm_content_forces() est la sortie de secours — encore faut-il
+// qu'elle morde, et qu'elle morde des clés qui existent.
+require_once dirname(__DIR__) . '/seed.php';
+
+$forces = wsm_content_forces();
+$livre  = wsm_content_livre();
+$connues = [];
+foreach ($livre['i18n'] as [$t, $lg, $k, $v]) $connues[$t][$k] = true;
+
+$orphelines = [];
+foreach ($forces as $table => $regle) {
+    foreach ($regle['force'] ?? [] as $pfx) {
+        $vus = 0;
+        foreach (array_keys($connues[$table] ?? []) as $k) if (str_starts_with($k, $pfx)) $vus++;
+        if ($vus === 0) $orphelines[] = "$table:$pfx";
+    }
+}
+ok('chaque préfixe forcé désigne des clés réellement livrées', !$orphelines, $orphelines);
+
+// Une clé à la fois purgée ET livrée se ferait supprimer puis réinsérer à
+// chaque déploiement : la purge n'aurait aucun effet et personne ne le verrait.
+$contradictoires = [];
+foreach ($forces as $table => $regle) {
+    foreach ($regle['purge'] ?? [] as $k) {
+        if (isset($connues[$table][$k])) $contradictoires[] = "$table:$k";
+    }
+}
+ok('rien n\'est purgé et livré en même temps', !$contradictoires, $contradictoires);
+
+// La preuve par la mutation : on remet l'ancienne phrase en base, la
+// synchronisation doit la REMPLACER. Sans la règle, elle resterait telle
+// quelle et cette assertion tomberait.
+$forcee = null;
+foreach ($livre['i18n'] as [$t, $lg, $k, $v]) {
+    if ($t !== 'wsm_shop_i18n' || $lg !== 'pl') continue;
+    foreach ($forces['wsm_shop_i18n']['force'] ?? [] as $pfx) {
+        if (str_starts_with($k, $pfx)) { $forcee = [$k, $v]; break 2; }
+    }
+}
+if ($forcee) {
+    [$fk, $fv] = $forcee;
+    $pdo->prepare('UPDATE wsm_shop_i18n SET v = ? WHERE lang = ? AND k = ?')
+        ->execute(['ancienne phrase à remplacer', 'pl', $fk]);
+    [$maj, $sup] = wsm_content_applique_forces($pdo, $livre);
+    ok('un texte forcé écrase la version présente en base', $maj >= 1
+        && (wsm_shop_strings($pdo, 'pl')[$fk] ?? '') === $fv, [$maj, $fk]);
+    // Deuxième passage : rien ne bouge. Un compteur qui gonfle à chaque
+    // déploiement ne dirait plus rien de ce qui a changé.
+    [$maj2] = wsm_content_applique_forces($pdo, $livre);
+    ok('et le passage suivant ne remplace plus rien', $maj2 === 0, $maj2);
+} else {
+    ok('au moins une clé forcée à éprouver', false, array_keys($forces));
+}
+
+// La purge enlève le texte devenu sans lecteur, et ne se plaint pas s'il est
+// déjà parti.
+$mort = $forces['wsm_shop_i18n']['purge'][0] ?? '';
+if ($mort !== '') {
+    $pdo->prepare('INSERT INTO wsm_shop_i18n (lang, k, v) VALUES (?,?,?)')->execute(['pl', $mort, 'zombie']);
+    [, $sup1] = wsm_content_applique_forces($pdo, $livre);
+    [, $sup2] = wsm_content_applique_forces($pdo, $livre);
+    ok('la purge enlève le texte sans lecteur, une fois et pas deux',
+        $sup1 === 1 && $sup2 === 0, [$sup1, $sup2]);
+}
+
+// Les deux voies disent la MÊME chose. La voie SQLite tourne en test, la voie
+// SQL tourne chez le client : c'est celle que personne ne relit.
+$sql = wsm_sync_content_sql();
+$clair = preg_replace_callback('/_utf8mb4 0x([0-9a-f]+)/', fn($m) => "'" . hex2bin($m[1]) . "'", $sql);
+$updSql = 0;
+foreach (explode("\n", $clair) as $l) {
+    if (!str_starts_with($l, 'UPDATE `wsm_shop_i18n`')) continue;
+    foreach ($forces['wsm_shop_i18n']['force'] ?? [] as $pfx) {
+        if (str_contains($l, "k = '$pfx")) { $updSql++; break; }
+    }
+}
+$attendu = 0;
+foreach ($livre['i18n'] as [$t, $lg, $k, $v]) {
+    if ($t !== 'wsm_shop_i18n') continue;
+    foreach ($forces['wsm_shop_i18n']['force'] ?? [] as $pfx) {
+        if (str_starts_with($k, $pfx)) { $attendu++; break; }
+    }
+}
+ok('le SQL de production force exactement les mêmes clés', $updSql === $attendu && $attendu > 0,
+    [$updSql, $attendu]);
+foreach ($forces['wsm_shop_i18n']['purge'] ?? [] as $k) {
+    ok("le SQL de production purge « $k »",
+        str_contains($clair, "DELETE FROM `wsm_shop_i18n` WHERE k = '$k';"));
+}
+
 // ---- Remise en état ------------------------------------------------------------------
 foreach ($langs as $l) {
     if (isset($avant[$l])) {
