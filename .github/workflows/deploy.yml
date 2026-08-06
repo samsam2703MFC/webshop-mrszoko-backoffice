@@ -358,10 +358,18 @@ jobs:
             # retombe exactement dans le silence qu'on vient de réparer.
             # INSERT IGNORE porte la règle : la clé primaire est (lang, k),
             # donc un libellé retouché en console est laissé intact.
-            (cd "$API" && php migrate.php --sync-content-sql) \
-              | mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko \
-              && echo 'contenu éditorial : synchronisé' \
-              || echo 'ATTENTION : synchronisation du contenu échouée'
+            # ON GARDE CE QUE MYSQL A DIT. Au déploiement 90 ce lot est tombé
+            # entier — le SQL nommait une colonne que la base n'avait pas encore
+            # — et la seule trace était « synchronisation échouée », sans la
+            # raison. Il a fallu la déduire. La raison tient en une ligne : on
+            # l'imprime, et la prochaine fois elle sera là.
+            if OUT_SC=$( (cd "$API" && php migrate.php --sync-content-sql) \
+                 | mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko 2>&1 ); then
+              echo 'contenu éditorial : synchronisé'
+            else
+              echo 'ATTENTION : synchronisation du contenu échouée'
+              printf '%s\n' "$OUT_SC" | head -3 | sed 's/^/    MySQL: /'
+            fi
           else
             echo 'ATTENTION : mysql injoignable — rebranding et contenu NON synchronisés'
           fi
