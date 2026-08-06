@@ -1095,6 +1095,27 @@ jobs:
             *etykiet=0) echo "  ^ ATTENTION : brak etykiet propozycji — karty bylyby nieme"; fail=1;;
             *) ;;
           esac
+          if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
+          REMOTE
+
+      # ----------------------------------------------------------------------
+      #  Ce qui suit la vente : le dossier, le lien, la campagne, le colis.
+      #
+      #  Étape séparée pour la même raison que la précédente : GitHub REFUSE
+      #  EN SILENCE un fichier dont une expression dépasse 21 000 caractères —
+      #  course créée puis tuée, zéro job, aucun message. L'étape « money »
+      #  atteignait 19 088. Découpage déclenché par l'avertissement de
+      #  tools/check-workflow.sh, pas par un incident.
+      # ----------------------------------------------------------------------
+      - name: Verify fulfilment rules (claims, links, campaigns, shipping)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
+          fail=0
           echo "== zgloszenia : milczenie kosztuje towar =="
           # Le droit polonais donne QUATORZE JOURS pour repondre a une
           # reclamation ; passe ce delai sans reponse, elle est reputee
@@ -1180,6 +1201,47 @@ jobs:
           case "$CV2" in
             *ZLE*) echo "  ^ ATTENTION : nie udalo sie policzyc kampanii"; fail=1;;
             *) ;;
+          esac
+          echo "== wysylka : nie nadajemy niezaplaconego =="
+          # Une commande payee dont le colis n est jamais cree ne fait AUCUN
+          # bruit. Et un colis pour une commande NON reglee, c est de la
+          # marchandise donnee. Les deux regles se verifient sans base.
+          WOUT=$(php -r '
+            require_once "'"$DIR_API"'/shipping.php";
+            $codes = array_keys(WSM_SHIP_BLOCKERS);
+            $muet = false;
+            foreach ($codes as $c) { if (wsm_ship_blocker_label($c) === $c) $muet = true; }
+            $tel = wsm_ship_blocker_label("telefon");
+            $utile = str_contains($tel, "kurier") && mb_strlen($tel) > 20;
+            $conf = wsm_ship_erreur_humaine("inpost_nieskonfigurowany");
+            $dit = str_contains($conf, "Ustawieni") && str_contains($conf, "ręcznie");
+            $multi = wsm_ship_erreur_humaine("brakujace_dane: telefon, waga");
+            $trad = str_contains($multi, "kurier") && str_contains($multi, "Waga");
+            $st = count(WSM_SHIP_STATUSES) >= 4;
+            echo (!$muet ? "etykiety-ok" : "etykiety-ZLE"), " ",
+                 ($utile ? "powod-ok" : "powod-ZLE"), " ",
+                 ($dit ? "brak-tokenu-ok" : "brak-tokenu-ZLE"), " ",
+                 ($trad ? "wielo-ok" : "wielo-ZLE"), " ",
+                 ($st ? "stany-ok" : "stany-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || WOUT="php-ZLE :: $WOUT"
+          echo "  $WOUT"
+          case "$WOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguly kolejki wysylki nie dzialaja"; fail=1;;
+            *) ;;
+          esac
+          # Le chiffre qui compte en production : combien de commandes PAYEES
+          # attendent encore un numero de suivi. Personne ne les cherche.
+          QW="SELECT CONCAT('zaplacone_bez_sledzenia=', COUNT(*)) FROM mrszoko.wsm_orders o LEFT JOIN mrszoko.wsm_shipments s ON s.order_id = o.id WHERE o.payment_status = 'oplacone' AND o.status <> 'anulowane' AND (s.tracking_number IS NULL OR s.tracking_number = '')"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            WV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QW" 2>&1 || echo "sql-ZLE")
+          else
+            WV=$(mysql -N -e "$QW" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $WV"
+          case "$WV" in
+            *ZLE*) echo "  ^ ATTENTION : nie udalo sie policzyc kolejki wysylki"; fail=1;;
+            *zaplacone_bez_sledzenia=0) ;;
+            *) echo "  ^ UWAGA : zaplacone zamowienia czekaja na nadanie — otworz ekran Wysylka";;
           esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
