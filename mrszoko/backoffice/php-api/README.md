@@ -244,17 +244,44 @@ checkout. `POST /franchisor/vies` runs a check on demand without saving anything
 
 All in `config.php`, entirely env-driven (see the header there).
 
-Payment and shipping credentials have **no defaults** and never belong in this
-repository (it is public). Set them in `config.local.php` on the server, or as
-`WSM_TPAY_CLIENT_ID`, `WSM_TPAY_CLIENT_SECRET`, `WSM_TPAY_SECURITY_CODE`,
-`WSM_INPOST_TOKEN`, `WSM_INPOST_ORG_ID`, `WSM_INPOST_GEOWIDGET_TOKEN`.
+Every credential below has **no default** and none of them belong in this
+repository, which is public. They go in `config.local.php` on the server
+(gitignored, web-denied, `chmod 640`) or in GitHub Actions secrets. Copy
+`config.local.sample.php` to start.
+
+### What is still missing, and what each one unblocks
+
+`php tools/rapport.php` answers this against the live database at any time,
+and separates what *blocks* from what merely *annoys*. The table is the same
+list, written out.
+
+| Setting | Env var | Without it |
+| --- | --- | --- |
+| **Bank account** | `WSM_INV_IBAN` | **No invoice can be issued at all.** The most expensive gap in the list, because it only shows itself at the moment of issuing. |
+| **tpay** | `WSM_TPAY_CLIENT_ID`, `WSM_TPAY_CLIENT_SECRET`, `WSM_TPAY_SECURITY_CODE` | The shop takes orders nobody can pay for. |
+| **Outgoing mail** | `WSM_MAIL_TRANSPORT=smtp`, `WSM_MAIL_FROM`, `WSM_MAIL_SMTP_HOST`, `WSM_MAIL_SMTP_PORT`, `WSM_MAIL_SMTP_USER`, `WSM_MAIL_SMTP_PASS`, `WSM_MAIL_SMTP_SECURE` | Order confirmations sit in the queue and nobody receives them. |
+| **InPost ShipX** | `WSM_INPOST_TOKEN`, `WSM_INPOST_ORG_ID`, `WSM_INPOST_GEOWIDGET_TOKEN` | Parcels are booked by hand. The *Wysyłka* screen shows which ones. |
+| **KSeF** | `WSM_KSEF_TOKEN`, `WSM_KSEF_PUBLIC_KEY`, `WSM_KSEF_ENV` | Invoices are not filed automatically. The *KSeF* screen still builds the FA(2) XML for manual filing. `WSM_KSEF_PUBLIC_KEY` is a **path on the server** to the Ministry of Finance public key — without it the token cannot be encrypted, so no session opens. |
+| **Allegro** | `WSM_ALLEGRO_CLIENT_ID`, `WSM_ALLEGRO_CLIENT_SECRET`, `WSM_ALLEGRO_REFRESH_TOKEN`, `WSM_ALLEGRO_SELLER_ID` | The second sales channel stays shut. The *Allegro* screen still shows which listings would go out and which are blocked. |
+| **Superadmin** | `WSM_SUPERADMIN_EMAILS` | The platform-owner module is invisible and its page answers 404. Deliberately not a database role: an account that could grant itself the role could rewrite its own invoice. |
+| **Claude** | `WSM_ANTHROPIC_API_KEY` | The "translate the missing strings" button does not appear. |
+
+Every one of these integrations is **fail-closed**, and `xxxx` counts as
+unconfigured — it is what a demo field holds, and taking it for a credential
+would open an integration on nothing. A half-wired integration is worse than
+an absent one, because you believe you are selling.
+
+tpay, InPost and Allegro default to **sandbox**; KSeF defaults to the **test**
+environment. Set `WSM_TPAY_SANDBOX=0` / `WSM_INPOST_SANDBOX=0` /
+`WSM_ALLEGRO_SANDBOX=0` / `WSM_KSEF_ENV=prod` to go live.
 
 VIES needs no credentials (it is a public service), but set
 `WSM_VIES_REQUESTER` to our own VAT number so consultations come back with a
 provable reference. `WSM_VIES_ENABLED=0` turns the network call off entirely —
 numbers are then checked for shape only.
-Both integrations default to **sandbox**; set `WSM_TPAY_SANDBOX=0` /
-`WSM_INPOST_SANDBOX=0` to go live.
+
+The company NIP is **not** a secret (it is in the public KRS registry) and
+lives in `config.php` with the other invoice defaults.
 
 Editorial content is additive on deploy: `php migrate.php --sync-content` adds
 strings shipped since the last release **without** overwriting anything edited

@@ -78,21 +78,40 @@ jobs:
           test -s site/shop/tokens.css && grep -q -- '--choco-700' site/shop/tokens.css \
             || { echo "tokens.css régénéré vide ou incomplet"; exit 1; }
 
-          # Écrans PHP autonomes de la console (même session, mêmes rôles) :
-          # Commandes et Produits/photos. Le fichier exporté par Claude Design
-          # n'est pas touché — un patch à la main le rendrait irrécupérable au
-          # prochain export.
-          cp mrszoko/backoffice/zamowienia.php mrszoko/backoffice/produkty.php \
-             mrszoko/backoffice/kontrahenci.php mrszoko/backoffice/kraje.php mrszoko/backoffice/rabaty.php \
-             mrszoko/backoffice/poczta.php mrszoko/backoffice/ustawienia.php \
-             mrszoko/backoffice/pulpit.php mrszoko/backoffice/faktury.php \
-             mrszoko/backoffice/faktura_druk.php mrszoko/backoffice/magazyn.php \
-             mrszoko/backoffice/magazyn_druk.php mrszoko/backoffice/uzytkownicy.php \
-             mrszoko/backoffice/audyt.php mrszoko/backoffice/zamowienie_druk.php \
-             mrszoko/backoffice/etykieta_druk.php mrszoko/backoffice/tresci.php \
-             mrszoko/backoffice/etykieta_inpost.php mrszoko/backoffice/superadmin.php \
-             mrszoko/backoffice/klienci.php \
-             mrszoko/backoffice/console.php mrszoko/backoffice/console.css site/backoffice/
+          # Écrans PHP autonomes de la console (même session, mêmes rôles).
+          # Le fichier exporté par Claude Design n'est pas touché — un patch à
+          # la main le rendrait irrécupérable au prochain export.
+          #
+          # CECI ÉTAIT UNE LISTE ÉCRITE À LA MAIN, ET ELLE A COÛTÉ CHER.
+          # Sept écrans livrés entre-temps — Subskrypcje, Zgłoszenia, Kampanie,
+          # Wysyłka, Allegro, Przypomnienia, KSeF — n'y avaient jamais été
+          # ajoutés. Ils existaient dans le dépôt, le rail y menait, et en
+          # production ils répondaient 301 : six d'entre eux étaient morts
+          # depuis leur mise en ligne sans que rien ne le dise. Une liste
+          # blanche qu'il faut penser à tenir à jour n'est pas un contrôle,
+          # c'est un piège à retardement.
+          #
+          # On copie donc TOUT le PHP de ce répertoire. Les sous-répertoires
+          # (php-api/) sont traités plus haut par leur propre rsync ; le glob
+          # ne descend pas.
+          cp mrszoko/backoffice/*.php mrszoko/backoffice/console.css site/backoffice/
+
+          # ET ON VÉRIFIE QUE LE RAIL NE MÈNE NULLE PART DE VIDE. Le menu est
+          # la seule source de vérité de ce qui doit exister : chaque entrée
+          # doit correspondre à un fichier réellement assemblé. Un écran ajouté
+          # au rail et oublié à la copie casse ici, au build, et pas devant un
+          # client trois semaines plus tard.
+          php -r '
+            require_once "mrszoko/backoffice/console.php";
+            $manque = [];
+            foreach (console_sections(["role" => "Centrala"]) as $items) {
+              foreach (array_keys($items) as $f) {
+                if (!is_file("site/backoffice/" . $f)) $manque[] = $f;
+              }
+            }
+            if ($manque) { fwrite(STDERR, "ÉCRANS DU RAIL NON ASSEMBLÉS : " . implode(", ", $manque) . "\n"); exit(1); }
+            echo "rail vérifié : chaque entrée du menu a son fichier\n";
+          '
 
           # Le lanceur : la console exportée ne connaît pas les écrans PHP, et
           # on n'édite pas l'export à la main. On INJECTE une ligne de <script>
@@ -1406,6 +1425,50 @@ jobs:
           REMOTE
 
 
+      # Le pendant en ligne de la garde du build. Le build garantit que chaque
+      # entrée du rail a son FICHIER ; celle-ci garantit qu'elle a une PAGE.
+      # Étape à part, et pas ajoutée à « Verify web surfaces » : cette
+      # expression frôlait déjà les 17 000 caractères, et au-delà de 21 000
+      # GitHub rejette le fichier EN SILENCE — zéro job, aucun message. Le
+      # contrôle qui n'existe pas est celui qu'on a mis dans l'étape de trop.
+      - name: Verify console screens answer (rail-derived)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+          fail=0
+          BO="http://localhost/mrszoko/backoffice"
+          # Sept écrans livrés n'avaient jamais été copiés par l'assemblage, et
+          # six étaient morts en production depuis leur mise en ligne : aucun
+          # écran .php n'était vérifié en ligne. Sans session la console renvoie
+          # vers sa page de connexion ; ce qu'on refuse, c'est 404 et 500 — une
+          # page absente ne redirige pas, et une page qui explose non plus.
+          #
+          # La liste n'est PAS écrite ici : elle est DEMANDÉE au rail déployé.
+          # Une seconde liste à tenir à jour reproduirait exactement la panne
+          # qu'on vient de réparer, avec un cran de retard supplémentaire.
+          ECRANS=$(php -r '
+            require_once "'"$DIR_BO"'/console.php";
+            foreach (console_sections(["role" => "Centrala"]) as $i)
+              foreach (array_keys($i) as $f) echo $f, " ";
+          ' 2>/dev/null)
+          if [ -z "$ECRANS" ]; then
+            echo "  ^ NOT OK : impossible de lire le rail (console.php)"; fail=1
+          fi
+          for e in $ECRANS; do
+            EC=$(curl -skL -o /dev/null -w "%{http_code}" "$BO/$e")
+            case "$EC" in
+              200|302|303) echo "  $EC  $e" ;;
+              *) echo "  $EC  $e  ^ NOT OK"; fail=1 ;;
+            esac
+          done
+          if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
+          REMOTE
+
+
       - name: Verify tax rules (KSeF FA(2))
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
@@ -1545,7 +1608,13 @@ jobs:
           echo "== ekran odpowiada =="
           # Sans session, la console redirige vers sa page de connexion. Ce
           # qui compte ici : pas de 500. Une page qui explose ne redirige pas.
-          KCODE=$(curl -sk -o /dev/null -w "%{http_code}" "http://localhost/mrszoko/backoffice/ksef.php")
+          #
+          # -L n'est PAS un détail. Ce serveur impose HTTPS, donc toute URL en
+          # http reçoit d'abord un 301 — sans suivre, on lit 301 partout et on
+          # conclut à une panne qui n'existe pas. C'est ce que font les autres
+          # étapes de vérification, et ne pas le faire ici a fait échouer le
+          # déploiement 76 sur un faux motif, à côté d'un vrai.
+          KCODE=$(curl -skL -o /dev/null -w "%{http_code}" "http://localhost/mrszoko/backoffice/ksef.php")
           echo "  ksef.php → $KCODE"
           case "$KCODE" in
             200|302|303) echo "  ok" ;;
