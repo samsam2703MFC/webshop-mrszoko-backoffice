@@ -39,13 +39,13 @@ function console_boot(): array {
     // « ?wyloguj=1 » suffirait sinon à éjecter quelqu'un de sa session.
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_GET['wyloguj'])) {
         wsm_logout();
-        header('Location: index.html', true, 303);
+        header('Location: login.php', true, 303);
         exit;
     }
 
     $me = wsm_current_user($pdo);
     if (!$me) {
-        header('Location: index.html', true, 302);
+        header('Location: login.php', true, 302);
         exit;
     }
 
@@ -198,25 +198,6 @@ function console_sections(?array $me = null): array {
 }
 
 /**
- * Les écrans de la console exportée. Elle navigue par état interne, sans
- * adresse : impossible d'y pointer directement. console-nav.js lit
- * « #ekran=… » à l'arrivée et clique l'entrée correspondante — c'est ce qui
- * rend ces écrans atteignables d'ici, et pas seulement l'inverse.
- */
-function console_erp_menu(): array {
-    // Volontairement court. La console héritée porte encore l'attirail d'un
-    // réseau de franchise — Sklepy sieci, Promocje sieci, Strefy zasięgu,
-    // Analiza geograficzna. Ici on vend en ligne : ces écrans ne décrivent
-    // rien de réel et n'ont pas à être proposés. Ne restent que ceux qui
-    // servent à une boutique : les comptes et la piste d'audit.
-    // Vide, et c'est voulu : la console héritée n'a plus d'écran que la nôtre
-    // ne couvre. Ses Użytkownicy ne pouvaient rien écrire (aucune route
-    // d'écriture n'existait) et son Dziennik audytu ne montrait que le
-    // journal, sans les chiffres. Les deux sont désormais chez nous.
-    return [];
-}
-
-/**
  * Ouvre la page : en-tête HTML, barre, navigation.
  * $extraCss : le peu de style propre à un écran, quand il y en a.
  */
@@ -285,13 +266,6 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
         <a href="<?= h($f) ?>"<?= $f === $file ? ' class="on" aria-current="page"' : '' ?>><?= h($label) ?></a>
         <?php endforeach; ?>
       <?php endforeach; ?>
-
-      <?php if (console_erp_menu()): ?>
-      <span class="sep">Konsola ERP</span>
-      <?php foreach (console_erp_menu() as $k => $label): ?>
-      <a href="./#ekran=<?= h($k) ?>"><?= h($label) ?></a>
-      <?php endforeach; ?>
-      <?php endif; ?>
 
       <span class="sep">Publiczne</span>
       <a href="../shop/" target="_blank" rel="noopener">Sklep ↗</a>

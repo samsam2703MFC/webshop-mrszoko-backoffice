@@ -19,6 +19,24 @@
 // ============================================================================
 declare(strict_types=1);
 
+/**
+ * L'échec d'authentification, quand personne ne rend du JSON.
+ *
+ * wsm_login() signale ses refus par wsm_fail(), qui est défini par le ROUTEUR
+ * d'API : il écrit un corps JSON et sort. Une page HTML qui appellerait
+ * wsm_login() recevrait donc `{"error":"bad_credentials"}` au milieu de son
+ * formulaire. Plutôt que de recopier la logique de connexion — verrouillage,
+ * compteur d'échecs, régénération de session, réhachage — dans un second
+ * endroit qui aurait dérivé, on donne ici un défaut qui LÈVE. Le routeur
+ * déclare la sienne avant d'inclure ce fichier (PHP déclare les fonctions de
+ * premier niveau à la compilation), donc l'API garde son comportement exact.
+ */
+if (!function_exists('wsm_fail')) {
+    function wsm_fail(string $msg, int $code = 400): void {
+        throw new RuntimeException($msg, $code);
+    }
+}
+
 const WSM_SESSION_NAME     = 'WSMSESS';
 const WSM_SESSION_IDLE     = 28800;  // 8 h sans activité → session expirée
 const WSM_LOGIN_MAX_TRIES  = 5;      // échecs avant verrouillage du compte
