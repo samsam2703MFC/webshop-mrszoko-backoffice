@@ -331,6 +331,7 @@ function wsm_shipping_methods(PDO $pdo, string $lang, string $country = ''): arr
         return [
             'id'        => (string) $r['id'],
             'carrier'   => (string) $r['carrier'],
+            'kind'      => wsm_ship_kind_row($r),
             'label'     => $S['ship.' . $r['id'] . '.label'] ?? (string) $r['id'],
             'note'      => $S['ship.' . $r['id'] . '.note'] ?? '',
             'price_net' => $net,
@@ -340,6 +341,59 @@ function wsm_shipping_methods(PDO $pdo, string $lang, string $country = ''): arr
             'max_weight_g' => (int) $r['max_weight_g'],
         ];
     }, $rows);
+}
+
+/**
+ * LE TYPE DE SERVICE D'UNE LIGNE DE MÉTHODE : 'punkt' ou 'adres'.
+ *
+ * La colonne fait foi. Le repli sur le nom n'est là que pour la fenêtre entre
+ * le déploiement du code et le premier démarrage qui ajoute la colonne — sans
+ * lui, pendant ces quelques secondes, un Paczkomat serait traité comme une
+ * adresse et la caisse réclamerait une rue.
+ */
+function wsm_ship_kind_row(array $r): string {
+    $k = strtolower(trim((string) ($r['kind'] ?? '')));
+    if ($k === 'punkt' || $k === 'adres') return $k;
+    return str_contains(strtolower((string) ($r['id'] ?? '')), 'locker')
+        || str_contains(strtolower((string) ($r['id'] ?? '')), 'point')
+        || str_contains(strtolower((string) ($r['id'] ?? '')), 'pickup') ? 'punkt' : 'adres';
+}
+
+/**
+ * Le type de service d'une COMMANDE — « faut-il un code de point, ou une
+ * adresse ? ». C'est la question que quatorze endroits posaient en comparant
+ * l'identifiant à « inpost_locker ». Elle se pose une fois, ici.
+ *
+ * Une méthode disparue de la table (retirée après coup) ne doit pas faire
+ * changer d'avis une commande déjà passée : on retombe alors sur le nom, qui
+ * est ce que la commande a gardé.
+ */
+function wsm_ship_kind(PDO $pdo, string $methodId): string {
+    static $cache = [];
+    if (isset($cache[$methodId])) return $cache[$methodId];
+    try {
+        $st = $pdo->prepare("SELECT id, kind FROM wsm_shipping_methods WHERE id = ?");
+        $st->execute([$methodId]);
+        $row = $st->fetch();
+    } catch (Throwable $e) { $row = false; }
+    return $cache[$methodId] = wsm_ship_kind_row($row ?: ['id' => $methodId]);
+}
+
+/** Le transporteur d'une commande, lu dans la table — jamais deviné du nom. */
+function wsm_ship_carrier(PDO $pdo, string $methodId): string {
+    static $cache = [];
+    if (isset($cache[$methodId])) return $cache[$methodId];
+    try {
+        $st = $pdo->prepare("SELECT carrier FROM wsm_shipping_methods WHERE id = ?");
+        $st->execute([$methodId]);
+        $c = (string) $st->fetchColumn();
+    } catch (Throwable $e) { $c = ''; }
+    if ($c === '') {
+        // Repli : le préfixe du nom. Il ne sert qu'aux commandes dont la
+        // méthode a été supprimée de la table entre-temps.
+        $c = explode('_', $methodId)[0] ?: 'inpost';
+    }
+    return $cache[$methodId] = strtolower($c);
 }
 
 function wsm_shipping_method(PDO $pdo, string $id, string $lang): ?array {
@@ -769,10 +823,19 @@ function wsm_next_order_code(PDO $pdo): string {
 }
 
 /**
- * Valide l'acheteur : e-mail et téléphone pour tpay et InPost, adresse selon
- * le mode de livraison, NIP si une facture d'entreprise est demandée.
+ * Valide l'acheteur : e-mail et téléphone pour tpay et le transporteur,
+ * adresse selon le TYPE de service, NIP si une facture d'entreprise est
+ * demandée.
+ *
+ * $kind — 'punkt' ou 'adres'. Il vient de la table (wsm_ship_kind), parce
+ * qu'il n'est pas devinable : ce validateur exigeait un code de Paczkomat sur
+ * « delivery_method === 'inpost_locker' » et une rue sur
+ * « === 'inpost_courier' ». Ajoutez un transporteur, et les DEUX tests sont
+ * faux : on n'exige plus rien du tout, et une commande part sans destination.
+ * Laissé à null, il se déduit du nom — uniquement pour les appels anciens.
  */
-function wsm_validate_buyer(array $in, string $method, bool $invoice): array {
+function wsm_validate_buyer(array $in, string $method, bool $invoice, ?string $kind = null): array {
+    $kind = $kind ?? wsm_ship_kind_row(['id' => $method]);
     $e = [];
     $out = [];
 
@@ -824,16 +887,17 @@ function wsm_validate_buyer(array $in, string $method, bool $invoice): array {
     $cc = strtoupper(trim((string) ($in['bill_country'] ?? 'PL')));
     $out['bill_country'] = preg_match('/^[A-Z]{2}$/', $cc) ? $cc : 'PL';
 
-    // Destination : Paczkomat (code) ou adresse coursier complète.
+    // Destination : un point (code) ou une adresse complète. C'est le TYPE de
+    // service qui tranche, pas le nom de la méthode.
     $point = strtoupper(trim((string) ($in['inpost_point'] ?? '')));
-    if ($method === 'inpost_locker') {
-        if ($point === '') $e['inpost_point'] = 'wybierz paczkomat';
+    if ($kind === 'punkt') {
+        if ($point === '') $e['inpost_point'] = 'wybierz punkt odbioru';
         elseif (!wsm_valid_inpost_point($point)) $e['inpost_point'] = 'np. KRA010';
     }
     $out['inpost_point'] = $point;
 
     $spc = (string) ($in['ship_postcode'] ?? '');
-    if ($method === 'inpost_courier') {
+    if ($kind === 'adres') {
         foreach (['ship_street' => 'ulica', 'ship_building' => 'numer', 'ship_city' => 'miasto'] as $k => $lbl) {
             if (trim((string) ($in[$k] ?? '')) === '') $e[$k] = $lbl . ' wymagane dla kuriera';
         }
@@ -867,7 +931,7 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
     $code_bon = (string) ($body['voucher'] ?? '');
     [$quote, $qErr] = wsm_shop_quote($pdo, (array) ($body['items'] ?? []), $method, $lang,
                                      ['email' => (string) ($body['email'] ?? ''), 'voucher' => $code_bon]);
-    [$buyer, $bErr] = wsm_validate_buyer($body, $method, $invoice);
+    [$buyer, $bErr] = wsm_validate_buyer($body, $method, $invoice, wsm_ship_kind($pdo, $method));
     $errors = $qErr + $bErr;
     if ($errors) return [null, $errors];
     if ($quote['total_gross'] <= 0) return [null, ['items' => 'koszyk pusty']];

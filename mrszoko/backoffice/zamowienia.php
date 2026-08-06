@@ -198,19 +198,28 @@ console_crumbs($detail
       <?php if ($wzRow): ?>
       <a class="code" href="magazyn.php?dok=<?= (int) $wzRow['id'] ?>&amp;druk=1" target="_blank" rel="noopener">Drukuj WZ <?= h((string) $wzRow['number']) ?> (A4) ↗</a>
       <?php endif; ?>
+      <?php
+      // L'ÉTIQUETTE SUIT LE TRANSPORTEUR. Le lien pointait sur InPost quel que
+      // soit le colis : une commande DPD envoyait chercher son étiquette chez
+      // un transporteur qui ne la connaît pas, et l'on cherchait la panne du
+      // mauvais côté. Le transporteur se lit dans la table des méthodes.
+      $carrier = wsm_ship_carrier($pdo, (string) $o['delivery_method']);
+      $ecranEt = $carrier === 'dpd' ? 'etykieta_dpd.php' : 'etykieta_inpost.php';
+      $nomEt   = $carrier === 'dpd' ? 'DPD' : 'InPost';
+      ?>
       <?php if ($maPrzesylke): ?>
-      <a class="code" href="etykieta_inpost.php?id=<?= (int) $o['id'] ?>" target="_blank" rel="noopener">Etykieta InPost — A6 ↗</a>
-      <a class="code" href="etykieta_inpost.php?id=<?= (int) $o['id'] ?>&amp;format=a4" target="_blank" rel="noopener">Etykieta InPost — A4 ↗</a>
+      <a class="code" href="<?= h($ecranEt) ?>?id=<?= (int) $o['id'] ?>" target="_blank" rel="noopener">Etykieta <?= h($nomEt) ?> — A6 ↗</a>
+      <a class="code" href="<?= h($ecranEt) ?>?id=<?= (int) $o['id'] ?>&amp;format=a4" target="_blank" rel="noopener">Etykieta <?= h($nomEt) ?> — A4 ↗</a>
       <?php endif; ?>
       <a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>&amp;etykieta=1" target="_blank" rel="noopener">Etykieta wewnętrzna ↗</a>
     </p>
     <p class="muted small" style="margin-top:4px">
       <?php if ($maPrzesylke): ?>
-        Na paczkę naklejamy <b>etykietę InPost</b> — to ona ma kod kreskowy i tylko ona jest
+        Na paczkę naklejamy <b>etykietę <?= h($nomEt) ?></b> — to ona ma kod kreskowy i tylko ona jest
         listem przewozowym. A6 na drukarkę etykiet, A4 na zwykłą kartkę.
         Etykieta wewnętrzna to opis pomocniczy, nie przewozowy.
       <?php else: ?>
-        Przesyłka nie została jeszcze utworzona w InPost, więc etykiety przewoźnika nie ma.
+        Przesyłka nie została jeszcze utworzona w <?= h($nomEt) ?>, więc etykiety przewoźnika nie ma.
         Do tego czasu można wydrukować <b>etykietę wewnętrzną</b> — nie zastępuje listu przewozowego.
       <?php endif; ?>
       <?php if (!$wzRow): ?>
@@ -276,7 +285,10 @@ console_crumbs($detail
       <td data-l="Numer"><a class="code" href="?id=<?= (int) $o['id'] ?>"><?= h($o['code']) ?></a></td>
       <td data-l="Data" class="num"><?= h(substr((string) $o['created_at'], 0, 16)) ?></td>
       <td data-l="Klient"><?= h($o['client']) ?><br><small class="muted"><?= h($o['email']) ?></small></td>
-      <td data-l="Dostawa"><?= h($o['delivery_method'] === 'inpost_locker' ? 'Paczkomat' : 'Kurier') ?>
+      <?php // « Kurier » tout court ne dit plus lequel : avec deux transporteurs,
+            // c'est l'information qu'on cherche en premier quand un colis coince. ?>
+      <td data-l="Dostawa"><?= h(wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'
+            ? 'Paczkomat' : 'Kurier ' . strtoupper(wsm_ship_carrier($pdo, (string) $o['delivery_method']))) ?>
         <?= $o['inpost_point'] !== '' ? '<br><small class="muted">' . h($o['inpost_point']) . '</small>' : '' ?></td>
       <td data-l="Status"><span class="tag"><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
         <?php if (!empty($o['backorder'])): ?> <span class="tag no">do potwierdzenia</span><?php endif; ?>

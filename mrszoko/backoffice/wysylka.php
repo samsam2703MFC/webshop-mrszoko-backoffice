@@ -169,8 +169,12 @@ if ($detail) {
             <b><?= h((string) $o['code']) ?></b>
             <small><?= h(trim((string) $o['first_name'] . ' ' . (string) $o['last_name']) ?: (string) $o['company']) ?>
               · <?= h((string) $o['email']) ?>
-              · <?= h((string) ($o['delivery_method'] === 'inpost_locker'
-                    ? 'Paczkomat ' . (string) $o['inpost_point'] : 'Kurier')) ?></small>
+              <?php // Le transporteur est nommé : c'est l'écran depuis lequel on
+                    // nadaje, et savoir chez QUI part le colis est la première
+                    // chose qu'on regarde quand un envoi coince. ?>
+              · <?= h(wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'
+                    ? 'Paczkomat ' . (string) $o['inpost_point']
+                    : 'Kurier ' . strtoupper(wsm_ship_carrier($pdo, (string) $o['delivery_method']))) ?></small>
             <?php if (!$x['pret']): ?>
             <span class="stop">
               <?php foreach ($x['blockers'] as $b): ?>

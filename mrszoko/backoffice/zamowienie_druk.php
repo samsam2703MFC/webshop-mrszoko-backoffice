@@ -90,8 +90,8 @@ $manque = array_filter($o['items'], fn($l) => (int) ($l['backorder'] ?? 0) > 0);
       <h2>Odbiorca</h2>
       <p><b><?= h(trim(($o['company'] ?: $o['first_name'] . ' ' . $o['last_name']))) ?></b><br>
          <?= h($o['email']) ?><?= $o['phone'] !== '' ? ' · ' . h($o['phone']) : '' ?><br>
-         <?php if ($o['delivery_method'] === 'inpost_locker'): ?>
-           Paczkomat <b><?= h($o['inpost_point']) ?></b>
+         <?php if (wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'): ?>
+           Punkt odbioru <b><?= h($o['inpost_point']) ?></b>
          <?php else: ?>
            <?= h($o['ship']['street'] . ' ' . $o['ship']['building']) ?><br>
            <?= h($o['ship']['postcode'] . ' ' . $o['ship']['city']) ?>, <?= h($o['ship']['country']) ?>

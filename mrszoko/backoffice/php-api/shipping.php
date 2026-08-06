@@ -37,7 +37,10 @@ require_once __DIR__ . '/db.php';
 /** Les états d'une expédition, dans l'ordre de sa vie. */
 const WSM_SHIP_STATUSES = [
     'do_utworzenia'            => 'Do utworzenia',
-    'oczekuje_na_konfiguracje' => 'Czeka na konfigurację InPost',
+    // Le libellé ne nomme plus InPost : il vaut pour n'importe quel
+    // transporteur, et en nommer un seul faisait chercher la panne du mauvais
+    // côté le jour où la commande partait par l'autre.
+    'oczekuje_na_konfiguracje' => 'Czeka na konfigurację przewoźnika',
     'utworzona'                => 'Utworzona u przewoźnika',
     'blad'                     => 'Błąd u przewoźnika',
 ];
@@ -55,6 +58,10 @@ const WSM_SHIP_BLOCKERS = [
     'odbiorca'       => 'Brak nazwiska odbiorcy',
     'waga'           => 'Waga zerowa — przewoźnik odrzuci przesyłkę',
     'paczkomat'      => 'Nie wybrano paczkomatu',
+    // Une commande dont la méthode ne désigne aucun transporteur connu. Elle
+    // ne doit surtout pas s'afficher comme prête : on la verrait échouer au
+    // clic, sans que la file ait jamais prévenu.
+    'przewoznik'     => 'Nieznany przewoźnik dla tej metody dostawy',
     'adres.street'   => 'Brak ulicy',
     'adres.building' => 'Brak numeru budynku',
     'adres.postcode' => 'Brak kodu pocztowego',
@@ -64,6 +71,65 @@ const WSM_SHIP_BLOCKERS = [
 /** Le libellé humain d'un blocage. */
 function wsm_ship_blocker_label(string $code): string {
     return WSM_SHIP_BLOCKERS[$code] ?? $code;
+}
+
+// ---------------------------------------------------------------------------
+//  LA RÉPARTITION PAR TRANSPORTEUR
+//
+//  Cette file appelait wsm_inpost_blockers() et wsm_inpost_create() en dur.
+//  Tant qu'il n'y avait qu'InPost, ça se lisait comme une simplification ;
+//  avec un second transporteur, ça devient un piège muet — une commande DPD
+//  serait présentée à l'API d'InPost, qui la refuserait pour une raison sans
+//  aucun rapport avec ce qui cloche vraiment.
+//
+//  Le transporteur se lit dans la TABLE des méthodes, jamais dans le nom :
+//  une méthode renommée en console ne doit pas changer d'API.
+//
+//  AJOUTER UN TRANSPORTEUR se fait ici et à un seul endroit : une entrée dans
+//  WSM_SHIP_ADAPTERS. Rien d'autre dans la file ne le connaît.
+// ---------------------------------------------------------------------------
+const WSM_SHIP_ADAPTERS = [
+    'inpost' => ['fichier' => 'inpost.php', 'blockers' => 'wsm_inpost_blockers', 'create' => 'wsm_inpost_create'],
+    'dpd'    => ['fichier' => 'dpd.php',    'blockers' => 'wsm_dpd_blockers',    'create' => 'wsm_dpd_create'],
+];
+
+/** Charge les adaptateurs. Un fichier absent n'explose pas : il manque, c'est tout. */
+function wsm_ship_adapters(): void {
+    foreach (WSM_SHIP_ADAPTERS as $a) {
+        $f = __DIR__ . '/' . $a['fichier'];
+        if (is_file($f)) require_once $f;
+    }
+}
+
+/** L'adaptateur d'une commande, ou null si son transporteur est inconnu. */
+function wsm_ship_adapter(PDO $pdo, array $order): ?array {
+    if (!function_exists('wsm_ship_carrier')) require_once __DIR__ . '/shop.php';
+    $c = wsm_ship_carrier($pdo, (string) ($order['delivery_method'] ?? ''));
+    return WSM_SHIP_ADAPTERS[$c] ?? null;
+}
+
+/**
+ * Ce qui manque pour expédier — posé au BON transporteur.
+ *
+ * Un transporteur inconnu ne rend pas « rien ne manque » : ce serait afficher
+ * la commande comme prête et la voir échouer au moment du clic, sans que la
+ * file ait jamais prévenu.
+ */
+function wsm_ship_blockers(PDO $pdo, array $order): array {
+    $a = wsm_ship_adapter($pdo, $order);
+    if (!$a || !function_exists($a['blockers'])) {
+        return ['przewoznik'];
+    }
+    return ($a['blockers'])($order);
+}
+
+/** Crée l'expédition chez le bon transporteur. */
+function wsm_ship_create(PDO $pdo, array $order): array {
+    $a = wsm_ship_adapter($pdo, $order);
+    if (!$a || !function_exists($a['create'])) {
+        return [null, 'brak_przewoznika: ' . wsm_ship_carrier($pdo, (string) ($order['delivery_method'] ?? ''))];
+    }
+    return ($a['create'])($pdo, $order);
 }
 
 /**
@@ -77,7 +143,7 @@ function wsm_ship_blocker_label(string $code): string {
  */
 function wsm_ship_queue(PDO $pdo, int $limit = 200): array {
     if (!function_exists('wsm_order_by_id')) require_once __DIR__ . '/shop.php';
-    if (!function_exists('wsm_inpost_blockers')) require_once __DIR__ . '/inpost.php';
+    wsm_ship_adapters();
 
     try {
         $st = $pdo->prepare("SELECT o.id
@@ -96,7 +162,7 @@ function wsm_ship_queue(PDO $pdo, int $limit = 200): array {
     foreach ($ids as $id) {
         $o = wsm_order_by_id($pdo, (int) $id);
         if (!$o) continue;
-        $b = wsm_inpost_blockers($o);
+        $b = wsm_ship_blockers($pdo, $o);
         $out[] = ['order' => $o, 'shipment' => $o['shipment'] ?? null,
                   'blockers' => $b, 'pret' => $b === []];
     }
@@ -157,8 +223,8 @@ function wsm_ship_kpis(PDO $pdo, ?array $file = null): array {
  * @return array ['utworzone'=>int, 'pominiete'=>int, 'bledy'=>string[], 'message'=>string]
  */
 function wsm_ship_batch(PDO $pdo, array $orderIds, string $actor = 'konsola'): array {
-    if (!function_exists('wsm_inpost_create')) require_once __DIR__ . '/inpost.php';
     if (!function_exists('wsm_order_by_id')) require_once __DIR__ . '/shop.php';
+    wsm_ship_adapters();
 
     $faits = 0; $sautes = 0; $bledy = [];
     foreach ($orderIds as $id) {
@@ -175,7 +241,7 @@ function wsm_ship_batch(PDO $pdo, array $orderIds, string $actor = 'konsola'): a
         // Règle 2 : déjà parti ?
         if (trim((string) ($o['shipment']['tracking_number'] ?? '')) !== '') { $sautes++; continue; }
 
-        [$ship, $err] = wsm_inpost_create($pdo, $o);
+        [$ship, $err] = wsm_ship_create($pdo, $o);
         if ($ship) {
             $faits++;
             if (function_exists('wsm_audit')) {
@@ -203,6 +269,13 @@ function wsm_ship_batch(PDO $pdo, array $orderIds, string $actor = 'konsola'): a
 function wsm_ship_erreur_humaine(string $err): string {
     if ($err === 'inpost_nieskonfigurowany') {
         return 'Brak tokenu InPost — uzupełnij w Ustawieniach. Do tego czasu paczki nadajesz ręcznie.';
+    }
+    if ($err === 'dpd_nieskonfigurowany') {
+        return 'Brak danych DPD (login, hasło, FID) — uzupełnij w Ustawieniach. Do tego czasu paczki nadajesz ręcznie.';
+    }
+    if (str_starts_with($err, 'brak_przewoznika: ')) {
+        return 'Nieznany przewoźnik « ' . substr($err, strlen('brak_przewoznika: '))
+             . ' » — sprawdź metodę dostawy tego zamówienia.';
     }
     if (str_starts_with($err, 'brakujace_dane: ')) {
         $codes = array_map('trim', explode(',', substr($err, strlen('brakujace_dane: '))));

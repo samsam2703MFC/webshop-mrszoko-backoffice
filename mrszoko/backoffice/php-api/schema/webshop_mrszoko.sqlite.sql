@@ -339,6 +339,9 @@ CREATE TABLE IF NOT EXISTS wsm_landing_products (
 CREATE TABLE IF NOT EXISTS wsm_shipping_methods (
   id           TEXT PRIMARY KEY,
   carrier      TEXT NOT NULL DEFAULT 'inpost',
+  -- 'punkt' : le client designe un point (Paczkomat, DPD Pickup).
+  -- 'adres' : le colis va a une adresse. Voir le schema MySQL.
+  kind         TEXT NOT NULL DEFAULT 'adres',
   sort_order   INTEGER NOT NULL DEFAULT 0,
   active       INTEGER NOT NULL DEFAULT 1,
   price_net    INTEGER NOT NULL DEFAULT 0,

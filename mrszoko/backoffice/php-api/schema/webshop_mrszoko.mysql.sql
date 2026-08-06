@@ -439,8 +439,14 @@ CREATE TABLE IF NOT EXISTS `wsm_landing_products` (
 
 -- --- Modes de livraison (tarifs pilotés par la base, pas par le code) -------
 CREATE TABLE IF NOT EXISTS `wsm_shipping_methods` (
-  `id`           VARCHAR(24)  NOT NULL,          -- inpost_locker | inpost_courier
+  `id`           VARCHAR(24)  NOT NULL,          -- inpost_locker | inpost_courier | dpd_courier
   `carrier`      VARCHAR(24)  NOT NULL DEFAULT 'inpost',
+  -- 'punkt' : le client designe un point (Paczkomat, DPD Pickup).
+  -- 'adres' : le colis va a une adresse.
+  -- Rangee ICI et pas devinee du nom : quatorze endroits comparaient
+  -- l'identifiant a « inpost_locker », et repondaient donc « adresse » pour
+  -- tout transporteur ajoute ensuite.
+  `kind`         VARCHAR(12)  NOT NULL DEFAULT 'adres',
   `sort_order`   INT NOT NULL DEFAULT 0,
   `active`       TINYINT(1)   NOT NULL DEFAULT 1,
   `price_net`    INT NOT NULL DEFAULT 0,         -- grosze, hors TVA

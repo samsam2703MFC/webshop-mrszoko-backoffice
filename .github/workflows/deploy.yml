@@ -1565,6 +1565,59 @@ jobs:
             *wzorow=0*) echo "  ^ ATTENTION : brak wzoru — przypomnienie byloby nieme"; fail=1;;
             *) ;;
           esac
+          echo "== drugi przewoźnik : DPD =="
+          # DEUX TRANSPORTEURS, ET LE PIÈGE N'EST PAS OÙ L'ON CROIT. Ce qui
+          # casse en ajoutant DPD, ce n'est pas DPD : ce sont les quatorze
+          # endroits qui demandaient « delivery_method === 'inpost_locker' »
+          # pour savoir s'il fallait un code de point ou une adresse. Avec un
+          # troisième nom, les deux branches répondent non — et la caisse
+          # n'exige plus RIEN. Une commande part payée, sans destination.
+          #
+          # On vérifie donc d'abord que le TYPE de service est bien en base.
+          if [ -n "$DB_USER" ]; then
+            QK="SELECT CONCAT(id,'=',kind) FROM mrszoko.wsm_shipping_methods ORDER BY sort_order;"
+            KINDS=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QK" 2>/dev/null | tr '\n' ' ')
+          else
+            KINDS=$(mysql -N -e "SELECT CONCAT(id,'=',kind) FROM mrszoko.wsm_shipping_methods ORDER BY sort_order;" 2>/dev/null | tr '\n' ' ')
+          fi
+          echo "  metody: ${KINDS:-?}"
+          case "$KINDS" in
+            *"inpost_locker=punkt"*) echo "  paczkomat jest PUNKTEM — potwierdzone" ;;
+            *"inpost_locker="*) echo "  ^ ZLE : paczkomat nie jest punktem — kasa poprosi o ulicę do skrytki"; fail=1 ;;
+            *) echo "  ^ ATTENTION : nie udało się odczytać metod dostawy"; fail=1 ;;
+          esac
+          case "$KINDS" in
+            *"dpd_courier=adres"*) echo "  DPD jest kurierem pod ADRES — potwierdzone" ;;
+            *"dpd_courier="*) echo "  ^ ZLE : DPD ma zły typ usługi"; fail=1 ;;
+            *) echo "  ^ ATTENTION : brak metody dpd_courier w bazie" ;;
+          esac
+          # L'API DE DPD POLSKA EST DU SOAP. On MESURE l'extension au lieu de
+          # la supposer : le php de ce serveur n'a déjà pas pdo_mysql en ligne
+          # de commande, et trois déploiements ont été perdus avant qu'on le
+          # constate. Son absence n'est PAS un échec — la boutique vend, les
+          # colis partent à la main — mais elle doit être ÉCRITE, sinon on
+          # cherche des heures pourquoi « Nadaj » ne fait rien.
+          SOAP=$(php -r 'echo class_exists("SoapClient") ? "jest" : "brak";' 2>/dev/null || echo "brak")
+          if [ "$SOAP" = "jest" ]; then
+            echo "  rozszerzenie soap: jest — DPD moze nadawac"
+          else
+            echo "  rozszerzenie soap: BRAK — DPD nie nada nic, dopoki nie doinstalujesz php-soap"
+            echo "  (sklep sprzedaje dalej; paczki DPD nadaje sie recznie — to stan oczekiwania, nie awaria)"
+          fi
+          # Et le canal reste-t-il FERMÉ sans identifiants ? Un canal qu'on
+          # croit ouvert alors qu'il ne l'est pas produit des commandes payées
+          # dont le colis n'existe pas — le défaut le plus silencieux qui soit.
+          DPDC=$(php -r '
+            require_once "'"$DIR_API"'/dpd.php";
+            echo wsm_dpd_enabled() ? "OTWARTY" : "zamkniety";
+            echo " brakuje=", count(wsm_dpd_manquants());
+          ' 2>&1)
+          echo "  $DPDC"
+          case "$DPDC" in
+            zamkniety*) echo "  ok — nic nie wyjdzie bez poswiadczen z serwera" ;;
+            OTWARTY*)   echo "  UWAGA : kanal DPD otwarty. Sprawdz, ze dane sa w config.local.php, nie w repozytorium." ;;
+            *)          echo "  ^ ZLE : dpd.php nie laduje sie"; fail=1 ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 

@@ -896,7 +896,11 @@ if ($page === 'kasa') {
         <?php endif; ?>
         <?php foreach ($q['methods'] as $sm): ?>
         <label class="radio">
-          <input type="radio" name="delivery_method" value="<?= e($sm['id']) ?>"<?= $sm['id'] === $shipId ? ' checked' : '' ?> data-ship>
+          <?php // data-kind : le type de service voyage AVEC le bouton. Sans
+                // lui, le script devrait deviner d'après le nom de la méthode,
+                // et se tromperait sur tout transporteur ajouté ensuite. ?>
+          <input type="radio" name="delivery_method" value="<?= e($sm['id']) ?>"<?= $sm['id'] === $shipId ? ' checked' : '' ?>
+                 data-ship data-kind="<?= e($sm['kind'] ?? 'adres') ?>">
           <span><strong><?= e($sm['label']) ?></strong>
             <em class="mono"><?= $q['shipping_free'] ? e($S['cart.free'] ?? '') : e(zl($sm['price'])) ?></em>
             <small><?= e($sm['note']) ?></small></span>
@@ -909,7 +913,15 @@ if ($page === 'kasa') {
               // champ « Paczkomat — KRA010 » à remplir. Les deux ne peuvent pas
               // être vrais en même temps, et c'est le champ qu'on croit. ?>
         <?php if ($q['methods']): ?>
-        <div class="ship-locker"<?= $shipId === 'inpost_courier' ? ' hidden' : '' ?> data-ship-locker>
+        <?php
+        // Le type du service choisi. C'est lui qui décide de ce qu'on demande :
+        // un code de point, ou une adresse. Comparer l'identifiant à
+        // « inpost_courier » marchait tant qu'il n'y avait qu'InPost — et
+        // affichait le champ Paczkomat pour un coursier DPD.
+        $kindSel = 'adres';
+        foreach ($q['methods'] as $sm) if ($sm['id'] === $shipId) $kindSel = $sm['kind'] ?? 'adres';
+        ?>
+        <div class="ship-locker"<?= $kindSel === 'punkt' ? '' : ' hidden' ?> data-ship-locker>
           <?php $field('inpost_point', $S['checkout.point'] ?? '', ['hint' => $S['checkout.point_hint'] ?? '', 'placeholder' => 'KRA010']); ?>
           <?php
           // LE SÉLECTEUR DE PACZKOMAT SUR CARTE.
@@ -946,7 +958,7 @@ if ($page === 'kasa') {
           <script src="https://geowidget.inpost.pl/inpost-geowidget.js" defer></script>
           <?php endif; ?>
         </div>
-        <div class="ship-courier"<?= $shipId === 'inpost_courier' ? '' : ' hidden' ?> data-ship-courier>
+        <div class="ship-courier"<?= $kindSel === 'punkt' ? ' hidden' : '' ?> data-ship-courier>
           <div class="row">
             <?php $field('ship_street', $S['checkout.street'] ?? '', ['autocomplete' => 'address-line1', 'required' => false]); ?>
             <?php $field('ship_building', $S['checkout.building'] ?? '', ['required' => false]); ?>

@@ -287,7 +287,25 @@ function wsm_ensure_countries(PDO $pdo): void {
     // Paczkomat, par exemple, est polonais.
     wsm_ensure_columns($pdo, 'wsm_shipping_methods', [
         'countries' => ["VARCHAR(255) NOT NULL DEFAULT 'PL'", "TEXT NOT NULL DEFAULT 'PL'"],
+        // LE TYPE DE SERVICE, EN DONNÉE ET PLUS EN DEVINETTE.
+        //
+        // Quatorze endroits demandaient « delivery_method === 'inpost_locker' »
+        // pour savoir s'il fallait un code de point relais ou une adresse. Ça
+        // marchait tant qu'il n'existait que deux services. Le jour où l'on
+        // ajoute un transporteur, chacun de ces quatorze tests répond « adresse »
+        // par défaut — et la caisse réclame une rue pour un point relais, ou
+        // l'inverse. On le range donc à côté de la méthode, une fois.
+        //
+        //   'punkt' = le client désigne un point (Paczkomat, DPD Pickup)
+        //   'adres' = le colis va à une adresse
+        'kind'      => ["VARCHAR(12) NOT NULL DEFAULT 'adres'", "TEXT NOT NULL DEFAULT 'adres'"],
     ]);
+    // Les deux services historiques n'ont jamais porté ce champ : on le pose
+    // une fois, d'après ce qu'ils ont toujours été.
+    try {
+        $pdo->exec("UPDATE wsm_shipping_methods SET kind = 'punkt'
+                     WHERE id = 'inpost_locker' AND (kind IS NULL OR kind = '' OR kind = 'adres')");
+    } catch (Throwable $e) { /* colonne pas encore là : le prochain démarrage la posera */ }
     // La commande retient le pays de livraison et le régime appliqué.
     wsm_ensure_columns($pdo, 'wsm_orders', [
         'reverse_charge' => ['TINYINT(1) NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],

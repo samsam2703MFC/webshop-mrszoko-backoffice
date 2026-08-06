@@ -53,6 +53,16 @@ function wsm_settings_fields(): array {
         'inpost.geowidget_token' => ['inpost', 'Token Geowidget (publiczny)', ['inpost', 'geowidget_token'], 'WSM_INPOST_GEOWIDGET_TOKEN', 'text', 'Trafia do strony — to token przeglądarkowy.'],
         'inpost.sandbox'         => ['inpost', 'Środowisko', ['inpost', 'sandbox'], 'WSM_INPOST_SANDBOX', 'select:1|0', '1 = sandbox, 0 = produkcja.'],
 
+        'dpd.login'    => ['dpd', 'Login DPD',            ['dpd', 'login'],    'WSM_DPD_LOGIN',    'text',   'Z panelu DPD (usługi webowe).'],
+        'dpd.password' => ['dpd', 'Hasło DPD',            ['dpd', 'password'], 'WSM_DPD_PASSWORD', 'secret', 'Nigdy nie opuszcza serwera.'],
+        'dpd.fid'      => ['dpd', 'Numer klienta (FID)',  ['dpd', 'fid'],      'WSM_DPD_FID',      'text',   'Bez niego DPD nie wie, komu policzyć transport.'],
+        'dpd.sandbox'  => ['dpd', 'Środowisko', ['dpd', 'sandbox'], 'WSM_DPD_SANDBOX', 'select:1|0', '1 = testy, 0 = produkcja (prawdziwe paczki).'],
+        'dpd.sender_name'     => ['dpd', 'Nadawca — nazwa',   ['dpd', 'sender_name'],     'WSM_DPD_SENDER_NAME',     'text', 'Drukowane na etykiecie. Bez adresu zwrotnego paczka nie wraca.'],
+        'dpd.sender_address'  => ['dpd', 'Nadawca — ulica i numer', ['dpd', 'sender_address'], 'WSM_DPD_SENDER_ADDRESS', 'text', ''],
+        'dpd.sender_postcode' => ['dpd', 'Nadawca — kod',     ['dpd', 'sender_postcode'], 'WSM_DPD_SENDER_POSTCODE', 'text', ''],
+        'dpd.sender_city'     => ['dpd', 'Nadawca — miasto',  ['dpd', 'sender_city'],     'WSM_DPD_SENDER_CITY',     'text', ''],
+        'dpd.sender_phone'    => ['dpd', 'Nadawca — telefon', ['dpd', 'sender_phone'],    'WSM_DPD_SENDER_PHONE',    'text', 'Kurier dzwoni tu, nie do klienta.'],
+
         'mail.transport'   => ['mail', 'Sposób wysyłki', ['mail', 'transport'], 'WSM_MAIL_TRANSPORT', 'select:mail|smtp', 'mail = funkcja serwera, smtp = konto pocztowe.'],
         'mail.from'        => ['mail', 'Adres nadawcy',  ['mail', 'from'],      'WSM_MAIL_FROM',      'text',   'Bez niego poczta jest wyłączona.'],
         'mail.from_name'   => ['mail', 'Nazwa nadawcy',  ['mail', 'from_name'], 'WSM_MAIL_FROM_NAME', 'text',   'Widoczna w skrzynce klienta.'],

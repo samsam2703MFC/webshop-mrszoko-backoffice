@@ -95,14 +95,21 @@
   });
 
   // ---- Caisse : n'afficher que les champs réellement exigés ----------------
+  //
+  // ON LIT LE TYPE DE SERVICE, PAS LE NOM DE LA MÉTHODE. La ligne d'avant
+  // testait « r.value === 'inpost_courier' ». Avec un deuxième transporteur ce
+  // test est faux pour lui : le client choisit le coursier DPD et la caisse
+  // lui montre le champ « Paczkomat » en cachant l'adresse — il n'a alors
+  // aucun endroit où écrire où livrer. Le serveur pose le type sur chaque
+  // bouton (data-kind), parce que lui seul le connaît.
   var locker = document.querySelector('[data-ship-locker]');
   var courier = document.querySelector('[data-ship-courier]');
   document.querySelectorAll('input[data-ship]').forEach(function (r) {
     r.addEventListener('change', function () {
       if (!locker || !courier) return;
-      var isCourier = r.value === 'inpost_courier';
-      locker.hidden = isCourier;
-      courier.hidden = !isCourier;
+      var punkt = r.getAttribute('data-kind') === 'punkt';
+      locker.hidden = !punkt;
+      courier.hidden = punkt;
     });
   });
 
