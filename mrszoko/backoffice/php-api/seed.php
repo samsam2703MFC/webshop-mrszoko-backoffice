@@ -565,6 +565,45 @@ function wsm_sql_txt(string $s): string {
 function wsm_sync_content_sql(): string {
     $livre = wsm_content_livre();
     $out = [];
+
+    // ── LA COLONNE AVANT LA LIGNE ────────────────────────────────────────
+    //
+    // Ce SQL tourne AVANT que l'application ait démarré une seule fois. Or
+    // c'est wsm_bootstrap() — donc le SAPI web, donc une visite — qui ajoute
+    // les colonnes récentes. Résultat au déploiement 90 : le SQL nommait la
+    // colonne `kind`, MySQL ne la connaissait pas encore, tout le lot est
+    // tombé, et le `|| echo` a avalé l'échec. La méthode DPD n'est jamais
+    // arrivée en base ; seule la vérification d'effet l'a vu (« 2 lignes pour
+    // 3 livrés »). Sans elle, on aurait cru la boutique à jour.
+    //
+    // MySQL n'a pas d'`ADD COLUMN IF NOT EXISTS` : on interroge donc
+    // information_schema et on prépare l'ordre seulement s'il manque. C'est
+    // idempotent, et ça ne coûte rien quand la colonne est déjà là.
+    $ajoute = function (string $table, string $col, string $decl) use (&$out): void {
+        // Littéraux ASCII SIMPLES ici, pas les hexadécimaux utf8mb4 utilisés
+        // pour le contenu : information_schema porte ses propres collations, et
+        // comparer un _utf8mb4 à ses colonnes peut lever « Illegal mix of
+        // collations » — ce qui ferait tomber tout le lot, exactement comme la
+        // colonne manquante vient de le faire. Un nom de table et un nom de
+        // colonne n'ont de toute façon jamais d'accent.
+        $out[] = "SET @c := (SELECT COUNT(*) FROM information_schema.columns"
+               . " WHERE table_schema = DATABASE() AND table_name = '$table'"
+               . " AND column_name = '$col');";
+        // L'ordre voyage DANS une chaîne SQL : ses propres apostrophes doivent
+        // donc être doublées. Sans ça, « DEFAULT 'adres' » referme la chaîne au
+        // milieu et MySQL refuse tout le lot — le défaut qu'on est en train de
+        // réparer, reproduit un étage plus bas.
+        $ordre = str_replace("'", "''", "ALTER TABLE `$table` ADD COLUMN `$col` $decl");
+        $out[] = "SET @s := IF(@c = 0, '$ordre', 'SELECT 1');";
+        $out[] = "PREPARE wsm_st FROM @s; EXECUTE wsm_st; DEALLOCATE PREPARE wsm_st;";
+    };
+    $ajoute('wsm_shipping_methods', 'kind', "VARCHAR(12) NOT NULL DEFAULT 'adres'");
+    // Et les deux services historiques prennent le type qu'ils ont toujours eu.
+    // Sans cette ligne, le Paczkomat hérite du défaut « adres » et la caisse
+    // réclame une rue pour une skrytka.
+    $out[] = "UPDATE wsm_shipping_methods SET kind = 'punkt'"
+           . " WHERE id = 'inpost_locker' AND (kind IS NULL OR kind = '' OR kind = 'adres');";
+
     foreach ($livre['i18n'] as [$table, $lang, $k, $v]) {
         $out[] = "INSERT IGNORE INTO $table (lang, k, v) VALUES ("
                . wsm_sql_txt($lang) . ', ' . wsm_sql_txt($k) . ', ' . wsm_sql_txt($v) . ');';
