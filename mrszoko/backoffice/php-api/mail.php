@@ -37,6 +37,13 @@ const WSM_MAIL_EVENTS = [
     'wysylka'          => 'Przesyłka nadana',
     'zadanie_zaplaty'  => 'Prośba o płatność (proforma)',
     'przypomnienie'    => 'Przypomnienie o płatności',
+    // Une commande abandonnée à la caisse n'est PAS une facture impayée. Les
+    // deux modèles ci-dessus demandent un VIREMENT et donnent un numéro de
+    // compte : c'est juste pour une proforma B2B. Un panier abandonné se
+    // rattrape avec un LIEN, pas avec un RIB — demander un virement à
+    // quelqu'un qui allait payer par carte le fait renoncer une seconde fois.
+    'niedokonczone'    => 'Zamówienie bez zapłaty — przypomnienie 1',
+    'niedokonczone2'   => 'Zamówienie bez zapłaty — przypomnienie ostatnie',
     // Le formulaire public. L'accusé part dans la langue du visiteur ;
     // sans modèle dans sa langue, on retombe sur le polonais (contact.php).
     'formularz'        => 'Formularz kontaktowy — potwierdzenie',
