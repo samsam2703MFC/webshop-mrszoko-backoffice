@@ -728,10 +728,30 @@ function wsm_invoice_lien_public(PDO $pdo, array $order, array $doc): string {
 function wsm_order_etapy(PDO $pdo, array $o): array {
     $st   = (string) ($o['status'] ?? '');
     $reg  = wsm_orders_cfg();
-    $flux = ['nowe' => 'Nowe', 'oplacone' => 'Opłacone', 'w_realizacji' => 'W realizacji',
+
+    // ─── « OPŁACONE » N'EST PAS UNE ÉTAPE DE L'OPÉRATEUR ──────────────────
+    //
+    // Il était au milieu du chemin, donc il ressortait en GRAND BOUTON sur
+    // presque toutes les lignes — puisque la plupart des commandes sont
+    // « nowe ». Le geste le plus visible de l'écran le plus utilisé de la
+    // maison proposait donc, quarante fois par jour, quelque chose que
+    // personne ne devait faire : l'encaissement est écrit par tpay, pas au
+    // doigt. Pire, il le faisait mal (voir wsm_order_status_set).
+    //
+    // Le chemin que conduit l'opérateur est celui du COLIS : on prépare, on
+    // expédie, ça arrive. Le paiement est un autre axe, avec sa colonne et
+    // son propre bouton — « Oznacz opłacone », pour les virements.
+    //
+    // « Opłacone » reste un état où l'on PEUT être : la commande y est mise
+    // par tpay. On l'affiche alors comme état courant, à sa place dans le
+    // chemin, et l'étape suivante est « W realizacji ».
+    $flux = ['nowe' => 'Nowe', 'w_realizacji' => 'W realizacji',
              'wyslane' => 'Wysłane', 'dostarczone' => 'Dostarczone'];
     $ordre  = array_keys($flux);
-    $rang   = array_search($st, $ordre, true);
+    // Payée mais pas encore préparée : on est au même point du chemin qu'une
+    // commande neuve — le colis, lui, n'a pas bougé.
+    $rang   = $st === 'oplacone' ? 0 : array_search($st, $ordre, true);
+    if ($st === 'oplacone') $flux['nowe'] = 'Opłacone';
     $annule = $st === 'anulowane';
     $code   = (string) ($o['code'] ?? '');
 
@@ -741,9 +761,11 @@ function wsm_order_etapy(PDO $pdo, array $o): array {
     $dejaDoc = wsm_invoice_for_order($pdo, (int) ($o['id'] ?? 0)) !== null;
 
     $out = [];
+    // « Opłacone » occupe la case de « Nowe » : c'est là que le colis en est.
+    $stEff = $st === 'oplacone' ? 'nowe' : $st;
     foreach ($ordre as $k => $c) {
         if ($annule)                              $etat = 'niemozliwy';
-        elseif ($c === $st)                       $etat = 'teraz';
+        elseif ($c === $stEff)                    $etat = 'teraz';
         elseif ($rang !== false && $k === $rang + 1) $etat = 'nastepny';
         elseif ($rang !== false && $k < $rang)    $etat = 'przeszly';
         else                                      $etat = 'dalszy';
