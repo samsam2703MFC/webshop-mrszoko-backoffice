@@ -136,6 +136,23 @@ if ($orphelins): ?>
       <span class="tag <?= $state[$g] ? 'ok' : 'bad' ?>"><?= $state[$g] ? 'działa' : 'wyłączone' ?></span>
     <?php endif; ?></h2>
     <?php if ($intro !== ''): ?><p class="muted small"><?= h($intro) ?></p><?php endif; ?>
+    <?php
+    // LE DIAGNOSTIC DU SÉLECTEUR DE PACZKOMAT.
+    //
+    // Quand la clé ne convient pas, la caisse affiche « Brak dostępu, sprawdź
+    // czy token został wygenerowany dla odpowiedniej witryny » — une phrase
+    // d'InPost qui ne nomme NI le site attendu, NI celui qui sert la boutique,
+    // et qui recouvre trois causes différentes. On ne peut rien vérifier
+    // auprès d'InPost, mais la clé est un JWT : elle porte ses déclarations en
+    // clair. On les lit et on les met en face de l'adresse réelle.
+    if ($g === 'inpost' && function_exists('wsm_inpost_geo_verdict')):
+      [$etat, $phrase] = wsm_inpost_geo_verdict((string) ($_SERVER['HTTP_HOST'] ?? ''));
+      if ($etat !== 'ok' || wsm_inpost_geowidget_token() !== ''): ?>
+      <p class="warnbox<?= $etat === 'ok' ? ' ok' : '' ?>" style="margin:0 0 14px">
+        <b>Mapa paczkomatów:</b> <?= h($phrase) ?>
+      </p>
+      <?php endif;
+    endif; ?>
     <div class="grid2">
     <?php foreach ($fields as $key => $f): ?>
       <label class="field">

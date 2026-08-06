@@ -903,3 +903,21 @@ CREATE TABLE IF NOT EXISTS wsm_page_paths (
   n     INTEGER NOT NULL DEFAULT 0,
   UNIQUE (skad, dokad)
 );
+
+-- ---------------------------------------------------------------------------
+--  Les profils redefinis en console. Voir le schema MySQL pour les regles :
+--  surcouche par-dessus le code (vide = rien ne change), « Administrator » et
+--  « Superadmin » jamais modifiables, « superadmin.php » jamais accordable.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_role_profiles (
+  rola TEXT PRIMARY KEY,
+  opis TEXT NOT NULL DEFAULT '',
+  maj  TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wsm_role_screens (
+  rola  TEXT NOT NULL,
+  ekran TEXT NOT NULL,
+  droit TEXT NOT NULL DEFAULT 'r',
+  PRIMARY KEY (rola, ekran)
+);

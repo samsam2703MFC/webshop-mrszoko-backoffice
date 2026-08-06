@@ -37,6 +37,129 @@ function wsm_inpost_geowidget_token(): string {
     return wsm_inpost_cfg()['geowidget_token'];
 }
 
+// ---------------------------------------------------------------------------
+//  CE QUE LE JETON DU SÉLECTEUR DIT DE LUI-MÊME
+//
+//  « Brak dostępu, sprawdź czy token został wygenerowany dla odpowiedniej
+//  witryny. » — c'est le sélecteur d'InPost qui écrit ça, dans la caisse, à la
+//  place de la carte. Le client ne peut plus choisir son Paczkomat.
+//
+//  La phrase ne dit pas CE QUI cloche, et c'est là tout le problème : la clé
+//  du sélecteur est délivrée POUR UN SITE, et elle a aussi une date de fin.
+//  Trois causes donnent donc exactement le même écran :
+//
+//   · la clé a été créée pour un autre domaine que celui qui sert la boutique ;
+//   · la clé a expiré ;
+//   · on a collé la clé SERVEUR (ShipX) à la place de la clé du sélecteur.
+//
+//  On ne peut pas la vérifier auprès d'InPost — mais on n'en a pas besoin :
+//  c'est un JWT, et un JWT PORTE SES PROPRES DÉCLARATIONS EN CLAIR. On les
+//  lit, on les met à côté de l'adresse réelle de la boutique, et la console
+//  dit laquelle des trois causes s'applique, au lieu de renvoyer l'exploitant
+//  vers un message qui ne nomme rien.
+//
+//  ON NE VÉRIFIE PAS LA SIGNATURE, et ce n'est pas un oubli : on ne se sert de
+//  rien de ce qu'on lit pour autoriser quoi que ce soit. On l'affiche à celui
+//  qui a collé la clé, pour qu'il voie ce qu'il a collé.
+// ---------------------------------------------------------------------------
+
+/** Le corps d'un JWT, décodé. [] si ce n'en est pas un. */
+function wsm_jwt_charge(string $jeton): array {
+    $p = explode('.', trim($jeton));
+    if (count($p) !== 3) return [];
+    $b = strtr($p[1], '-_', '+/');                     // base64url → base64
+    $b = str_pad($b, (int) (ceil(strlen($b) / 4) * 4), '=');
+    $json = base64_decode($b, true);
+    if ($json === false) return [];
+    $d = json_decode($json, true);
+    return is_array($d) ? $d : [];
+}
+
+/**
+ * Ce qu'on peut dire du jeton du sélecteur sans appeler personne.
+ *
+ * @return array{present:bool, jwt:bool, exp:?int, wygasl:bool, domeny:string[]}
+ */
+function wsm_inpost_geo_diag(): array {
+    $t = trim(wsm_inpost_geowidget_token());
+    $vide = ['present' => false, 'jwt' => false, 'exp' => null, 'wygasl' => false, 'domeny' => []];
+    if ($t === '' || strtolower($t) === 'xxxx') return $vide;
+
+    $charge = wsm_jwt_charge($t);
+    if (!$charge) return ['present' => true, 'jwt' => false, 'exp' => null,
+                          'wygasl' => false, 'domeny' => []];
+
+    $exp = isset($charge['exp']) && is_numeric($charge['exp']) ? (int) $charge['exp'] : null;
+
+    // LES DOMAINES : on ne devine pas le nom du champ. InPost peut l'appeler
+    // comme il veut, et le nom peut changer sans nous prévenir. On parcourt
+    // donc toute la charge et on retient ce qui RESSEMBLE à un hôte. Mieux
+    // vaut montrer un champ de trop que rater le seul qui comptait.
+    $hotes = [];
+    $visite = function ($v) use (&$visite, &$hotes): void {
+        if (is_array($v)) { foreach ($v as $x) $visite($x); return; }
+        if (!is_string($v)) return;
+        foreach (preg_split('/[\s,;]+/', $v) ?: [] as $mot) {
+            $mot = trim($mot);
+            if ($mot === '') continue;
+            $h = parse_url($mot, PHP_URL_HOST) ?: $mot;
+            $h = strtolower(preg_replace('/:\d+$/', '', (string) $h));
+            // Un hôte : un nom pointé, ou une adresse IP. Le reste (« RS256 »,
+            // un identifiant, une date) n'en est pas un.
+            if (preg_match('/^(\*\.)?([a-z0-9-]+\.)+[a-z]{2,}$/', $h)
+                || filter_var($h, FILTER_VALIDATE_IP)) {
+                $hotes[$h] = true;
+            }
+        }
+    };
+    $visite($charge);
+
+    return ['present' => true, 'jwt' => true, 'exp' => $exp,
+            'wygasl' => $exp !== null && $exp < time(), 'domeny' => array_keys($hotes)];
+}
+
+/**
+ * Le verdict, en une phrase polonaise destinée à l'exploitant.
+ *
+ * @param string $hote  l'hôte qui sert réellement la boutique (HTTP_HOST)
+ * @return array{0:string, 1:string}  [état 'ok'|'uwaga'|'zle', phrase]
+ */
+function wsm_inpost_geo_verdict(string $hote): array {
+    $d = wsm_inpost_geo_diag();
+    $hote = strtolower(preg_replace('/:\d+$/', '', trim($hote)));
+
+    if (!$d['present']) return ['uwaga', 'Brak tokenu — mapa się nie pokazuje, klient wpisuje kod ręcznie.'];
+    if (!$d['jwt']) {
+        return ['zle', 'To nie wygląda na token Geowidgetu (nie jest to JWT). '
+                     . 'Czy nie wkleiłeś tu tokenu serwerowego ShipX?'];
+    }
+    if ($d['wygasl']) {
+        return ['zle', 'Token wygasł ' . date('Y-m-d', (int) $d['exp'])
+                     . ' — to dlatego mapa odpowiada „Brak dostępu”. Wygeneruj nowy.'];
+    }
+    if ($d['domeny']) {
+        // La comparaison qui tranche : le jeton nomme des sites, la boutique
+        // en sert un. On accepte le joker « *.exemple.pl ».
+        foreach ($d['domeny'] as $dm) {
+            $ok = $dm === $hote
+                || (str_starts_with($dm, '*.') && str_ends_with($hote, substr($dm, 1)));
+            if ($ok) {
+                return ['ok', 'Token ważny dla ' . $dm . ' — zgadza się z adresem sklepu.'
+                            . ($d['exp'] ? ' Wygasa ' . date('Y-m-d', (int) $d['exp']) . '.' : '')];
+            }
+        }
+        return ['zle', 'Token wygenerowano dla: ' . implode(', ', $d['domeny'])
+                     . '. Sklep działa pod adresem ' . $hote
+                     . ' — dlatego mapa odpowiada „Brak dostępu”. '
+                     . 'Wygeneruj token dla tego adresu w panelu InPost.'];
+    }
+    // Un JWT valide qui ne nomme aucun site : on ne prétend pas savoir.
+    return ['uwaga', 'Token wygląda poprawnie, ale nie wymienia żadnej witryny.'
+                   . ($d['exp'] ? ' Wygasa ' . date('Y-m-d', (int) $d['exp']) . '.' : '')
+                   . ' Jeśli mapa pisze „Brak dostępu”, sprawdź w panelu InPost, '
+                   . 'dla jakiego adresu klucz został wydany (' . $hote . ').'];
+}
+
 function wsm_inpost_base(): string {
     return wsm_inpost_cfg()['sandbox'] ? 'https://sandbox-api-shipx-pl.easypack24.net' : 'https://api-shipx-pl.easypack24.net';
 }

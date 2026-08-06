@@ -280,24 +280,52 @@ function console_sections(?array $me = null): array {
     // finit par faire croire que l'outil est cassé. Une section vidée de tous
     // ses écrans disparaît avec eux.
     if ($me) {
-        // LE FILTRE DOIT CONNAÎTRE LES MÊMES VOIES QUE LA PORTE.
-        //
-        // wsm_droit_ecran() ne raisonne que sur les rôles : pour un
-        // Administrator, superadmin.php répond ''. Ce filtre retirait donc
-        // l'entrée juste après qu'on l'ait ajoutée — le rail restait vide et
-        // la section « Platforma » n'existait que dans le code. Deux endroits
-        // qui décident du même accès doivent décider pareil.
-        $ouvre = function (string $f) use ($me): bool {
-            if (wsm_droit_ecran($me, $f) !== '') return true;
-            return $f === 'superadmin.php' && function_exists('wsm_super_par_code')
-                && wsm_super_par_code($me);
-        };
         foreach ($s as $titre => $items) {
-            $s[$titre] = array_filter($items, $ouvre, ARRAY_FILTER_USE_KEY);
+            $s[$titre] = array_filter($items, fn(string $f) => console_ouvre($me, $f),
+                                      ARRAY_FILTER_USE_KEY);
             if (!$s[$titre]) unset($s[$titre]);
         }
     }
     return $s;
+}
+
+/**
+ * CE COMPTE PEUT-IL OUVRIR CET ÉCRAN ? La règle, à un seul endroit.
+ *
+ * Elle sert au rail ET aux liens que les écrans posent dans leur corps. Ce
+ * n'est pas de la coquetterie : le tableau de bord proposait « Poczta »,
+ * « Produkty » et « Ustawienia » à un compte qui reçoit 403 sur les trois. Le
+ * rail, lui, était juste — il filtrait déjà. Deux endroits décidaient du même
+ * accès et ne disaient pas pareil, et c'est le deuxième qu'on voit en
+ * arrivant sur la console le matin.
+ *
+ * Elle doit aussi connaître les MÊMES VOIES QUE LA PORTE : wsm_droit_ecran()
+ * ne raisonne que sur les rôles, donc pour un Administrator superadmin.php
+ * répond ''. Sans le second cas, le filtre retirait l'entrée juste après
+ * qu'on l'ait ajoutée.
+ */
+function console_ouvre(?array $me, string $fichier): bool {
+    if (!$me) return true;                     // hors session : la liste complète
+    if (!function_exists('wsm_droit_ecran')) return true;
+    $f = basename($fichier);
+    if (wsm_droit_ecran($me, $f) !== '') return true;
+    return $f === 'superadmin.php' && function_exists('wsm_super_par_code')
+        && wsm_super_par_code($me);
+}
+
+/**
+ * Un lien vers un écran, ou rien du tout.
+ *
+ * Rien, et pas un lien grisé : un lien mort se clique trois fois avant qu'on
+ * renonce, et laisse croire que la console est cassée plutôt que fermée.
+ *
+ * @param string $href  « produkty.php » ou « klienci.php?widok=analiza »
+ */
+function console_lien(?array $me, string $href, string $texte, string $classe = ''): string {
+    $f = basename(explode('?', $href)[0]);
+    if (!console_ouvre($me, $f)) return '';
+    return '<a' . ($classe !== '' ? ' class="' . h($classe) . '"' : '')
+         . ' href="' . h($href) . '">' . h($texte) . '</a>';
 }
 
 /**

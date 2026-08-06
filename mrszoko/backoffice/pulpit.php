@@ -72,14 +72,20 @@ CSS);
     <tbody>
     <?php foreach ($alertes as $a): ?>
       <tr>
-        <td data-l="Klient"><a href="<?= h($a['href']) ?>"><b><?= h($a['nom']) ?></b></a></td>
+        <?php // Le lien ne s'affiche que si l'écran s'ouvre : sinon on
+              // envoie contre une porte fermée quelqu'un qui lisait juste
+              // son tableau de bord. ?>
+        <td data-l="Klient"><?= console_lien($me, (string) $a['href'], $a['nom']) ?: '<b>' . h($a['nom']) . '</b>' ?></td>
         <td data-l="Co się dzieje"><?= h($a['texte']) ?></td>
         <td data-l="Co zrobić" style="color:var(--text-muted)"><?= h($a['geste']) ?></td>
       </tr>
     <?php endforeach; ?>
     </tbody>
   </table>
-  <p style="margin-top:10px"><a class="code" href="klienci.php?widok=analiza">Cała analiza klientów →</a></p>
+  <?php $lienAnalyse = console_lien($me, 'klienci.php?widok=analiza', 'Cała analiza klientów →', 'code');
+        if ($lienAnalyse !== ''): ?>
+  <p style="margin-top:10px"><?= $lienAnalyse ?></p>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -87,7 +93,9 @@ CSS);
 <p class="warnbox">
   Sklep działa, ale te integracje czekają na dane:
   <b><?= h(implode(' · ', $missing)) ?></b>.
-  Uzupełnij je w <a href="ustawienia.php">Ustawieniach</a> — pola są wypełnione „xxxx”.
+  <?php $lienUst = console_lien($me, 'ustawienia.php', 'Ustawieniach'); ?>
+  <?= $lienUst !== '' ? 'Uzupełnij je w ' . $lienUst . ' — pola są wypełnione „xxxx”.'
+                      : 'Uzupełnia je administrator w Ustawieniach — pola są wypełnione „xxxx”.' ?>
 </p>
 <?php endif; ?>
 
@@ -102,10 +110,14 @@ CSS);
   <div class="kpi"><b><?= $visible ?></b><span>Produkty w sklepie</span></div>
 </div>
 
+<?php // LES RACCOURCIS SUIVENT LE PROFIL. Ils étaient écrits en dur : un
+      // compte « Sprzedaż » y trouvait « Poczta », « Produkty » et
+      // « Ustawienia », et recevait 403 sur les trois. Le rail, lui,
+      // filtrait déjà — deux endroits décidaient du même accès. ?>
 <p class="quick">
-  <a href="zamowienia.php">Zamówienia →</a>
-  <a href="poczta.php">Poczta →</a>
-  <a href="produkty.php">Produkty →</a>
+  <?= console_lien($me, 'zamowienia.php', 'Zamówienia →') ?>
+  <?= console_lien($me, 'poczta.php', 'Poczta →') ?>
+  <?= console_lien($me, 'produkty.php', 'Produkty →') ?>
   <a href="../shop/" target="_blank" rel="noopener">Zobacz sklep ↗</a>
 </p>
 
@@ -121,7 +133,8 @@ CSS);
       <tbody>
       <?php foreach ($orders as $o): ?>
       <tr>
-        <td data-l="Numer"><a class="code" href="zamowienia.php?id=<?= (int) $o['id'] ?>"><?= h($o['code']) ?></a></td>
+        <td data-l="Numer"><?= console_lien($me, 'zamowienia.php?id=' . (int) $o['id'], (string) $o['code'], 'code')
+                                 ?: '<span class="code">' . h((string) $o['code']) . '</span>' ?></td>
         <td data-l="Klient"><?= h($o['client']) ?></td>
         <td data-l="Status"><span class="tag"><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
           <?php if (!empty($o['backorder'])): ?> <span class="tag no">do potwierdzenia</span><?php endif; ?></td>
@@ -138,7 +151,7 @@ CSS);
     <h2>Magazyn i witryna</h2>
     <?php if ($noPhoto): ?>
     <p class="small"><b><?= $noPhoto ?></b> produkt(ów) w sprzedaży <b>bez zdjęcia</b> — klient widzi tylko kolorowy kafelek.
-      <a class="code" href="produkty.php">Dodaj zdjęcia →</a></p>
+      <?= console_lien($me, 'produkty.php', 'Dodaj zdjęcia →', 'code') ?></p>
     <?php endif; ?>
     <?php if (!$lowStock): ?>
     <p class="muted small">Żaden produkt nie schodzi poniżej 3 sztuk.</p>

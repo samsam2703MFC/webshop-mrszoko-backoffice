@@ -69,15 +69,29 @@ const WSM_ROLE_SUPERADMIN = 'Superadmin';
  */
 const WSM_ROLES_ANCIENS = ['Centrala' => WSM_ROLE_ADMIN, 'Franczyza' => 'Podgląd'];
 
-function wsm_roles(): array {
+/**
+ * LES PROFILS TELS QUE LE CODE LES DÉFINIT — le défaut, et le recours.
+ *
+ * Séparée de wsm_roles() depuis que la console peut les redéfinir (roles.php) :
+ * il faut pouvoir montrer « ce que dit le code » à côté de « ce qui a été
+ * changé », et pouvoir revenir au premier d'un clic. Sans cette séparation, le
+ * défaut n'existerait plus nulle part une fois la surcouche posée.
+ */
+function wsm_roles_base(): array {
     // Les écrans « métier » de chaque rôle. Les impressions (…_druk.php) et
-    // l'étiquette InPost suivent l'écran qui les ouvre.
+    // les étiquettes suivent l'écran qui les ouvre — la liste de ces
+    // satellites, et la règle, sont dans roles.php (wsm_profil_satellites).
     $vente  = ['zamowienia.php' => 'w', 'zamowienie_druk.php' => 'w', 'subskrypcje.php' => 'w',
                'klienci.php' => 'w', 'kontrahenci.php' => 'w', 'poczta.php' => 'w',
                'przypomnienia.php' => 'w', 'kampanie.php' => 'w', 'zgloszenia.php' => 'w',
                'rabaty.php' => 'w', 'produkty.php' => 'r', 'faktury.php' => 'r', 'pulpit.php' => 'r'];
+    // etykieta_dpd.php manquait ici, et personne ne l'a vu : le magasin
+    // imprimait l'étiquette InPost et se heurtait à un 403 sur celle de DPD,
+    // pour le même geste. C'est exactement le genre d'oubli que la règle des
+    // satellites empêche de refaire.
     $stock  = ['wysylka.php' => 'w', 'magazyn.php' => 'w', 'magazyn_druk.php' => 'w',
-               'etykieta_druk.php' => 'w', 'etykieta_inpost.php' => 'w', 'produkty.php' => 'w',
+               'etykieta_druk.php' => 'w', 'etykieta_inpost.php' => 'w', 'etykieta_dpd.php' => 'w',
+               'produkty.php' => 'w',
                'zamowienia.php' => 'r', 'zamowienie_druk.php' => 'r', 'pulpit.php' => 'r'];
     $compta = ['faktury.php' => 'w', 'faktura_druk.php' => 'w', 'ksef.php' => 'w',
                'kontrahenci.php' => 'w', 'zamowienia.php' => 'r', 'klienci.php' => 'r',
@@ -89,9 +103,15 @@ function wsm_roles(): array {
         // (voir wsm_peut_donner_role) : sinon un Administrator compromis se
         // hisserait tout seul jusqu'à sa propre facture.
         WSM_ROLE_SUPERADMIN => ['ecrans' => '*', 'ecrit' => true, 'super' => true,
-            'aide' => 'Superadmin — tout, y compris la facturation de la plateforme'],
+            // CES PHRASES SONT LUES PAR L'UTILISATEUR, pas par nous : elles
+            // s'affichent dans la liste déroulante de Użytkownicy au moment
+            // d'attribuer un rôle, et maintenant dans le tableau des profils.
+            // Les deux premières étaient restées en français — la console est
+            // polonaise, et personne ne l'avait vu tant qu'on ne les avait pas
+            // mises côte à côte.
+            'aide' => 'Superadmin — wszystko, łącznie z rozliczeniem platformy'],
         WSM_ROLE_ADMIN => ['ecrans' => '*', 'ecrit' => true,
-            'aide' => 'Administrator — toute la boutique, sauf la plateforme'],
+            'aide' => 'Administrator — cały sklep, bez rozliczenia platformy'],
         'Sprzedaż' => ['ecrans' => $vente,
             'aide' => 'Sprzedaż — zamówienia, klienci, poczta, zgłoszenia, rabaty'],
         'Magazyn' => ['ecrans' => $stock,
@@ -104,6 +124,21 @@ function wsm_roles(): array {
         'Podgląd' => ['ecrans' => '*', 'ecrit' => false, 'sauf' => ['uzytkownicy.php', 'ustawienia.php'],
             'aide' => 'Podgląd — wszystko do czytania, nic do zmiany'],
     ];
+}
+
+/**
+ * Les profils EN VIGUEUR : ceux du code, redéfinis par la console s'il y a
+ * lieu (roles.php).
+ *
+ * Le test function_exists() n'est pas une précaution de style : auth.php est
+ * chargé par des chemins qui ne connaissent pas roles.php — la boutique
+ * publique, migrate.php, une suite de tests. Sans lui, ajouter la surcouche
+ * aurait fait tomber la vitrine en « undefined function », c'est-à-dire tout
+ * casser pour un écran d'administration que le client ne voit jamais.
+ */
+function wsm_roles(): array {
+    $base = wsm_roles_base();
+    return function_exists('wsm_roles_surcouche') ? wsm_roles_surcouche($base) : $base;
 }
 
 /** Le rôle d'un compte, ancien vocabulaire compris. */

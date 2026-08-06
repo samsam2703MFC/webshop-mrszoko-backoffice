@@ -123,6 +123,14 @@ function wsm_bootstrap(bool $seed = true): PDO {
     // que leur table existe, et seulement là où le fichier serveur se tait.
     require_once __DIR__ . '/settings.php';
     wsm_settings_apply($pdo);
+    // Les profils redéfinis en console (roles.php). On CHARGE le fichier ici et
+    // pas dans chaque écran : un droit qui s'applique sur un chemin et pas sur
+    // un autre est la panne la plus coûteuse de ce dépôt — deux listes qui
+    // décident de la même chose et ne disent pas pareil. Le coût est nul tant
+    // que personne ne consulte un profil : la surcouche ne lit la base qu'au
+    // premier appel de wsm_roles(), et la boutique publique n'en fait aucun.
+    $roles = __DIR__ . '/roles.php';
+    if (is_file($roles)) require_once $roles;
     return $pdo;
 }
 
@@ -184,7 +192,8 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
               'wsm_client_notes', 'wsm_platform_terms', 'wsm_platform_periods',
               'wsm_voucher_uses', 'wsm_subscriptions', 'wsm_subscription_items',
               'wsm_claims', 'wsm_links', 'wsm_campaigns',
-              'wsm_page_views', 'wsm_page_paths'] as $t) {
+              'wsm_page_views', 'wsm_page_paths',
+              'wsm_role_profiles', 'wsm_role_screens'] as $t) {
         if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
     }
     $links = __DIR__ . '/links.php';

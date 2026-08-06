@@ -949,6 +949,23 @@ if ($page === 'kasa') {
               <inpost-geowidget token="<?= e($geo) ?>" language="<?= e($lang) ?>"
                                 config="parcelCollect" onpoint="wsmGeoPoint"></inpost-geowidget>
             </div>
+            <?php
+            // LA SORTIE DE SECOURS, MONTRÉE DÈS QUE LA CARTE EST OUVERTE.
+            //
+            // Le repli au-dessus ne se déclenche que si la carte n'ARRIVE PAS.
+            // Il existe un troisième cas, et c'est celui qu'on a rencontré : la
+            // carte arrive, se dessine, et affiche à la place « Brak dostępu,
+            // sprawdź czy token został wygenerowany dla odpowiedniej witryny ».
+            // Le composant est défini, la boîte a sa hauteur : aucune de nos
+            // détections ne bronche, et le client reste devant un refus en
+            // polonais sans savoir qu'il peut simplement taper son code.
+            //
+            // On ne cherche pas à reconnaître leur message — il est chez eux,
+            // dans trois langues, et il changera. On rend la sortie visible en
+            // permanence : c'est vrai quand la carte marche (certains préfèrent
+            // taper), et ça sauve la commande quand elle refuse.
+            ?>
+            <p class="geo-help" data-geo-help hidden><?= e($S['checkout.point_map_help'] ?? '') ?></p>
           </div>
           <?php // Chargés ICI et nulle part ailleurs : uniquement sur la caisse,
                 // uniquement quand le jeton existe. Une boutique qui n'utilise
