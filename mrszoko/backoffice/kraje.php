@@ -41,18 +41,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         foreach ($on as $c) if (preg_match('/^[A-Z]{2}$/', $c)) $up->execute([$c]);
         wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zmiana', 'wsm_countries (' . count($on) . ' aktywnych)', 'Sieć');
         $flash = 'Zapisano kraje sprzedaży: ' . count($on) . '.';
-    } elseif (isset($_POST['save_shipping'])) {
-        $up = $pdo->prepare("UPDATE wsm_shipping_methods SET countries = ? WHERE id = ?");
-        foreach ((array) ($_POST['countries'] ?? []) as $id => $list) {
-            $codes = array_values(array_unique(array_filter(
-                array_map(fn($c) => strtoupper(trim($c)), preg_split('/[,\s]+/', (string) $list) ?: []),
-                fn($c) => preg_match('/^[A-Z]{2}$/', $c) === 1
-            )));
-            $up->execute([implode(',', $codes), (string) $id]);
-        }
-        wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zmiana', 'wsm_shipping_methods (zasięg)', 'Sieć');
-        $flash = 'Zapisano zasięg przewoźników.';
     }
+    // La portée d'un transporteur ne s'écrit plus ici : deux formulaires sur
+    // la même colonne, c'est un jour où l'un écrase l'autre. Elle est passée
+    // sur « Dostawa », où l'on voit en même temps le coût du colis et le poids
+    // maximum — les deux nombres sans lesquels on la réglait à l'aveugle.
 }
 
 $countries = $pdo->query("SELECT * FROM wsm_countries ORDER BY sort_order, name_pl")->fetchAll();
@@ -137,20 +130,25 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Kraje i VAT' => null]);
     </div>
   </form>
 
-  <form method="post">
-    <input type="hidden" name="_t" value="<?= h($csrf) ?>">
-    <div class="panel">
-      <h2>Zasięg przewoźników</h2>
-      <p class="sub">Kody krajów po przecinku. Kraj otwarty na sprzedaż, ale bez przewoźnika, nie pozwoli złożyć zamówienia — i kasa powie to wprost.</p>
-      <div class="ship">
-        <?php foreach ($methods as $m): ?>
-        <label for="s-<?= h((string) $m['id']) ?>"><b><?= h((string) $m['id']) ?></b><br>
-          <small style="color:var(--text-muted)"><?= h((string) $m['carrier']) ?></small></label>
-        <input id="s-<?= h((string) $m['id']) ?>" name="countries[<?= h((string) $m['id']) ?>]"
-               value="<?= h((string) ($m['countries'] ?? '')) ?>" placeholder="PL"<?= $isAdmin ? '' : ' disabled' ?>>
-        <?php endforeach; ?>
-      </div>
-      <?php if ($isAdmin): ?><button class="primary" type="submit" name="save_shipping" value="1">Zapisz zasięg</button><?php endif; ?>
+  <div class="panel">
+    <h2>Zasięg przewoźników</h2>
+    <?php // OUVRIR UN PAYS ET LE DESSERVIR SONT DEUX DÉCISIONS. La première
+          // engage la TVA, l'OSS et les mentions légales ; la seconde un tarif,
+          // un poids et un coût de colis. Elles étaient sur le même écran par
+          // commodité, et l'on réglait la portée sans voir aucun des nombres
+          // qui la rendent tenable. La portée a donc suivi le tarif. ?>
+    <p class="sub">Który przewoźnik dokąd jeździ — razem z ceną, kosztem paczki i maksymalną
+      wagą — ustawia się na ekranie <a href="dostawa.php"><b>Dostawa</b></a>.
+      Kraj otwarty tutaj, ale <b>bez przewoźnika</b>, nie pozwoli złożyć zamówienia —
+      i kasa powie to wprost.</p>
+    <div class="ship">
+      <?php foreach ($methods as $m): ?>
+      <span><b><?= h((string) $m['id']) ?></b><br>
+        <small style="color:var(--text-muted)"><?= h((string) $m['carrier']) ?></small></span>
+      <span class="code"><?= h(((string) ($m['countries'] ?? '')) !== ''
+            ? (string) $m['countries'] : 'wszędzie') ?></span>
+      <?php endforeach; ?>
     </div>
-  </form>
+    <div class="actions"><a class="btn btn--brand" href="dostawa.php">Przejdź do Dostawy</a></div>
+  </div>
 <?php console_foot();

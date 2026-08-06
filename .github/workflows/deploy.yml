@@ -1201,6 +1201,27 @@ jobs:
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : la valorisation ne se calcule pas juste sur le serveur"; fail=1;;
             *) ;;
           esac
+          echo "== prog darmowej dostawy : liczba, ktora trafia do sklepu =="
+          # Ce seuil s'affiche au client et decide de qui paie le port. Trois
+          # facons de le rater, aucune visible a l'oeil : arrondir vers le bas
+          # (on offre le port un grosz avant de l'avoir gagne, sur chaque
+          # commande), confondre net et brut (la caisse compare du BRUT, donc
+          # on offre 23 % trop tot), et calculer sur une marge inconnue.
+          FOUT=$(php -r '
+            require_once "'"$DIR_API"'/analytics.php";
+            $a = wsm_franco_seuil(1000, 0.25, 0.0, 0.23);
+            $b = wsm_franco_seuil(1000, 0.30, 0.0, 0.23);
+            $c = wsm_franco_seuil(1000, 0.0,  0.0, 0.23);
+            echo ($a["net"] === 4000 && $a["brut"] === 4920 ? "rachunek-ok" : "rachunek-ZLE"), " ",
+                 ($b["net"] === 3334 ? "zaokraglenie-ok" : "zaokraglenie-ZLE"), " ",
+                 ($a["brut"] > $a["net"] ? "brutto-ok" : "brutto-ZLE"), " ",
+                 (!$c["possible"] && trim($c["raison"]) !== "" ? "odmowa-ok" : "odmowa-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || FOUT="php-ZLE :: $FOUT"
+          echo "  $FOUT"
+          case "$FOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : prog darmowej dostawy liczy sie zle na serwerze"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 

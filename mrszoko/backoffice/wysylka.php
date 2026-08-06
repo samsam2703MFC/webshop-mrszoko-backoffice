@@ -131,7 +131,7 @@ if ($detail) {
   <div class="panel" style="border-color: color-mix(in srgb, var(--warn, #9a6a00) 40%, transparent)">
     <h2>InPost nie jest skonfigurowany</h2>
     <p class="hint" style="margin:0">
-      Brakuje tokenu i identyfikatora organizacji — uzupełnij je w <a href="ustawienia.php">Ustawieniach</a>.
+      Brakuje tokenu i identyfikatora organizacji — uzupełnij je w <a href="ustawienia.php">Integracjach</a>.
       Do tego czasu <b>ten ekran nadal działa jako lista rzeczy do zrobienia</b>: paczki nadajesz ręcznie,
       a widzisz tu dokładnie które i co im brakuje.
     </p>

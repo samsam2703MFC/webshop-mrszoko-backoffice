@@ -93,7 +93,7 @@ CSS);
 <p class="warnbox">
   Sklep działa, ale te integracje czekają na dane:
   <b><?= h(implode(' · ', $missing)) ?></b>.
-  <?php $lienUst = console_lien($me, 'ustawienia.php', 'Ustawieniach'); ?>
+  <?php $lienUst = console_lien($me, 'ustawienia.php', 'Integracjach'); ?>
   <?= $lienUst !== '' ? 'Uzupełnij je w ' . $lienUst . ' — pola są wypełnione „xxxx”.'
                       : 'Uzupełnia je administrator w Ustawieniach — pola są wypełnione „xxxx”.' ?>
 </p>

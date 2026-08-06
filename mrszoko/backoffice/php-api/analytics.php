@@ -33,6 +33,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+// wsm_grosze() vit dans shop.php. Ce fichier s'en servait DÉJÀ sans le dire,
+// en comptant sur l'écran appelant pour l'avoir chargé — ce qui marche jusqu'au
+// jour où on appelle une de ces fonctions depuis une vérification de
+// déploiement, où rien d'autre n'est chargé. On le déclare.
+require_once __DIR__ . '/shop.php';
 
 /** Le taux de marge nette visé — la cible du plan, pas une observation. */
 const WSM_VAL_TARGET_RATE = 0.15;
@@ -276,4 +281,142 @@ function wsm_margin_totals(array $series): array {
         'margin_pct'     => $rc > 0 ? round($sum('margin') / $rc * 100, 1) : 0.0,
         'cost_known_pct' => $rev > 0 ? round($rc / $rev * 100, 1) : 0.0,
     ];
+}
+
+// ---------------------------------------------------------------------------
+//  À PARTIR DE QUEL PANIER PEUT-ON OFFRIR LE PORT ?
+//
+//  La question se pose tous les jours et se répond au doigt mouillé : on met
+//  « darmowa dostawa od 200 zł » parce que le voisin le fait. Or elle a une
+//  réponse arithmétique, et une seule donnée manque pour la calculer — le taux
+//  de marge. Il est déjà mesuré ici, mois par mois, sur les commandes
+//  ENCAISSÉES et sur les seules lignes dont le prix de revient est connu.
+//
+//  LA FORMULE, ET POURQUOI ELLE EST CELLE-LÀ.
+//
+//    marchandise nette × taux de marge  =  ce que la commande rapporte
+//    on veut que ça couvre le colis     =  ce que le transporteur nous facture
+//
+//    d'où :  seuil net = coût du colis ÷ taux
+//
+//  À ce seuil exact, la commande ne rapporte RIEN : toute la marge part dans
+//  le colis. C'est rarement ce qu'on veut, d'où la « part gardée » : garder
+//  30 % de la marge revient à diviser par 0,7 de plus.
+//
+//    seuil net = coût ÷ (taux × (1 − part gardée))
+//
+//  LE SEUIL SE COMPARE À UN MONTANT BRUT. wsm_shop_quote() teste
+//  « itemsGross >= free_from » : rendre un seuil net le ferait atteindre trop
+//  tôt de tout le montant de la TVA, et l'on offrirait le port en dessous du
+//  point d'équilibre en croyant l'avoir calculé. On convertit donc, avec le
+//  taux de TVA moyen du catalogue — et l'écran affiche les deux nombres et le
+//  taux utilisé, pour que la conversion se vérifie de tête.
+// ---------------------------------------------------------------------------
+
+/** Sous cette couverture, une moyenne ne moyenne rien. Même règle que la valorisation. */
+const WSM_FRANCO_COUVERTURE_MIN = 0.5;
+
+/**
+ * Le taux de marge à utiliser, et D'OÙ IL VIENT.
+ *
+ * Trois sources, de la plus solide à la plus faible, et l'écran doit pouvoir
+ * dire laquelle a servi. Un seuil calculé sur une marge devinée est un seuil
+ * deviné : le présenter comme calculé est exactement l'erreur que ce fichier
+ * refuse ailleurs.
+ *
+ *   1. « sprzedaz » — mesurée sur les commandes encaissées. La seule qui vaut.
+ *   2. « katalog »  — la marge théorique du catalogue (prix − prix de revient).
+ *      Vraie sur le papier, muette sur ce qui se vend vraiment.
+ *   3. « brak »     — rien à mesurer. On ne renvoie AUCUN taux, et l'écran
+ *      demande à la place de le saisir. On ne comble pas un trou par 15 %.
+ *
+ * @return array{taux:float, source:string, couverture:float, base:int, produits:int}
+ */
+function wsm_marge_taux(PDO $pdo, array $series): array {
+    $vide = ['taux' => 0.0, 'source' => 'brak', 'couverture' => 0.0, 'base' => 0, 'produits' => 0];
+
+    // 1. Ce qui s'est vendu.
+    $costed = 0; $marge = 0; $rev = 0;
+    foreach ($series as $r) {
+        $costed += (int) ($r['revenue_costed'] ?? 0);
+        $marge  += (int) ($r['margin'] ?? 0);
+        $rev    += (int) ($r['revenue'] ?? 0);
+    }
+    $couv = $rev > 0 ? $costed / $rev : 0.0;
+    if ($costed > 0 && $couv >= WSM_FRANCO_COUVERTURE_MIN) {
+        return ['taux' => $marge / $costed, 'source' => 'sprzedaz',
+                'couverture' => $couv, 'base' => $costed, 'produits' => 0];
+    }
+
+    // 2. Ce qui est en rayon. On ne compte que les produits dont le prix de
+    //    revient est renseigné — un produit sans coût n'est pas un produit à
+    //    100 % de marge, c'est un produit qu'on ne sait pas juger.
+    try {
+        $rows = $pdo->query("SELECT prix, base_cost FROM wsm_products
+                             WHERE active = 1 AND base_cost > 0 AND prix > 0")->fetchAll() ?: [];
+    } catch (Throwable $e) { return $vide; }
+    $prix = 0; $cout = 0;
+    foreach ($rows as $p) {
+        $prix += wsm_grosze($p['prix']);
+        $cout += wsm_grosze($p['base_cost']);
+    }
+    if ($prix > 0 && $cout < $prix) {
+        return ['taux' => ($prix - $cout) / $prix, 'source' => 'katalog',
+                'couverture' => $couv, 'base' => $prix, 'produits' => count($rows)];
+    }
+    return $vide;
+}
+
+/** Le taux de TVA moyen du catalogue, pondéré par le prix. 0,23 à défaut. */
+function wsm_vat_moyen(PDO $pdo): float {
+    try {
+        $rows = $pdo->query("SELECT prix, vat_rate FROM wsm_products WHERE active = 1 AND prix > 0")->fetchAll() ?: [];
+    } catch (Throwable $e) { return 0.23; }
+    $poids = 0; $somme = 0.0;
+    foreach ($rows as $p) {
+        $g = wsm_grosze($p['prix']);
+        $poids += $g;
+        $somme += $g * (float) $p['vat_rate'];
+    }
+    return $poids > 0 ? $somme / $poids : 0.23;
+}
+
+/**
+ * Le panier minimum qui paie son propre colis.
+ *
+ * PURE : aucun accès base. C'est elle qu'on teste, et c'est elle qui décide
+ * d'un chiffre qui partira sur la boutique.
+ *
+ * @param int   $coutNet  ce que le transporteur nous facture, en grosze HT
+ * @param float $taux     marge, entre 0 et 1
+ * @param float $garde    part de la marge qu'on veut CONSERVER (0 = équilibre)
+ * @param float $vat      taux de TVA moyen, pour rendre un seuil brut
+ * @return array{net:int, brut:int, possible:bool, raison:string}
+ */
+function wsm_franco_seuil(int $coutNet, float $taux, float $garde = 0.0, float $vat = 0.23): array {
+    $non = fn(string $r) => ['net' => 0, 'brut' => 0, 'possible' => false, 'raison' => $r];
+    if ($coutNet <= 0)                 return $non('koszt przesyłki nieznany');
+    if ($taux <= 0)                    return $non('marża nieznana albo zerowa');
+    if ($taux >= 1)                    return $non('marża powyżej 100 % — sprawdź ceny zakupu');
+    if ($garde < 0 || $garde >= 1)     return $non('zatrzymywana część marży poza zakresem');
+
+    $eff = $taux * (1 - $garde);
+    if ($eff <= 0) return $non('nic nie zostaje na przesyłkę');
+
+    // On ARRONDIT VERS LE HAUT : un seuil arrondi vers le bas offre le port un
+    // grosz avant de l'avoir gagné, sur chaque commande, pour toujours.
+    $net = (int) ceil($coutNet / $eff);
+    return ['net' => $net, 'brut' => (int) ceil($net * (1 + $vat)),
+            'possible' => true, 'raison' => ''];
+}
+
+/**
+ * Ce qu'une commande AU SEUIL laisse réellement dans la caisse.
+ *
+ * Sert de contre-épreuve à l'écran : on affiche le seuil ET ce qu'il rapporte,
+ * parce qu'un seuil sans son résultat se lit comme un gain alors qu'à part
+ * gardée nulle il vaut exactement zéro.
+ */
+function wsm_franco_reste(int $seuilNet, float $taux, int $coutNet): int {
+    return (int) round($seuilNet * $taux) - $coutNet;
 }

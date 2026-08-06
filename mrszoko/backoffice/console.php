@@ -184,12 +184,34 @@ function console_menu(?array $me = null): array {
  * lit du haut vers le bas jusqu'à retrouver le mot cherché, chaque fois, et
  * rien n'apprend où vivent les choses. Les sections répondent à la question
  * qu'on se pose vraiment — « où est-ce que je regarde une commande », « où
- * est-ce que je change un prix » — et elles rendent la position stable :
- * Faktury est TOUJOURS le troisième de Sprzedaż.
+ * est-ce que je change un prix » — et elles rendent la position stable.
  *
  * Pulpit reste seul en tête, sans titre : c'est le point de départ, pas une
  * catégorie. Ustawienia ferme la marche parce qu'on y va rarement et jamais
  * dans l'urgence.
+ *
+ * ── LA RELECTURE, ET CE QU'ELLE A CORRIGÉ ────────────────────────────────
+ *
+ * Le premier découpage groupait par PROXIMITÉ DE VOCABULAIRE, pas par
+ * travail. Trois choses s'en ressentaient, et toutes les trois coûtaient un
+ * aller-retour par jour :
+ *
+ *  · « Sprzedaż » portait SIX entrées, dont la facturation ET l'expédition —
+ *    deux métiers, deux personnes, deux moments. La section la plus consultée
+ *    était donc la plus longue à parcourir.
+ *  · « Magazyn » vivait sous « Katalog », loin de « Wysyłka ». C'est pourtant
+ *    la MÊME personne qui regarde le stock et qui prépare le colis : elle
+ *    traversait le rail à chaque paquet.
+ *  · « Ustawienia » contenait une entrée nommée « Ustawienia ». Le libellé ne
+ *    disait rien de ce qu'on y trouve — des clés d'intégration — et se
+ *    confondait avec le titre au-dessus. Il s'appelle maintenant
+ *    « Integracje », qui est ce que la page contient.
+ *
+ * Aucune section ne passe cinq entrées, et aucune ne porte le nom d'un de ses
+ * écrans. Ce qui reste à trancher — faut-il rapprocher deux écrans qui
+ * s'enchaînent tout le temps ? — se lira dans l'enregistreur de pages
+ * (Superadmin → « Co po czym »), qui existe exactement pour ça. On ne réordonne
+ * pas au jugé une seconde fois.
  *
  * @return array<string, array<string,string>>  titre de section => fichier => libellé
  */
@@ -210,19 +232,37 @@ function console_sections(?array $me = null): array {
         // Le tableau de bord n'appartient à aucune section : il les résume.
         '' => ['pulpit.php' => 'Pulpit'],
 
-        // Ce qui rentre : la vente, de la commande à la facture.
+        // CE QU'UN CLIENT A DEMANDÉ. La commande, ce qui la prolonge, ce qui
+        // se plaint. Ni le document, ni le colis : ce sont d'autres gestes.
         'Sprzedaż' => [
             'zamowienia.php'  => 'Zamówienia',
             'subskrypcje.php' => 'Subskrypcje',
-            'faktury.php'     => 'Faktury',
-            'ksef.php'        => 'KSeF',
-            'wysylka.php'     => 'Wysyłka',
             'zgloszenia.php'  => 'Zgłoszenia',
         ],
 
-        // Les gens. La messagerie est ici et pas ailleurs : un message est
-        // toujours quelqu'un, jamais un document.
-        'Klienci' => [
+        // CE QUI PART. Le stock et l'expédition sont le même geste, fait par
+        // la même personne, souvent debout dans l'atelier avec un téléphone.
+        // La section ne s'appelle pas « Wysyłka » : elle contient un écran de
+        // ce nom, et un titre qui répète une de ses entrées n'aide personne.
+        'Paczki' => [
+            'wysylka.php' => 'Wysyłka',
+            'magazyn.php' => 'Magazyn',
+        ],
+
+        // CE QUI RENTRE, et de quoi le prouver. Audyt est ici et pas dans les
+        // réglages : on y lit la marge, le résultat après port et la
+        // prévision — c'est de l'argent, pas de la configuration.
+        'Pieniądze' => [
+            'faktury.php' => 'Faktury',
+            'ksef.php'    => 'KSeF',
+            'audyt.php'   => 'Audyt',
+        ],
+
+        // LES GENS. La messagerie est ici et pas ailleurs : un message est
+        // toujours quelqu'un, jamais un document. La section ne s'appelle pas
+        // « Klienci » : elle CONTIENT un écran de ce nom, et un titre qui
+        // répète une de ses entrées ne dit rien de plus que l'entrée.
+        'Kontakty' => [
             'klienci.php'     => 'Klienci',
             'kontrahenci.php' => 'Kontrahenci',
             'poczta.php'      => 'Poczta',
@@ -230,10 +270,12 @@ function console_sections(?array $me = null): array {
             'kampanie.php'    => 'Kampanie',
         ],
 
-        // Ce qu'on vend, et à quel prix.
-        'Katalog' => [
+        // CE QU'ON VEND, et comment ça se présente. Pas « Sklep » : le bas du
+        // rail porte déjà « Sklep ↗ », le lien vers la boutique publique. Deux
+        // « Sklep » dans la même colonne, l'un section et l'autre lien
+        // sortant, et l'on clique sur le mauvais une fois sur deux.
+        'Oferta' => [
             'produkty.php' => 'Produkty',
-            'magazyn.php'  => 'Magazyn',
             'rabaty.php'   => 'Rabaty',
             'tresci.php'   => 'Treści',
             'allegro.php'  => 'Allegro',
@@ -241,10 +283,13 @@ function console_sections(?array $me = null): array {
 
         // Ce qu'on règle une fois et qu'on ne rouvre presque jamais.
         'Ustawienia' => [
+            // « Dostawa » en tête : on y va pour fixer un tarif ou un seuil,
+            // ce qui arrive souvent ; on ouvre un pays à la vente une fois
+            // par an, et on touche aux comptes moins souvent encore.
+            'dostawa.php'     => 'Dostawa',
             'kraje.php'       => 'Kraje',
+            'ustawienia.php'  => 'Integracje',
             'uzytkownicy.php' => 'Użytkownicy',
-            'audyt.php'       => 'Audyt',
-            'ustawienia.php'  => 'Ustawienia',
         ],
     ];
 

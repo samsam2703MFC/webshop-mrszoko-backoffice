@@ -84,9 +84,9 @@ $state = [
     'faktura' => wsm_invoice_blockers() === [],
 ];
 
-console_head('Ustawienia', $me);
+console_head('Integracje', $me);
 console_flash($flash, $flashKind);
-console_crumbs(['Pulpit' => 'pulpit.php', 'Ustawienia' => null]);
+console_crumbs(['Pulpit' => 'pulpit.php', 'Integracje' => null]);
 ?>
 
 <div class="kpis">

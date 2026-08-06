@@ -116,27 +116,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $flash = $ok2 ? 'Oznaczono jako sprawdzone.' : 'Nie udało się oznaczyć.';
         $flashKind = $ok2 ? 'ok' : 'err';
 
-    } elseif (isset($_POST['dostawa'])) {
-        // Le prix du port et le seuil de gratuité s'affichent sur la boutique
-        // à chaque page : ce sont des valeurs de façade, et jusqu'ici elles
-        // n'étaient modifiables qu'en redéployant. Les voici éditables.
-        $up = $pdo->prepare("UPDATE wsm_shipping_methods
-                                SET price_net = ?, free_from = ?, max_weight_g = ?, active = ?, cost_net = ?
-                              WHERE id = ?");
-        $n = 0;
-        foreach ((array) ($_POST['d'] ?? []) as $id => $row) {
-            $up->execute([
-                wsm_cms_grosze($row['price_net'] ?? ''),
-                wsm_cms_grosze($row['free_from'] ?? ''),
-                max(1, (int) ($row['max_weight_g'] ?? 25000)),
-                empty($row['active']) ? 0 : 1,
-                wsm_cms_grosze($row['cost_net'] ?? ''),
-                (string) $id,
-            ]);
-            $n++;
-        }
-        wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Cennik dostawy', $n . ' metod', 'Sieć');
-        $flash = 'Zapisano cennik dostawy (' . $n . ').';
     } elseif (isset($_POST['kafelki'])) {
         // Les cartes de la page d'accueil : ordre, visibilité, teinte, prix.
         $up = $pdo->prepare("UPDATE wsm_landing_products
@@ -442,54 +421,20 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
   <?php endif; ?>
 </div>
 
-<?php elseif ($tab === 'dostawa' && $sk === 'sklep'):
-  $ship = $pdo->query("SELECT * FROM wsm_shipping_methods ORDER BY sort_order, id")->fetchAll() ?: [];
-  $zl2 = fn($g) => number_format(((int) $g) / 100, 2, ',', ''); ?>
+<?php elseif ($tab === 'dostawa' && $sk === 'sklep'): ?>
 <div class="panel">
-  <h2>Cennik dostawy</h2>
-  <p class="muted small">Te kwoty klient widzi w koszyku i przy zamawianiu — <b>„Darmowa dostawa od…”</b>
-    bierze się właśnie stąd. Cena jest <b>netto</b>; VAT (23 %) dolicza sklep, tak jak dla towaru.
-    Próg 0 zł oznacza „nigdy za darmo”. Odznaczona metoda znika z wyboru, ale zamówienia,
-    które już ją mają, pozostają nietknięte.
-    Zasięg krajów ustawia się w <a href="kraje.php">Krajach</a>.<br>
-    <b>Koszt u przewoźnika</b> to Wasz rachunek za paczkę — klient go nie widzi. Bez niego
-    <a href="audyt.php">Audyt</a> nie umie powiedzieć, jaką część kosztu dostawy pokrywa klient:
-    przyjmuje wtedy cenę sprzedaży i pokazuje 100 % z definicji.</p>
-  <form method="post">
-    <input type="hidden" name="dostawa" value="1">
-    <div class="tablewrap">
-    <table class="rwd">
-      <thead><tr><th>Metoda</th><th>Czynna</th><th class="num">Cena netto (zł)</th>
-                 <th class="num">Koszt u przewoźnika (zł)</th>
-                 <th class="num">Gratis od (zł brutto)</th><th class="num">Maks. waga (g)</th><th class="num">Brutto</th></tr></thead>
-      <tbody>
-      <?php foreach ($ship as $s): $id = (string) $s['id'];
-        $brut = (int) round((int) $s['price_net'] * (1 + (float) $s['vat_rate'])); ?>
-      <tr>
-        <td data-l="Metoda">
-          <b><?= h((string) ($content['ship.' . $id . '.label'][WSM_CMS_BASE_LANG] ?? $id)) ?></b><br>
-          <code class="muted" style="font-size:11.5px"><?= h($id) ?> · <?= h((string) $s['carrier']) ?></code>
-        </td>
-        <td data-l="Czynna"><input type="checkbox" name="d[<?= h($id) ?>][active]" value="1"
-              <?= (int) $s['active'] === 1 ? 'checked' : '' ?>></td>
-        <td data-l="Cena netto" class="num"><input type="text" inputmode="decimal" style="width:100px"
-              name="d[<?= h($id) ?>][price_net]" value="<?= h($zl2($s['price_net'])) ?>"></td>
-        <td data-l="Koszt u przewoźnika" class="num"><input type="text" inputmode="decimal" style="width:100px"
-              name="d[<?= h($id) ?>][cost_net]" value="<?= h($zl2($s['cost_net'] ?? 0)) ?>"
-              placeholder="0,00"></td>
-        <td data-l="Gratis od" class="num"><input type="text" inputmode="decimal" style="width:110px"
-              name="d[<?= h($id) ?>][free_from]" value="<?= h($zl2($s['free_from'])) ?>"></td>
-        <td data-l="Maks. waga" class="num"><input type="number" min="1" style="width:110px"
-              name="d[<?= h($id) ?>][max_weight_g]" value="<?= (int) $s['max_weight_g'] ?>"></td>
-        <td data-l="Brutto" class="num"><?= h(pln($brut)) ?></td>
-      </tr>
-      <?php endforeach; ?>
-      </tbody>
-    </table>
-    </div>
-    <div class="actions"><button class="primary" type="submit"<?= $isAdmin ? '' : ' disabled' ?>>Zapisz cennik</button>
-      <a class="code" href="<?= h($site['url']) ?>" target="_blank" rel="noopener">Sprawdź w sklepie ↗</a></div>
-  </form>
+  <h2>Cennik dostawy przeniesiony</h2>
+  <?php // DEUX FORMULAIRES SUR LES MÊMES COLONNES, C'EST UN JOUR OÙ L'UN
+        // ÉCRASE L'AUTRE. Le tarif, le poids et le seuil se règlent maintenant
+        // au même endroit que le coût réel du colis et la marge — sans quoi on
+        // fixait un seuil de gratuité en gardant le coût du transporteur dans
+        // sa tête, d'un écran à l'autre. ?>
+  <p class="muted small">
+    Cena, próg darmowej dostawy, maksymalna waga i zasięg krajów mają teraz jeden ekran:
+    <a href="dostawa.php"><b>Dostawa</b></a>. Jest tam też rachunek, <b>od jakiej kwoty
+    zamówienia stać Was na darmową przesyłkę</b> — policzony z marży, nie z sufitu.
+  </p>
+  <div class="actions"><a class="btn btn--brand" href="dostawa.php">Przejdź do Dostawy</a></div>
 </div>
 
 <?php elseif ($tab === 'kafelki' && $sk === 'strona'):
