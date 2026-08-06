@@ -26,6 +26,21 @@ require_once $API . '/invoice.php';
 
 $flash = ''; $flashKind = 'ok';
 
+// ─── CSRF ────────────────────────────────────────────────────────────────
+//
+// CET ÉCRAN N'EN AVAIT AUCUN. Il change l'état d'une commande — et depuis
+// aujourd'hui ce changement ÉMET UN DOCUMENT FISCAL, l'envoie au client et le
+// dépose au registre national. Une image distante pointant sur un POST
+// suffisait à faire expédier et facturer une commande à l'insu de la personne
+// connectée. Les autres écrans (Ustawienia, Superadmin, Kraje) portaient déjà
+// ce jeton ; celui-ci était passé au travers.
+$csrf = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
+if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {
+    $csrf = bin2hex(random_bytes(16));
+    setcookie('ms_bo_csrf', $csrf, ['expires' => time() + 86400, 'path' => '/',
+        'httponly' => true, 'samesite' => 'Lax', 'secure' => wsm_is_https()]);
+}
+
 $statusLabel = ['nowe' => 'Nowe', 'oplacone' => 'Opłacone', 'w_realizacji' => 'W realizacji',
                 'wyslane' => 'Wysłane', 'dostarczone' => 'Dostarczone', 'anulowane' => 'Anulowane'];
 $payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 'Nieudana',
@@ -33,6 +48,7 @@ $payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 
 
 // ---- Actions (réservées à Centrala) ---------------------------------------
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    if (!hash_equals($csrf, (string) ($_POST['_t'] ?? ''))) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może zmieniać zamówienia.'; $flashKind = 'err';
     } else {
@@ -40,6 +56,38 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $order = wsm_order_by_id($pdo, $id);
         if (!$order) {
             $flash = 'Nie znaleziono zamówienia.'; $flashKind = 'err';
+        } elseif (isset($_POST['vies'])) {
+            // Reconsulter MAINTENANT. Le contrôle qui compte est celui du jour
+            // de la livraison ; on veut pouvoir le refaire avant d'expédier,
+            // sans attendre le passage automatique.
+            $order = wsm_order_vies_refresh($pdo, $order);
+            $vs = strtolower((string) ($order['vat']['status'] ?? ''));
+            $flash = $order['code'] . ' · VIES: ' . ($vs !== '' ? $vs : 'brak odpowiedzi')
+                   . ' — przy „Wysłane" powstanie: ' . wsm_invoice_kind_for($order)['kind'] . '.';
+            $flashKind = $vs === 'invalid' ? 'err' : 'ok';
+
+        } elseif (isset($_POST['ksef'])) {
+            $doc = wsm_invoice_for_order($pdo, $id);
+            if (!$doc) { $flash = 'Nie ma jeszcze dokumentu.'; $flashKind = 'err'; }
+            else {
+                require_once $API . '/ksef.php';
+                [$num, $err] = wsm_ksef_wyslij($pdo, wsm_invoice_hydrate($pdo, $doc),
+                                               (string) ($me['nom'] ?? ''));
+                $flash = $num ? 'Zgłoszono do KSeF: ' . $num : 'KSeF: ' . $err;
+                $flashKind = $num ? 'ok' : 'err';
+            }
+
+        } elseif (isset($_POST['do_wysylki']) || isset($_POST['wyslane'])) {
+            // LE MÊME POINT UNIQUE que le sélecteur de statut. Deux chemins
+            // vers le même geste doivent passer par la même porte, sinon celui
+            // qu'on ajoute aujourd'hui n'émettra pas de document demain.
+            $new = isset($_POST['wyslane']) ? 'wyslane' : 'w_realizacji';
+            $chg = wsm_order_status_set($pdo, $id, $new, (string) ($me['nom'] ?? ''));
+            wsm_order_event($pdo, $id, 'status', $new, (string) ($me['nom'] ?? ''));
+            $flash = $order['code'] . ' → ' . ($statusLabel[$new] ?? $new)
+                   . (($chg['note'] ?? '') !== '' ? ' · ' . $chg['note'] : '');
+            $flashKind = $chg['ok'] ? 'ok' : 'err';
+
         } elseif (isset($_POST['status'])) {
             $new = (string) $_POST['status'];
             if (!in_array($new, WSM_ORDER_STATUSES, true)) {
@@ -196,6 +244,7 @@ console_crumbs($detail
     <?php if ($isAdmin): ?>
     <div class="actions">
       <form method="post" style="align-items:center">
+        <input type="hidden" name="_t" value="<?= h($csrf) ?>">
         <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
         <select name="status">
           <?php foreach (WSM_ORDER_STATUSES as $s): ?>
@@ -209,6 +258,7 @@ console_crumbs($detail
         <button type="submit">Zmień status</button>
       </form>
       <form method="post">
+        <input type="hidden" name="_t" value="<?= h($csrf) ?>">
         <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
         <?php if ($wzRow): ?>
         <a class="code" href="magazyn.php?dok=<?= (int) $wzRow['id'] ?>">WZ <?= h((string) $wzRow['number']) ?> →</a>
@@ -217,6 +267,7 @@ console_crumbs($detail
         <?php endif; ?>
       </form>
       <form method="post">
+        <input type="hidden" name="_t" value="<?= h($csrf) ?>">
         <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
         <button class="primary" type="submit" name="ship" value="1"
           <?= $blockers || $o['payment_status'] !== 'oplacone' ? 'disabled title="' . h($blockers ? 'Brak danych: ' . implode(', ', $blockers) : 'Zamówienie nieopłacone') . '"' : '' ?>>
@@ -318,7 +369,7 @@ console_crumbs($detail
 
   <div class="tablewrap">
   <table class="rwd">
-    <thead><tr><th>Numer</th><th>Data</th><th>Klient</th><th>Dostawa</th><th>Status</th><th>Płatność</th><th class="num">Poz.</th><th class="num">Brutto</th></tr></thead>
+    <thead><tr><th>Numer</th><th>Data</th><th>Klient</th><th>Dostawa</th><th>Status</th><th>Płatność</th><th class="num">Poz.</th><th class="num">Brutto</th><th>Co dalej</th></tr></thead>
     <tbody>
     <?php if (!$orders): ?>
     <tr><td class="muted">Brak zamówień.</td></tr>
@@ -340,6 +391,26 @@ console_crumbs($detail
       <td data-l="Płatność"><span class="tag <?= h($payCls) ?>"><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span></td>
       <td data-l="Pozycje" class="num"><?= (int) $o['units'] ?></td>
       <td data-l="Brutto" class="num"><?= h(pln($o['total_gross'])) ?></td>
+      <?php
+      // LES QUATRE VOYANTS, ET LE GESTE QUI VA AVEC. Il fallait ouvrir chaque
+      // fiche pour savoir si une commande partirait avec une facture ou un
+      // e-paragon, si son numéro de TVA tenait toujours, et si le document
+      // était arrivé au registre. On ne le faisait donc pas.
+      $vy = wsm_order_voyants($pdo, $o); ?>
+      <td data-l="Co dalej"><div class="voyants">
+        <?php foreach ($vy as $k => $v): ?>
+          <?php if ($v['agir'] !== '' && $isAdmin): ?>
+          <form method="post" style="display:inline">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+            <button class="tag <?= h($v['etat']) ?>" name="<?= h($v['agir']) ?>" value="1"
+                    title="<?= h($v['quoi']) ?>"><?= h($v['txt']) ?></button>
+          </form>
+          <?php else: ?>
+          <span class="tag <?= h($v['etat']) ?>" title="<?= h($v['quoi']) ?>"><?= h($v['txt']) ?></span>
+          <?php endif; ?>
+        <?php endforeach; ?>
+      </div></td>
     </tr>
     <?php endforeach; ?>
     </tbody>

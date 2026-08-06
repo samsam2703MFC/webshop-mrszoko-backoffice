@@ -25,6 +25,9 @@ $API = console_api_dir();
 require_once $API . '/platform.php';
 require_once $API . '/usage.php';
 require_once $API . '/roles.php';
+require_once $API . '/invoice.php';       // wsm_status_triggers()
+require_once $API . '/mail.php';
+require_once $API . '/ksef.php';
 
 // ============================================================================
 //  LA PORTE. Rien au-delà de cette ligne ne s'exécute pour quelqu'un d'autre.
@@ -968,6 +971,59 @@ $mesure = $uDepuis !== '';
     to one otwierają ekran kont. Jedno odznaczone pole i nikt — łącznie z tym, kto je
     odznaczył — nie wszedłby już do konsoli. Zostają drogą powrotną.
   </p>
+</div>
+
+<?php
+// ============================================================================
+//  STATUSY I WYZWALACZE — ce que chaque état de commande déclenche.
+//
+//  Un état n'est plus un mot depuis que « wysłane » émet un document fiscal,
+//  l'envoie et le dépose au registre national. Ce qui se déclenche n'était
+//  écrit nulle part : il fallait lire quatre fichiers pour le savoir, et
+//  personne ne le faisait — on découvrait l'effet après l'avoir provoqué.
+//
+//  CE TABLEAU EST CALCULÉ, PAS RECOPIÉ. Chaque ligne interroge les sources qui
+//  décident vraiment — les modèles de courrier en base, l'état du canal KSeF,
+//  les données du vendeur. Une seconde liste tenue à la main aurait divergé au
+//  premier changement, et une table de déclencheurs fausse est pire qu'aucune.
+// ============================================================================
+$trig = wsm_status_triggers($pdo);
+?>
+
+<div class="panel" style="margin-top:20px">
+  <h2>Statusy zamówień i co wyzwalają</h2>
+  <p class="why">
+    Stan zamówienia nie jest już tylko słowem: <b>„Wysłane" wystawia dokument podatkowy</b>,
+    wysyła go klientowi i zgłasza do KSeF. Poniżej — co dokładnie robi każdy stan, kto go
+    ustawia, i czy klient dostaje wiadomość.
+    <br>
+    Tabela jest <b>liczona z kodu i z bazy</b>, nie przepisana ręcznie: gdyby ktoś wyłączył
+    szablon albo zamknął kanał KSeF, widać to tutaj tego samego dnia.
+    Same szablony zmienia się w <a href="poczta.php">Poczcie</a>.
+  </p>
+  <table class="rwd">
+    <thead><tr><th>Stan</th><th>Kto go ustawia</th><th>Co wyzwala</th><th>Wiadomość do klienta</th></tr></thead>
+    <tbody>
+    <?php foreach ($trig as $t): ?>
+      <tr>
+        <td data-l="Stan"><span class="prof-nom"><?= h($t['statut']) ?></span></td>
+        <td data-l="Kto go ustawia"><?= h($t['kto']) ?></td>
+        <td data-l="Co wyzwala">
+          <ul style="margin:0;padding-left:18px">
+            <?php foreach ($t['wyzwala'] as $w): ?>
+            <li<?= str_starts_with($w, 'UWAGA') ? ' style="color:var(--warning)"' : '' ?>><?= h($w) ?></li>
+            <?php endforeach; ?>
+          </ul>
+        </td>
+        <td data-l="Wiadomość do klienta">
+          <?php // « Pas de modèle » n'est pas une panne : c'est un état muet,
+                // voulu ou oublié. On le dit sans accuser, mais on le dit. ?>
+          <span class="st<?= str_contains($t['mail'], 'czynny') ? ' oplacone' : '' ?>"><?= h($t['mail']) ?></span>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
 </div>
 
 <?php console_foot(); ?>
