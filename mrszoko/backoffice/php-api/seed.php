@@ -20,19 +20,17 @@ function wsm_seed(PDO $pdo): void {
 
     $pdo->beginTransaction();
 
-    // ---- KPIs (dashboard snapshot) -----------------------------------------
-    $kpis = [
-        ['Obrót sieci (miesiąc)', '428 k€', 'var(--color-text)', '▲ +6,4 %', 'var(--success)'],
-        ['Obrót sklepów', '306 k€', 'var(--color-primary)', '▲ +4,8 %', 'var(--success)'],
-        ['Obrót dostaw biurowych', '122 k€', 'var(--accent)', '▲ +11 %', 'var(--success)'],
-        ['Aktywne sklepy', '14 / 15', 'var(--color-text)', '▲ +1 w tym kw.', 'var(--success)'],
-        ['Zamówienia dnia', '512', 'var(--color-text)', '▲ +38 vs wczoraj', 'var(--success)'],
-        ['Adopcja whitelisty', '82 %', 'var(--color-text)', '▼ −3 pkt', 'var(--color-primary)'],
-    ];
-    foreach ($kpis as $i => $k) {
-        $ins('wsm_kpis', ['sort_order' => $i, 'label' => $k[0], 'value' => $k[1],
-            'val_color' => $k[2], 'delta' => $k[3], 'delta_color' => $k[4]]);
-    }
+    // ---- KPIs : AUCUN, et c'est le sujet ------------------------------------
+    // Ces tuiles étaient six chaînes écrites à la main : « Obrót sieci
+    // 428 k€ », « Aktywne sklepy 14 / 15 », « Adopcja whitelisty 82 % ». En
+    // euros, pour une boutique qui facture en złoty ; pour un réseau de quinze
+    // points de vente qui n'existe pas ; avec des flèches de progression
+    // inventées. Et c'était la PREMIÈRE chose qu'on voyait en se connectant.
+    //
+    // Sur un tableau de bord, un nombre plausible ne se met pas en doute : il
+    // se retient, et il sert à décider. Les tuiles sont désormais calculées
+    // (voir /franchisor/kpis), depuis la même fonction que l'écran Pulpit.
+    // La table reste, vide : plus personne ne la lit.
 
     // ---- Shops --------------------------------------------------------------
     // AUCUNE. La maquette d'origine peuplait cinq boutiques belges — Bruxelles-

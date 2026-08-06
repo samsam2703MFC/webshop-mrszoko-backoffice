@@ -249,10 +249,45 @@ if ($method === 'GET') {
     wsm_require_read($pdo);
     switch ($route) {
         case 'kpis':
-            wsm_send(array_map(fn($r) => [
-                'label' => $r['label'], 'value' => $r['value'], 'valColor' => $r['val_color'],
-                'delta' => $r['delta'], 'deltaColor' => $r['delta_color'],
-            ], $pdo->query("SELECT * FROM wsm_kpis ORDER BY sort_order")->fetchAll()));
+            // CES TUILES SONT LA PREMIÈRE CHOSE QU'ON VOIT EN SE CONNECTANT.
+            //
+            // Elles lisaient wsm_kpis, une table de chaînes écrites à la main
+            // par la maquette : « Obrót sieci 428 k€ », « Aktywne sklepy
+            // 14 / 15 », « Adopcja whitelisty 82 % ». En euros, pour une
+            // boutique qui facture en złoty ; pour un réseau de quinze points
+            // de vente qui n'existe pas ; avec des flèches de progression
+            // inventées. Le vrai chiffre d'affaires est cent fois plus petit.
+            //
+            // C'est le même défaut que les boutiques belges, en pire : sur un
+            // tableau de bord, un nombre plausible ne se met pas en doute, il
+            // se retient et sert à décider. On les calcule donc, et depuis la
+            // MÊME fonction que notre écran Pulpit — deux tableaux de bord qui
+            // se contredisent sont pires qu'un seul qui manque.
+            $k = wsm_shop_kpis($pdo);
+            $zl = fn(int $g): string => number_format($g / 100, 2, ',', "\u{202F}") . "\u{202F}zł";
+            $tuiles = [
+                ['Zamówienia', (string) $k['orders'], ''],
+                ['Opłacone', (string) $k['orders_paid'], ''],
+                ['Czeka na płatność', (string) $k['orders_pending'],
+                 $k['orders_pending'] > 0 ? 'do przypomnienia' : ''],
+                ['Obrót brutto', $zl((int) $k['revenue_gross']), ''],
+                ['Średni koszyk', $zl((int) $k['basket_avg']), ''],
+            ];
+            // Une seule tuile porte une couleur, et seulement quand elle a une
+            // raison : de l'argent encaissé dont le colis n'est jamais parti.
+            try {
+                $bloque = (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders o
+                                        LEFT JOIN wsm_shipments s ON s.order_id = o.id
+                                            WHERE o.payment_status = 'oplacone'
+                                              AND o.status <> 'anulowane'
+                                              AND (s.tracking_number IS NULL OR s.tracking_number = '')")->fetchColumn();
+                $tuiles[] = ['Do nadania', (string) $bloque, $bloque > 0 ? 'zapłacone, nie wysłane' : ''];
+            } catch (Throwable $e) { /* table de la boutique pas encore née */ }
+
+            wsm_send(array_map(fn(array $t) => [
+                'label' => $t[0], 'value' => $t[1], 'valColor' => '',
+                'delta' => $t[2], 'deltaColor' => $t[2] !== '' ? 'var(--danger)' : '',
+            ], $tuiles));
 
         case 'shops':
             wsm_send(array_map(fn($r) => [

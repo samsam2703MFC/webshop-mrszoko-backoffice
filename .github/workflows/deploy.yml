@@ -307,6 +307,14 @@ jobs:
           # compte n'est supprimé ; seuls les liens vers une boutique absente
           # partent, parce qu'un tel lien est un compte qui ne voit rien.
           # Idempotent : rejoué, il ne trouve plus rien.
+          #
+          # wsm_kpis part EN ENTIER, et c'est une exception assumée à la règle
+          # « jamais un TRUNCATE » : cette table ne contenait que six chaînes
+          # de maquette (« Obrót sieci 428 k€ », « Aktywne sklepy 14 / 15 »),
+          # elle n'a jamais eu d'écriture applicative, et plus personne ne la
+          # lit — les tuiles sont calculées. Il n'y a donc aucune donnée
+          # d'exploitation à protéger, contrairement à wsm_shops où un second
+          # point de vente réel pourrait exister demain.
           if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
             mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko <<'SQL' 2>/dev/null \
               && echo 'boutiques de démonstration : retrait joué' \
@@ -315,6 +323,7 @@ jobs:
           UPDATE wsm_users SET portee = 'Cała sieć'
            WHERE portee IN ('Bruxelles-Centre','Anderlecht, Uccle','Louvain','Anderlecht','Uccle','Schaerbeek');
           DELETE FROM wsm_shops WHERE id IN ('bxl','and','ucc','sch','lv');
+          DELETE FROM wsm_kpis;
           SQL
           else
             echo 'ATTENTION : mysql injoignable — boutiques de démonstration NON retirées'
@@ -875,6 +884,17 @@ jobs:
             0)   echo "  libellés L'Atelier restants : aucun (rebranding confirmé)" ;;
             ZLE) echo "  ^ ATTENTION : rebranding non vérifiable"; fail=1 ;;
             *)   echo "  ^ ZLE : $RESTE ligne(s) portent encore L'Atelier — le rebranding n'a pas tourné"; fail=1 ;;
+          esac
+
+          # Les tuiles du tableau de bord ne doivent plus venir d'une table :
+          # une seule ligne qui survit et c'est « 428 k€ » qui réapparaît en
+          # page d'accueil.
+          KPI=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT COUNT(*) FROM wsm_kpis;" 2>/dev/null || echo ZLE)
+          case "$KPI" in
+            0)   echo "  tuiles de maquette : aucune (calculées désormais)" ;;
+            ZLE) echo "  ^ ATTENTION : wsm_kpis illisible"; fail=1 ;;
+            *)   echo "  ^ ZLE : $KPI tuile(s) de maquette encore en base"; fail=1 ;;
           esac
 
           # Plus aucun compte ne doit porter l'ancien vocabulaire : un rôle
