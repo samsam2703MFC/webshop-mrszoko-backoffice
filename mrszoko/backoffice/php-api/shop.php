@@ -1361,3 +1361,70 @@ function wsm_shop_kpis(PDO $pdo): array {
         'basket_avg' => $count > 0 ? (int) round(((int) $rowPaid['s']) / $count) : 0,
     ];
 }
+
+// ---------------------------------------------------------------------------
+//  LE CHANGEMENT D'ÉTAT D'UNE COMMANDE — À UN SEUL ENDROIT
+//
+//  Quatre endroits écrivaient « UPDATE wsm_orders SET status » : l'écran
+//  Zamówienia, l'API, et les deux transporteurs après création du colis. Tant
+//  que l'état n'était qu'un mot, ça allait. Il déclenche maintenant l'ÉMISSION
+//  DU DOCUMENT — et une règle qui vit à quatre endroits est une règle qui ne
+//  s'applique qu'à trois : la commande expédiée par le quatrième chemin
+//  n'aurait jamais eu ni facture ni e-paragon, sans une erreur nulle part.
+//
+//  POURQUOI « wysłane » ET PAS LE PAIEMENT. Une commande payée peut encore
+//  être annulée ou modifiée ; un document émis, non — il est figé, numéroté
+//  dans une série continue, et déposé au registre national. On l'émet donc
+//  quand la marchandise part, c'est-à-dire quand la vente est faite.
+// ---------------------------------------------------------------------------
+
+/**
+ * Change l'état d'une commande, et fait ce que cet état entraîne.
+ *
+ * @return array{ok:bool, doc:?array, note:string}
+ */
+function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''): array {
+    $new = trim($new);
+    $out = ['ok' => false, 'doc' => null, 'note' => ''];
+
+    $st = $pdo->prepare("SELECT status FROM wsm_orders WHERE id = ?");
+    $st->execute([$id]);
+    $avant = (string) ($st->fetchColumn() ?: '');
+    if ($avant === '') { $out['note'] = 'nie ma takiego zamówienia'; return $out; }
+    // Une commande annulée ne repart pas : c'est la règle que les deux
+    // transporteurs portaient chacun dans leur coin (« AND status <> 'anulowane' »).
+    if ($avant === 'anulowane' && $new !== 'anulowane') {
+        $out['note'] = 'zamówienie anulowane — stan nie zmieniony';
+        return $out;
+    }
+
+    $pdo->prepare("UPDATE wsm_orders SET status = ? WHERE id = ?")->execute([$new, $id]);
+    $out['ok'] = true;
+    if ($avant === $new) return $out;              // rien de neuf : rien à émettre
+
+    if ($new === 'wyslane') {
+        $inv = __DIR__ . '/invoice.php';
+        if (is_file($inv)) {
+            require_once $inv;
+            $order = wsm_order_by_id($pdo, $id);
+            if ($order) {
+                // Elle ne lève jamais : une commande expédiée dont le document
+                // échoue reste expédiée. Le colis est parti, on ne le rattrape
+                // pas en refusant d'écrire un état.
+                try {
+                    $d = wsm_order_document($pdo, $order, $actor);
+                    $out['doc']  = $d['doc'];
+                    $out['note'] = $d['doc']
+                        ? strtoupper((string) $d['kind']) . ' ' . (string) $d['doc']['number']
+                          . ' — ' . $d['raison']
+                          . ($d['mail'] ? ' · wysłano mailem' : '')
+                          . ($d['ksef'] !== '' ? ' · KSeF: ' . $d['ksef'] : '')
+                        : 'dokument nie powstał: ' . $d['raison'];
+                } catch (Throwable $e) {
+                    $out['note'] = 'stan zmieniony, dokument nie powstał';
+                }
+            }
+        }
+    }
+    return $out;
+}

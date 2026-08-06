@@ -340,8 +340,13 @@ function wsm_mail_queue(PDO $pdo, array $m): int {
     $cols = [
         'order_id'      => $m['order_id'] ?? null,
         'email'         => mb_substr((string) ($m['email'] ?? ''), 0, 200),
+        // Le défaut est lu DES DEUX CÔTÉS du test. Il ne l'était qu'à gauche :
+        // un appelant qui omet « direction » — le cas normal pour un envoi —
+        // passait le in_array grâce au défaut, puis relisait la clé absente.
+        // Avertissement à chaque message, et un null rangé en base au lieu de
+        // « wyjscie ». Trouvé en branchant l'envoi des documents.
         'direction'     => in_array($m['direction'] ?? 'wyjscie', ['wyjscie', 'wejscie', 'notatka'], true)
-                           ? $m['direction'] : 'wyjscie',
+                           ? ($m['direction'] ?? 'wyjscie') : 'wyjscie',
         'subject'       => mb_substr((string) ($m['subject'] ?? ''), 0, 250),
         'body'          => (string) ($m['body'] ?? ''),
         'template_code' => mb_substr((string) ($m['template_code'] ?? ''), 0, 60),

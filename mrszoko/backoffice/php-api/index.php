@@ -693,7 +693,8 @@ if ($method === 'POST') {
             if (!in_array($new, WSM_ORDER_STATUSES, true)) {
                 wsm_fail_fields(['status' => implode('|', WSM_ORDER_STATUSES)]);
             }
-            $pdo->prepare("UPDATE wsm_orders SET status = ? WHERE id = ?")->execute([$new, $id]);
+            // Le point unique : l'état de « wysłane » émet le document.
+            $chg = wsm_order_status_set($pdo, (int) $id, $new, (string) ($actor['nom'] ?? ''));
             wsm_order_event($pdo, $id, 'status', $new, $actorName);
             wsm_send(wsm_order_by_id($pdo, $id));
         }
