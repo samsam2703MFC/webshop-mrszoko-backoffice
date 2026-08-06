@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  deploy-manuel.sh — le déploiement, à la main, quand GitHub Actions ne prend
+#  pas la file d'attente.
+#
+#  POURQUOI CE FICHIER EXISTE. Le 6 août, quatre exécutions du workflow sont
+#  restées en file sans jamais démarrer, l'API de GitHub renvoyant tour à tour
+#  un 500 sur le déclenchement, des exécutions annulées qui repassaient en
+#  attente, et un 409 « impossible d'annuler » sur celles-là mêmes qu'elle
+#  venait de lister. Trois changements finis attendaient un runner qui ne
+#  venait pas. Une boutique ne s'arrête pas parce qu'un fournisseur a une
+#  mauvaise soirée.
+#
+#  IL FAIT EXACTEMENT CE QUE FAIT LE WORKFLOW, dans le même ordre :
+#    1. il assemble site/ (backoffice + landing + shop, php-api → api) ;
+#    2. il vérifie l'assemblage AVANT d'envoyer quoi que ce soit ;
+#    3. il envoie par rsync, SANS --delete (les photos du serveur survivent) ;
+#    4. il joue le SQL de contenu par le client mysql — le php en ligne de
+#       commande de ce serveur n'a pas pdo_mysql, `migrate.php --sync-content`
+#       n'y ferait rien du tout ;
+#    5. il vérifie l'EFFET sur les pages réelles, pas l'exécution du script.
+#
+#  CE QU'IL NE FAIT PAS : les vingt étapes de vérification du workflow (rôles,
+#  KSeF, transporteurs, écrans de la console…). Ce script met le code en ligne
+#  et contrôle l'essentiel ; le workflow reste la référence quand il repart.
+#
+#  Usage, depuis la racine du dépôt, sur une machine qui atteint le serveur :
+#
+#      SSH_HOST=185.180.206.46 SSH_USER=root SSH_PASSWORD='…' \
+#      DB_USER=…  DB_PASS=… \
+#      bash tools/deploy-manuel.sh
+#
+#  DB_USER / DB_PASS sont ceux de phpMyAdmin (mêmes valeurs que les secrets
+#  WSM_DB_USER / WSM_DB_PASS). Sans eux, le code part quand même mais les
+#  textes de la vitrine ne sont pas synchronisés — le script le dit.
+#
+#  Rien n'est écrit en dur ici : aucun mot de passe ne doit ENTRER dans ce
+#  fichier. Le dépôt est public.
+# =============================================================================
+set -euo pipefail
+
+: "${SSH_HOST:?SSH_HOST manquant (ex. 185.180.206.46)}"
+: "${SSH_USER:?SSH_USER manquant}"
+: "${SSH_PASSWORD:?SSH_PASSWORD manquant}"
+SSH_PORT="${SSH_PORT:-22}"
+DEPLOY_DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
+DB_USER="${DB_USER:-}"
+DB_PASS="${DB_PASS:-}"
+
+command -v sshpass >/dev/null || { echo "sshpass absent : apt install sshpass (ou brew install hudochenkov/sshpass/sshpass)"; exit 1; }
+command -v rsync   >/dev/null || { echo "rsync absent"; exit 1; }
+command -v php     >/dev/null || { echo "php absent (il sert à vérifier le rail et à émettre le SQL)"; exit 1; }
+
+export SSHPASS="$SSH_PASSWORD"
+SSHOPT="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+distant() { sshpass -e ssh $SSHOPT "$SSH_USER@$SSH_HOST" "$@"; }
+
+echo "══ 1/5 · assemblage ═══════════════════════════════════════════════════"
+rm -rf site && mkdir -p site/backoffice site/landing
+
+BO=mrszoko/backoffice
+cp -r "$BO"/_ds site/backoffice/
+mkdir -p site/backoffice/img && cp "$BO"/img/logo.png site/backoffice/img/
+cat > site/backoffice/index.html <<'HTML'
+<!doctype html><html lang="pl"><head><meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="refresh" content="0; url=login.php">
+<title>Konsola Mister Szoko</title></head>
+<body><p><a href="login.php">Przejdź do logowania</a></p></body></html>
+HTML
+# php-api → api : c'est le chemin que la console dérive de sa propre adresse.
+# La base SQLite locale ne part JAMAIS — le serveur a MySQL.
+rsync -a --exclude 'data' --exclude '*.sqlite' "$BO"/php-api/ site/backoffice/api/
+# TOUT le PHP du répertoire, pas une liste blanche : sept écrans livrés ont
+# déjà été oubliés d'une liste tenue à la main, et sont restés morts en
+# production pendant des semaines.
+cp mrszoko/backoffice/*.php mrszoko/backoffice/console.css site/backoffice/
+
+cp -r mrszoko/landing/. site/landing/
+
+mkdir -p site/shop
+rsync -a --exclude 'router.php' --exclude 'serve.sh' mrszoko/shop/. site/shop/
+cp mrszoko/shop/.htaccess site/shop/.htaccess
+mkdir -p site/shop/media && cp mrszoko/shop/media/.htaccess site/shop/media/.htaccess
+cp mrszoko/.htaccess site/.htaccess
+
+# Les jetons du design system, régénérés en UN fichier depuis la source.
+{
+  echo "/* Généré au déploiement depuis design-system/tokens/*.css — ne pas éditer. */"
+  for f in colors typography spacing radius shadow motion fonts; do
+    echo ""; echo "/* ---- $f ---- */"
+    grep -v "^@import" "mrszoko/design-system/tokens/$f.css"
+  done
+} > site/shop/tokens.css
+
+cat > site/index.html <<'HTML'
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=shop/">
+<title>Mister Szoko</title>
+<link rel="canonical" href="shop/">
+</head><body><p><a href="shop/">Mister Szoko</a></p></body></html>
+HTML
+
+echo "══ 2/5 · contrôles AVANT envoi ════════════════════════════════════════"
+# Le rail est la seule source de vérité de ce qui doit exister. Un écran
+# ajouté au menu et oublié à la copie casse ICI, pas devant un client.
+php -r '
+  require_once "mrszoko/backoffice/console.php";
+  $manque = [];
+  foreach (console_sections(["role" => "Centrala"]) as $items) {
+    foreach (array_keys($items) as $f) {
+      if (!is_file("site/backoffice/" . $f)) $manque[] = $f;
+    }
+  }
+  if ($manque) { fwrite(STDERR, "ÉCRANS DU RAIL NON ASSEMBLÉS : " . implode(", ", $manque) . "\n"); exit(1); }
+  echo "  rail : chaque entrée du menu a son fichier\n";
+'
+test -s site/backoffice/login.php || { echo "  login.php absent : personne ne pourrait entrer"; exit 1; }
+grep -q 'login.php' site/backoffice/index.html || { echo "  index.html ne renvoie pas vers login.php"; exit 1; }
+test -s site/shop/tokens.css && grep -q -- '--choco-700' site/shop/tokens.css \
+  || { echo "  tokens.css régénéré vide ou incomplet"; exit 1; }
+# Les trois pièces des boutons de statut doivent partir ENSEMBLE : deux sur
+# trois, et l'écran répond 200 avec des pastilles qu'aucun pouce n'atteint.
+grep -q 'wsm_order_etapy' site/backoffice/api/invoice.php \
+  && grep -q 'name="status"' site/backoffice/zamowienia.php \
+  && grep -q '\.etap' site/backoffice/console.css \
+  || { echo "  les boutons de statut ne sont pas complets dans l'assemblage"; exit 1; }
+echo "  boutons de statut : les trois pièces sont là"
+echo "  login, tokens, htaccess : présents"
+
+echo "══ 3/5 · envoi vers $SSH_USER@$SSH_HOST:$DEPLOY_DIR ═══════════════════"
+# SANS --delete, volontairement : les photos envoyées depuis la console vivent
+# sur le serveur et ne sont pas dans le dépôt.
+sshpass -e rsync -rltDz --omit-dir-times \
+  -e "ssh $SSHOPT" site/ "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/"
+echo "  envoyé"
+
+echo "══ 4/5 · contenu éditorial (SQL) ══════════════════════════════════════"
+if [ -n "$DB_USER" ]; then
+  # PAR LE CLIENT mysql, et pas par migrate.php : le php en ligne de commande
+  # de ce serveur n'a pas pdo_mysql. `--sync-content` n'y a JAMAIS rien fait,
+  # et l'échec était avalé — trois déploiements verts n'ont rien synchronisé.
+  php "$BO"/php-api/migrate.php --sync-content-sql > /tmp/wsm-sync.sql
+  echo "  $(wc -l < /tmp/wsm-sync.sql) instructions SQL"
+  sshpass -e scp $SSHOPT /tmp/wsm-sync.sql "$SSH_USER@$SSH_HOST:/tmp/wsm-sync.sql" >/dev/null
+  distant "DB_USER='$DB_USER' DB_PASS='$DB_PASS' bash -s" <<'REMOTE'
+    if mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko < /tmp/wsm-sync.sql 2>/tmp/wsm-sync.err; then
+      echo "  contenu éditorial : synchronisé"
+    else
+      echo "  ATTENTION : synchronisation du contenu échouée"
+      head -3 /tmp/wsm-sync.err | sed 's/^/    MySQL: /'
+    fi
+    rm -f /tmp/wsm-sync.sql /tmp/wsm-sync.err
+REMOTE
+  rm -f /tmp/wsm-sync.sql
+else
+  echo "  DB_USER absent — textes de la vitrine NON synchronisés."
+  echo "  Le nouveau bloc B2B n'apparaîtra pas tant que ce SQL n'aura pas tourné."
+fi
+
+echo "══ 5/5 · l'effet, sur les pages réelles ═══════════════════════════════"
+distant bash -s <<'REMOTE'
+  fail=0
+  SH="http://localhost/mrszoko/shop"
+  BOU="http://localhost/mrszoko/backoffice"
+
+  H=$(curl -skL "$SH/")
+  case "$H" in
+    *'Strefa pro'*|*'40 kg'*) echo "  ^ ZLE : stary blok « Strefa pro » nadal na stronie"; fail=1;;
+    *'id="pro"'*)             echo "  blok B2B jest na stronie — potwierdzone";;
+    *)                        echo "  ^ ATTENTION : brak bloku B2B"; fail=1;;
+  esac
+  case "$H" in
+    *'kontakt?temat=wspolpraca'*|*'kontakt&#63;temat=wspolpraca'*)
+      echo "  przycisk prowadzi do formularza z tematem — potwierdzone";;
+    *) echo "  ^ ZLE : przycisk B2B nie prowadzi do formularza"; fail=1;;
+  esac
+  case "$(curl -skL "$SH/kontakt?temat=wspolpraca")" in
+    *'value="wspolpraca" selected'*) echo "  formularz otwiera się na « Współpraca / hurt » — potwierdzone";;
+    *) echo "  ^ ZLE : formularz ignoruje temat z adresu"; fail=1;;
+  esac
+
+  # La console sans session redirige vers sa porte : ce qu'on refuse, c'est
+  # 404 (fichier absent) et 500 (page qui explose).
+  for e in zamowienia.php superadmin.php dostawa.php login.php; do
+    C=$(curl -skL -o /dev/null -w '%{http_code}' "$BOU/$e")
+    case "$C" in
+      200) echo "  $e : $C";;
+      *)   echo "  ^ ZLE : $e odpowiada $C"; fail=1;;
+    esac
+  done
+  curl -skL "$BOU/console.css" | grep -q '\.etap' \
+    && echo "  console.css ze stylem etapów: dojechał" \
+    || { echo "  ^ ZLE : console.css bez stylu etapów — przyciski będą za małe"; fail=1; }
+
+  [ "$fail" = 0 ] && echo "  ── TOUT EST VERT" || { echo "  ── DES CONTRÔLES ONT ÉCHOUÉ"; exit 1; }
+REMOTE
+
+echo
+echo "Déploiement terminé. La boutique : https://$SSH_HOST/mrszoko/shop/"
