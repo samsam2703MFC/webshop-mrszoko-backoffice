@@ -24,6 +24,7 @@ require_once __DIR__ . '/console.php';
 $API = console_api_dir();
 require_once $API . '/platform.php';
 require_once $API . '/usage.php';
+require_once $API . '/roles.php';
 
 // ============================================================================
 //  LA PORTE. Rien au-delà de cette ligne ne s'exécute pour quelqu'un d'autre.
@@ -155,11 +156,46 @@ if (wsm_super_code_actif() && !wsm_super_code_donne()) {
 
 $flash = ''; $kind = 'ok'; $errors = [];
 
+// Les écrans qu'un profil peut citer : le rail COMPLET, non filtré. Passer
+// $me donnerait la liste de celui qui regarde — on attribuerait alors des
+// droits en fonction de ce que l'on possède soi-même, ce qui n'a aucun sens.
+$dispo = console_menu(null);
+unset($dispo['superadmin.php']);       // ceinture : cet écran ne s'accorde pas
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!hash_equals($csrf, (string) ($_POST['_t'] ?? ''))) { http_response_code(400); exit('Bad request.'); }
     $actor = (string) ($me['nom'] ?? '');
 
-    if (isset($_POST['wystaw'])) {
+    if (isset($_POST['profil_zapisz'])) {
+        $nom = (string) ($_POST['profil_nom'] ?? '');
+        $ecr = [];
+        foreach ((array) ($_POST['ekran'] ?? []) as $f => $d) $ecr[(string) $f] = (string) $d;
+        [$okP, $errors] = wsm_profil_save($pdo, $nom, $ecr, (string) ($_POST['profil_opis'] ?? ''), $dispo);
+        if ($okP) {
+            $flash = 'Zapisano profil ' . $nom . '.';
+            // Une trace NOMINATIVE, contrairement à l'enregistreur : changer
+            // qui ouvre quoi est un acte, pas une visite.
+            wsm_audit($pdo, $actor, 'Zmiana profilu', 'wsm_role_profiles ' . $nom, 'Platforma');
+        } else { $flash = 'Popraw zaznaczone pola.'; $kind = 'err'; }
+
+    } elseif (isset($_POST['profil_reset'])) {
+        $nom = (string) $_POST['profil_reset'];
+        if (wsm_profil_reset($pdo, $nom)) {
+            $flash = 'Profil ' . $nom . ' wrócił do ustawień wbudowanych.';
+            wsm_audit($pdo, $actor, 'Przywrócenie profilu', 'wsm_role_profiles ' . $nom, 'Platforma');
+        } else { $flash = 'Tego profilu nie można zmieniać.'; $kind = 'err'; }
+
+    } elseif (isset($_POST['profil_usun'])) {
+        $nom = (string) $_POST['profil_usun'];
+        [$okD, $msg] = wsm_profil_supprime($pdo, $nom, wsm_roles_base());
+        if ($okD) {
+            $flash = 'Usunięto profil ' . $nom . '.';
+            wsm_audit($pdo, $actor, 'Usunięcie profilu', 'wsm_role_profiles ' . $nom, 'Platforma');
+            header('Location: superadmin.php', true, 303);
+            exit;
+        } else { $flash = $msg; $kind = 'err'; }
+
+    } elseif (isset($_POST['wystaw'])) {
         [$p, $err] = wsm_platform_issue($pdo, (string) $_POST['wystaw'], $actor);
         if ($p) {
             $flash = 'Wystawiono rozliczenie za ' . $_POST['wystaw'] . ' — '
@@ -186,6 +222,176 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             wsm_audit($pdo, $actor, 'Zmiana warunków', 'wsm_platform_terms', 'Platforma');
         } else { $flash = 'Popraw zaznaczone pola.'; $kind = 'err'; }
     }
+}
+
+// ============================================================================
+//  L'ÉDITEUR D'UN PROFIL — une vue à part, et pas un panneau de plus.
+//
+//  Modifier qui ouvre quoi demande de lire vingt lignes ligne à ligne. Le
+//  poser au bas d'un écran qui chiffre déjà douze mois de loyer, c'est se
+//  tromper de case une fois sur trois. Il prend donc la page entière — et
+//  reste DERRIÈRE la même porte : rien à garder deux fois.
+// ============================================================================
+$editProfil = isset($_GET['profil']) ? (string) $_GET['profil'] : null;
+if ($editProfil !== null) {
+    $nouveau = ($editProfil === '+' || $editProfil === '');
+    $tableau = wsm_profil_tableau($pdo, $dispo, 30);
+    $ligne   = $nouveau ? null : ($tableau[$editProfil] ?? null);
+
+    if (!$nouveau && !$ligne) {
+        http_response_code(404);
+        $flash = 'Nie ma takiego profilu.'; $kind = 'err';
+    }
+    // Un profil intouchable ne s'ouvre pas dans un formulaire : proposer des
+    // cases qu'on refusera d'enregistrer est une promesse qu'on ne tient pas.
+    if ($ligne && !$ligne['modifiable']) {
+        header('Location: superadmin.php', true, 303);
+        exit;
+    }
+
+    // Après un enregistrement refusé, on RÉAFFICHE ce qui a été saisi : sinon
+    // la correction d'une faute de frappe efface vingt cases cochées à la main.
+    $vNom  = (string) ($_POST['profil_nom']  ?? ($ligne['rola'] ?? ''));
+    $vOpis = (string) ($_POST['profil_opis'] ?? ($ligne['aide'] ?? ''));
+    $vEcr  = isset($_POST['ekran']) ? (array) $_POST['ekran'] : ($ligne['droits'] ?? []);
+    $fait  = wsm_profil_de_fait($pdo, 30)[$ligne['rola'] ?? ''] ?? [];
+    $satParent = [];
+    foreach (wsm_profil_satellites() as $p => $ss) foreach ($ss as $s) $satParent[$p][] = $s;
+
+    console_head('Profil', $me, <<<'CSS'
+      .why { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0 0 14px; }
+      .fld { display: grid; gap: 5px; margin-bottom: 14px; max-width: 520px; }
+      .fld label { font-size: 12.5px; color: var(--text-muted); }
+      .fld .err { font-size: 12px; color: var(--danger); }
+      .fld input.bad { border-color: var(--danger); }
+      .ecr td:first-child { font-family: var(--font-mono); font-size: 12.5px; }
+      .ecr select { min-height: 40px; }
+      /* Un droit jamais exercé en trente jours n'est pas une faute : c'est une
+         question. Il se signale, il ne s'accuse pas. */
+      .dormant { color: var(--warning); font-size: 11.5px; white-space: nowrap; }
+      .vu { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+      .sat { font-size: 11.5px; color: var(--text-muted); }
+      .danger-zone { border-top: 1px solid var(--border-subtle); margin-top: 22px; padding-top: 16px; }
+    CSS);
+    console_crumbs(['Pulpit' => 'pulpit.php', 'Superadmin' => 'superadmin.php',
+                    ($nouveau ? 'Nowy profil' : $vNom) => null]);
+    if ($flash !== '') console_flash($flash, $kind);
+    ?>
+    <div class="panel">
+      <h2><?= $nouveau ? 'Nowy profil' : 'Profil ' . h($vNom) ?></h2>
+      <p class="why">
+        Profil mówi, które ekrany ktoś <b>otwiera</b> i gdzie może <b>zmieniać</b>.
+        Ekran spoza listy nie znika tylko z menu — <b>strona sama się pilnuje</b> i odpowiada
+        odmową. Zapis <b>zastępuje</b> całą listę: to, co odznaczysz, naprawdę zniknie.
+        <br>
+        Kolumna „Otwierano” pokazuje, ile razy ten profil wchodził na ekran przez ostatnie
+        <b>30 dni</b>. Prawo, z którego nikt nie korzysta, nie daje żadnego błędu i nikt się
+        nie skarży — dlatego łatwo je przeoczyć. Ale <b>trzydzieści dni to nie rok</b>:
+        praca miesięczna (KSeF, faktury) potrafi się w tym okresie nie pokazać. To podpowiedź,
+        nie wyrok.
+      </p>
+
+      <form method="post" action="superadmin.php?profil=<?= rawurlencode($nouveau ? '+' : $vNom) ?>">
+        <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+        <input type="hidden" name="profil_zapisz" value="1">
+
+        <div class="fld">
+          <label for="pnom">Nazwa profilu</label>
+          <input id="pnom" name="profil_nom" maxlength="<?= (int) WSM_PROFIL_NOM_MAX ?>"
+                 value="<?= h($vNom) ?>" class="<?= isset($errors['rola']) ? 'bad' : '' ?>"
+                 <?= $nouveau ? 'autofocus' : 'readonly' ?>>
+          <?php if (isset($errors['rola'])): ?><span class="err"><?= h($errors['rola']) ?></span><?php endif; ?>
+          <?php if (!$nouveau): ?><span class="why" style="margin:0">Nazwy nie zmieniamy —
+            noszą ją konta w tabeli użytkowników.</span><?php endif; ?>
+        </div>
+
+        <div class="fld">
+          <label for="popis">Do czego służy</label>
+          <input id="popis" name="profil_opis" maxlength="160" value="<?= h($vOpis) ?>"
+                 class="<?= isset($errors['opis']) ? 'bad' : '' ?>"
+                 placeholder="np. Praktykant — podgląd zamówień, nic więcej">
+          <?php if (isset($errors['opis'])): ?><span class="err"><?= h($errors['opis']) ?></span><?php endif; ?>
+          <span class="why" style="margin:0">To zdanie widać przy nadawaniu roli
+            na ekranie Użytkownicy — samo „Sprzedaż” nikomu nie pomaga wybrać.</span>
+        </div>
+
+        <table class="rwd ecr">
+          <thead><tr><th>Ekran</th><th>Dostęp</th><th class="num">Otwierano (30 dni)</th></tr></thead>
+          <tbody>
+          <?php foreach ($dispo as $f => $label):
+            $cur = (string) ($vEcr[$f] ?? '');
+            $n   = (int) ($fait[$f] ?? 0);
+            // Les écrans qui donnent les clés méritent d'être nommés comme tels
+            // au moment où on les coche, pas dans une note qu'on lira après.
+            $sensible = in_array($f, ['uzytkownicy.php', 'ustawienia.php', 'audyt.php'], true); ?>
+            <tr>
+              <td data-l="Ekran"><?= h($label) ?><br>
+                <span class="sat"><?= h((string) $f) ?><?php
+                  if ($sensible) echo ' — <b>daje klucze</b>';
+                  if (isset($satParent[$f])) echo ' + ' . h(implode(', ', $satParent[$f]));
+                ?></span></td>
+              <td data-l="Dostęp">
+                <?php // UNE ÉTIQUETTE PAR LISTE, et pas un intitulé de colonne.
+                      // Vingt et une listes s'annonçaient « menu déroulant,
+                      // Podgląd » à la synthèse vocale : le nom de l'écran est
+                      // dans la cellule d'à côté, et une cellule d'à côté ne se
+                      // lit pas. Sur téléphone, le tableau se replie en fiches
+                      // et la colonne disparaît carrément. ?>
+                <select name="ekran[<?= h((string) $f) ?>]"
+                        aria-label="Dostęp do ekranu <?= h($label) ?>">
+                  <option value=""<?= $cur === ''  ? ' selected' : '' ?>>— zamknięty</option>
+                  <option value="r"<?= $cur === 'r' ? ' selected' : '' ?>>Podgląd</option>
+                  <option value="w"<?= $cur === 'w' ? ' selected' : '' ?>>Podgląd i zmiana</option>
+                </select>
+              </td>
+              <td data-l="Otwierano (30 dni)" class="num">
+                <?php if ($n > 0): ?><span class="vu"><?= $n ?></span>
+                <?php elseif ($cur !== ''): ?><span class="dormant">ani razu</span>
+                <?php else: ?><span class="vu">—</span><?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+        <p class="why" style="margin-top:12px">
+          Wydruki i etykiety (<code>…_druk.php</code>, <code>etykieta_…</code>) nie mają tu
+          własnego wiersza — <b>idą za swoim ekranem</b>. Inaczej ktoś dostałby „Zamówienia”
+          bez prawa do wydruku, ekran by się otworzył, a przycisk odmówił — i szukałoby się
+          usterki w drukarce.
+        </p>
+        <div class="actions" style="margin-top:14px">
+          <button class="btn btn--brand" type="submit">Zapisz profil</button>
+          <a class="btn ghost" href="superadmin.php">Anuluj</a>
+        </div>
+      </form>
+
+      <?php if (!$nouveau && $ligne): ?>
+      <div class="danger-zone">
+        <?php if ($ligne['custom']): ?>
+          <form method="post" onsubmit="return confirm('Usunąć profil <?= h($vNom) ?>?')">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <p class="why" style="margin:0 0 8px">Profil utworzony w konsoli. Usunięcie jest
+              możliwe tylko wtedy, gdy nie ma go już żadne <b>aktywne konto</b> — inaczej te
+              konta cicho spadłyby na „Podgląd”, bez jednego komunikatu.</p>
+            <button class="btn sm ghost" name="profil_usun" value="<?= h($vNom) ?>">Usuń profil</button>
+          </form>
+        <?php elseif ($ligne['change']): ?>
+          <form method="post">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <p class="why" style="margin:0 0 8px">Ten profil został zmieniony w konsoli.
+              Można wrócić do listy wbudowanej w kod.</p>
+            <button class="btn sm ghost" name="profil_reset" value="<?= h($vNom) ?>">Przywróć domyślne</button>
+          </form>
+        <?php else: ?>
+          <p class="why" style="margin:0">Profil jest dokładnie taki, jak w kodzie —
+            nie ma czego przywracać.</p>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+    </div>
+    <?php
+    console_foot();
+    exit;
 }
 
 $terms   = wsm_platform_terms($pdo);
@@ -310,6 +516,9 @@ console_head('Superadmin', $me, <<<'CSS'
   .flow .n { margin-left: auto; font-family: var(--font-mono); font-size: 12px;
              color: var(--text-muted); }
   .slow { color: var(--warning); font-weight: 600; }
+  .dormant { color: var(--warning); }
+  .prof-nom { font-family: var(--font-mono); font-size: 13px; color: var(--text-strong); }
+  .prof-aide { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 CSS);
 console_crumbs(['Pulpit' => 'pulpit.php', 'Superadmin' => null]);
 ?>
@@ -655,6 +864,100 @@ $uMax     = $uEcrans ? max(array_column($uEcrans, 'n')) : 0;
       <?php endif; ?>
     </div>
   </div>
+</div>
+
+<?php
+// ============================================================================
+//  LES PROFILS — DE DROIT ET DE FAIT, CÔTE À CÔTE.
+//
+//  Le tableau au-dessus dit ce que l'équipe FAIT. Celui-ci dit ce qu'elle a le
+//  DROIT de faire. Les deux ne se ressemblent pas, et c'est l'écart qui vaut
+//  qu'on les mette sur la même page.
+//
+//  Une matrice de droits ne se relit pas : elle s'écrit une fois, paraît
+//  juste, et dérive au premier écran livré. Un droit EN TROP ne provoque
+//  aucune erreur, aucune page blanche, aucune plainte — il ne se voit qu'après
+//  un incident. Confronté aux mesures, il se voit AVANT.
+//
+//  Les deux profils complets figurent ici sans bouton : les montrer et
+//  expliquer POURQUOI ils ne se touchent pas vaut mieux que les cacher, ce qui
+//  ferait chercher où on les modifie.
+// ============================================================================
+$profs = wsm_profil_tableau($pdo, $dispo, 30);
+$mesure = $uDepuis !== '';
+?>
+
+<div class="panel" style="margin-top:20px">
+  <h2>Profile — kto co otwiera</h2>
+  <p class="why">
+    Profil mówi, które ekrany ktoś otwiera i gdzie może zmieniać. Ekran spoza listy
+    <b>nie znika tylko z menu</b> — strona sama się pilnuje i odpowiada odmową.
+    <br>
+    Kolumna <b>„Prawa bez użycia”</b> to sedno: prawo, z którego przez 30 dni nikt nie
+    skorzystał, nie daje żadnego błędu i nikt się nie skarży. Widać je dopiero wtedy, gdy
+    ktoś przejmie konto. <?php if (!$mesure): ?><b>Na razie nie ma pomiarów</b> — dopóki ich
+    nie ma, „ani razu” nic nie znaczy.<?php endif; ?>
+  </p>
+
+  <table class="rwd" style="margin-top:6px">
+    <thead><tr>
+      <th>Profil</th><th class="num">Konta</th><th class="num">Otwiera</th>
+      <th class="num">Używa (30 dni)</th><th class="num">Prawa bez użycia</th><th></th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ($profs as $p): ?>
+      <tr>
+        <td data-l="Profil">
+          <span class="prof-nom"><?= h($p['rola']) ?></span>
+          <?php if ($p['change']): ?><span class="st">zmieniony</span><?php endif; ?>
+          <?php if ($p['custom']): ?><span class="st">własny</span><?php endif; ?>
+          <?php if (!$p['modifiable']): ?><span class="st">wbudowany</span><?php endif; ?>
+          <span class="prof-aide"><?= h($p['aide']) ?></span>
+        </td>
+        <td data-l="Konta" class="num"><?= (int) $p['comptes'] ?></td>
+        <td data-l="Otwiera" class="num"><?= $p['tout'] ? 'wszystko' : count($p['droits']) ?></td>
+        <td data-l="Używa (30 dni)" class="num"><?= count($p['uzywane']) ?></td>
+        <td data-l="Prawa bez użycia" class="num">
+          <?php // Sans mesure, « 12 droits dormants » se lit comme un reproche
+                // alors qu'on n'a simplement rien mesuré. On se tait. ?>
+          <?php if (!$mesure): ?><span style="color:var(--text-muted)">—</span>
+          <?php elseif (!$p['nieuzywane']): ?><span style="color:var(--success)">0</span>
+          <?php else: ?><span class="dormant" title="<?= h(implode(', ', array_keys($p['nieuzywane']))) ?>"><?= count($p['nieuzywane']) ?></span>
+          <?php endif; ?>
+        </td>
+        <td data-l="">
+          <?php if ($p['modifiable']): ?>
+            <a class="btn ghost" href="superadmin.php?profil=<?= rawurlencode($p['rola']) ?>">Zmień</a>
+          <?php else: ?>
+            <?php // Pas un bouton grisé : une raison. Un bouton mort fait
+                  // cliquer trois fois avant qu'on abandonne sans comprendre. ?>
+            <span style="color:var(--text-muted);font-size:12px">otwiera konta — nietykalny</span>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php if ($mesure && $p['bez_prawa']): ?>
+      <tr>
+        <td colspan="6" style="font-size:12.5px;color:var(--warning)">
+          <?php // L'autre sens de l'écart : ouvert, puis retiré. Normal juste
+                // après une modification, anormal si personne n'a rien touché. ?>
+          <b><?= h($p['rola']) ?></b> otwierał ostatnio ekrany, których już nie ma na liście:
+          <?= h(implode(', ', array_keys($p['bez_prawa']))) ?>.
+          Jeśli nikt nic nie zmieniał, warto sprawdzić dlaczego.
+        </td>
+      </tr>
+      <?php endif; ?>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+
+  <div class="actions" style="margin-top:14px">
+    <a class="btn btn--brand" href="superadmin.php?profil=%2B">Nowy profil</a>
+  </div>
+  <p class="why" style="margin:12px 0 0">
+    <b>„Administrator” i „Superadmin” nie dają się zmienić</b>, i to nie jest niedoróbka:
+    to one otwierają ekran kont. Jedno odznaczone pole i nikt — łącznie z tym, kto je
+    odznaczył — nie wszedłby już do konsoli. Zostają drogą powrotną.
+  </p>
 </div>
 
 <?php console_foot(); ?>

@@ -455,6 +455,12 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
             color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent);
             border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
             border-radius: var(--radius-md); max-width: 62ch; }
+/* La sortie de secours, montrée tant que la carte est ouverte. Elle n'annonce
+   pas une panne — elle rappelle que le champ au-dessus marche toujours — donc
+   elle se lit comme une note, pas comme une alerte. C'est ce qui sauve la
+   commande le jour où la carte se dessine mais refuse le jeton. */
+.geo-help { margin-top: var(--space-3); font-size: var(--text-sm);
+            color: var(--text-muted); max-width: 62ch; line-height: 1.6; }
 .geo-box { margin-top: var(--space-3); border: 1px solid var(--border-default);
            border-radius: var(--radius-md); overflow: hidden; }
 /* `:defined` N'EST PAS UN DÉTAIL. Sans lui, la règle s'applique AUSSI quand le

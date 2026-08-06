@@ -158,6 +158,36 @@ function wsm_usage_par_role(PDO $pdo, int $jours = 30): array {
     } catch (Throwable $e) { return []; }
 }
 
+/**
+ * QUI OUVRE QUOI, écran par écran — la matière des « profils de fait ».
+ *
+ * wsm_usage_par_role() donne un total par rôle : utile pour savoir où passe le
+ * temps de l'équipe, inutile pour juger un droit. C'est le croisement rôle ×
+ * écran qui répond à la seule question qui compte quand on relit une matrice
+ * de droits : « ce droit-là sert-il à quelqu'un ? »
+ *
+ * Un droit accordé et jamais exercé en trente jours ne provoque aucune erreur
+ * et ne fait l'objet d'aucune plainte — c'est précisément ce qui le rend
+ * invisible, et ce qu'un compte volé emporte en plus.
+ *
+ * @return array<string, array<string,int>>  rôle => écran => ouvertures
+ */
+function wsm_usage_par_role_ecran(PDO $pdo, int $jours = 30): array {
+    $depuis = date('Y-m-d', time() - max(1, $jours) * 86400);
+    try {
+        $st = $pdo->prepare("SELECT rola, ekran, SUM(n) AS n FROM wsm_page_views
+                             WHERE dzien >= ? GROUP BY rola, ekran");
+        $st->execute([$depuis]);
+        $out = [];
+        foreach ($st->fetchAll() as $r) {
+            $out[(string) $r['rola']][(string) $r['ekran']] = (int) $r['n'];
+        }
+        foreach ($out as &$par) arsort($par);
+        unset($par);
+        return $out;
+    } catch (Throwable $e) { return []; }
+}
+
 /** Les enchaînements les plus fréquents. C'est la matière du futur rangement. */
 function wsm_usage_chemins(PDO $pdo, int $limite = 12): array {
     try {

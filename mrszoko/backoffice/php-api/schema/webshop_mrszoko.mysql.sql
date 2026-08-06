@@ -1162,3 +1162,42 @@ CREATE TABLE IF NOT EXISTS `wsm_page_paths` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_page_paths` (`skad`, `dokad`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  LES PROFILS REDEFINIS EN CONSOLE (voir roles.php).
+--
+--  Les profils vivent dans le CODE (auth.php, wsm_roles_base). Ces deux
+--  tables ne les remplacent pas : elles posent une surcouche par-dessus, pour
+--  les profils qu'on a voulu changer sans attendre un deploiement. Tant
+--  qu'elles sont vides — le cas normal — rien ne change.
+--
+--  DEUX PROFILS N'Y ENTRENT JAMAIS : « Administrator » et « Superadmin ».
+--  Ce sont eux qui ouvrent les comptes ; s'ils etaient modifiables, une case
+--  decochee fermerait la console a tout le monde, y compris a celui qui vient
+--  de la decocher. La regle est appliquee a l'ECRITURE et relue a la LECTURE,
+--  pour qu'une ligne posee a la main avec un client SQL ne la contourne pas.
+--
+--  « superadmin.php » n'y entre jamais non plus : un profil qui pourrait
+--  l'accorder permettrait a un Administrator de se fabriquer l'acces a sa
+--  propre facture de plateforme.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_role_profiles` (
+  -- 32 et pas 40 (la largeur de wsm_users.role) : l'enregistreur range le
+  -- role dans wsm_page_views.rola en VARCHAR(32) et tronque au-dela. Un nom
+  -- plus long existerait sous deux formes et le rapprochement « de droit /
+  -- de fait » ne rapprocherait plus rien, sans rien signaler.
+  `rola` VARCHAR(32)  NOT NULL,
+  `opis` VARCHAR(160) NOT NULL DEFAULT '',
+  `maj`  DATETIME     NULL DEFAULT NULL,
+  PRIMARY KEY (`rola`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_role_screens` (
+  `rola`  VARCHAR(32) NOT NULL,
+  `ekran` VARCHAR(64) NOT NULL,
+  -- 'w' = ouvrir et modifier · 'r' = ouvrir en lecture seule. Un ecran ABSENT
+  -- est ferme : on enumere ce qu'on ouvre, jamais ce qu'on ferme, sinon
+  -- chaque ecran livre demain serait ouvert a tous par defaut.
+  `droit` CHAR(1)     NOT NULL DEFAULT 'r',
+  PRIMARY KEY (`rola`, `ekran`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

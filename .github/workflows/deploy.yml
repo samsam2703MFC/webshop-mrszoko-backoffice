@@ -2005,6 +2005,37 @@ jobs:
           echo "  odsłon w bazie: ${VUES:-0}"
           [ "${VUES:-0}" = "0" ] && echo "  (jeszcze nikt nie wszedł po tym wdrożeniu — to nie jest usterka)"
 
+          echo "== profile: tabele i dwie zasady, ktorych nie wolno zlamac =="
+          # Les profils sont modifiables depuis la console (roles.php). Deux
+          # regles protegent la console d'elle-meme, et il ne suffit pas
+          # qu'elles soient ECRITES : on les exerce sur le serveur, sur le
+          # code LIVRE, avec le php du serveur.
+          for t in wsm_role_profiles wsm_role_screens; do
+            N=$(q "SELECT COUNT(*) FROM information_schema.tables
+                   WHERE table_schema='mrszoko' AND table_name='$t';")
+            [ "${N:-0}" = "1" ] \
+              && echo "  $t : obecna" \
+              || { echo "  ^ ZLE : brak tabeli $t — nie da sie zmienic zadnego profilu"; fail=1; }
+          done
+          # php-cli n'a pas pdo_mysql : ces deux regles sont PURES (elles ne
+          # lisent aucune base), donc elles s'exercent quand meme.
+          POUT=$(php -r '
+            require_once "/var/www/html/mrszoko/backoffice/api/db.php";
+            require_once "/var/www/html/mrszoko/backoffice/api/delivery.php";
+            require_once "/var/www/html/mrszoko/backoffice/api/auth.php";
+            require_once "/var/www/html/mrszoko/backoffice/api/roles.php";
+            $fixes = wsm_profil_modifiable("Administrator") || wsm_profil_modifiable("Superadmin");
+            $plat  = wsm_profil_nettoie(["superadmin.php" => "w", "pulpit.php" => "r"]);
+            $sat   = wsm_profil_nettoie(["wysylka.php" => "w"]);
+            echo $fixes ? "pelne-ZLE" : "pelne-ok", " ",
+                 isset($plat["superadmin.php"]) ? "platforma-ZLE" : "platforma-ok", " ",
+                 (($sat["etykieta_dpd.php"] ?? "") === "w") ? "satelity-ok" : "satelity-ZLE";
+          ' 2>&1)
+          echo "  $POUT"
+          case "$POUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ NOT OK"; fail=1 ;;
+          esac
+
           if [ "$fail" = "0" ]; then echo "ALL RECORDER CHECKS OK"; else echo "RECORDER CHECK FAILED"; exit 1; fi
           REMOTE
 

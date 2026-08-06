@@ -318,5 +318,83 @@ if ($cAcc !== 200) {
 }
 @unlink($jarS);
 
+// ---------------------------------------------------------------------------
+//  LE JETON DU SÉLECTEUR DE PACZKOMAT — CE QU'IL DIT DE LUI-MÊME
+//
+//  « Brak dostępu, sprawdź czy token został wygenerowany dla odpowiedniej
+//  witryny. » Cette phrase est arrivée en production, dans la caisse, à la
+//  place de la carte. Elle ne nomme NI le site pour lequel la clé a été faite,
+//  NI celui qui sert la boutique — et elle recouvre trois causes distinctes.
+//
+//  On ne peut rien demander à InPost depuis ici. On n'en a pas besoin : la clé
+//  est un JWT, elle porte ses déclarations en clair. Les lire et les mettre en
+//  face de l'adresse réelle transforme un refus muet en une phrase qui dit
+//  quoi faire. Ce qui suit vérifie que chaque cause reçoit SA phrase — se
+//  tromper de cause enverrait régénérer une clé qui n'a rien à se reprocher.
+// ---------------------------------------------------------------------------
+echo "\n-- token mapy paczkomatów : co sam o sobie mówi --\n";
+
+$jwt = function (array $charge): string {
+    $b = fn($x) => rtrim(strtr(base64_encode((string) json_encode($x)), '+/', '-_'), '=');
+    return $b(['alg' => 'RS256', 'typ' => 'JWT']) . '.' . $b($charge) . '.podpis';
+};
+$pose = function (string $t) { wsm_config_overlay(['inpost' => ['geowidget_token' => $t]]); };
+
+// 1. Aucun jeton : la carte ne s'affiche pas, ce n'est pas une panne.
+$pose('');
+[$e1] = wsm_inpost_geo_verdict('sklep.mrszoko.pl');
+ok('sans jeton, on avertit sans crier à la panne', $e1 === 'uwaga', $e1);
+$pose('xxxx');
+[$e1b] = wsm_inpost_geo_verdict('sklep.mrszoko.pl');
+ok('« xxxx » compte pour un jeton absent', $e1b === 'uwaga', $e1b);
+
+// 2. La confusion la plus facile : coller la clé SERVEUR ShipX à la place.
+$pose('a1b2c3d4e5f6a7b8c9d0');
+[$e2, $p2] = wsm_inpost_geo_verdict('sklep.mrszoko.pl');
+ok('un jeton qui n\'est pas un JWT est signalé comme mauvais', $e2 === 'zle');
+ok('et la phrase nomme la confusion probable (ShipX)', str_contains($p2, 'ShipX'), $p2);
+
+// 3. Le jeton nomme un AUTRE site que celui qui sert la boutique. C'est le cas
+//    rencontré : une clé faite pour un domaine, une boutique servie sous un
+//    autre. La phrase doit citer LES DEUX, sinon elle n'aide pas.
+$pose($jwt(['exp' => time() + 86400, 'aud' => 'https://sklep.mrszoko.pl']));
+[$e3, $p3] = wsm_inpost_geo_verdict('185.180.206.46');
+ok('un jeton fait pour un autre site est signalé comme mauvais', $e3 === 'zle');
+ok('la phrase cite le site du jeton', str_contains($p3, 'sklep.mrszoko.pl'), $p3);
+ok('ET l\'adresse réelle de la boutique', str_contains($p3, '185.180.206.46'), $p3);
+
+// 4. Le même jeton, sur le bon site : rien à signaler.
+[$e4, $p4] = wsm_inpost_geo_verdict('sklep.mrszoko.pl');
+ok('sur le bon site, le jeton est déclaré valable', $e4 === 'ok', $p4);
+ok('le port ne fait pas échouer la comparaison — HTTP_HOST le porte, pas le jeton',
+   wsm_inpost_geo_verdict('sklep.mrszoko.pl:8093')[0] === 'ok');
+
+// Un joker de domaine doit être accepté, sinon on ferait régénérer une clé
+// parfaitement bonne.
+$pose($jwt(['exp' => time() + 86400, 'aud' => '*.mrszoko.pl']));
+ok('un joker « *.mrszoko.pl » couvre un sous-domaine',
+   wsm_inpost_geo_verdict('sklep.mrszoko.pl')[0] === 'ok');
+ok('mais pas un domaine étranger',
+   wsm_inpost_geo_verdict('sklep.autre.pl')[0] === 'zle');
+
+// 5. Expiré : même écran chez InPost, cause tout autre. Se tromper ici enverrait
+//    changer un domaine qui est déjà le bon.
+$pose($jwt(['exp' => time() - 86400, 'aud' => 'https://sklep.mrszoko.pl']));
+[$e5, $p5] = wsm_inpost_geo_verdict('sklep.mrszoko.pl');
+ok('un jeton expiré est signalé comme tel, pas comme un problème de domaine',
+   $e5 === 'zle' && str_contains($p5, 'wygasł'), $p5);
+
+// 6. Un JWT valide qui ne nomme aucun site : on ne prétend pas savoir.
+$pose($jwt(['exp' => time() + 86400, 'sub' => 'abc-123']));
+[$e6, $p6] = wsm_inpost_geo_verdict('sklep.mrszoko.pl');
+ok('sans site déclaré, on n\'affirme rien — on dit où regarder', $e6 === 'uwaga', $p6);
+ok('et on rappelle l\'adresse à vérifier', str_contains($p6, 'sklep.mrszoko.pl'), $p6);
+
+// 7. Ce qu'on lit n'autorise RIEN : un jeton illisible ne doit pas faire tomber
+//    la page qui l'affiche.
+ok('une chaîne quelconque ne casse pas la lecture', wsm_jwt_charge('nawet.nie.jwt') === []);
+ok('une chaîne vide non plus', wsm_jwt_charge('') === []);
+$pose('');
+
 echo "\n" . ($fail === 0 ? "OK — $pass assertions" : "ÉCHEC — $fail sur " . ($pass + $fail)) . "\n";
 exit($fail === 0 ? 0 : 1);

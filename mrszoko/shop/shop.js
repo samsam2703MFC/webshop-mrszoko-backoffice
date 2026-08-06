@@ -145,9 +145,22 @@
     geo.hidden = false;
 
     var souci = geo.querySelector('[data-geo-fail]');
+    var aide = geo.querySelector('[data-geo-help]');
 
     geo.querySelector('[data-geo-open]').addEventListener('click', function () {
       boite.hidden = !boite.hidden;
+      // LA SORTIE DE SECOURS SUIT LA CARTE, ET NE JUGE RIEN.
+      //
+      // Le repli plus bas ne se déclenche que si la carte n'arrive pas. Mais
+      // elle peut très bien arriver et refuser : « Brak dostępu, sprawdź czy
+      // token został wygenerowany dla odpowiedniej witryny » — le composant est
+      // défini, la boîte a sa hauteur, et rien ne bronche. Le client reste
+      // devant un refus sans savoir que le champ au-dessus marche toujours.
+      //
+      // On ne tente pas de lire leur message : il est chez eux, en trois
+      // langues, et il changera. On montre la sortie tant que la carte est
+      // ouverte — utile quand elle marche, salutaire quand elle refuse.
+      if (aide) aide.hidden = boite.hidden;
       if (boite.hidden) return;
 
       // LE SCRIPT D'INPOST VIENT D'UN AUTRE DOMAINE, ET IL ARRIVE QU'IL NE
@@ -169,6 +182,9 @@
         if (souci) souci.hidden = !vide;
         if (vide) {
           boite.hidden = true;
+          // Un seul message à la fois : le repli DIT déjà de taper le code,
+          // la note de secours le répéterait mot pour mot.
+          if (aide) aide.hidden = true;
           if (champ) champ.focus();
         }
       }, 1800);
@@ -193,6 +209,9 @@
         choisi.hidden = false;
       }
       boite.hidden = true;
+      // Le point est choisi : la carte se referme, et la note qui expliquait
+      // comment s'en passer n'a plus d'objet.
+      if (aide) aide.hidden = true;
     };
   }
 
