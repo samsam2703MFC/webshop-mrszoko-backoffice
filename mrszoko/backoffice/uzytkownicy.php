@@ -10,14 +10,15 @@
 //  garde-fous qu'un écran de gestion de comptes doit avoir :
 //
 //   1. ON NE SE VERROUILLE PAS DEHORS. Impossible de se désactiver soi-même,
-//      ni de retirer le dernier compte Centrala capable de se connecter.
+//      ni de retirer le dernier compte capable d'écrire et de se connecter.
 //      Sans cette règle, un clic malheureux ferme la console à tout le monde
 //      et il faut un accès SSH pour rentrer.
 //   2. UN MOT DE PASSE NE SE RELIT PAS. On le pose, on ne l'affiche jamais.
 //      Minimum dix caractères — le même plancher que le déploiement.
 //   3. TOUT CHANGEMENT EST DANS L'AUDIT, avec l'auteur réel.
 //
-//  Lecture : tout compte actif. Écriture : Centrala.
+//  Lecture : tout compte dont le rôle ouvre cet écran. Écriture : Administrator
+//  et Superadmin — et seul un Superadmin peut en désigner un autre.
 // ============================================================================
 declare(strict_types=1);
 
@@ -26,18 +27,26 @@ require_once __DIR__ . '/console.php';
 
 $flash = ''; $kind = 'ok';
 
-/** Les comptes actifs qui peuvent réellement se connecter avec le rôle siège. */
+/**
+ * Les comptes actifs qui peuvent réellement se connecter ET tout écrire.
+ *
+ * « Centrala » y figure encore : c'est l'ancien nom du rôle, et tant qu'une
+ * base n'a pas été migrée, ce sont ces comptes-là qui tiennent la porte.
+ * L'oublier ferait croire qu'il ne reste aucun administrateur, et bloquerait
+ * une modification parfaitement saine.
+ */
 function admins_restants(PDO $pdo, int $exceptId = 0): int {
     $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_users
-                          WHERE act = 1 AND role = ? AND password_hash IS NOT NULL AND password_hash <> ''
+                          WHERE act = 1 AND role IN (?, ?, 'Centrala')
+                            AND password_hash IS NOT NULL AND password_hash <> ''
                             AND id <> ?");
-    $st->execute([WSM_ROLE_ADMIN, $exceptId]);
+    $st->execute([WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN, $exceptId]);
     return (int) $st->fetchColumn();
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!$isAdmin) {
-        $flash = 'Tylko rola Centrala może zmieniać konta.'; $kind = 'err';
+        $flash = 'Twoja rola nie pozwala zmieniać kont.'; $kind = 'err';
     } else {
         $id    = (int) ($_POST['id'] ?? 0);
         $meId  = (int) ($me['id'] ?? 0);
@@ -50,7 +59,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $pass  = (string) ($_POST['password'] ?? '');
             $nom   = trim((string) ($_POST['nom'] ?? ''));
             $role  = (string) ($_POST['role'] ?? WSM_ROLE_ADMIN);
+            // Le rôle arrive du navigateur : on le repasse par la règle, pas
+            // par la liste déroulante qui l'a proposé.
+            if (!wsm_peut_donner_role($me, $role)) {
+                $flash = 'Nie możesz nadać roli ' . $role . '.'; $kind = 'err'; $role = '';
+            }
             try {
+                if ($role === '') throw new InvalidArgumentException($flash);
                 // La fonction renvoie un message d'exploitation en français ;
                 // l'écran est en polonais, on formule donc le nôtre.
                 $msg = wsm_set_password($pdo, $email, $pass, $role, $nom);
@@ -69,13 +84,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         } elseif (isset($_POST['zapisz'])) {
             $role = (string) ($_POST['role'] ?? $u['role']);
             $act  = empty($_POST['act']) ? 0 : 1;
+            $ecrit = in_array($role, [WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN], true);
 
-            // Les deux façons de fermer la porte derrière soi.
+            // Les trois façons de fermer la porte derrière soi.
             if ($id === $meId && $act === 0) {
                 $flash = 'Nie możesz wyłączyć własnego konta.'; $kind = 'err';
-            } elseif (($act === 0 || $role !== WSM_ROLE_ADMIN)
-                      && (string) $u['role'] === WSM_ROLE_ADMIN && admins_restants($pdo, $id) === 0) {
-                $flash = 'To ostatnie konto Centrali — po tej zmianie nikt nie wszedłby do konsoli.';
+            } elseif ($role !== (string) $u['role'] && !wsm_peut_donner_role($me, $role)) {
+                // Un Administrator ne se hisse pas Superadmin, et ne hisse
+                // personne : la facturation de la plateforme se garde d'un
+                // compte de la boutique, même compromis.
+                $flash = 'Nie możesz nadać roli ' . $role . '.'; $kind = 'err';
+            } elseif (($act === 0 || !$ecrit)
+                      && in_array((string) $u['role'], [WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN, 'Centrala'], true)
+                      && admins_restants($pdo, $id) === 0) {
+                $flash = 'To ostatnie konto z pełnym dostępem — po tej zmianie nikt nie wszedłby do konsoli.';
                 $kind = 'err';
             } else {
                 $pdo->prepare("UPDATE wsm_users SET nom = ?, role = ?, portee = ?, act = ? WHERE id = ?")
@@ -108,8 +130,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 $users = $pdo->query("SELECT * FROM wsm_users ORDER BY act DESC, role, nom")->fetchAll() ?: [];
-$roles = [WSM_ROLE_ADMIN => 'Centrala — pełny dostęp, może zmieniać dane',
-          'Franczyza'    => 'Franczyza — tylko podgląd'];
+// Les rôles proposés, et RIEN de plus : « Superadmin » n'apparaît que dans la
+// liste d'un Superadmin. Le refus vit aussi côté serveur
+// (wsm_peut_donner_role) — une liste déroulante n'est pas un contrôle
+// d'accès, elle se modifie dans le navigateur en quinze secondes.
+$roles = [];
+foreach (wsm_roles() as $r => $def) {
+    if (wsm_peut_donner_role($me, $r)) $roles[$r] = (string) ($def['aide'] ?? $r);
+}
 $now = time();
 
 console_head('Użytkownicy', $me, <<<'CSS'
@@ -149,7 +177,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Użytkownicy' => null]);
         <?php if ((int) $u['id'] === (int) ($me['id'] ?? 0)): ?> <span class="tag">to Ty</span><?php endif; ?>
         <br><span class="em"><?= h((string) $u['email']) ?></span>
       </span>
-      <span class="tag <?= (string) $u['role'] === WSM_ROLE_ADMIN ? 'ok' : '' ?>"><?= h((string) $u['role']) ?></span>
+      <span class="tag <?= in_array((string) $u['role'], [WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN], true) ? 'ok' : '' ?>"><?= h((string) $u['role']) ?></span>
       <?php if (!$u['act']): ?><span class="tag bad">wyłączone</span><?php endif; ?>
       <?php if ($noPass): ?><span class="tag no">bez hasła</span><?php endif; ?>
       <?php if ($locked): ?><span class="tag bad">zablokowane</span><?php endif; ?>

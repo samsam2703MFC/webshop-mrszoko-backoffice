@@ -24,7 +24,103 @@ const WSM_SESSION_IDLE     = 28800;  // 8 h sans activité → session expirée
 const WSM_LOGIN_MAX_TRIES  = 5;      // échecs avant verrouillage du compte
 const WSM_LOGIN_LOCK       = 900;    // 15 min de verrouillage
 const WSM_PASSWORD_MIN     = 10;
-const WSM_ROLE_ADMIN       = 'Centrala';
+// ---------------------------------------------------------------------------
+//  LES RÔLES DE LA CONSOLE
+//
+//  Ils décrivent une boutique en ligne qui vend du chocolat, pas un réseau de
+//  franchise : « Centrala » et « Franczyza » venaient de la maquette d'origine
+//  et ne nommaient le métier de personne. Surtout, l'ancien modèle était
+//  BINAIRE — Centrala écrivait tout, Franczyza ne lisait que tout — ce qui
+//  oblige à donner les clés de la facturation à quelqu'un qui doit seulement
+//  imprimer des étiquettes.
+//
+//  Chaque rôle porte donc la liste des écrans qu'il peut OUVRIR, et pour
+//  chacun s'il peut y ÉCRIRE. Un écran hors de la liste disparaît du rail et
+//  répond 403 : cacher un lien n'est pas une protection, la page se garde
+//  elle-même.
+//
+//  'w' = ouvrir et modifier · 'r' = ouvrir en lecture seule · '*' = tous.
+// ---------------------------------------------------------------------------
+const WSM_ROLE_ADMIN      = 'Administrator';
+const WSM_ROLE_SUPERADMIN = 'Superadmin';
+
+/**
+ * L'ancien vocabulaire, et ce qu'il devient. Sert à la migration des comptes
+ * existants et à ne pas éjecter quelqu'un dont la ligne n'a pas encore été
+ * réécrite : une session ouverte sur « Centrala » doit continuer de marcher.
+ */
+const WSM_ROLES_ANCIENS = ['Centrala' => WSM_ROLE_ADMIN, 'Franczyza' => 'Podgląd'];
+
+function wsm_roles(): array {
+    // Les écrans « métier » de chaque rôle. Les impressions (…_druk.php) et
+    // l'étiquette InPost suivent l'écran qui les ouvre.
+    $vente  = ['zamowienia.php' => 'w', 'zamowienie_druk.php' => 'w', 'subskrypcje.php' => 'w',
+               'klienci.php' => 'w', 'kontrahenci.php' => 'w', 'poczta.php' => 'w',
+               'przypomnienia.php' => 'w', 'kampanie.php' => 'w', 'zgloszenia.php' => 'w',
+               'rabaty.php' => 'w', 'produkty.php' => 'r', 'faktury.php' => 'r', 'pulpit.php' => 'r'];
+    $stock  = ['wysylka.php' => 'w', 'magazyn.php' => 'w', 'magazyn_druk.php' => 'w',
+               'etykieta_druk.php' => 'w', 'etykieta_inpost.php' => 'w', 'produkty.php' => 'w',
+               'zamowienia.php' => 'r', 'zamowienie_druk.php' => 'r', 'pulpit.php' => 'r'];
+    $compta = ['faktury.php' => 'w', 'faktura_druk.php' => 'w', 'ksef.php' => 'w',
+               'kontrahenci.php' => 'w', 'zamowienia.php' => 'r', 'klienci.php' => 'r',
+               'zgloszenia.php' => 'r', 'pulpit.php' => 'r'];
+
+    return [
+        // Le propriétaire de la plateforme. Seul rôle qui ouvre l'écran de
+        // facturation de la plateforme — et seul rôle qui peut l'attribuer
+        // (voir wsm_peut_donner_role) : sinon un Administrator compromis se
+        // hisserait tout seul jusqu'à sa propre facture.
+        WSM_ROLE_SUPERADMIN => ['ecrans' => '*', 'ecrit' => true, 'super' => true,
+            'aide' => 'Superadmin — tout, y compris la facturation de la plateforme'],
+        WSM_ROLE_ADMIN => ['ecrans' => '*', 'ecrit' => true,
+            'aide' => 'Administrator — toute la boutique, sauf la plateforme'],
+        'Sprzedaż' => ['ecrans' => $vente,
+            'aide' => 'Sprzedaż — zamówienia, klienci, poczta, zgłoszenia, rabaty'],
+        'Magazyn' => ['ecrans' => $stock,
+            'aide' => 'Magazyn — wysyłka, stany, produkty i etykiety'],
+        'Księgowość' => ['ecrans' => $compta,
+            'aide' => 'Księgowość — faktury, KSeF, dane kontrahentów'],
+        // Lecture seule PARTOUT sauf les écrans qui donnent les clés : les
+        // comptes et les réglages (jetons, mots de passe) ne se regardent pas
+        // « juste pour voir ».
+        'Podgląd' => ['ecrans' => '*', 'ecrit' => false, 'sauf' => ['uzytkownicy.php', 'ustawienia.php'],
+            'aide' => 'Podgląd — wszystko do czytania, nic do zmiany'],
+    ];
+}
+
+/** Le rôle d'un compte, ancien vocabulaire compris. */
+function wsm_role_de(?array $u): string {
+    $r = trim((string) ($u['role'] ?? ''));
+    if (!empty($u['service'])) return WSM_ROLE_ADMIN;      // jeton de service
+    $r = WSM_ROLES_ANCIENS[$r] ?? $r;
+    return isset(wsm_roles()[$r]) ? $r : 'Podgląd';        // rôle inconnu = le moins permissif
+}
+
+/**
+ * Le droit d'un compte sur un écran : 'w', 'r' ou '' (interdit).
+ *
+ * Un écran absent de la liste d'un rôle n'est pas « à voir plus tard » : il
+ * est fermé. C'est le sens de la liste — on énumère ce qu'on ouvre, jamais ce
+ * qu'on ferme, sinon chaque écran livré serait ouvert à tous par défaut.
+ */
+function wsm_droit_ecran(?array $u, string $ecran): string {
+    $role = wsm_role_de($u);
+    $def  = wsm_roles()[$role] ?? [];
+    if (in_array($ecran, (array) ($def['sauf'] ?? []), true)) return '';
+    if (($def['ecrans'] ?? null) === '*') {
+        if ($ecran === 'superadmin.php' && empty($def['super'])) return '';
+        return !empty($def['ecrit']) ? 'w' : 'r';
+    }
+    $d = (array) ($def['ecrans'] ?? []);
+    return (string) ($d[$ecran] ?? '');
+}
+
+/** Qui peut attribuer quel rôle. Seul un Superadmin fabrique un Superadmin. */
+function wsm_peut_donner_role(?array $u, string $role): bool {
+    if (wsm_droit_ecran($u, 'uzytkownicy.php') !== 'w') return false;
+    if ($role === WSM_ROLE_SUPERADMIN) return wsm_role_de($u) === WSM_ROLE_SUPERADMIN;
+    return isset(wsm_roles()[$role]);
+}
 
 /** La requête courante arrive-t-elle en HTTPS (y compris derrière un proxy) ? */
 function wsm_is_https(): bool {
@@ -108,10 +204,24 @@ function wsm_require_read(PDO $pdo): array {
     return $u;
 }
 
-/** Exige en plus le rôle siège pour écrire. 403 si simplement authentifié. */
+/**
+ * Exige un rôle qui écrit PARTOUT. 403 si simplement authentifié.
+ *
+ * L'API n'a pas d'écran, donc pas de périmètre à appliquer : elle ne peut pas
+ * dire « cette route appartient au magasin ». Elle reste donc réservée aux
+ * deux rôles complets, et les rôles métier passent par les écrans, qui
+ * connaissent, eux, le leur.
+ *
+ * Le rôle est lu par wsm_role_de() et pas comparé à la main : un compte encore
+ * en « Centrala » — base non migrée, session déjà ouverte — doit continuer de
+ * travailler. Comparer la chaîne brute l'aurait éjecté au premier
+ * déploiement, et c'est exactement ce qui est arrivé au test d'authentification
+ * avant cette ligne.
+ */
 function wsm_require_write(PDO $pdo): array {
     $actor = wsm_require_read($pdo);
-    if (empty($actor['service']) && ($actor['role'] ?? '') !== WSM_ROLE_ADMIN) {
+    if (empty($actor['service'])
+        && !in_array(wsm_role_de($actor), [WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN], true)) {
         wsm_fail('forbidden_role', 403);
     }
     return $actor;
@@ -169,7 +279,11 @@ function wsm_public_user(array $u): array {
         'email'  => $u['email'] ?? '',
         'role'   => $u['role'] ?? '',
         'portee' => $u['portee'] ?? '',
-        'admin'  => ($u['role'] ?? '') === WSM_ROLE_ADMIN || !empty($u['service']),
+        // L'API n'a pas d'écran : « admin » y veut dire « peut écrire ».
+        // Seuls les deux rôles qui écrivent partout l'obtiennent — un rôle
+        // métier passe par les écrans, qui appliquent SON périmètre.
+        'admin'  => !empty($u['service'])
+                    || in_array(wsm_role_de($u), [WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN], true),
     ];
 }
 

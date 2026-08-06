@@ -44,6 +44,18 @@ if (in_array('--rebrand-sql', $args, true)) {
     }
     exit(0);
 }
+// Les rôles : « Centrala » et « Franczyza » venaient de la maquette de
+// franchise et ne nommaient le métier de personne. Le nouveau vocabulaire vit
+// dans auth.php (WSM_ROLES_ANCIENS) ; on le rejoue ici sur les comptes déjà en
+// base. Idempotent, et sans effet sur un compte déjà migré.
+if (in_array('--roles-sql', $args, true)) {
+    require_once __DIR__ . '/seed.php';          // wsm_sql_txt()
+    foreach (WSM_ROLES_ANCIENS as $avant => $apres) {
+        echo 'UPDATE wsm_users SET role = ' . wsm_sql_txt($apres)
+           . ' WHERE role = ' . wsm_sql_txt($avant) . ";\n";
+    }
+    exit(0);
+}
 if (in_array('--sync-content-sql', $args, true)) {
     require_once __DIR__ . '/seed.php';
     echo wsm_sync_content_sql();
