@@ -83,6 +83,25 @@ if (is_file($API . '/inpost.php')) {
     else gene('InPost nieskonfigurowany', 'Ustawienia › wysyłka — paczki nadajesz ręcznie, ekran Wysyłka pokazuje które');
 } else { saute('InPost', 'brak pliku inpost.php'); }
 
+// KSeF : gênant, pas bloquant — et il faut le dire dans cet ordre. Le
+// commerce fonctionne sans lui aujourd'hui : les factures s'émettent, se
+// numérotent et s'envoient. Ce qui manque, c'est le dépôt AUTOMATIQUE au
+// registre ; l'écran KSeF construit le XML FA(2) et on le dépose à la main.
+// Le classer bloquant noierait les vrais blocages ; le taire ferait
+// découvrir le sujet le jour de la bascule, avec des centaines de factures
+// en retard.
+if (is_file($API . '/ksef.php')) {
+    require_once $API . '/ksef.php';
+    if (wsm_ksef_enabled()) {
+        bien('KSeF skonfigurowany — faktury idą do rejestru same');
+    } else {
+        $n = wsm_ksef_poza_rejestrem($pdo);
+        gene('KSeF nieskonfigurowany' . ($n > 0 ? " — $n faktur poza rejestrem" : ''),
+             'ekran KSeF — XML FA(2) pobierzesz i złożysz ręcznie; brakuje: '
+             . implode(', ', array_map(fn($s) => explode(' —', $s)[0], wsm_ksef_manquants())));
+    }
+} else { saute('KSeF', 'brak pliku ksef.php'); }
+
 // La poste : sans elle, aucun message ne sort de la file.
 if (is_file($API . '/mail.php')) {
     require_once $API . '/mail.php';
