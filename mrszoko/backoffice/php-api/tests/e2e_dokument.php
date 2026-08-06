@@ -190,7 +190,52 @@ ok('son état n\'a pas bougé', $st->fetchColumn() === 'anulowane');
 // Une commande inexistante ne fabrique rien.
 ok('un identifiant inconnu ne fait rien', wsm_order_status_set($pdo, 999999999, 'wyslane')['ok'] === false);
 
-// ---- 6. Un e-paragon ne va JAMAIS au registre national ---------------------
+// ---- 6. VIES est RECONSULTÉ avant d'émettre --------------------------------
+echo "\n-- VIES sprawdzany ponownie tuż przed wystawieniem --\n";
+// LE CAS QUI COÛTE. Un numéro valable à la commande, révoqué avant
+// l'expédition : facturer en autoliquidation laisse la TVA à la charge du
+// vendeur. Le contrôle doit donc dater de la LIVRAISON, pas de la commande.
+require_once dirname(__DIR__) . '/vies.php';
+$o7 = $mk(['company' => 'Müller GmbH', 'vat_eu' => 'DE811569869',
+           'vat_status' => 'valid', 'invoice' => 1]);
+ok('à la commande, le numéro est marqué valide',
+   strtolower((string) ($o7['vat']['status'] ?? '')) === 'valid', $o7['vat'] ?? []);
+
+// VIES répond « révoqué » au moment de l'expédition.
+wsm_vies_transport(fn(string $c, string $n) => [200, ['isValid' => false,
+    'name' => '', 'address' => '', 'requestIdentifier' => 'WAPIAAAAX0000']]);
+$chg7 = wsm_order_status_set($pdo, (int) $o7['id'], 'wyslane', 'test');
+$apres7 = wsm_order_by_id($pdo, (int) $o7['id']);
+ok('le statut de la commande a été RÉÉCRIT par la consultation du jour',
+   strtolower((string) ($apres7['vat']['status'] ?? '')) === 'invalid', $apres7['vat'] ?? []);
+ok('et le document émis est un PARAGON, pas une facture',
+   (wsm_invoice_for_order($pdo, (int) $o7['id'])['kind'] ?? '') === 'paragon', $chg7['note']);
+ok('la date de contrôle est celle du jour',
+   str_starts_with((string) ($apres7['vat']['checked_at'] ?? ''), date('Y-m-d')),
+   $apres7['vat']['checked_at'] ?? '');
+ok('le numéro de consultation est gardé — c\'est LUI la preuve en contrôle',
+   trim((string) ($apres7['vat']['consultation'] ?? '')) !== '', $apres7['vat'] ?? []);
+
+// Une panne de VIES ne doit RIEN effacer ni bloquer l'expédition.
+$o8 = $mk(['company' => 'Müller GmbH', 'vat_eu' => 'DE811569869',
+           'vat_status' => 'valid', 'invoice' => 1]);
+wsm_vies_transport(fn(string $c, string $n) => [503, null]);
+$chg8 = wsm_order_status_set($pdo, (int) $o8['id'], 'wyslane', 'test');
+$apres8 = wsm_order_by_id($pdo, (int) $o8['id']);
+ok('VIES en panne : l\'expédition passe quand même', $chg8['ok'] === true, $chg8);
+ok('et le statut d\'avant n\'est PAS effacé',
+   strtolower((string) ($apres8['vat']['status'] ?? '')) === 'valid', $apres8['vat'] ?? []);
+ok('le document reste une facture', (wsm_invoice_for_order($pdo, (int) $o8['id'])['kind'] ?? '') === 'faktura',
+   $chg8['note']);
+
+// Une commande sans numéro UE ne déclenche aucune consultation.
+$appels = 0;
+wsm_vies_transport(function (string $c, string $n) use (&$appels) { $appels++; return [503, null]; });
+$o9 = $mk(['invoice' => 0]);
+wsm_order_status_set($pdo, (int) $o9['id'], 'wyslane', 'test');
+ok('sans numéro UE, VIES n\'est pas dérangé', $appels === 0, $appels);
+
+// ---- 7. Un e-paragon ne va JAMAIS au registre national ---------------------
 echo "\n-- paragon nie idzie do KSeF --\n";
 // Déposer un e-paragon inscrirait au registre un document qui n'existe pas
 // pour le fisc. On ne s'en remet pas au refus de KSeF : on n'y va pas.

@@ -124,7 +124,13 @@ function wsm_vies_interpret(int $httpCode, $res): array {
         ];
     }
     if ($err === 'INVALID' || ($httpCode === 200 && array_key_exists('isValid', $res) && $res['isValid'] === false && $err === '')) {
-        return ['status' => 'invalid', 'reason' => 'numer nieznany w VIES'];
+        // LE NUMÉRO DE CONSULTATION COMPTE AUSSI POUR UN REFUS — et sans doute
+        // plus. Il prouve qu'on a vérifié le jour de la livraison, donc qu'on
+        // avait raison de NE PAS appliquer l'autoliquidation. Il n'était gardé
+        // que sur la réponse positive : la preuve manquait exactement dans le
+        // cas où l'on aurait à s'expliquer.
+        return ['status' => 'invalid', 'reason' => 'numer nieznany w VIES',
+                'consultation' => (string) ($res['requestIdentifier'] ?? '')];
     }
     if ($err === 'INVALID_INPUT') {
         return ['status' => 'invalid', 'reason' => 'nieprawidłowy format numeru'];

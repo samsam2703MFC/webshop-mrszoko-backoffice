@@ -19,6 +19,10 @@ require_once $API . '/tpay.php';
 require_once $API . '/inpost.php';
 require_once $API . '/mail.php';
 require_once $API . '/stock.php';
+// wsm_invoice_kind_for() : l'écran annonce QUEL document partira au passage à
+// « wysłane ». Sans ce require, le function_exists() plus bas répondrait non et
+// la ligne disparaîtrait en silence — le pire des deux mondes.
+require_once $API . '/invoice.php';
 
 $flash = ''; $flashKind = 'ok';
 
@@ -136,6 +140,40 @@ console_crumbs($detail
         <dt>E-mail</dt><dd><?= h($o['email']) ?></dd>
         <dt>Telefon</dt><dd><?= h($o['phone']) ?></dd>
         <?php if ($o['invoice']): ?><dt>Faktura</dt><dd>NIP <?= h($o['nip']) ?><br><?= h($o['bill']['street'] . ' ' . $o['bill']['building']) ?>, <?= h($o['bill']['postcode'] . ' ' . $o['bill']['city']) ?></dd><?php endif; ?>
+        <?php
+        // ─── VIES : L'ÉTAT DU NUMÉRO, ET CE QU'IL ENTRAÎNE ────────────────
+        //
+        // Sans cette ligne, on ne savait pas — avant l'expédition — si la
+        // commande partirait avec une facture ou un e-paragon. On le
+        // découvrait après, dans Faktury. Or c'est AVANT que ça se corrige :
+        // un numéro refusé se discute avec le client pendant qu'on prépare le
+        // colis, pas une fois le document déposé au registre national.
+        //
+        // Le numéro de CONSULTATION est affiché parce que c'est lui la preuve
+        // en contrôle fiscal — pas la date, pas le nom.
+        $vs = strtolower((string) ($o['vat_status'] ?? ($o['vat']['status'] ?? '')));
+        $ve = trim((string) ($o['vat_eu'] ?? ''));
+        if ($ve !== '' || $vs !== ''):
+          $et = ['valid' => ['ok',  'VIES: potwierdzony'],
+                 'invalid' => ['no', 'VIES: ODRZUCONY — będzie paragon'],
+                 'unavailable' => ['', 'VIES: niedostępny'],
+                 'skipped' => ['',    'VIES: niesprawdzony']][$vs] ?? ['', 'VIES: niesprawdzony'];
+          $doc = function_exists('wsm_invoice_kind_for') ? wsm_invoice_kind_for($o) : null; ?>
+        <dt>VIES</dt>
+        <dd><span class="tag <?= h($et[0]) ?>"><?= h($et[1]) ?></span>
+          <?php if ($ve !== ''): ?><br><span class="code"><?= h($ve) ?></span><?php endif; ?>
+          <?php if (($o['vat']['checked_at'] ?? $o['vat_checked_at'] ?? '') !== ''): ?>
+            <br><small class="muted">sprawdzono <?= h((string) ($o['vat']['checked_at'] ?? $o['vat_checked_at'])) ?></small>
+          <?php endif; ?>
+          <?php if (($o['vat']['consultation'] ?? $o['vat_consultation'] ?? '') !== ''): ?>
+            <br><small class="muted">nr konsultacji <span class="code"><?= h((string) ($o['vat']['consultation'] ?? $o['vat_consultation'])) ?></span></small>
+          <?php endif; ?>
+          <?php if ($doc): ?>
+            <br><small class="muted">Przy „wysłane": <b><?= h($doc['kind']) ?></b> — <?= h($doc['raison']) ?>.
+              VIES zostanie sprawdzony ponownie tuż przed wystawieniem.</small>
+          <?php endif; ?>
+        </dd>
+        <?php endif; ?>
         <dt>Dostawa</dt><dd><?= h($o['delivery_method']) ?><?= $o['inpost_point'] !== '' ? ' · ' . h($o['inpost_point']) : '' ?>
           <?php if ($o['delivery_method'] === 'inpost_courier'): ?><br><?= h($o['ship']['street'] . ' ' . $o['ship']['building']) ?>, <?= h($o['ship']['postcode'] . ' ' . $o['ship']['city']) ?><?php endif; ?></dd>
         <dt>Paczka</dt><dd><?= number_format($o['weight_g'] / 1000, 2, ',', ' ') ?> kg · gabaryt <?= h($o['parcel_template'] ?: '—') ?>
