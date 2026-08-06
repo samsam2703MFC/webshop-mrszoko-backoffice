@@ -241,15 +241,39 @@ jobs:
           DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
           API="$DIR/backoffice/api"
 
-          # ── Libellés de démonstration : L'Atelier → Mister Szoko dans la base
-          # déjà seedée. Idempotent (plus rien à remplacer une fois passé).
-          (cd "$API" && php migrate.php --rebrand) || echo 'rebranding ignoré'
+          # ── Rebranding et contenu éditorial, PAR DU SQL ÉMIS.
+          #
+          # Ces deux passages appelaient `php migrate.php --rebrand` et
+          # `--sync-content`. Le php en ligne de commande de ce serveur n'a pas
+          # pdo_mysql — l'étape de vérification le mesure et l'écrit à chaque
+          # déploiement — donc ils ne faisaient RIEN, et le `|| echo` avalait
+          # l'échec. Des déploiements verts qui ne synchronisaient rien.
+          #
+          # Émettre du SQL ne demande aucune base : le serveur produit le
+          # script, le client mysql l'exécute. Le travail reste décrit une
+          # seule fois (seed.php) et rendu de deux façons, plutôt que réécrit
+          # en SQL à côté — deux listes auraient divergé au premier libellé
+          # ajouté, et c'est la version de production qu'on ne relit jamais.
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            # Rebranding : --force, parce que wsm_params peut ne pas exister
+            # sur une base récente. La voie PHP tolère déjà l'absence table par
+            # table ; on garde la même indulgence, pas plus.
+            (cd "$API" && php migrate.php --rebrand-sql) \
+              | mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 --force mrszoko 2>/dev/null \
+              && echo 'rebranding : joué' \
+              || echo 'ATTENTION : rebranding échoué'
 
-          # ── Contenu éditorial livré depuis le dernier déploiement : on AJOUTE
-          # les libellés manquants (nouveau bouton, nouvelle page) sans toucher
-          # à ceux que la console a modifiés. Sans ce passage, un texte livré
-          # dans le code resterait vide sur une base déjà seedée.
-          (cd "$API" && php migrate.php --sync-content) || echo 'synchronisation du contenu ignorée'
+            # Contenu : PAS de --force. Une erreur ici doit se voir, sinon on
+            # retombe exactement dans le silence qu'on vient de réparer.
+            # INSERT IGNORE porte la règle : la clé primaire est (lang, k),
+            # donc un libellé retouché en console est laissé intact.
+            (cd "$API" && php migrate.php --sync-content-sql) \
+              | mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko \
+              && echo 'contenu éditorial : synchronisé' \
+              || echo 'ATTENTION : synchronisation du contenu échouée'
+          else
+            echo 'ATTENTION : mysql injoignable — rebranding et contenu NON synchronisés'
+          fi
 
           # ── Boutiques belges de démonstration. La maquette en peuplait cinq,
           # avec chiffre d'affaires et taux d'adoption : le décor d'une démo de
@@ -815,6 +839,55 @@ jobs:
 
           if [ "$fail" = "0" ]; then echo "ALL DB CHECKS OK"; else echo "DB CHECK FAILED"; exit 1; fi
           REMOTE
+
+      - name: Verify bootstrap actually changed the database
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
+          fail=0
+          # CE QUE L'AMORÇAGE A RÉELLEMENT CHANGÉ EN BASE. Étape à part parce
+          # que « Verify database » frôlait les 18 500 caractères et que
+          # l'outil de garde disait de scinder — au-delà de 21 000, GitHub
+          # rejette le fichier EN SILENCE, ce qui a déjà coûté cinq
+          # déploiements. Elle est de toute façon d'une autre nature : les
+          # autres contrôles décrivent la FORME de la base (tables, colonnes,
+          # index) ; celui-ci vérifie qu'un GESTE a bien eu lieu.
+          #
+          # Ces deux passages ont tourné DANS LE VIDE pendant des semaines sans
+          # que rien ne le dise. On mesure donc le résultat, pas l'exécution.
+          RESTE=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT (SELECT COUNT(*) FROM wsm_shops WHERE nom LIKE '%L''Atelier%')
+                  + (SELECT COUNT(*) FROM wsm_users WHERE email LIKE '%@latelierby.be%');" 2>/dev/null || echo ZLE)
+          case "$RESTE" in
+            0)   echo "  libellés L'Atelier restants : aucun (rebranding confirmé)" ;;
+            ZLE) echo "  ^ ATTENTION : rebranding non vérifiable"; fail=1 ;;
+            *)   echo "  ^ ZLE : $RESTE ligne(s) portent encore L'Atelier — le rebranding n'a pas tourné"; fail=1 ;;
+          esac
+
+          # Le contenu livré par les fichiers doit être EN BASE. Le nombre
+          # attendu est lu dans les fichiers eux-mêmes (aucune base requise),
+          # puis comparé au réel. « Au moins » et pas « exactement » : la
+          # console peut légitimement avoir ajouté des libellés à la main.
+          for PAIRE in $(cd "$API" && php migrate.php --content-count 2>/dev/null); do
+            T="${PAIRE%%=*}"; ATT="${PAIRE##*=}"
+            REEL=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e "SELECT COUNT(*) FROM $T;" 2>/dev/null || echo ZLE)
+            case "$REEL" in
+              ZLE) echo "  ^ ATTENTION : $T illisible"; fail=1 ;;
+              *) if [ "${REEL:-0}" -ge "${ATT:-0}" ]; then
+                   echo "  $T : $REEL en base pour $ATT livrés"
+                 else
+                   echo "  ^ ZLE : $T n'a que $REEL lignes pour $ATT livrés — contenu non synchronisé"; fail=1
+                 fi ;;
+            esac
+          done
+
+          if [ "$fail" = "0" ]; then echo "ALL BOOTSTRAP EFFECTS OK"; else echo "BOOTSTRAP EFFECTS FAILED"; exit 1; fi
+          REMOTE
+
 
       - name: Verify business rules (pure logic, no DB)
         env:

@@ -20,6 +20,51 @@ require __DIR__ . '/delivery.php';   // wsm_audit(), utilisé par auth.php
 require __DIR__ . '/auth.php';
 
 $args = array_slice($argv, 1);
+
+// ---- Voies « j'émets du SQL » (sortie immédiate, AUCUNE base) --------------
+//
+// POURQUOI ELLES EXISTENT. Le php en ligne de commande du serveur de
+// production n'a pas pdo_mysql — l'étape de vérification du déploiement le
+// mesure et l'écrit à chaque passage. `php migrate.php --rebrand` et
+// `--sync-content` n'y ont donc JAMAIS rien fait, et leur échec était avalé
+// par un `|| echo` : des déploiements verts qui ne synchronisaient rien.
+//
+// Émettre du SQL ne demande aucune connexion. Le serveur peut donc produire
+// le script, et le client mysql — qui, lui, marche là-bas — l'exécute. Le
+// travail est décrit UNE fois (seed.php) et rendu de deux façons, plutôt que
+// réécrit en SQL à côté, ce qui aurait dérivé au premier champ ajouté.
+//
+// Ces deux branches passent AVANT wsm_pdo() : appeler la base ici échouerait
+// justement sur le serveur qu'on cherche à servir.
+if (in_array('--rebrand-sql', $args, true)) {
+    require_once __DIR__ . '/seed.php';          // wsm_sql_txt()
+    foreach (wsm_rebrand_ops() as [$t, $c, $from, $to]) {
+        echo "UPDATE $t SET $c = REPLACE($c, " . wsm_sql_txt($from) . ', ' . wsm_sql_txt($to) . ')'
+           . " WHERE $c LIKE CONCAT('%', " . wsm_sql_txt($from) . ", '%');\n";
+    }
+    exit(0);
+}
+if (in_array('--sync-content-sql', $args, true)) {
+    require_once __DIR__ . '/seed.php';
+    echo wsm_sync_content_sql();
+    exit(0);
+}
+
+/**
+ * Combien de libellés les fichiers de contenu livrent, sans toucher à la base.
+ * Sert au déploiement à VÉRIFIER que la synchronisation a bien eu lieu : un
+ * compte attendu, comparé au compte réel, plutôt qu'une étape verte.
+ */
+if (in_array('--content-count', $args, true)) {
+    require_once __DIR__ . '/seed.php';
+    $l = wsm_content_livre();
+    $par = [];
+    foreach ($l['i18n'] as [$t, , , ]) $par[$t] = ($par[$t] ?? 0) + 1;
+    foreach ($par as $t => $n) echo "$t=$n\n";
+    echo 'wsm_shipping_methods=' . count($l['ship']) . "\n";
+    exit(0);
+}
+
 $fresh = in_array('--fresh', $args, true);
 $seed = !in_array('--no-seed', $args, true);
 $cfg = wsm_config();
@@ -42,14 +87,24 @@ if (in_array('--sync-content', $args, true)) {
 // passage les réécrit en place. Idempotent : une fois exécuté, REPLACE() ne
 // trouve plus rien à remplacer. Ne touche qu'à des libellés d'affichage —
 // aucun identifiant, aucune clé technique.
-if (in_array('--rebrand', $args, true)) {
-    $pdo = wsm_bootstrap();
-    $ops = [
+/**
+ * Les libellés de démonstration à réécrire, et rien d'autre : aucun
+ * identifiant, aucune clé technique. Sortis en fonction pour que la voie
+ * exécutée et la voie SQL décrivent LE MÊME travail — deux listes auraient
+ * divergé, et c'est celle de production qu'on ne relit jamais.
+ */
+function wsm_rebrand_ops(): array {
+    return [
         ["wsm_shops",    "nom",   "L'Atelier — ", "Mister Szoko — "],
         ["wsm_products", "nom",   "— L'Atelier",  "— Mister Szoko"],
         ["wsm_users",    "email", "@latelierby.be", "@misterszoko.com"],
         ["wsm_params",   "val",   "aide.latelierby.be", "pomoc.misterszoko.com"],
     ];
+}
+
+if (in_array('--rebrand', $args, true)) {
+    $pdo = wsm_bootstrap();
+    $ops = wsm_rebrand_ops();
     $total = 0;
     foreach ($ops as [$t, $c, $from, $to]) {
         try {
