@@ -190,9 +190,25 @@ for e in login.php zamowienia.php superadmin.php dostawa.php; do
   C=$(curl -skL -o /dev/null -w '%{http_code}' "$BOU/$e")
   [ "$C" = 200 ] && echo "  $e : 200" || { echo "  ^ ZLE : $e odpowiada $C"; fail=1; }
 done
-curl -skL "$BOU/console.css" | grep -q '\.etap' \
-  && echo "  console.css ze stylem etapów : dojechał" \
-  || { echo "  ^ ZLE : console.css bez stylu etapów — przyciski będą za małe"; fail=1; }
+# PAS DE TUBE ICI, ET C'EST TOUT LE SUJET.
+#
+# Écrit « curl … | grep -q », ce contrôle a déclaré le style ABSENT alors que
+# le fichier était parfaitement servi. grep -q s'arrête au PREMIER motif
+# trouvé ; curl, lui, a encore 26 Ko à écrire, reçoit un SIGPIPE et meurt en
+# 141 ; et `set -o pipefail` — plus haut, et à juste titre — promeut cette
+# mort en échec du tube. Le motif était là, le contrôle disait non.
+#
+# Le piège ne se voit pas sur un petit fichier : quand tout tient dans le
+# tampon du tube (64 Ko), le producteur a fini d'écrire avant que grep ne
+# sorte, et le contrôle passe. Il ne mord QUE sur un flux réel — c'est-à-dire
+# uniquement en production.
+#
+# On lit donc la réponse dans une variable, comme les contrôles voisins.
+CSS=$(curl -skL "$BOU/console.css" || true)
+case "$CSS" in
+  *".etap"*) echo "  console.css ze stylem etapów : dojechał";;
+  *) echo "  ^ ZLE : console.css bez stylu etapów — przyciski będą za małe"; fail=1;;
+esac
 
 echo
 if [ "$fail" = 0 ]; then
