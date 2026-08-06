@@ -181,6 +181,48 @@ $_SERVER['REMOTE_ADDR'] = '198.51.100.' . random_int(2, 250);
 [$idAutre] = wsm_contact_submit($pdo, $bon(['email' => "autre.$sfx@example.com"]));
 ok('une autre IP passe toujours — le plafond n\'est pas global', $idAutre !== null);
 
+// ---- 8. LA PORTE B2B DE L'ACCUEIL -----------------------------------------------------
+//
+// Le bloc « B2B ? Mamy dla Ciebie lepsze ceny » ne fait plus ouvrir un client
+// de messagerie : il mène ICI, avec le sujet déjà posé. La première version
+// passait le LIBELLÉ du sujet (« Konto B2B — Mister Szoko ») ; le formulaire ne
+// sait présélectionner qu'un CODE de la liste, le libellé était donc ignoré en
+// silence — le lien marchait, le bouton s'illuminait, et la demande arrivait
+// classée « inne » au milieu du tout-venant. Rien ne l'aurait montré avant de
+// dépouiller la Poczta.
+echo "\n-- wejście B2B ze strony głównej --\n";
+$_SERVER['REMOTE_ADDR'] = '203.0.113.' . random_int(2, 250);
+
+// php-api/tests → php-api → backoffice → mrszoko, puis la boutique. Le
+// déploiement renomme php-api en api : la profondeur, elle, ne change pas.
+$fSrc = dirname(__DIR__, 3) . '/shop/index.php';
+ok('la source de la boutique est là où on la cherche', is_file($fSrc), $fSrc);
+$src = is_file($fSrc) ? (string) file_get_contents($fSrc) : '';
+preg_match("/'temat'\s*=>\s*'([a-z_]+)'/", $src, $m);
+$codeCta = $m[1] ?? '';
+ok('le bouton B2B porte un sujet de la liste, pas une phrase',
+    $codeCta !== '' && in_array($codeCta, WSM_CONTACT_SUJETS, true), $codeCta);
+
+// La page d'accueil pose le sujet, la page de contact le RELIT. Sans cette
+// relecture le paramètre serait décoratif — c'était exactement le défaut.
+ok('la page de contact relit le sujet reçu, et le valide',
+    str_contains($src, "\$_GET['temat']") && str_contains($src, 'WSM_CONTACT_SUJETS'));
+
+[$idB2b] = wsm_contact_submit($pdo, $bon(['topic' => $codeCta, 'email' => "b2b.$sfx@example.com"]));
+$stB = $pdo->prepare('SELECT subject FROM wsm_messages WHERE id = ?');
+$stB->execute([$idB2b]);
+$sujB2b = (string) $stB->fetchColumn();
+ok('une demande venue du bloc B2B arrive classée sur son sujet',
+    $idB2b !== null && !str_contains(mb_strtolower($sujB2b), 'inne'), $sujB2b);
+
+// Et la démonstration par l'absurde : l'ancien libellé libre retombe sur
+// « inne », c'est-à-dire nulle part.
+[$idLibre] = wsm_contact_submit($pdo, $bon(['topic' => 'Konto B2B — Mister Szoko',
+                                            'email' => "libre.$sfx@example.com"]));
+$stB->execute([$idLibre]);
+ok('un sujet écrit à la main retombe sur « inne » — d\'où le code',
+    str_contains(mb_strtolower((string) $stB->fetchColumn()), 'inne'));
+
 // ---- Nettoyage ---------------------------------------------------------------------------------------
 $pdo->prepare("DELETE FROM wsm_messages WHERE email LIKE ?")->execute(['%' . $sfx . '@example.com']);
 $pdo->prepare("DELETE FROM wsm_messages WHERE actor LIKE ?")->execute(['formularz|203.0.113.%']);

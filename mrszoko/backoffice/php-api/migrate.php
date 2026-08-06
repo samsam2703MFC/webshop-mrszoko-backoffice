@@ -89,8 +89,13 @@ $pdo = wsm_pdo();
 if (in_array('--sync-content', $args, true)) {
     $pdo = wsm_bootstrap();
     require_once __DIR__ . '/seed.php';
-    [$keys, $ship] = wsm_sync_content($pdo);
-    echo "contenu synchronisé : $keys libellés ajoutés, $ship modes de livraison ajoutés\n";
+    [$keys, $ship, $maj, $sup] = wsm_sync_content($pdo);
+    // Les deux derniers comptes ne sont pas décoratifs : c'est par eux qu'on
+    // voit si un texte forcé est VRAIMENT arrivé en base. Un déploiement vert
+    // qui annonce « 0 libellé remplacé » alors qu'on vient d'en réécrire quinze
+    // dit qu'on lit la mauvaise base.
+    echo "contenu synchronisé : $keys libellés ajoutés, $maj remplacés, $sup retirés,"
+       . " $ship modes de livraison ajoutés\n";
     exit(0);
 }
 

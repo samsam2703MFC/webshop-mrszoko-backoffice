@@ -411,8 +411,7 @@ if ($page === '') {
   </section>
 
   <?php // ---- Panneau pro : compte B2B ------------------------------------- ?>
-  <?php if (isset($S['story.pro.title'])):
-    $mail = (string) ($S['footer.email'] ?? ''); ?>
+  <?php if (isset($S['story.pro.title'])): ?>
   <section class="wrap block" id="pro" style="padding-top:0">
     <div class="pro">
       <div class="pro-in">
@@ -421,12 +420,27 @@ if ($page === '') {
           <h2><?= e($S['story.pro.title']) ?></h2>
           <p><?= e($S['story.pro.text'] ?? '') ?></p>
         </div>
-        <?php if ($mail !== ''): ?>
+        <?php
+        // LE FORMULAIRE, PLUS LE « mailto: ».
+        //
+        // Un lien mailto suppose un client de messagerie configuré sur la
+        // machine. Sur un téléphone il ouvre parfois une application que
+        // personne n'utilise, au bureau il ouvre Outlook chez les uns et rien
+        // du tout chez les autres — et le prospect B2B qu'on vient
+        // d'intéresser referme l'onglet. Le formulaire de contact existe, il
+        // écrit dans la Poczta, et il ne dépend de rien chez le visiteur.
+        //
+        // Le sujet voyage en paramètre pour que la demande arrive déjà
+        // qualifiée. Il porte un CODE de la liste (« wspolpraca »), pas une
+        // phrase : la page de contact ne sait présélectionner qu'une option
+        // qui existe. Un libellé libre serait ignoré en silence — le lien
+        // marcherait, la demande arriverait classée « inne », et personne ne
+        // verrait la différence avant de dépouiller la Poczta.
+        ?>
         <a class="btn btn--accent btn--lg"
-           href="mailto:<?= e($mail) ?>?subject=<?= e(rawurlencode((string) ($S['story.pro.mail_subject'] ?? ''))) ?>">
+           href="<?= e(u('kontakt', ['temat' => 'wspolpraca'])) ?>">
           <?= e($S['story.pro.cta'] ?? '') ?>
         </a>
-        <?php endif; ?>
       </div>
     </div>
   </section>
@@ -558,6 +572,15 @@ if ($page === 'kontakt') {
         $v = $_POST;
         [$cid, $cErr] = wsm_contact_submit($pdo, $_POST, $lang);
         if ($cid) { $envoye = true; $v = []; }
+    } else {
+        // Le sujet peut arriver de la page d'où l'on vient (le bloc B2B de
+        // l'accueil pointe ici avec ?temat=wspolpraca). On le VALIDE contre la
+        // liste avant de le présélectionner : un paramètre d'URL est saisi par
+        // le visiteur, pas par nous, et il finirait sinon en `selected` sur une
+        // option fabriquée. Inconnu, on ne présélectionne rien — le formulaire
+        // s'ouvre sur son premier choix, comme si le paramètre n'existait pas.
+        $t = (string) ($_GET['temat'] ?? '');
+        if ($t !== '' && in_array($t, WSM_CONTACT_SUJETS, true)) $v['topic'] = $t;
     }
 
     layout_head($S, $lang, $langs, $S['contact.title'] ?? '', $S['contact.lead'] ?? '', 'kontakt');

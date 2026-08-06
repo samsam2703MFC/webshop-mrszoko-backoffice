@@ -1898,6 +1898,62 @@ jobs:
           curl -skL "$SH/sitemap.xml" | grep -qE '/(koszyk|kasa|zamowienie)' \
             && { echo "  ^ FUITE : sitemap wymienia stronę prywatną"; fail=1; } \
             || echo "  sitemap nie wymienia stron prywatnych"
+
+          echo "== wejście B2B ze strony głównej =="
+          # LE TEXTE A-T-IL VRAIMENT CHANGÉ ? La synchronisation est un INSERT
+          # IGNORE : elle protège ce qui a été écrit en console, et elle avale
+          # en silence tout texte MODIFIÉ dans le dépôt. wsm_content_forces()
+          # est la sortie de secours — mais elle passe par le client mysql, et
+          # « contenu éditorial : synchronisé » ne prouve QUE l'exécution du
+          # script. Ici on regarde la page réelle : si l'ancien bloc « Strefa
+          # pro » est encore servi, le déploiement est vert et la vitrine est
+          # périmée. C'est la panne exacte qu'on est en train de réparer.
+          case "$HOME_HTML" in
+            *'Strefa pro'*|*'40 kg'*)
+              echo "  ^ ZLE : stary blok « Strefa pro » nadal na stronie — treść nie doszła"; fail=1;;
+            *'id="pro"'*) echo "  blok B2B jest na stronie — potwierdzone";;
+            *) echo "  ^ ATTENTION : brak bloku B2B na stronie głównej"; fail=1;;
+          esac
+          # Le bouton mène au FORMULAIRE, sujet déjà posé. Un « mailto: »
+          # suppose un client de messagerie configuré : au bureau il ouvre
+          # Outlook chez les uns et rien du tout chez les autres, et le
+          # prospect referme l'onglet sans qu'on le sache jamais.
+          case "$HOME_HTML" in
+            *'mailto:'*'#pro'*|*'#pro'*'mailto:'*)
+              echo "  ^ ATTENTION : blok B2B nadal proponuje mailto";;
+          esac
+          case "$HOME_HTML" in
+            *'kontakt?temat=wspolpraca'*|*'kontakt&#63;temat=wspolpraca'*)
+              echo "  przycisk prowadzi do formularza z tematem — potwierdzone";;
+            *) echo "  ^ ZLE : przycisk B2B nie prowadzi do formularza z tematem"; fail=1;;
+          esac
+          # Et le formulaire présélectionne CE sujet. Sans cette ligne le
+          # paramètre serait décoratif : la demande arriverait classée « inne »,
+          # au milieu du tout-venant, et personne ne le verrait avant de
+          # dépouiller la Poczta.
+          KH=$(curl -skL "$SH/kontakt?temat=wspolpraca")
+          case "$KH" in
+            *'value="wspolpraca" selected'*) echo "  formularz otwiera się na « Współpraca / hurt » — potwierdzone";;
+            *) echo "  ^ ZLE : formularz ignoruje temat z adresu"; fail=1;;
+          esac
+          # Un paramètre inventé ne doit RIEN présélectionner : il vient du
+          # visiteur, pas de nous.
+          case "$(curl -skL "$SH/kontakt?temat=nie-ma-takiego")" in
+            *' selected'*) echo "  ^ ZLE : formularz przyjmuje wymyślony temat"; fail=1;;
+            *) echo "  wymyślony temat nic nie zaznacza — potwierdzone";;
+          esac
+          # Le sujet du mailto n'a plus de lecteur : laissé en base il resterait
+          # éditable dans Treści, quelqu'un le soignerait, et rien ne changerait.
+          if [ -n "$DB_USER" ]; then
+            NMS=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e \
+              "SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n WHERE k='story.pro.mail_subject'" 2>/dev/null || echo '?')
+            case "$NMS" in
+              0) echo "  martwy klucz story.pro.mail_subject usunięty — potwierdzone";;
+              '?') echo "  ^ ATTENTION : nie udało się sprawdzić martwego klucza";;
+              *) echo "  ^ ATTENTION : story.pro.mail_subject nadal w bazie ($NMS) — edytowalny, bez efektu";;
+            esac
+          fi
+
           if [ "$fail" = "0" ]; then echo "ALL SHOP CHECKS OK"; else echo "SHOP CHECK FAILED"; exit 1; fi
           REMOTE
 
