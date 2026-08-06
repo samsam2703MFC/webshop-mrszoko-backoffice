@@ -1243,6 +1243,33 @@ jobs:
             *zaplacone_bez_sledzenia=0) ;;
             *) echo "  ^ UWAGA : zaplacone zamowienia czekaja na nadanie — otworz ekran Wysylka";;
           esac
+          echo "== Allegro : kanal zamkniety, ale stan pilnowany =="
+          # Le vrai danger d un second canal n est pas l API : c est le STOCK
+          # PARTAGE. Les memes cinquante tablettes affichees ici ET la-bas se
+          # vendent CENT fois. On verifie donc, sans compte et sans reseau,
+          # qu on ne publie jamais tout, et jamais sous le prix boutique.
+          AOUT=$(php -r '
+            require_once "'"$DIR_API"'/allegro.php";
+            $ferme = !wsm_allegro_enabled() || count(wsm_allegro_manquants()) === 0;
+            $p = wsm_allegro_stock_plan(100);
+            $res = $p["publikowalne"] === 80 && $p["rezerwa"] === 20
+                && ($p["publikowalne"] + $p["rezerwa"]) === 100;
+            $petit = wsm_allegro_stock_plan(2)["publikowalne"] === 0;
+            $abs = wsm_allegro_stock_plan(100, 999)["publikowalne"] === 80;
+            $pl = wsm_allegro_prix_plancher(10000) > 10000;
+            $o = wsm_allegro_offer(["id"=>"x","nom"=>"Test","ean"=>"","prix_grosze"=>10000,"stock"=>50]);
+            $ean = $o["_blockers"] !== [];
+            echo ($ferme ? "brama-ok" : "brama-ZLE"), " ",
+                 ($res ? "rezerwa-ok" : "rezerwa-ZLE"), " ",
+                 ($petit && $abs ? "progi-ok" : "progi-ZLE"), " ",
+                 ($pl ? "prog-ceny-ok" : "prog-ceny-ZLE"), " ",
+                 ($ean ? "ean-ok" : "ean-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || AOUT="php-ZLE :: $AOUT"
+          echo "  $AOUT"
+          case "$AOUT" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguly kanalu Allegro nie dzialaja"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 
