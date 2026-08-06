@@ -1,0 +1,58 @@
+name: Deploy now (voie de secours)
+
+# =============================================================================
+#  LA VOIE DE SECOURS, QUAND LA FILE D'ATTENTE NE PREND PAS.
+#
+#  Le 6 août, cinq exécutions de deploy.yml sont restées en file et ont été
+#  annulées après ~15 minutes SANS JAMAIS DÉMARRER. Elles mouraient donc avant
+#  la première étape : ce n'est pas le contenu du job qui coince, c'est
+#  l'attribution du runner. Deux choses se changent sans toucher au code :
+#
+#   · LE LABEL. « ubuntu-latest » est un alias ; une image épinglée passe par
+#     un autre chemin d'allocation. Si l'alias est en cause, celle-ci part.
+#   · L'IDENTIFIANT DU WORKFLOW. Un fichier neuf a son propre id côté GitHub
+#     et n'hérite pas de l'état de l'ancien (qui, ce jour-là, renvoyait 500 au
+#     déclenchement et 409 « impossible d'annuler » sur ses propres runs).
+#
+#  CE N'EST PAS UNE COPIE DE deploy.yml. Le déploiement est écrit UNE fois,
+#  dans tools/deploy-manuel.sh, et appelé ici. Deux copies d'un déploiement
+#  divergeraient au premier correctif, et c'est celle qu'on n'utilise presque
+#  jamais qui serait fausse le jour où on en a besoin.
+#
+#  deploy.yml reste la référence : il porte les vingt étapes de vérification
+#  (rôles, KSeF, transporteurs, écrans, TVA). Celui-ci met le code en ligne et
+#  contrôle l'essentiel — c'est une roue de secours, pas une roue.
+#
+#  Déclenchement à la main uniquement : deux workflows sur le même push, ce
+#  serait deux rsync simultanés sur le même serveur.
+# =============================================================================
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    # Épinglé, pas « latest » : c'est tout l'objet de cette voie.
+    runs-on: ubuntu-24.04
+    # deploy.yml n'en avait AUCUN : un job bloqué pouvait tourner six heures.
+    # Le déploiement normal prend deux minutes.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Outils (sshpass, rsync, php)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass rsync php-cli
+          php -v | head -1
+
+      - name: Deploy → ${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}
+        env:
+          SSH_HOST:     ${{ secrets.SSH_HOST }}
+          SSH_USER:     ${{ secrets.SSH_USER }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_PORT:     ${{ vars.SSH_PORT || '22' }}
+          DEPLOY_DIR:   ${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}
+          DB_USER:      ${{ secrets.WSM_DB_USER }}
+          DB_PASS:      ${{ secrets.WSM_DB_PASS }}
+        run: bash tools/deploy-manuel.sh
