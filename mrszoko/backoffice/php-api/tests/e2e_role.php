@@ -142,6 +142,30 @@ ok('un jeton de service n\'est JAMAIS superadmin',
     wsm_is_superadmin(['email' => '', 'service' => true, 'role' => 'Superadmin']) === false);
 wsm_config_overlay(['superadmin_emails' => '']);
 
+// ---- 5 bis. Refuser, ou nier son existence --------------------------------
+//
+//  Ce ne sont pas deux façons de dire la même chose. « Cet écran n'est pas de
+//  ton métier » est un 403 : il aide, on sait à qui demander. L'écran de la
+//  plateforme, lui, chiffre ce que la boutique doit à qui la lui loue — un
+//  403 confirmerait à un locataire curieux qu'il y a quelque chose derrière.
+//
+//  La page l'écrivait déjà et rendait un 404. Sauf qu'elle ne s'exécutait
+//  plus : depuis que console_boot() garde les écrans en amont, le 403
+//  générique partait avant elle. La règle était écrite, plus appliquée —
+//  d'où ces lignes, qui la tiennent maintenant.
+echo "\n-- odmowa, a zaprzeczenie istnieniu to nie to samo --\n";
+ok('l\'écran de la plateforme nie son existence',
+    wsm_ecran_cache('superadmin.php') === true);
+ok('et il le fait quel que soit le chemin qui l\'a désigné',
+    wsm_ecran_cache('/var/www/html/mrszoko/backoffice/superadmin.php') === true);
+ok('un écran métier, lui, se dit franchement interdit',
+    wsm_ecran_cache('faktury.php') === false && wsm_ecran_cache('ustawienia.php') === false);
+// La règle du 404 ne remplace PAS le droit : elle décide seulement de la
+// forme du refus. Un Administrator reste sans droit sur cet écran.
+ok('nier son existence ne l\'ouvre à personne de plus',
+    wsm_droit_ecran($u('Administrator'), 'superadmin.php') === ''
+    && wsm_droit_ecran($u(WSM_ROLE_SUPERADMIN), 'superadmin.php') === 'w');
+
 // ---- 6. Le vocabulaire d'avant --------------------------------------------
 echo "\n-- stare nazwy ról nadal działają --\n";
 ok('« Centrala » devient Administrator', wsm_role_de($u('Centrala')) === WSM_ROLE_ADMIN);

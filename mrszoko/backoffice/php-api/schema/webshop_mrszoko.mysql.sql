@@ -1111,3 +1111,48 @@ CREATE TABLE IF NOT EXISTS `wsm_campaigns` (
   `sent_at`    DATETIME NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  L'ENREGISTREUR DE PAGES. Deux tables minuscules, et ce qu'elles NE
+--  contiennent pas compte autant que ce qu'elles contiennent.
+--
+--  PAS DE QUERY STRING. « ?zamowienie=MS-2026-0412 », « ?szukaj=Kowalski » :
+--  l'adresse d'un ecran de back-office porte des numeros de commande et des
+--  noms de clients. On enregistre l'ECRAN, jamais l'adresse complete — sinon
+--  un journal d'ergonomie devient un fichier de donnees personnelles.
+--
+--  PAS DE « QUI ». On note le ROLE, pas la personne. La question posee est
+--  « ou passe le temps de l'equipe », pas « qu'a fait Anna a 14h ». Le role
+--  repond a la premiere, et rend la seconde impossible a poser. Les
+--  ecritures, elles, restent tracees nominativement dans wsm_audit_log :
+--  c'est leur role a elles, et ce n'est pas le meme sujet.
+--
+--  BORNEES PAR CONSTRUCTION. On agrege a l'ecriture au lieu d'empiler une
+--  ligne par vue : wsm_page_views plafonne a (ecrans x jours x roles) et
+--  wsm_page_paths a (ecrans x ecrans) — quelques centaines de lignes. Pas de
+--  purge a programmer, donc pas de purge a oublier.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_page_views` (
+  `id`      INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ekran`   VARCHAR(64) NOT NULL,
+  `dzien`   DATE        NOT NULL,
+  `rola`    VARCHAR(32) NOT NULL DEFAULT '',
+  `n`       INT UNSIGNED NOT NULL DEFAULT 0,
+  `ms_sum`  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `ms_max`  INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_page_views` (`ekran`, `dzien`, `rola`),
+  KEY `ix_wsm_page_views_dzien` (`dzien`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ce qui suit quoi. C'est la table qui dit dans quel ORDRE le travail se
+-- fait — donc ce qu'il faudrait mettre a cote de quoi dans le rail. Une
+-- suite d'ecrans, rien d'autre : ni horodatage, ni session, ni personne.
+CREATE TABLE IF NOT EXISTS `wsm_page_paths` (
+  `id`     INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `skad`   VARCHAR(64) NOT NULL,
+  `dokad`  VARCHAR(64) NOT NULL,
+  `n`      INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_page_paths` (`skad`, `dokad`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

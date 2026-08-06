@@ -875,3 +875,28 @@ CREATE TABLE IF NOT EXISTS wsm_campaigns (
   created_at TEXT NOT NULL,
   sent_at    TEXT DEFAULT NULL
 );
+
+-- ---------------------------------------------------------------------------
+--  L'enregistreur de pages. Voir le schema MySQL pour les trois regles :
+--  pas de query string (elle porte des numeros de commande et des noms), pas
+--  de « qui » (le role suffit a la question posee), et des tables bornees par
+--  construction (on agrege a l'ecriture, donc rien a purger).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_page_views (
+  id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  ekran  TEXT NOT NULL,
+  dzien  TEXT NOT NULL,
+  rola   TEXT NOT NULL DEFAULT '',
+  n      INTEGER NOT NULL DEFAULT 0,
+  ms_sum INTEGER NOT NULL DEFAULT 0,
+  ms_max INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (ekran, dzien, rola)
+);
+
+CREATE TABLE IF NOT EXISTS wsm_page_paths (
+  id    INTEGER PRIMARY KEY AUTOINCREMENT,
+  skad  TEXT NOT NULL,
+  dokad TEXT NOT NULL,
+  n     INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (skad, dokad)
+);
