@@ -200,5 +200,123 @@ ok('et le code de sa commande', $vuP && (string) $vuP['code'] === (string) $bon[
 ok('les états ont tous un libellé',
    count(WSM_SHIP_STATUSES) >= 4 && !in_array('', array_values(WSM_SHIP_STATUSES), true));
 
+// ---- Le pays commande la livraison ----------------------------------------
+//
+// C'EST LA RÈGLE QU'ON OUBLIE. Un Paczkomat est polonais : le proposer pour
+// une adresse allemande, c'est promettre un colis qu'aucun transporteur ne
+// prendra. Le formulaire filtre déjà, mais un formulaire n'est pas un
+// contrôle — il se modifie dans le navigateur, et le pays peut changer APRÈS
+// le choix du mode.
+echo "\n-- kraj rządzi dostawą --\n";
+require_once dirname(__DIR__) . '/shop.php';
+$pidS = $pdo->query("SELECT id FROM wsm_products WHERE shop_visible = 1 LIMIT 1")->fetchColumn();
+if ($pidS) {
+    $pdo->exec("UPDATE wsm_countries SET active = 1 WHERE code = 'DE'");
+    $panier = [['id' => $pidS, 'qty' => 1]];
+
+    [$qPL, $ePL] = wsm_shop_quote($pdo, $panier, 'inpost_locker', 'pl', ['country' => 'PL']);
+    ok('un Paczkomat pour la Pologne passe', !isset($ePL['delivery_method']), $ePL);
+
+    [$qDE, $eDE] = wsm_shop_quote($pdo, $panier, 'inpost_locker', 'pl', ['country' => 'DE']);
+    ok('LE MÊME Paczkomat pour l\'Allemagne est REFUSÉ',
+        isset($eDE['delivery_method']), $eDE);
+    // Et le refus doit nommer le PAYS, pas la méthode : « nieznana metoda »
+    // envoie le client essayer l'autre mode, puis recommencer, sans jamais
+    // comprendre que le problème est son adresse.
+    ok('et le refus nomme le pays, pas la méthode',
+        str_contains((string) ($eDE['delivery_method'] ?? ''), 'kraju'), $eDE['delivery_method'] ?? '');
+
+    [, $eF] = wsm_shop_quote($pdo, $panier, 'dhl_express', 'pl', ['country' => 'PL']);
+    ok('une méthode inventée par le client est refusée', isset($eF['delivery_method']), $eF);
+
+    // Le filtrage lui-même, sans le devis.
+    ok('la Pologne a des transporteurs', count(wsm_shipping_methods($pdo, 'pl', 'PL')) > 0);
+    ok('l\'Allemagne n\'en a aucun', wsm_shipping_methods($pdo, 'pl', 'DE') === []);
+    ok('sans pays, on ne filtre pas — la vitrine montre l\'offre',
+        count(wsm_shipping_methods($pdo, 'pl', '')) > 0);
+    $pdo->exec("UPDATE wsm_countries SET active = 0 WHERE code = 'DE'");
+} else {
+    echo "  · pas de produit visible — règle pays non exercée, ne compte PAS pour vert\n";
+}
+
+// ---- La même règle, mais TELLE QU'ELLE S'AFFICHE ---------------------------
+//
+// Tout ce qui précède interroge l'adaptateur. L'adaptateur avait raison, et
+// la caisse affichait quand même un champ « Paczkomat — KRA010 » sous la
+// phrase « nous ne livrons pas encore dans ce pays ». Les deux ne peuvent pas
+// être vrais en même temps, et c'est le champ qu'on croit : on remplit donc
+// un panier comme un client et on LIT la page.
+echo "\n-- ta sama zasada, ale tak jak ją widzi klient --\n";
+$SHOP = rtrim(getenv('WSM_SHOP_URL') ?: 'http://localhost:8091', '/');
+$jarS = tempnam(sys_get_temp_dir(), 'wsmshp');
+$get = function (string $url, array $post = []) use ($jarS): array {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 15, CURLOPT_COOKIEJAR => $jarS, CURLOPT_COOKIEFILE => $jarS]);
+    if ($post) curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post));
+    $body = (string) curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$code, $body];
+};
+[$cAcc, $acc] = $get("$SHOP/");
+if ($cAcc !== 200) {
+    echo "  · boutique injoignable ($SHOP) — rendu non exercé, ne compte PAS pour vert\n";
+} else {
+    preg_match('/name="add" value="([^"]+)"/', $acc, $mA);
+    preg_match('/name="_t" value="([^"]+)"/', $acc, $mT);
+    if (!isset($mA[1], $mT[1])) {
+        echo "  · aucun produit en vitrine — rendu non exercé, ne compte PAS pour vert\n";
+    } else {
+        $get("$SHOP/koszyk", ['_t' => $mT[1], 'add' => $mA[1], 'qty' => 1]);
+        [, $kPL] = $get("$SHOP/kasa");
+        // 1. Là où l'on livre, le client doit POUVOIR désigner son Paczkomat.
+        ok('Pologne : le champ Paczkomat est rendu', str_contains($kPL, 'id="f-inpost_point"'));
+
+        // 2. Là où l'on ne livre pas, il ne doit RIEN y avoir à remplir.
+        $pdo->exec("UPDATE wsm_countries SET active = 1 WHERE code = 'DE'");
+        [, $kDE] = $get("$SHOP/kasa?kraj=DE");
+        ok('Allemagne : AUCUN champ Paczkomat', !str_contains($kDE, 'id="f-inpost_point"'));
+        // Et l'absence doit être EXPLIQUÉE : une caisse qui se contente de
+        // retirer les champs ressemble à une page cassée. On exige la phrase
+        // réelle — pas « la page contient un encadré », qui serait vrai de
+        // toute façon et ne prouverait rien.
+        $phrase = (string) (wsm_shop_strings($pdo, 'pl')['checkout.no_shipping'] ?? '');
+        ok('Allemagne : l\'absence de livraison est écrite en toutes lettres',
+           $phrase !== '' && str_contains($kDE, htmlspecialchars($phrase, ENT_QUOTES, 'UTF-8')), $phrase);
+        // Et la CLÉ ne doit jamais s'afficher à la place du texte : c'est ce
+        // qui arrive quand la table i18n n'a pas été synchronisée.
+        ok('Allemagne : c\'est la phrase qui s\'affiche, pas la clé i18n',
+           !str_contains($kDE, 'checkout.no_shipping'));
+        $pdo->exec("UPDATE wsm_countries SET active = 0 WHERE code = 'DE'");
+
+        // 3. Le sélecteur sur carte est un ENRICHISSEMENT. Sans jeton il ne
+        //    s'affiche pas — et surtout, le champ texte reste, sinon on aurait
+        //    remplacé un champ qui marche par un bouton mort.
+        //
+        //    ON JUGE LA PAGE SUR ELLE-MÊME. Comparer avec la configuration lue
+        //    ICI n'aurait aucun sens : la boutique tourne dans un AUTRE
+        //    processus, qui peut très bien ne pas voir le même jeton. Ce qui
+        //    doit être vrai quoi qu'il arrive, c'est que le sélecteur ne
+        //    s'affiche jamais SANS jeton utilisable — la règle fail-closed.
+        if (preg_match('/<inpost-geowidget[^>]*token="([^"]*)"/', $kPL, $mG)) {
+            ok('le sélecteur affiché porte un jeton utilisable',
+               $mG[1] !== '' && strtolower($mG[1]) !== 'xxxx', $mG[1]);
+            ok('et le script du sélecteur est chargé avec lui',
+               str_contains($kPL, 'geowidget.inpost.pl/inpost-geowidget.js'));
+        } else {
+            ok('sans sélecteur, aucun appel au domaine tiers n\'est fait',
+               !str_contains($kPL, 'geowidget.inpost.pl'));
+        }
+        ok('avec ou sans carte, le champ texte reste — jamais de bouton seul',
+           str_contains($kPL, 'id="f-inpost_point"'));
+        // Le domaine tiers n'est chargé QUE sur la caisse, et QUE s'il sert.
+        [, $accueil] = $get("$SHOP/");
+        ok('geowidget.inpost.pl n\'est pas chargé sur la page d\'accueil',
+           !str_contains($accueil, 'geowidget.inpost.pl'));
+    }
+}
+@unlink($jarS);
+
 echo "\n" . ($fail === 0 ? "OK — $pass assertions" : "ÉCHEC — $fail sur " . ($pass + $fail)) . "\n";
 exit($fail === 0 ? 0 : 1);

@@ -526,10 +526,26 @@ function wsm_shop_quote(PDO $pdo, array $items, string $methodId, string $lang, 
 
     // --- Livraison ----------------------------------------------------------
     $methods = wsm_shipping_methods($pdo, $lang, $country);
-    if (!$methods) $e['delivery_method'] = 'brak dostawy do tego kraju';
     $method = null;
     foreach ($methods as $m) if ($m['id'] === $methodId) $method = $m;
-    if ($methodId !== '' && !$method) $e['delivery_method'] = 'nieznana metoda dostawy';
+
+    // DEUX REFUS QUI SE RESSEMBLENT ET N'ONT RIEN À VOIR.
+    //
+    // « Aucun transporteur ne dessert ce pays » et « cette méthode n'existe
+    // pas » aboutissent au même endroit, mais la personne devant l'écran ne
+    // doit pas lire la même chose. Le second message était écrit par-dessus le
+    // premier : un client à Berlin lisait « nieznana metoda dostawy » — alors
+    // il essaie l'autre mode, puis recommence, parce que rien ne lui dit que
+    // le problème est son PAYS et pas son clic.
+    //
+    // L'ordre compte donc : le pays d'abord, et on ne l'écrase plus.
+    if (!$methods) {
+        $e['delivery_method'] = $country !== ''
+            ? 'nie dowozimy jeszcze do tego kraju (' . $country . ')'
+            : 'brak dostawy do tego kraju';
+    } elseif ($methodId !== '' && !$method) {
+        $e['delivery_method'] = 'nieznana metoda dostawy';
+    }
     if (!$method && $methods) $method = $methods[0];
 
     $shipNet = 0; $shipVat = 0; $shipGross = 0; $freeShipping = false;
