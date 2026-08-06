@@ -63,6 +63,22 @@ function wsm_settings_fields(): array {
         'dpd.sender_city'     => ['dpd', 'Nadawca — miasto',  ['dpd', 'sender_city'],     'WSM_DPD_SENDER_CITY',     'text', ''],
         'dpd.sender_phone'    => ['dpd', 'Nadawca — telefon', ['dpd', 'sender_phone'],    'WSM_DPD_SENDER_PHONE',    'text', 'Kurier dzwoni tu, nie do klienta.'],
 
+        // ─── CE QUE DÉCLENCHE UN CHANGEMENT D'ÉTAT ────────────────────────
+        //
+        // Ces quatre réglages décident de ce qui part au fisc et au client.
+        // Ils ne s'affichent PAS dans Ustawienia : ils vivent derrière la
+        // porte du Superadmin, avec le tableau qui explique chacun d'eux.
+        // Les déclarer ici quand même donne trois choses gratuitement — le
+        // stockage, la priorité serveur > base, et la variable d'environnement.
+        //
+        // TOUS ONT UN DÉFAUT « ACTIVÉ » LU DANS LE CODE, pas dans config.php :
+        // une base vide doit se comporter exactement comme avant, et un
+        // réglage absent ne doit jamais éteindre une obligation légale.
+        'orders.doc_status'   => ['zamowienia', 'Stan, który wystawia dokument', ['orders', 'doc_status'], 'WSM_ORDER_DOC_STATUS', 'select:wyslane|oplacone|dostarczone|nigdy', 'Domyślnie „wysłane". „nigdy" wyłącza automat — dokumenty wystawia się wtedy ręcznie.'],
+        'orders.doc_mail'     => ['zamowienia', 'Wysyłać dokument mailem', ['orders', 'doc_mail'], 'WSM_ORDER_DOC_MAIL', 'select:1|0', 'Wyłączenie nie kasuje dokumentu — tylko go nie wysyła.'],
+        'orders.doc_ksef'     => ['zamowienia', 'Zgłaszać fakturę do KSeF', ['orders', 'doc_ksef'], 'WSM_ORDER_DOC_KSEF', 'select:1|0', 'Wyłączone: faktura czeka w kolejce KSeF i wysyła się ręcznie.'],
+        'orders.vies_recheck' => ['zamowienia', 'Sprawdzać VIES przed wystawieniem', ['orders', 'vies_recheck'], 'WSM_ORDER_VIES_RECHECK', 'select:1|0', 'Wyłączenie zostawia status z chwili zamówienia — przy WDT to ryzyko podatkowe.'],
+
         'mail.transport'   => ['mail', 'Sposób wysyłki', ['mail', 'transport'], 'WSM_MAIL_TRANSPORT', 'select:mail|smtp', 'mail = funkcja serwera, smtp = konto pocztowe.'],
         'mail.from'        => ['mail', 'Adres nadawcy',  ['mail', 'from'],      'WSM_MAIL_FROM',      'text',   'Bez niego poczta jest wyłączona.'],
         'mail.from_name'   => ['mail', 'Nazwa nadawcy',  ['mail', 'from_name'], 'WSM_MAIL_FROM_NAME', 'text',   'Widoczna w skrzynce klienta.'],

@@ -1402,10 +1402,15 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
     $out['ok'] = true;
     if ($avant === $new) return $out;              // rien de neuf : rien à émettre
 
-    if ($new === 'wyslane') {
-        $inv = __DIR__ . '/invoice.php';
+    $inv = __DIR__ . '/invoice.php';
+    if (is_file($inv)) require_once $inv;
+    // QUEL ÉTAT ÉMET LE DOCUMENT est un réglage, avec « wysłane » pour défaut
+    // et « nigdy » pour couper l'automat. Le défaut est lu dans le code : une
+    // base vide doit se comporter comme hier.
+    $reg = function_exists('wsm_orders_cfg') ? wsm_orders_cfg()
+         : ['doc_status' => 'wyslane', 'vies_recheck' => true];
+    if ($new === $reg['doc_status'] && $reg['doc_status'] !== 'nigdy') {
         if (is_file($inv)) {
-            require_once $inv;
             $order = wsm_order_by_id($pdo, $id);
             if ($order) {
                 // VIES D'ABORD, DOCUMENT ENSUITE. Le numéro doit être vérifié
@@ -1413,7 +1418,7 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
                 // pu être révoqué entre les deux, et c'est le vendeur qui
                 // paierait la TVA d'une facture en autoliquidation devenue
                 // fausse. La consultation datée reste sur la commande.
-                $order = wsm_order_vies_refresh($pdo, $order);
+                if ($reg['vies_recheck']) $order = wsm_order_vies_refresh($pdo, $order);
                 // Elle ne lève jamais : une commande expédiée dont le document
                 // échoue reste expédiée. Le colis est parti, on ne le rattrape
                 // pas en refusant d'écrire un état.

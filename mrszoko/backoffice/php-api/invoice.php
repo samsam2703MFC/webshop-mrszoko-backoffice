@@ -618,8 +618,9 @@ function wsm_order_document(PDO $pdo, array $order, string $actor = ''): array {
     // --- Le courrier ---------------------------------------------------------
     // La clé d'événement porte le NUMÉRO du document, pas l'identifiant de la
     // commande : un avoir émis plus tard doit pouvoir partir à son tour.
+    $reg  = wsm_orders_cfg();
     $mail = trim((string) ($order['email'] ?? ''));
-    if ($mail !== '') {
+    if ($mail !== '' && $reg['doc_mail']) {
         try {
             $lien = wsm_invoice_lien_public($pdo, $order, $doc);
             $est  = $out['kind'] === 'faktura' ? 'Faktura' : 'Paragon';
@@ -642,7 +643,12 @@ function wsm_order_document(PDO $pdo, array $order, string $actor = ''): array {
     // Un e-paragon N'EST PAS une facture : le déposer au registre national y
     // inscrirait un document qui n'existe pas pour le fisc. wsm_ksef_blockers()
     // le refuse déjà ; on ne l'appelle même pas.
-    if ($out['kind'] === 'faktura') {
+    if ($out['kind'] === 'faktura' && !$reg['doc_ksef']) {
+        // Éteint à dessein : la facture existe et attend dans la file du
+        // KSeF, où quelqu'un la déposera à la main. Ce n'est pas une panne,
+        // et l'écran ne doit pas le présenter comme telle.
+        $out['ksef'] = 'automat wyłączony — faktura czeka w kolejce KSeF';
+    } elseif ($out['kind'] === 'faktura') {
         $k = __DIR__ . '/ksef.php';
         if (is_file($k)) {
             require_once $k;
@@ -809,5 +815,40 @@ function wsm_status_triggers(PDO $pdo): array {
         ['statut' => 'anulowane', 'kto' => 'Ręcznie',
          'wyzwala' => ['Zamyka zamówienie — nie da się go już wysłać'],
          'mail' => $mail('anulowane')],
+    ];
+}
+
+/**
+ * LES QUATRE INTERRUPTEURS DU CHANGEMENT D'ÉTAT.
+ *
+ * Ils décident de ce qui part au fisc et au client. D'où trois précautions :
+ *
+ *  · LE DÉFAUT EST « TOUT ACTIVÉ », et il est lu ICI, pas dans config.php.
+ *    Une base vide, une table absente, un déploiement à moitié fait : le
+ *    comportement doit rester celui d'hier. Un réglage manquant ne doit
+ *    jamais éteindre une obligation légale.
+ *  · ON N'ÉTEINT QUE CE QUI EST EXPLICITEMENT ÉTEINT. Seule la chaîne « 0 »
+ *    ou false coupe ; tout le reste — vide, null, « xxxx » — vaut activé.
+ *  · CE N'EST PAS UN RÉGLAGE DE CONFORT. Couper l'émission ou la
+ *    reconsultation VIES a des conséquences fiscales ; l'écran qui les
+ *    propose doit le dire, et l'audit doit garder qui a coupé quoi.
+ *
+ * @return array{doc_status:string, doc_mail:bool, doc_ksef:bool, vies_recheck:bool}
+ */
+function wsm_orders_cfg(): array {
+    $c = wsm_config()['orders'] ?? [];
+    $on = static function ($v): bool {
+        if ($v === null) return true;
+        if (is_bool($v)) return $v;
+        $s = strtolower(trim((string) $v));
+        return !($s === '0' || $s === 'nie' || $s === 'false' || $s === 'off');
+    };
+    $st = strtolower(trim((string) ($c['doc_status'] ?? '')));
+    if (!in_array($st, ['wyslane', 'oplacone', 'dostarczone', 'nigdy'], true)) $st = 'wyslane';
+    return [
+        'doc_status'   => $st,
+        'doc_mail'     => $on($c['doc_mail'] ?? null),
+        'doc_ksef'     => $on($c['doc_ksef'] ?? null),
+        'vies_recheck' => $on($c['vies_recheck'] ?? null),
     ];
 }
