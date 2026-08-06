@@ -127,6 +127,32 @@ function wsm_superadmin_emails(): array {
 const WSM_SUPER_CODE_MAX  = 5;      // essais avant pause
 const WSM_SUPER_CODE_LOCK = 900;    // 15 min, comme la page de connexion
 
+/**
+ * Ce compte peut-il entrer PAR LE CODE ?
+ *
+ * Le rôle Superadmin et la liste du serveur restent les deux voies nobles.
+ * Celle-ci est la troisième, et c'est la seule qui n'exige rien d'autre que
+ * de connaître le code du jour — donc la seule qui rende l'entrée visible
+ * quand aucun compte ne porte encore le rôle.
+ *
+ * ELLE NE S'OUVRE QU'AUX ADMINISTRATEURS. Pas à la vente, pas au magasin,
+ * pas à la lecture seule : le code se voit par-dessus une épaule, et cet
+ * écran chiffre ce que la boutique doit à qui la lui loue. Restreindre à
+ * l'administrateur ne rend pas le code fort — ça réduit le nombre de gens à
+ * qui il suffit de le voir passer.
+ */
+function wsm_super_par_code(?array $u): bool {
+    if (!$u || !empty($u['service'])) return false;      // jamais un jeton
+    if (!wsm_super_code_actif()) return false;           // pas de code = pas de voie
+    if (!function_exists('wsm_role_de')) return false;
+    return in_array(wsm_role_de($u), [WSM_ROLE_SUPERADMIN, WSM_ROLE_ADMIN], true);
+}
+
+/** Le code a-t-il été donné AUJOURD'HUI dans cette session ? */
+function wsm_super_code_donne(): bool {
+    return ($_SESSION['wsm_super_code_jour'] ?? '') === date('Y-m-d');
+}
+
 /** Le nombre de base, ou '' s'il n'est pas configuré. */
 function wsm_super_code_base(): string {
     $v = trim((string) (wsm_config()['superadmin_code'] ?? ''));

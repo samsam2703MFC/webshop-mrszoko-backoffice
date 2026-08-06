@@ -59,6 +59,22 @@ function console_boot(): array {
     // et donc sans risquer d'en oublier un ouvert.
     $ecran = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
     $droit = wsm_droit_ecran($me, $ecran);
+
+    // LA VOIE DU CODE PASSE PAR ICI, sinon elle n'existe pas.
+    //
+    // wsm_droit_ecran() ne connaît que les rôles : pour un Administrator,
+    // superadmin.php répond ''. Le garde ci-dessous rendrait donc un 404
+    // AVANT que la page ait pu demander le code — l'entrée serait dans le
+    // rail et mènerait à une porte murée. On ouvre le passage ici ; la page,
+    // elle, exige toujours le code avant d'afficher quoi que ce soit.
+    if ($droit === '' && $ecran === 'superadmin.php') {
+        $plat = console_api_dir() . '/platform.php';
+        if (is_file($plat)) {
+            require_once $plat;
+            if (wsm_super_par_code($me)) $droit = 'w';
+        }
+    }
+
     if ($droit === '') {
         // DEUX REFUS QUI NE DISENT PAS LA MÊME CHOSE.
         //
@@ -232,15 +248,31 @@ function console_sections(?array $me = null): array {
         ],
     ];
 
-    // « Superadmin » s'ouvre à deux titres : le rôle Superadmin en base, et
-    // l'appartenance déclarée côté serveur (superadmin_emails). La seconde
-    // reste, et n'est pas décorative — c'est elle qui permet de désigner le
-    // PREMIER superadmin, avant qu'aucun compte ne porte le rôle. Sans elle,
-    // personne ne pourrait jamais entrer.
+    // « Superadmin » s'ouvre à TROIS titres, et le troisième est celui qui
+    // rend l'entrée visible pour de vrai :
+    //
+    //   1. le rôle Superadmin en base ;
+    //   2. l'appartenance déclarée côté serveur (superadmin_emails) ;
+    //   3. LE CODE DU JOUR — un Administrator voit l'entrée et entre en
+    //      tapant le code. C'est le seul des trois qui ne demande rien
+    //      d'autre que de connaître le code.
+    //
+    //  POURQUOI LE TROISIÈME. Avec les deux premiers seulement, l'entrée
+    //  n'apparaissait pour PERSONNE : aucun compte ne portait le rôle, la
+    //  liste du serveur n'était pas renseignée, et seul un Superadmin peut en
+    //  désigner un autre. Le rail était juste — et vide. Un lien qu'aucun
+    //  œil ne voit ne mène nulle part.
+    //
+    //  CE QUE ÇA COÛTE, DIT FRANCHEMENT : le code devient la clé de l'écran
+    //  qui chiffre le loyer. Qui le voit une fois par-dessus une épaule l'a.
+    //  Il n'est donc proposé qu'aux comptes Administrator — pas à la vente,
+    //  pas au magasin, pas à la lecture seule — et l'écran compte les essais.
     $plat = console_api_dir() . '/platform.php';
     if ($me && is_file($plat)) {
         require_once $plat;
-        if (wsm_is_superadmin($me)) $s['Platforma'] = ['superadmin.php' => 'Superadmin'];
+        if (wsm_is_superadmin($me) || wsm_super_par_code($me)) {
+            $s['Platforma'] = ['superadmin.php' => 'Superadmin'];
+        }
     }
 
     // ON NE MONTRE QUE CE QUI S'OUVRE. Un rail qui propose un écran interdit
@@ -248,8 +280,20 @@ function console_sections(?array $me = null): array {
     // finit par faire croire que l'outil est cassé. Une section vidée de tous
     // ses écrans disparaît avec eux.
     if ($me) {
+        // LE FILTRE DOIT CONNAÎTRE LES MÊMES VOIES QUE LA PORTE.
+        //
+        // wsm_droit_ecran() ne raisonne que sur les rôles : pour un
+        // Administrator, superadmin.php répond ''. Ce filtre retirait donc
+        // l'entrée juste après qu'on l'ait ajoutée — le rail restait vide et
+        // la section « Platforma » n'existait que dans le code. Deux endroits
+        // qui décident du même accès doivent décider pareil.
+        $ouvre = function (string $f) use ($me): bool {
+            if (wsm_droit_ecran($me, $f) !== '') return true;
+            return $f === 'superadmin.php' && function_exists('wsm_super_par_code')
+                && wsm_super_par_code($me);
+        };
         foreach ($s as $titre => $items) {
-            $s[$titre] = array_filter($items, fn($f) => wsm_droit_ecran($me, $f) !== '', ARRAY_FILTER_USE_KEY);
+            $s[$titre] = array_filter($items, $ouvre, ARRAY_FILTER_USE_KEY);
             if (!$s[$titre]) unset($s[$titre]);
         }
     }

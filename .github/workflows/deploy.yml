@@ -335,6 +335,27 @@ jobs:
             "kod dnia : liczba bazowa zapisana w config.local.php" \
             "kod dnia : brak sekretu WSM_SUPERADMIN_CODE — ekran Platforma bez drugiego zamka"
 
+          # LE SEUL ENDROIT QUI PEUT VRAIMENT VÉRIFIER ÇA, C'EST ICI.
+          #
+          # Une suite de tests ne sait pas quel nombre est le vrai : elle ne
+          # peut que refuser un littéral qui RESSEMBLE à un code. Le
+          # déploiement, lui, CONNAÎT le secret — il peut donc chercher
+          # exactement celui-là dans le code livré.
+          #
+          # Ça n'est pas théorique : le premier jet de la suite reprenait le
+          # vrai nombre « parce que c'est un test », et un test part sur GitHub
+          # comme le reste. Un code publié ne verrouille plus rien.
+          if [ -n "${SUPER_CODE:-}" ]; then
+            FUITE=$(grep -rlF "$SUPER_CODE" "$DIR/backoffice" "$DIR/shop" 2>/dev/null \
+                    | grep -v 'config\.local\.php' | head -3)
+            if [ -n "$FUITE" ]; then
+              echo "  ^ ZLE : kod dnia znaleziony w WYDANYM kodzie — jest publiczny, nie chroni niczego :"
+              printf '%s\n' "$FUITE" | sed 's/^/      /'
+              exit 1
+            fi
+            echo "kod dnia : nie występuje w wydanym kodzie — potwierdzone"
+          fi
+
           # ── Rebranding et contenu éditorial, PAR DU SQL ÉMIS.
           #
           # Ces deux passages appelaient `php migrate.php --rebrand` et
