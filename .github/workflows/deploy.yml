@@ -236,7 +236,7 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' ADM_EMAIL='${{ secrets.WSM_ADMIN_EMAIL }}' ADM_PASS='${{ secrets.WSM_ADMIN_PASSWORD }}' bash -s" << 'REMOTE'
+            "DEPLOY_DIR='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}' ADM_EMAIL='${{ secrets.WSM_ADMIN_EMAIL }}' ADM_PASS='${{ secrets.WSM_ADMIN_PASSWORD }}' DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
           set -e
           DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
           API="$DIR/backoffice/api"
@@ -256,10 +256,36 @@ jobs:
           # franchise, alors que l'affaire réelle est UNE boutique à Wrocław.
           # Des chiffres de démonstration qui ressemblent à des vrais sont pires
           # que pas de chiffres — on lit « 29 800 » sur un tableau de bord et on
-          # en tire une conclusion. Ne supprime que les cinq identifiants connus
-          # (jamais un TRUNCATE : un second point de vente réel doit survivre),
-          # ne touche ni à l'audit ni aux comptes. Idempotent.
-          (cd "$API" && php migrate.php --purge-demo-shops) || echo 'retrait des boutiques de démonstration ignoré'
+          # en tire une conclusion.
+          #
+          # PAR LE CLIENT mysql, ET PAS PAR migrate.php. Le php-cli de ce
+          # serveur n'a pas pdo_mysql — l'étape de vérification le mesure et
+          # l'écrit à chaque déploiement. `php migrate.php --purge-demo-shops`
+          # ne pouvait donc RIEN faire, et le `|| echo` avalait l'échec : le
+          # déploiement 79 est passé au vert en laissant les cinq boutiques en
+          # place. C'est le contrôle ajouté juste après qui l'a dit. Les deux
+          # appels voisins (--rebrand, --sync-content) sont dans le même cas :
+          # ils ne tournent pas ici, et ce qui est en base y est arrivé par le
+          # premier démarrage de l'application, pas par eux.
+          #
+          # On ne supprime que les cinq identifiants connus — jamais un
+          # TRUNCATE : un second point de vente réel doit survivre au passage.
+          # L'audit n'est pas touché : c'est l'histoire, elle reste. Aucun
+          # compte n'est supprimé ; seuls les liens vers une boutique absente
+          # partent, parce qu'un tel lien est un compte qui ne voit rien.
+          # Idempotent : rejoué, il ne trouve plus rien.
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko <<'SQL' 2>/dev/null \
+              && echo 'boutiques de démonstration : retrait joué' \
+              || echo 'ATTENTION : le retrait des boutiques de démonstration a échoué'
+          DELETE FROM wsm_user_shops WHERE shop_id IN ('bxl','and','ucc','sch','lv');
+          UPDATE wsm_users SET portee = 'Cała sieć'
+           WHERE portee IN ('Bruxelles-Centre','Anderlecht, Uccle','Louvain','Anderlecht','Uccle','Schaerbeek');
+          DELETE FROM wsm_shops WHERE id IN ('bxl','and','ucc','sch','lv');
+          SQL
+          else
+            echo 'ATTENTION : mysql injoignable — boutiques de démonstration NON retirées'
+          fi
 
           # ── Compte administrateur : créé UNE SEULE FOIS. --ensure-admin ne fait
           # rien si un compte capable de se connecter existe déjà, donc les
