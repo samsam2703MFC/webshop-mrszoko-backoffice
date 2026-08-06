@@ -152,7 +152,7 @@ console_crumbs($detail
 <?php if ($missing): ?>
 <p class="warnbox">
   Nie da się wystawić faktury — brakuje: <b><?= h(implode(', ', $missing)) ?></b>.
-  Uzupełnij w <a href="ustawienia.php">Ustawieniach</a>, sekcja „faktura”.
+  Uzupełnij w <a href="ustawienia.php">Integracjach</a>, sekcja „faktura”.
   E-paragony dla klientów bez NIP działają mimo to.
 </p>
 <?php endif; ?>

@@ -223,7 +223,7 @@ console_crumbs($detail
 <p class="warnbox">
   Poczta jeszcze nie wysyła — brakuje: <?= h(implode(', ', $blockers)) ?>.
   Wiadomości są zapisywane w kolejce i nic nie ginie; uzupełnij dane w
-  <a href="ustawienia.php">Ustawieniach</a>, potem wyślij je stąd jednym kliknięciem.
+  <a href="ustawienia.php">Integracjach</a>, potem wyślij je stąd jednym kliknięciem.
 </p>
 <?php endif; ?>
 

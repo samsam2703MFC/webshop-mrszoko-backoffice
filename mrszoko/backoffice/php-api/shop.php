@@ -310,6 +310,50 @@ function wsm_shop_reverse_charge(PDO $pdo, string $country, array $vies): bool {
     return $c !== null && $c['active'] && $c['is_eu'];
 }
 
+/**
+ * LES CODES PAYS D'UN TRANSPORTEUR, VÉRIFIÉS CONTRE LA TABLE.
+ *
+ * « Deux lettres majuscules » n'est pas une vérification : elle laisse passer
+ * XX, ZZ, et surtout la faute de frappe plausible — PK au lieu de PL. Le
+ * transporteur se met alors à desservir un pays qui n'existe pas, sans erreur,
+ * sans message, et avec une ligne qui n'a pas l'air fausse. On ne garde que ce
+ * que wsm_countries connaît, et on rend ce qu'on a jeté pour que l'écran le
+ * dise au lieu de l'avaler.
+ *
+ * Le troisième tas — « connu mais fermé à la vente » — n'est pas une faute :
+ * on peut préparer la portée d'un transporteur avant d'ouvrir le pays. Mais
+ * c'est une commande impossible tant que les deux ne concordent pas, et ça se
+ * découvre d'ordinaire par un client qui n'arrive pas à payer.
+ *
+ * @return array{codes:string[], inconnus:string[], fermes:string[]}
+ */
+function wsm_ship_codes(PDO $pdo, string $saisie): array {
+    $connus = [];
+    try {
+        foreach ($pdo->query("SELECT code, active FROM wsm_countries")->fetchAll() ?: [] as $c) {
+            $connus[strtoupper((string) $c['code'])] = (int) $c['active'] === 1;
+        }
+    } catch (Throwable $e) { $connus = []; }
+
+    $codes = []; $inconnus = []; $fermes = [];
+    foreach (preg_split('/[,\s]+/', $saisie) ?: [] as $c) {
+        $c = strtoupper(trim($c));
+        if ($c === '') continue;
+        // Table vide ou illisible : on retombe sur le contrôle de forme plutôt
+        // que de tout refuser — sinon une base incomplète effacerait la portée
+        // de tous les transporteurs d'un seul enregistrement.
+        if (!$connus) {
+            if (preg_match('/^[A-Z]{2}$/', $c)) $codes[$c] = true;
+            continue;
+        }
+        if (!isset($connus[$c])) { $inconnus[$c] = true; continue; }
+        if (!$connus[$c]) $fermes[$c] = true;
+        $codes[$c] = true;
+    }
+    return ['codes' => array_keys($codes), 'inconnus' => array_keys($inconnus),
+            'fermes' => array_keys($fermes)];
+}
+
 /** Modes de livraison actifs, tarifs compris — pilotés par la base. */
 function wsm_shipping_methods(PDO $pdo, string $lang, string $country = ''): array {
     $S = wsm_shop_strings($pdo, $lang);

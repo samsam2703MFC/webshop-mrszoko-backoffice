@@ -400,9 +400,19 @@ $tot     = wsm_platform_totals($serie);
 $histo   = wsm_platform_terms_history($pdo);
 $courant = $serie[0] ?? null;
 
-/** Le pourcentage tel qu'on l'écrit en Pologne. */
+/**
+ * Le pourcentage tel qu'on l'écrit en Pologne.
+ *
+ * ON NE RONGE LES ZÉROS QU'APRÈS LA VIRGULE. Sans cette garde, pct(0.20, 0)
+ * rend « 2 % » : number_format donne « 20 », et le rtrim('0') emporte le zéro
+ * des dizaines. Les deux taux qu'on regardait — 23 % de TVA et 5 % de
+ * commission — n'ont pas de zéro final, donc rien ne se voyait. Trouvé sur
+ * l'écran Dostawa, où « × 100 % » s'affichait « × 1 % ».
+ */
 function pct(float $r, int $dec = 2): string {
-    return rtrim(rtrim(number_format($r * 100, $dec, ',', ' '), '0'), ',') . ' %';
+    $s = number_format($r * 100, $dec, ',', "\u{202F}");
+    if (str_contains($s, ',')) $s = rtrim(rtrim($s, '0'), ',');
+    return $s . "\u{202F}%";
 }
 
 /** Une barre pour douze mois : le décompte mensuel, du plus ancien au récent. */

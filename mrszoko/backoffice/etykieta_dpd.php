@@ -88,7 +88,7 @@ if ($err !== null) {
         'DPD odpowiedział: <code>' . h($err) . '</code>.'
       . ($manque
           ? '<br><br>Brakuje: <b>' . h(implode(', ', $manque)) . '</b>. '
-          . 'Uzupełnij w <a href="ustawienia.php">Ustawieniach</a>, sekcja „dpd”.'
+          . 'Uzupełnij w <a href="ustawienia.php">Integracjach</a>, sekcja „dpd”.'
           : '')
       // L'extension manquante ne se répare pas dans la console : on dit
       // clairement que c'est le serveur, pour ne pas envoyer quelqu'un

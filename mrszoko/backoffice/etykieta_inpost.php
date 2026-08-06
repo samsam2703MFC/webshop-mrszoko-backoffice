@@ -76,7 +76,7 @@ if ($err !== null) {
       . ($lien !== '' ? '<br><br>Zapisany wcześniej odnośnik: <a href="' . h($lien)
           . '" target="_blank" rel="noopener">otwórz etykietę ↗</a>' : '')
       . '<br><br>Jeśli integracja nie jest jeszcze skonfigurowana, uzupełnij dane w '
-      . '<a href="ustawienia.php">Ustawieniach</a>, sekcja „inpost”.',
+      . '<a href="ustawienia.php">Integracjach</a>, sekcja „inpost”.',
         $order);
 }
 
