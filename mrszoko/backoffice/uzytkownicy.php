@@ -72,8 +72,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $msg = str_contains($msg, 'créé')
                     ? 'Utworzono konto ' . $email . '.'
                     : 'Konto ' . $email . ' istniało — ustawiono nowe hasło.';
-                $pdo->prepare("UPDATE wsm_users SET portee = ? WHERE LOWER(email) = ?")
-                    ->execute([trim((string) ($_POST['portee'] ?? '')), $email]);
                 wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Konto', $email . ' · ' . $role, 'Sieć');
                 $flash = $msg;
             } catch (InvalidArgumentException $e) {
@@ -104,7 +102,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     ->execute([
                         mb_substr(trim((string) ($_POST['nom'] ?? $u['nom'])), 0, 120),
                         $role,
-                        mb_substr(trim((string) ($_POST['portee'] ?? '')), 0, 120),
+                        // Le champ n'existe plus à l'écran : on garde ce que la
+                        // colonne portait, plutôt que de l'effacer en silence.
+                        (string) $u['portee'],
                         $act, $id,
                     ]);
                 wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zmiana konta',
@@ -129,6 +129,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
+/**
+ * Ce qu'un rôle ouvre, en toutes lettres. Repris du RAIL lui-même : une
+ * seconde liste écrite ici mentirait le jour où un écran change de section,
+ * et c'est précisément l'écran où l'on ne peut pas se permettre d'à-peu-près.
+ */
+function role_ouvre(string $role): array {
+    $faux = ['email' => '', 'role' => $role];
+    $out = [];
+    foreach (console_sections($faux) as $items) {
+        foreach ($items as $f => $label) {
+            $out[] = $label . (wsm_droit_ecran($faux, $f) === 'r' ? ' (podgląd)' : '');
+        }
+    }
+    return $out;
+}
+
 $users = $pdo->query("SELECT * FROM wsm_users ORDER BY act DESC, role, nom")->fetchAll() ?: [];
 // Les rôles proposés, et RIEN de plus : « Superadmin » n'apparaît que dans la
 // liste d'un Superadmin. Le refus vit aussi côté serveur
@@ -151,6 +167,7 @@ console_head('Użytkownicy', $me, <<<'CSS'
   .usr[open] > summary::after { content: "▴"; }
   .usr .nm { font-weight: 600; color: var(--text-strong); }
   .usr .em { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+  .ouvre { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; display: block; padding-top: 6px; }
   .usr .inner { padding: 6px 4px 20px; }
 CSS);
 console_flash($flash, $kind);
@@ -200,8 +217,13 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Użytkownicy' => null]);
               <option value="<?= h($r) ?>"<?= (string) $u['role'] === $r ? ' selected' : '' ?>><?= h($desc) ?></option>
               <?php endforeach; ?>
             </select></label>
-          <label class="field"><span>Zakres (informacyjnie)</span>
-            <input type="text" name="portee" value="<?= h((string) $u['portee']) ?>"<?= $isAdmin ? '' : ' disabled' ?>></label>
+          <?php // « Zakres » était un champ de texte libre qui ne filtrait RIEN :
+                // on pouvait y écrire « tylko Wrocław » et croire que ça
+                // restreignait quelque chose. Ce qui décide, c'est la rôle —
+                // alors on montre ce qu'elle ouvre, au lieu d'un champ qui
+                // fait semblant. ?>
+          <label class="field"><span>Co otwiera ta rola</span>
+            <span class="ouvre"><?= h(implode(' · ', role_ouvre((string) $u['role']))) ?: '—' ?></span></label>
           <label class="field" style="display:flex;gap:10px;align-items:center;margin-top:22px">
             <input type="checkbox" name="act" value="1"<?= $u['act'] ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>>
             <span style="margin:0;text-transform:none;letter-spacing:0;font-size:14px;color:var(--text-strong)">Konto aktywne</span>
@@ -254,8 +276,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Użytkownicy' => null]);
         </select></label>
       <label class="field"><span>Hasło (min. <?= WSM_PASSWORD_MIN ?> znaków)</span>
         <input type="password" name="password" autocomplete="new-password" required></label>
-      <label class="field"><span>Zakres (informacyjnie)</span>
-        <input type="text" name="portee" placeholder="np. Cała sieć"></label>
+
     </div>
     <div class="actions"><button class="primary" type="submit">Utwórz konto</button></div>
   </form>
