@@ -97,4 +97,36 @@ if [ "$BAD" != "0" ]; then
   exit 1
 fi
 echo "OK — les $NB scripts distants se parsent (bash -n)."
+
+# ── CHAQUE ÉTAPE SSH DOIT PORTER SON MOT DE PASSE ────────────────────────────
+#
+# Une étape ajoutée en recopiant un gabarit d'un AUTRE dépôt nommait
+# DEPLOY_USER / DEPLOY_HOST / DEPLOY_PORT — qui n'existent pas ici — et
+# oubliait le bloc « env: SSHPASS ». Résultat au déploiement 92 : sshpass a
+# affiché son MODE D'EMPLOI, la cible valait « @ », et le déploiement est
+# tombé sans qu'aucune vérification n'ait été jouée. Rien dans le fichier ne
+# pouvait le voir : le YAML est valide, le script distant se parse.
+#
+# On vérifie donc l'appariement lui-même : autant de blocs « SSHPASS: » que
+# d'appels à sshpass, et aucun nom de secret étranger au dépôt.
+NBS=$(grep -c 'sshpass -e ssh' "$F")
+NBE=$(grep -c 'SSHPASS: ' "$F")
+if [ "${NBS:-0}" -lt 1 ]; then
+  echo "REFUSÉ — aucune étape sshpass trouvée : le contrôle ne contrôle rien."
+  exit 1
+fi
+if [ "$NBS" != "$NBE" ]; then
+  echo "REFUSÉ — $NBS étapes appellent sshpass mais $NBE déclarent SSHPASS."
+  echo "         Celle qui manque affichera le mode d'emploi de sshpass au lieu de vérifier."
+  exit 1
+fi
+echo "OK — les $NBS étapes SSH déclarent toutes leur mot de passe."
+
+ETR=$(grep -oE 'secrets\.(DEPLOY_USER|DEPLOY_HOST)|vars\.DEPLOY_PORT' "$F" | sort -u | tr '\n' ' ')
+if [ -n "$ETR" ]; then
+  echo "REFUSÉ — noms de secrets étrangers à ce dépôt : $ETR"
+  echo "         Ici c'est secrets.SSH_USER / SSH_HOST / SSH_PASSWORD et vars.SSH_PORT."
+  exit 1
+fi
+echo "OK — aucun nom de secret étranger."
 exit $RC

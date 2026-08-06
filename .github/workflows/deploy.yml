@@ -1910,11 +1910,21 @@ jobs:
           REMOTE
 
 
+      # Le nom des secrets de CE dépôt est SSH_USER / SSH_HOST / SSH_PASSWORD et
+      # le port vient de vars.SSH_PORT. Le premier jet de cette étape a été
+      # copié d'un autre gabarit (DEPLOY_USER, DEPLOY_HOST, DEPLOY_PORT) et
+      # oubliait le bloc env : sshpass s'est retrouvé sans mot de passe et la
+      # cible valait « @ ». Il n'a pas échoué sur la vérification — il a affiché
+      # son mode d'emploi, ce qui ne ressemble à rien de connu quand on lit un
+      # journal de déploiement. Toutes les autres étapes utilisent exactement
+      # ces quatre lignes ; celle-ci aussi, maintenant.
       - name: Verify the page recorder writes, and writes nothing personal
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
-          sshpass -e ssh -p ${{ vars.DEPLOY_PORT || 22 }} \
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' bash -s" << 'REMOTE'
           fail=0
           q() { mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e "$1" 2>/dev/null || echo ""; }
