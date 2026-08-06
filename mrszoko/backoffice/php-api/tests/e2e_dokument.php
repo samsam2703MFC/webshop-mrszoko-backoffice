@@ -299,7 +299,125 @@ ok('KSeF coupé : la facture est bien émise', ($dD['doc']['number'] ?? '') !== 
 ok('… et le message dit que l\'automat est éteint, pas qu\'il est cassé',
    str_contains((string) $dD['ksef'], 'wyłączony'), $dD['ksef']);
 
-wsm_config_overlay(['orders' => []]);
+// REMETTRE LES RÉGLAGES D'APLOMB — et pas avec « orders => [] ».
+//
+// wsm_config_overlay() fusionne par array_replace_recursive : un tableau VIDE
+// ne remplace rien du tout. La ligne qui prétendait rendre la main aux valeurs
+// par défaut laissait donc le courrier et le KSeF coupés pour tout ce qui
+// suit — un test écrit après elle aurait mesuré une machine à moitié éteinte
+// en croyant la mesurer au repos.
+$domyslne = fn() => wsm_config_overlay(['orders' => [
+    'doc_status' => 'wyslane', 'doc_mail' => 1, 'doc_ksef' => 1, 'vies_recheck' => 1]]);
+$domyslne();
+
+// ---- 5. LE CHEMIN EN BOUTONS, SUR LA LIGNE --------------------------------
+//
+// Le statut est devenu touchable dans la liste : c'est le geste le plus
+// fréquent de la maison, et l'un de ces boutons ÉMET UN DOCUMENT FISCAL. Ce
+// qui doit tenir, dans l'ordre du danger :
+//
+//  · le bouton qui émet PRÉVIENT, et il nomme le document — pas un « Czy na
+//    pewno? » que personne ne lit ;
+//  · l'étape actuelle n'est pas une action (un bouton qui ne fait rien envoie
+//    chercher une panne inexistante) ;
+//  · une commande annulée ne propose plus rien : wsm_order_status_set() la
+//    refuse, l'écran ne doit pas prétendre le contraire ;
+//  · on peut revenir en arrière — un doigt qui glisse se corrige sur place.
+echo "\n-- droga zamówienia w przyciskach --\n";
+
+$oE = $mk(['invoice' => 0]);                      // paragon : ni NIP ni TVA UE
+$et = wsm_order_etapy($pdo, $oE);
+$par = fn(array $l, string $c) => current(array_filter($l, fn($e) => $e['code'] === $c)) ?: [];
+
+ok('les cinq étapes du flux, plus la sortie', count($et) === 6, count($et));
+ok('l\'étape actuelle est marquée « teraz », une seule fois',
+   count(array_filter($et, fn($e) => $e['etat'] === 'teraz')) === 1,
+   array_column($et, 'etat'));
+ok('… et c\'est bien le statut de la commande',
+   ($par($et, 'oplacone')['etat'] ?? '') === 'teraz');
+ok('la suivante est mise en avant', ($par($et, 'w_realizacji')['etat'] ?? '') === 'nastepny');
+ok('la précédente reste proposée — on doit pouvoir se corriger',
+   ($par($et, 'nowe')['etat'] ?? '') === 'przeszly');
+
+// Le repère et la question ne se recopient pas : ils suivent le réglage.
+$wys = $par($et, 'wyslane');
+ok('l\'étape qui émet le document porte son repère', ($wys['doc'] ?? false) === true);
+ok('… et elle DEMANDE avant, en nommant le document',
+   str_contains($wys['pyt'] ?? '', 'PARAGON') && str_contains($wys['pyt'] ?? '', $oE['code']),
+   $wys['pyt'] ?? '');
+ok('les autres étapes ne demandent rien',
+   ($par($et, 'w_realizacji')['pyt'] ?? 'x') === '' && ($par($et, 'nowe')['pyt'] ?? 'x') === '');
+
+// Une facture : la question doit nommer la facture ET le registre.
+$oF = $mk(['company' => 'Kowalski sp. z o.o.', 'nip' => $NIP_OK, 'invoice' => 1]);
+$qF = $par(wsm_order_etapy($pdo, $oF), 'wyslane')['pyt'] ?? '';
+ok('une facture s\'annonce comme une facture, et dit qu\'elle part au KSeF',
+   str_contains($qF, 'FAKTURĘ') && str_contains($qF, 'KSeF'), $qF);
+
+// LE RÉGLAGE COMMANDE, PAS LE CODE. Si le Superadmin déplace l'émission sur
+// « dostarczone », c'est CETTE étape-là qui doit prévenir.
+wsm_config_overlay(['orders' => ['doc_status' => 'dostarczone']]);
+$et2 = wsm_order_etapy($pdo, $oE);
+ok('le repère suit le réglage du Superadmin',
+   ($par($et2, 'dostarczone')['doc'] ?? false) === true
+   && ($par($et2, 'wyslane')['doc'] ?? true) === false,
+   array_column($et2, 'doc'));
+wsm_config_overlay(['orders' => ['doc_status' => 'nigdy']]);
+ok('… et « nigdy » n\'arme plus aucune étape',
+   array_filter(wsm_order_etapy($pdo, $oE), fn($e) => $e['doc']) === []);
+$domyslne();
+
+// Le document déjà émis : plus rien à confirmer, ce clic ne fabrique rien.
+wsm_order_document($pdo, $oE, 'test');
+ok('une fois le document émis, on ne demande plus rien',
+   ($par(wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oE['id'])), 'wyslane')['pyt'] ?? 'x') === '');
+
+// Une commande annulée est FIGÉE — et l'écran doit le dire, pas l'inventer.
+$oG = $mk(['invoice' => 0]);
+$pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute(['anulowane', (int) $oG['id']]);
+$etG = wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oG['id']));
+ok('une commande annulée ne propose plus aucune étape',
+   count(array_filter($etG, fn($e) => in_array($e['etat'], ['nastepny', 'przeszly', 'dalszy', 'zly'], true))) === 0,
+   array_column($etG, 'etat'));
+ok('… et le mot affiché est un état, pas un ordre',
+   ($par($etG, 'anulowane')['txt'] ?? '') === 'Anulowane');
+// La preuve que le verrou n'est pas décoratif : le moteur refuse aussi.
+$avant = (string) wsm_order_by_id($pdo, (int) $oG['id'])['status'];
+wsm_order_status_set($pdo, (int) $oG['id'], 'wyslane', 'test');
+ok('et le moteur refuse pour de bon — l\'écran ne ment pas',
+   (string) wsm_order_by_id($pdo, (int) $oG['id'])['status'] === $avant);
+
+// L'ÉCRAN COUPE LA LISTE EN TROIS — l'étape actuelle, la suivante en grand,
+// le reste replié sous « Inny status ». Une étape qui tomberait entre deux
+// paquets disparaîtrait de l'interface SANS ERREUR : le bouton n'existerait
+// plus, et on croirait à une règle métier. On vérifie donc que les trois
+// paquets recouvrent exactement le chemin, depuis chaque statut possible.
+$oH = $mk(['invoice' => 0]);
+$trous = [];
+foreach (WSM_ORDER_STATUSES as $s) {
+    $pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute([$s, (int) $oH['id']]);
+    $l = wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oH['id']));
+    $t = array_filter($l, fn($e) => $e['etat'] === 'teraz');
+    $n = array_filter($l, fn($e) => $e['etat'] === 'nastepny');
+    $r = array_filter($l, fn($e) => !in_array($e['etat'], ['teraz', 'nastepny'], true));
+    if (count($t) + count($n) + count($r) !== count($l) || count($t) > 1 || count($n) > 1) {
+        $trous[] = $s . ':' . count($t) . '/' . count($n) . '/' . count($r);
+    }
+}
+ok('les trois paquets de l\'écran recouvrent le chemin, quel que soit le statut',
+   $trous === [], $trous);
+// Depuis le dernier état il n'y a plus de « suivante » : le grand bouton
+// disparaît au lieu de proposer un pas dans le vide.
+$pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute(['dostarczone', (int) $oH['id']]);
+ok('arrivé au bout, plus aucune étape n\'est mise en avant',
+   array_filter(wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oH['id'])),
+                fn($e) => $e['etat'] === 'nastepny') === []);
+
+// Les voyants ne refont plus le travail des étapes : « Do wysyłki » et
+// « Wysłane » y étaient les mêmes gestes sous d'autres noms.
+$vy = wsm_order_voyants($pdo, $oF);
+ok('les voyants informent, ils ne doublent plus les étapes',
+   array_keys($vy) === ['vies', 'dok'], array_keys($vy));
 
 // ---- ménage ---------------------------------------------------------------
 $ids = $pdo->query("SELECT id FROM wsm_orders WHERE code LIKE '" . strtoupper($sfx) . "%'")

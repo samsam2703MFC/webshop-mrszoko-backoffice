@@ -49,10 +49,12 @@ $payLabel = ['oczekuje' => 'Oczekuje', 'oplacone' => 'Opłacone', 'nieudane' => 
 // ---- Actions (réservées à Centrala) ---------------------------------------
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!hash_equals($csrf, (string) ($_POST['_t'] ?? ''))) { http_response_code(400); exit('Bad request.'); }
+    // Lu AVANT le contrôle de rôle : la redirection qui suit s'en sert pour
+    // ramener sur la bonne ligne, y compris quand l'action a été refusée.
+    $id = (int) ($_POST['id'] ?? 0);
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może zmieniać zamówienia.'; $flashKind = 'err';
     } else {
-        $id = (int) ($_POST['id'] ?? 0);
         $order = wsm_order_by_id($pdo, $id);
         if (!$order) {
             $flash = 'Nie znaleziono zamówienia.'; $flashKind = 'err';
@@ -77,18 +79,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $flashKind = $num ? 'ok' : 'err';
             }
 
-        } elseif (isset($_POST['do_wysylki']) || isset($_POST['wyslane'])) {
-            // LE MÊME POINT UNIQUE que le sélecteur de statut. Deux chemins
-            // vers le même geste doivent passer par la même porte, sinon celui
-            // qu'on ajoute aujourd'hui n'émettra pas de document demain.
-            $new = isset($_POST['wyslane']) ? 'wyslane' : 'w_realizacji';
-            $chg = wsm_order_status_set($pdo, $id, $new, (string) ($me['nom'] ?? ''));
-            wsm_order_event($pdo, $id, 'status', $new, (string) ($me['nom'] ?? ''));
-            $flash = $order['code'] . ' → ' . ($statusLabel[$new] ?? $new)
-                   . (($chg['note'] ?? '') !== '' ? ' · ' . $chg['note'] : '');
-            $flashKind = $chg['ok'] ? 'ok' : 'err';
-
         } elseif (isset($_POST['status'])) {
+            // UNE SEULE PORTE. « do_wysylki » et « wyslane » étaient deux
+            // branches de plus, ajoutées pour les deux boutons d'expédition de
+            // la liste. Ces boutons sont devenus des étapes, qui postent un
+            // statut comme la fiche : les branches ne servaient plus rien, et
+            // un chemin que personne n'emprunte est un chemin que personne ne
+            // corrige — celui qui n'émettra pas de document au prochain
+            // changement de règle.
             $new = (string) $_POST['status'];
             if (!in_array($new, WSM_ORDER_STATUSES, true)) {
                 $flash = 'Nieznany status.'; $flashKind = 'err';
@@ -134,6 +132,31 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             else { $flash = 'Utworzono przesyłkę ' . ($sh['tracking_number'] ?? ''); }
         }
     }
+
+    // ─── ON RÉPOND PAR UNE REDIRECTION, ET ON REVIENT SUR LA LIGNE ────────
+    //
+    // Cet écran répondait au POST en réaffichant la page. Deux conséquences,
+    // les deux payées par la personne qui s'en sert toute la journée :
+    //
+    //  · Rafraîchir la page rejouait l'action. Sur un écran qui émet des
+    //    documents fiscaux, « voulez-vous renvoyer le formulaire ? » est une
+    //    question qu'on ne devrait jamais avoir à se poser.
+    //  · On repartait EN HAUT d'une liste de deux cents commandes. Un geste
+    //    au milieu de la liste, et il faut re-dérouler jusqu'à sa place —
+    //    quarante fois par jour, au téléphone, une main prise par un colis.
+    //
+    // L'ancre ramène à la ligne touchée, et le message survit dans la
+    // session le temps d'un aller-retour.
+    $_SESSION['zam_flash'] = [$flash, $flashKind];
+    $vers = 'zamowienia.php'
+          . (isset($_GET['id']) ? '?id=' . (int) $_GET['id'] : '')
+          . ($id > 0 ? '#z' . $id : '');
+    header('Location: ' . $vers, true, 303);
+    exit;
+}
+if (isset($_SESSION['zam_flash'])) {
+    [$flash, $flashKind] = $_SESSION['zam_flash'];
+    unset($_SESSION['zam_flash']);
 }
 
 $detail = isset($_GET['id']) ? wsm_order_by_id($pdo, (int) $_GET['id']) : null;
@@ -368,36 +391,134 @@ console_crumbs($detail
 <?php endif; ?>
 
   <div class="tablewrap">
-  <table class="rwd">
-    <thead><tr><th>Numer</th><th>Data</th><th>Klient</th><th>Dostawa</th><th>Status</th><th>Płatność</th><th class="num">Poz.</th><th class="num">Brutto</th><th>Co dalej</th></tr></thead>
+  <?php // « dense » : neuf colonnes, dont une qui porte six boutons. Avec le
+        // rembourrage habituel, ce tableau-là dépasse la largeur de la page et
+        // s'offre une barre de défilement horizontale PERMANENTE — sur l'écran
+        // le plus consulté de la maison, et quelle que soit la taille de
+        // l'écran, puisque la zone de travail est plafonnée à 1180 px. ?>
+  <table class="rwd dense zam">
+    <thead><tr><th>Numer</th><th>Data</th><th>Klient</th><th>Dostawa</th><th>Status</th><th>Płatność</th><th class="num">Poz.</th><th class="num">Brutto</th><th>Kontrolki</th></tr></thead>
     <tbody>
     <?php if (!$orders): ?>
     <tr><td class="muted">Brak zamówień.</td></tr>
     <?php endif; ?>
     <?php foreach ($orders as $o):
       $payCls = $o['payment_status'] === 'oplacone' ? 'ok' : ($o['payment_status'] === 'oczekuje' ? 'wait' : 'bad'); ?>
-    <tr>
+    <tr id="z<?= (int) $o['id'] ?>">
       <td data-l="Numer"><a class="code" href="?id=<?= (int) $o['id'] ?>"><?= h($o['code']) ?></a></td>
-      <td data-l="Data" class="num"><?= h(substr((string) $o['created_at'], 0, 16)) ?></td>
+      <?php // DATE ET HEURE, CHACUNE D'UN SEUL TENANT. En un seul morceau de
+            // texte, la colonne se faisait couper par le tableau en « 2026- /
+            // 08-06 / 17:01 » — trois lignes qui se lisent comme trois données.
+            // Séparées, chacune reste entière : deux lignes au bureau, une
+            // seule sur la fiche du téléphone, jamais d'escalier. ?>
+      <td data-l="Data" class="num"><span class="dt"><?= h(substr((string) $o['created_at'], 0, 10)) ?></span>
+        <span class="tm"><?= h(substr((string) $o['created_at'], 11, 5)) ?></span></td>
       <td data-l="Klient"><?= h($o['client']) ?><br><small class="muted"><?= h($o['email']) ?></small></td>
       <?php // « Kurier » tout court ne dit plus lequel : avec deux transporteurs,
             // c'est l'information qu'on cherche en premier quand un colis coince. ?>
       <td data-l="Dostawa"><?= h(wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'
             ? 'Paczkomat' : 'Kurier ' . strtoupper(wsm_ship_carrier($pdo, (string) $o['delivery_method']))) ?>
         <?= $o['inpost_point'] !== '' ? '<br><small class="muted">' . h($o['inpost_point']) . '</small>' : '' ?></td>
-      <td data-l="Status"><span class="tag"><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
+      <?php
+      // ─── LE STATUT EST LE BOUTON — MAIS UN SEUL EST GROS ────────────────
+      //
+      // Première version : les six étapes en pastilles sur chaque ligne. Ça
+      // marchait, et c'était illisible — deux cents commandes, mille deux
+      // cents boutons, et sur un téléphone UNE seule commande par écran. Le
+      // geste de tous les jours (avancer d'un cran) avait exactement le même
+      // poids visuel que celui qu'on fait trois fois par an (revenir à
+      // « Nowe »), et que celui qu'on ne veut jamais faire par erreur.
+      //
+      // Donc : l'étape SUIVANTE est un grand bouton, seule en vue. Le reste du
+      // chemin se replie derrière un « Inny status » — un <details>, c'est-à-
+      // dire du HTML, qui s'ouvre sans une ligne de JavaScript et fonctionne
+      // sur le téléphone de la réserve.
+      //
+      // UN SEUL formulaire pour toute la ligne, et autant de boutons de
+      // soumission que d'étapes : un formulaire par bouton aurait multiplié
+      // par six le poids d'une page qui en porte déjà deux cents.
+      $etapy = wsm_order_etapy($pdo, $o);
+      $teraz = current(array_filter($etapy, fn($e) => $e['etat'] === 'teraz')) ?: null;
+      $suiv  = current(array_filter($etapy, fn($e) => $e['etat'] === 'nastepny')) ?: null;
+      $autres = array_values(array_filter($etapy,
+                    fn($e) => !in_array($e['etat'], ['teraz', 'nastepny'], true)));
+      // Un bouton d'étape, rendu une seule fois pour les deux endroits où il
+      // apparaît : le grand devant, et les petits dans le repli.
+      $bouton = function (array $e, string $extra = '') use ($o) { ?>
+        <button class="etap <?= h($e['etat']) ?><?= $extra !== '' ? ' ' . $extra : '' ?>"
+                name="status" value="<?= h($e['code']) ?>"
+                <?= $e['pyt'] !== '' ? 'data-pyt="' . h($e['pyt']) . '" onclick="return confirm(this.dataset.pyt)"' : '' ?>
+                title="<?= h($o['code']) ?> → <?= h($e['txt']) ?><?= $e['doc'] ? ' · wystawi dokument' : '' ?>">
+          <?= h($e['txt']) ?><?= $e['doc'] ? '<span class="doc" aria-hidden="true">•</span>' : '' ?>
+        </button>
+      <?php }; ?>
+      <td data-l="Status" class="wide">
+        <?php if ($isAdmin): ?>
+        <form method="post" class="etapy" role="group"
+              aria-label="Zmień status zamówienia <?= h($o['code']) ?>">
+          <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+          <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+          <?php // ON PRÉVIENT LE CLIENT D'ICI AUSSI.
+                //
+                // La fiche coche « Powiadom klienta » par défaut ; la liste,
+                // elle, n'a jamais rien envoyé. Tant que la liste ne portait que
+                // deux boutons de secours, la différence ne se voyait pas. Elle
+                // devient le chemin principal : sans cette ligne, « votre colis
+                // est parti » cesserait de partir du jour au lendemain, et
+                // personne ne saurait pourquoi.
+                //
+                // Un seul e-mail par (commande, état) — wsm_mail_for_status()
+                // le garantit par sa clé d'événement, donc revenir en arrière et
+                // ré-avancer ne renvoie rien. La fiche garde sa case pour les
+                // cas où l'on veut justement se taire. ?>
+          <input type="hidden" name="powiadom" value="1">
+
+          <?php // Où l'on est. Pas un bouton : appuyer dessus ne ferait rien, et
+                // un bouton qui ne fait rien envoie chercher une panne. ?>
+          <?php if ($teraz): ?>
+          <?php // Une commande annulée porte SA couleur, pleine. Marquée avec la
+                // classe du bouton « Anuluj », elle ressortait en lien rouge
+                // souligné : l'état d'une commande morte se lisait comme une
+                // action à faire. ?>
+          <span class="etap teraz<?= $o['status'] === 'anulowane' ? ' anulowana' : '' ?>"
+                aria-current="step"><?= h($teraz['txt']) ?></span>
+          <?php endif; ?>
+
+          <?php // Le geste de tous les jours, en grand. ?>
+          <?php if ($suiv) $bouton($suiv, 'glowny'); ?>
+
+          <?php // Et tout le reste du chemin, replié. Fermé, il coûte une ligne. ?>
+          <?php if ($autres): ?>
+          <details class="etapy-wiecej">
+            <summary>Inny status</summary>
+            <div class="etapy-lista">
+              <?php foreach ($autres as $e): ?>
+                <?php if ($e['etat'] === 'niemozliwy'): ?>
+                <?php // Grisé SANS explication, on cherche la panne. Le titre dit
+                      // que c'est la règle, pas un bouton cassé. ?>
+                <span class="etap niemozliwy"
+                      title="Zamówienie anulowane — stanu już nie zmienisz"><?= h($e['txt']) ?></span>
+                <?php else: $bouton($e); endif; ?>
+              <?php endforeach; ?>
+            </div>
+          </details>
+          <?php endif; ?>
+        </form>
+        <?php else: ?>
+        <span class="tag"><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
+        <?php endif; ?>
         <?php if (!empty($o['backorder'])): ?> <span class="tag no">do potwierdzenia</span><?php endif; ?>
         <?php if (($o['discount_percent'] ?? 0) > 0): ?> <span class="tag">−<?= (int) $o['discount_percent'] ?> %</span><?php endif; ?></td>
       <td data-l="Płatność"><span class="tag <?= h($payCls) ?>"><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span></td>
       <td data-l="Pozycje" class="num"><?= (int) $o['units'] ?></td>
       <td data-l="Brutto" class="num"><?= h(pln($o['total_gross'])) ?></td>
       <?php
-      // LES QUATRE VOYANTS, ET LE GESTE QUI VA AVEC. Il fallait ouvrir chaque
-      // fiche pour savoir si une commande partirait avec une facture ou un
-      // e-paragon, si son numéro de TVA tenait toujours, et si le document
+      // LES DEUX VOYANTS, ET LE GESTE QUI LES DÉBLOQUE. Il fallait ouvrir
+      // chaque fiche pour savoir si une commande partirait avec une facture ou
+      // un e-paragon, si son numéro de TVA tenait toujours, et si le document
       // était arrivé au registre. On ne le faisait donc pas.
       $vy = wsm_order_voyants($pdo, $o); ?>
-      <td data-l="Co dalej"><div class="voyants">
+      <td data-l="Kontrolki" class="wide"><div class="voyants">
         <?php foreach ($vy as $k => $v): ?>
           <?php if ($v['agir'] !== '' && $isAdmin): ?>
           <form method="post" style="display:inline">
