@@ -1669,8 +1669,14 @@ jobs:
             && echo "  index.html kieruje na login.php" \
             || { echo "  ^ NOT OK : stary adres prowadzi donikąd"; fail=1; }
           # Et les 1,2 Mo doivent avoir disparu du serveur.
+          #
+          # -L, ENCORE. Ce serveur impose HTTPS : toute URL en http reçoit
+          # d'abord un 301, et le lire comme la réponse du fichier fait
+          # conclure « toujours servi » sur des fichiers parfaitement absents.
+          # C'est la deuxième fois dans ce chantier — au déploiement 76 puis
+          # ici. Le commentaire reste pour la troisième.
           for mort in /support.js /bo_server.js /menu_api.js /menu_seed.js /vendor/react-dom.js; do
-            MC=$(curl -sk -o /dev/null -w '%{http_code}' "$BO$mort")
+            MC=$(curl -skL -o /dev/null -w '%{http_code}' "$BO$mort")
             case "$MC" in
               404|403) echo "  $MC  $mort (retiré)" ;;
               *) echo "  ^ ZLE : $mort répond encore $MC — l'ancienne console est toujours servie"; fail=1 ;;
