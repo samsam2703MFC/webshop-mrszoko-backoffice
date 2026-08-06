@@ -68,6 +68,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                    . ' — przy „Wysłane" powstanie: ' . wsm_invoice_kind_for($order)['kind'] . '.';
             $flashKind = $vs === 'invalid' ? 'err' : 'ok';
 
+        } elseif (isset($_POST['oplac'])) {
+            // L'ENCAISSEMENT À LA MAIN, pour les virements. Il ne passe PAS
+            // par le chemin du colis : marquer payée une commande déjà en
+            // préparation ne doit pas la ramener en arrière. wsm_order_mark_paid()
+            // écrit les deux champs et la date, comme le fait tpay.
+            if ((string) $order['payment_status'] === 'oplacone') {
+                $flash = $order['code'] . ' była już opłacona.';
+            } else {
+                wsm_order_mark_paid($pdo, $id, (string) ($me['nom'] ?? '') ?: 'ręcznie');
+                $fresh = wsm_order_by_id($pdo, $id) ?: $order;
+                $flash = $order['code'] . ' · zapłata odnotowana ręcznie — '
+                       . ($statusLabel[$fresh['status']] ?? $fresh['status']);
+            }
+
         } elseif (isset($_POST['ksef'])) {
             $doc = wsm_invoice_for_order($pdo, $id);
             if (!$doc) { $flash = 'Nie ma jeszcze dokumentu.'; $flashKind = 'err'; }
@@ -509,7 +523,21 @@ console_crumbs($detail
         <?php endif; ?>
         <?php if (!empty($o['backorder'])): ?> <span class="tag no">do potwierdzenia</span><?php endif; ?>
         <?php if (($o['discount_percent'] ?? 0) > 0): ?> <span class="tag">−<?= (int) $o['discount_percent'] ?> %</span><?php endif; ?></td>
-      <td data-l="Płatność"><span class="tag <?= h($payCls) ?>"><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span></td>
+      <?php // L'ARGENT A SA COLONNE, ET SON GESTE. La plupart des commandes
+            // sont réglées par tpay, qui écrit tout seul. Le virement, lui,
+            // arrive sur un relevé : quelqu'un doit pouvoir dire « c'est
+            // encaissé » sans passer par le chemin du colis. ?>
+      <td data-l="Płatność"><span class="tag <?= h($payCls) ?>"><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span>
+        <?php if ($isAdmin && $o['payment_status'] !== 'oplacone' && $o['status'] !== 'anulowane'): ?>
+        <form method="post" class="oplac">
+          <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+          <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+          <button class="etap kasa" name="oplac" value="1"
+                  data-pyt="<?= h($o['code']) ?> — odnotować zapłatę <?= h(pln($o['total_gross'])) ?>? Tego nie cofniesz z tego ekranu."
+                  onclick="return confirm(this.dataset.pyt)"
+                  title="Zapłata przyszła przelewem — zapisz ją ręcznie">Opłacone ✓</button>
+        </form>
+        <?php endif; ?></td>
       <td data-l="Pozycje" class="num"><?= (int) $o['units'] ?></td>
       <td data-l="Brutto" class="num"><?= h(pln($o['total_gross'])) ?></td>
       <?php

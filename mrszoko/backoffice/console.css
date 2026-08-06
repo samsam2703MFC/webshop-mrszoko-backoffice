@@ -380,6 +380,17 @@ span.etap { cursor: default; }
 /* Commande annulée : un état, pas une action. Plein, dans la couleur du
    refus, et sans soulignement — on ne clique pas dessus. */
 .etap.teraz.anulowana { background: var(--danger); border-color: var(--danger); color: var(--cream-50); }
+
+/* L'encaissement à la main : discret et VERT, jamais dans les tons du chemin
+   du colis. Ces deux axes ne se mélangent pas — c'était tout le défaut de la
+   version précédente, où « Opłacone » trônait au milieu des étapes. */
+.oplac { display: inline; }
+.etap.kasa {
+  min-height: 36px; padding: 0 11px; font-size: 12.5px; font-weight: 600;
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  color: var(--success); background: transparent;
+}
+@media (max-width: 760px) { .etap.kasa { min-height: 44px; font-size: 13px; } }
 /* Le repère de l'étape qui ÉMET un document fiscal. Discret, mais présent
    avant le clic — pas après, quand la facture est déjà partie au registre. */
 .etap .doc { font-size: 18px; line-height: 0; opacity: .75; }

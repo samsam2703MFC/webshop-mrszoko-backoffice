@@ -329,15 +329,27 @@ $oE = $mk(['invoice' => 0]);                      // paragon : ni NIP ni TVA UE
 $et = wsm_order_etapy($pdo, $oE);
 $par = fn(array $l, string $c) => current(array_filter($l, fn($e) => $e['code'] === $c)) ?: [];
 
-ok('les cinq étapes du flux, plus la sortie', count($et) === 6, count($et));
+// Quatre étapes de colis — préparer, expédier, livrer, plus le point de
+// départ — et la sortie. « Opłacone » n'en fait plus partie : c'est l'autre
+// axe, celui de l'argent.
+ok('les quatre étapes du colis, plus la sortie', count($et) === 5, count($et));
 ok('l\'étape actuelle est marquée « teraz », une seule fois',
    count(array_filter($et, fn($e) => $e['etat'] === 'teraz')) === 1,
    array_column($et, 'etat'));
-ok('… et c\'est bien le statut de la commande',
-   ($par($et, 'oplacone')['etat'] ?? '') === 'teraz');
+// La commande de test est « opłacone » : l'état s'affiche sous son propre
+// nom, à la place du colis — qui n'a pas bougé.
+ok('… et il porte le nom de l\'état réel de la commande',
+   (current(array_filter($et, fn($e) => $e['etat'] === 'teraz'))['txt'] ?? '') === 'Opłacone',
+   array_column($et, 'txt'));
 ok('la suivante est mise en avant', ($par($et, 'w_realizacji')['etat'] ?? '') === 'nastepny');
+// Revenir en arrière reste possible : un doigt qui glisse se corrige sur
+// place. Vu depuis « wysłane », la préparation est une étape passée, donc
+// toujours proposée.
+$pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute(['wyslane', (int) $oE['id']]);
+$etW = wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oE['id']));
 ok('la précédente reste proposée — on doit pouvoir se corriger',
-   ($par($et, 'nowe')['etat'] ?? '') === 'przeszly');
+   ($par($etW, 'w_realizacji')['etat'] ?? '') === 'przeszly', array_column($etW, 'etat'));
+$pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute(['oplacone', (int) $oE['id']]);
 
 // Le repère et la question ne se recopient pas : ils suivent le réglage.
 $wys = $par($et, 'wyslane');
@@ -412,6 +424,67 @@ $pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute(['dostar
 ok('arrivé au bout, plus aucune étape n\'est mise en avant',
    array_filter(wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oH['id'])),
                 fn($e) => $e['etat'] === 'nastepny') === []);
+
+// ---- 6. L'ARGENT ET LE COLIS SONT DEUX AXES -------------------------------
+//
+// « Opłacone » était au milieu du chemin des étapes. Comme la plupart des
+// commandes sont « nowe », il ressortait en GRAND BOUTON sur presque chaque
+// ligne : le geste le plus visible de l'écran le plus utilisé proposait,
+// quarante fois par jour, quelque chose que personne ne devait faire —
+// l'encaissement est écrit par tpay. Et il le faisait FAUX : la commande se
+// déclarait payée pendant que payment_status restait « oczekuje ».
+echo "\n-- pieniądze i paczka to dwie osie --\n";
+
+$oP = $mk(['invoice' => 0]);
+$pdo->prepare('UPDATE wsm_orders SET status = ?, payment_status = ?, paid_at = NULL WHERE id = ?')
+    ->execute(['nowe', 'oczekuje', (int) $oP['id']]);
+$et = wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oP['id']));
+ok('le chemin ne propose plus « Opłacone » comme étape',
+   !in_array('oplacone', array_column($et, 'code'), true), array_column($et, 'code'));
+ok('… et l\'étape suivante d\'une commande neuve est la préparation',
+   (current(array_filter($et, fn($e) => $e['etat'] === 'nastepny'))['code'] ?? '') === 'w_realizacji');
+
+// Une commande payée par tpay est un ÉTAT où l'on peut être : elle s'affiche,
+// à sa place, et la suite reste la préparation.
+$pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute(['oplacone', (int) $oP['id']]);
+$etO = wsm_order_etapy($pdo, wsm_order_by_id($pdo, (int) $oP['id']));
+$terazO = current(array_filter($etO, fn($e) => $e['etat'] === 'teraz')) ?: [];
+ok('une commande payée montre « Opłacone » comme état courant',
+   ($terazO['txt'] ?? '') === 'Opłacone', $terazO);
+ok('… et sa suite est toujours la préparation',
+   (current(array_filter($etO, fn($e) => $e['etat'] === 'nastepny'))['code'] ?? '') === 'w_realizacji');
+
+// LE FOND : « payée » n'est pas un mot, c'est de l'argent. Quelle que soit la
+// porte, les deux champs et la date bougent ensemble — sinon on expédie sans
+// avoir encaissé, le compteur « en attente de paiement » ment, et on relance
+// quelqu'un qui a payé.
+$oQ = $mk(['invoice' => 0]);
+$pdo->prepare('UPDATE wsm_orders SET status = ?, payment_status = ?, paid_at = NULL WHERE id = ?')
+    ->execute(['nowe', 'oczekuje', (int) $oQ['id']]);
+wsm_order_status_set($pdo, (int) $oQ['id'], 'oplacone', 'test');
+$rQ = $pdo->query('SELECT status, payment_status, paid_at FROM wsm_orders WHERE id = ' . (int) $oQ['id'])->fetch();
+ok('mettre le statut « opłacone » encaisse VRAIMENT la commande',
+   $rQ['payment_status'] === 'oplacone' && !empty($rQ['paid_at']), $rQ);
+
+// Et le colis ne recule pas : un virement encaissé pendant la préparation ne
+// doit pas renvoyer la commande dans la file de celui qui vient de la faire.
+$oR = $mk(['invoice' => 0]);
+$pdo->prepare('UPDATE wsm_orders SET status = ?, payment_status = ?, paid_at = NULL WHERE id = ?')
+    ->execute(['w_realizacji', 'oczekuje', (int) $oR['id']]);
+wsm_order_mark_paid($pdo, (int) $oR['id'], 'test');
+$rR = $pdo->query('SELECT status, payment_status FROM wsm_orders WHERE id = ' . (int) $oR['id'])->fetch();
+ok('encaisser une commande en préparation ne la fait pas reculer',
+   $rR['status'] === 'w_realizacji' && $rR['payment_status'] === 'oplacone', $rR);
+
+// Le cas ordinaire de tpay ne change pas : payée avant préparation, la
+// commande passe bien à « opłacone ».
+$oS = $mk(['invoice' => 0]);
+$pdo->prepare('UPDATE wsm_orders SET status = ?, payment_status = ?, paid_at = NULL WHERE id = ?')
+    ->execute(['nowe', 'oczekuje', (int) $oS['id']]);
+wsm_order_mark_paid($pdo, (int) $oS['id'], 'tpay');
+$rS = $pdo->query('SELECT status, payment_status FROM wsm_orders WHERE id = ' . (int) $oS['id'])->fetch();
+ok('… mais une commande neuve payée passe bien à « opłacone »',
+   $rS['status'] === 'oplacone' && $rS['payment_status'] === 'oplacone', $rS);
 
 // Les voyants ne refont plus le travail des étapes : « Do wysyłki » et
 // « Wysłane » y étaient les mêmes gestes sous d'autres noms.

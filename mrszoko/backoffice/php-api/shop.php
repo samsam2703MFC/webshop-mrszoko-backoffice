@@ -1309,7 +1309,17 @@ function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bo
     $st->execute([$orderId]);
     $cur = (string) $st->fetchColumn();
     if ($cur === 'oplacone') return false;                    // déjà encaissée
-    $pdo->prepare("UPDATE wsm_orders SET payment_status='oplacone', status='oplacone', paid_at=CURRENT_TIMESTAMP WHERE id=?")
+    // LE COLIS NE RECULE PAS. Cette ligne écrivait status='oplacone' sans
+    // condition. Tant que l'argent arrivait avant la préparation — le cas de
+    // tpay — ça ne se voyait pas. Mais un virement encaissé pendant que la
+    // commande est « W realizacji », et le colis retournait en arrière : la
+    // personne qui l'a préparé le voit réapparaître dans sa file, et le
+    // prépare une seconde fois.
+    $pdo->prepare("UPDATE wsm_orders
+                      SET payment_status = 'oplacone',
+                          status  = CASE WHEN status = 'nowe' THEN 'oplacone' ELSE status END,
+                          paid_at = CURRENT_TIMESTAMP
+                    WHERE id = ?")
         ->execute([$orderId]);
     $pdo->prepare("UPDATE wsm_payments SET status='oplacone' WHERE order_id=?")->execute([$orderId]);
     wsm_order_event($pdo, $orderId, 'oplacone', '', $actor);
@@ -1398,7 +1408,35 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
         return $out;
     }
 
+    // ─── « PAYÉE » N'EST PAS UN MOT, C'EST DE L'ARGENT ───────────────────
+    //
+    // Écrire status = 'oplacone' ne faisait QUE ça : la commande se déclarait
+    // payée, `payment_status` restait à « oczekuje » et `paid_at` à NULL. Une
+    // commande qui ment sur son encaissement, c'est un colis qu'on expédie
+    // sans avoir été payé, un compteur « en attente de paiement » faux sur le
+    // tableau de bord, et une relance envoyée à quelqu'un qui a payé.
+    //
+    // Le webhook tpay, lui, a toujours bougé les deux champs ensemble
+    // (wsm_order_mark_paid). On passe donc par la MÊME porte, quelle que soit
+    // la main qui pousse : la liste, la fiche, ou un futur écran.
+    //
+    // ON NE SORT PAS D'ICI APRÈS L'ENCAISSEMENT. wsm_order_mark_paid() écrit
+    // les deux champs mais n'émet aucun document — et « opłacone » est l'un
+    // des états que le Superadmin peut choisir pour l'émission. Rendre la main
+    // tout de suite aurait donc éteint la facture chez qui a réglé ce
+    // paramètre-là, sans un mot. On encaisse, puis on continue.
+    $paye = false;
+    if ($new === 'oplacone') {
+        $ps = $pdo->prepare("SELECT payment_status FROM wsm_orders WHERE id = ?");
+        $ps->execute([$id]);
+        if ((string) $ps->fetchColumn() !== 'oplacone') {
+            wsm_order_mark_paid($pdo, $id, $actor !== '' ? $actor : 'ręcznie');
+            $paye = true;
+        }
+    }
+
     $pdo->prepare("UPDATE wsm_orders SET status = ? WHERE id = ?")->execute([$new, $id]);
+    if ($paye) $out['note'] = 'zapłata odnotowana ręcznie';
     $out['ok'] = true;
     if ($avant === $new) return $out;              // rien de neuf : rien à émettre
 
@@ -1422,17 +1460,21 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
                 // Elle ne lève jamais : une commande expédiée dont le document
                 // échoue reste expédiée. Le colis est parti, on ne le rattrape
                 // pas en refusant d'écrire un état.
+                // On AJOUTE au message, on ne l'écrase pas : quand le
+                // paiement vient d'être noté à la main ET que ce même état
+                // émet le document, l'opérateur doit lire les deux.
+                $deja = $out['note'] !== '' ? $out['note'] . ' · ' : '';
                 try {
                     $d = wsm_order_document($pdo, $order, $actor);
                     $out['doc']  = $d['doc'];
-                    $out['note'] = $d['doc']
+                    $out['note'] = $deja . ($d['doc']
                         ? strtoupper((string) $d['kind']) . ' ' . (string) $d['doc']['number']
                           . ' — ' . $d['raison']
                           . ($d['mail'] ? ' · wysłano mailem' : '')
                           . ($d['ksef'] !== '' ? ' · KSeF: ' . $d['ksef'] : '')
-                        : 'dokument nie powstał: ' . $d['raison'];
+                        : 'dokument nie powstał: ' . $d['raison']);
                 } catch (Throwable $e) {
-                    $out['note'] = 'stan zmieniony, dokument nie powstał';
+                    $out['note'] = $deja . 'stan zmieniony, dokument nie powstał';
                 }
             }
         }
