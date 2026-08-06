@@ -1605,24 +1605,30 @@ jobs:
                 echo "  ^ NOT OK : dodanie do koszyka nie zadziałało — kasa pusta"; fail=1;;
               *) echo "  ^ NOT OK : kasa nie pokazuje pola paczkomatu"; fail=1;;
             esac
-            # Le sélecteur sur carte n'est un enrichissement que s'il ARRIVE.
+            # 3. LA PAGE RENDUE EST LE SEUL JUGE DU JETON.
+            #
+            # Il y avait ici une seconde question, posée à php-cli :
+            # `wsm_inpost_geowidget_token()`. Elle répondait « BRAK » sur une
+            # boutique où le sélecteur s'affichait parfaitement — deux lignes
+            # qui se contredisaient dans le même bloc de journal.
+            #
+            # La raison n'a rien à voir avec InPost. Le jeton est saisi dans
+            # l'écran Ustawienia, donc rangé en BASE, et il n'entre en vigueur
+            # que par la surcouche que wsm_bootstrap() applique après avoir
+            # ouvert la connexion. Or php-cli n'a pas pdo_mysql sur ce serveur
+            # — seul le SAPI web l'a. La sonde ne pouvait donc JAMAIS voir un
+            # jeton configuré depuis la console, et annonçait une panne qui
+            # n'existait pas. (Même piège qu'au déploiement 79.)
+            #
+            # Ce que reçoit le client est de toute façon la vraie réponse.
             case "$KA" in
-              *'<inpost-geowidget'*) echo "  selektor na mapie: w wyrenderowanej kasie";;
-              *) echo "  selektor na mapie: nieaktywny (brak tokenu) — pole tekstowe wystarcza";;
+              *'<inpost-geowidget'*)
+                echo "  selektor na mapie: AKTYWNY — token ustawiony, klient wybiera na mapie";;
+              *)
+                echo "  selektor na mapie: nieaktywny — brak tokenu; klient wpisuje kod ręcznie (pole działa)";;
             esac
           fi
           rm -f "$JAR"
-          # 3. Le jeton public est-il en place ? Il ne tient à aucune base.
-          GEO=$(php -r '
-            require_once "'"$DIR_API"'/inpost.php";
-            $t = wsm_inpost_geowidget_token();
-            echo ($t !== "" && strtolower($t) !== "xxxx") ? "jest" : "brak";
-          ' 2>/dev/null || echo "blad")
-          case "$GEO" in
-            jest) echo "  token geowidget: ustawiony — klient wybiera na mapie" ;;
-            brak) echo "  token geowidget: BRAK — klient wpisuje kod z pamięci (pole działa)" ;;
-            *)    echo "  ^ ATTENTION : nie udało się odczytać konfiguracji InPost"; fail=1 ;;
-          esac
 
           echo "== SEO : nic prywatnego w indeksie, hreflang bezwzględne =="
           # La page de suivi porte nom, adresse et détail d'achat. Un lien
