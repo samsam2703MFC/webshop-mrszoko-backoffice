@@ -392,11 +392,12 @@ function wsm_seed_shop(PDO $pdo): void {
     // --- Modes de livraison -------------------------------------------------
     $pdo->exec('DELETE FROM wsm_shipping_methods');
     $sm = $pdo->prepare('INSERT INTO wsm_shipping_methods
-        (id, carrier, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
-        VALUES (?,?,?,?,?,?,?,?)');
+        (id, carrier, sort_order, active, price_net, vat_rate, free_from, min_weight_g, max_weight_g)
+        VALUES (?,?,?,?,?,?,?,?,?)');
     foreach ($doc['shipping'] ?? [] as $m) {
         $sm->execute([$m['id'], $m['carrier'] ?? 'inpost', $m['sort_order'] ?? 0, $m['active'] ?? 1,
-            $m['price_net'] ?? 0, $m['vat_rate'] ?? 0.23, $m['free_from'] ?? 0, $m['max_weight_g'] ?? 25000]);
+            $m['price_net'] ?? 0, $m['vat_rate'] ?? 0.23, $m['free_from'] ?? 0,
+            $m['min_weight_g'] ?? 0, $m['max_weight_g'] ?? 25000]);
     }
 
     // --- Produits vendus en ligne ------------------------------------------
@@ -477,13 +478,14 @@ function wsm_sync_content(PDO $pdo): array {
     // un prix de port se décide en console, pas au déploiement.
     $sel = $pdo->prepare('SELECT 1 FROM wsm_shipping_methods WHERE id = ?');
     $insS = $pdo->prepare('INSERT INTO wsm_shipping_methods
-        (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from, max_weight_g)
-        VALUES (?,?,?,?,?,?,?,?,?)');
+        (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from, min_weight_g, max_weight_g)
+        VALUES (?,?,?,?,?,?,?,?,?,?)');
     foreach ($livre['ship'] as $m) {
         $sel->execute([$m['id']]);
         if ($sel->fetchColumn()) continue;
         $insS->execute([$m['id'], $m['carrier'], $m['kind'], $m['sort_order'], $m['active'],
-                        $m['price_net'], $m['vat_rate'], $m['free_from'], $m['max_weight_g']]);
+                        $m['price_net'], $m['vat_rate'], $m['free_from'],
+                        $m['min_weight_g'], $m['max_weight_g']]);
         $ship++;
     }
     return [$added, $ship];
@@ -528,7 +530,11 @@ function wsm_content_livre(): array {
                 'kind' => (string) ($m['kind'] ?? 'adres'),
                 'sort_order' => (int) ($m['sort_order'] ?? 0), 'active' => (int) ($m['active'] ?? 1),
                 'price_net' => (int) ($m['price_net'] ?? 0), 'vat_rate' => (float) ($m['vat_rate'] ?? 0.23),
-                'free_from' => (int) ($m['free_from'] ?? 0), 'max_weight_g' => (int) ($m['max_weight_g'] ?? 25000),
+                'free_from' => (int) ($m['free_from'] ?? 0),
+                // Le poids PLANCHER d'un transporteur de palettes. Absent du
+                // fichier, il vaut zéro : les modes historiques n'en ont pas.
+                'min_weight_g' => (int) ($m['min_weight_g'] ?? 0),
+                'max_weight_g' => (int) ($m['max_weight_g'] ?? 25000),
             ];
         }
     }
@@ -598,6 +604,12 @@ function wsm_sync_content_sql(): string {
         $out[] = "PREPARE wsm_st FROM @s; EXECUTE wsm_st; DEALLOCATE PREPARE wsm_st;";
     };
     $ajoute('wsm_shipping_methods', 'kind', "VARCHAR(12) NOT NULL DEFAULT 'adres'");
+    // Même leçon que `kind` au déploiement 90 : la colonne AVANT la ligne.
+    // Ce SQL tourne avant que l'application ait démarré une seule fois, donc
+    // avant que wsm_bootstrap() ait pu poser min_weight_g. Sans cet ordre,
+    // l'INSERT de Fresh Logistic nomme une colonne inconnue et TOUT le lot
+    // tombe — y compris les libellés des autres transporteurs.
+    $ajoute('wsm_shipping_methods', 'min_weight_g', 'INT NOT NULL DEFAULT 0');
     // Et les deux services historiques prennent le type qu'ils ont toujours eu.
     // Sans cette ligne, le Paczkomat hérite du défaut « adres » et la caisse
     // réclame une rue pour une skrytka.
@@ -610,11 +622,13 @@ function wsm_sync_content_sql(): string {
     }
     foreach ($livre['ship'] as $m) {
         $out[] = 'INSERT IGNORE INTO wsm_shipping_methods'
-               . ' (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from, max_weight_g) VALUES ('
+               . ' (id, carrier, kind, sort_order, active, price_net, vat_rate, free_from,'
+               . ' min_weight_g, max_weight_g) VALUES ('
                . wsm_sql_txt($m['id']) . ', ' . wsm_sql_txt($m['carrier']) . ', '
                . wsm_sql_txt($m['kind']) . ', '
                . $m['sort_order'] . ', ' . $m['active'] . ', ' . $m['price_net'] . ', '
-               . $m['vat_rate'] . ', ' . $m['free_from'] . ', ' . $m['max_weight_g'] . ');';
+               . $m['vat_rate'] . ', ' . $m['free_from'] . ', '
+               . $m['min_weight_g'] . ', ' . $m['max_weight_g'] . ');';
     }
     return $out ? implode("\n", $out) . "\n" : '';
 }

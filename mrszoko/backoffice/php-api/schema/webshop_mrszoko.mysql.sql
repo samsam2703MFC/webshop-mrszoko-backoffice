@@ -452,6 +452,11 @@ CREATE TABLE IF NOT EXISTS `wsm_shipping_methods` (
   `price_net`    INT NOT NULL DEFAULT 0,         -- grosze, hors TVA
   `vat_rate`     DECIMAL(4,2) NOT NULL DEFAULT 0.23,
   `free_from`    INT NOT NULL DEFAULT 0,         -- franco en grosze TTC (0 = jamais)
+  -- LE POIDS MINIMUM, et pas seulement le maximum. Un transporteur de palettes
+  -- (Fresh Logistic) commence a 200 kg : le proposer pour une tablette de
+  -- chocolat est absurde, et l'inverse — proposer un Paczkomat pour 300 kg —
+  -- l'est tout autant. Les deux bornes se lisent donc ici, pas dans du code.
+  `min_weight_g` INT NOT NULL DEFAULT 0,
   `max_weight_g` INT NOT NULL DEFAULT 25000,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1627,6 +1627,27 @@ jobs:
             *wzorow=0*) echo "  ^ ATTENTION : brak wzoru — przypomnienie byloby nieme"; fail=1;;
             *) ;;
           esac
+          if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
+          REMOTE
+
+      # ----------------------------------------------------------------------
+      #  LES TRANSPORTEURS, DANS UNE ÉTAPE À PART.
+      #
+      #  Même raison que pour l'argent : le validateur (tools/check-workflow.sh)
+      #  a signalé « proche de la limite » à 17 600 caractères sur l'étape
+      #  fulfilment. GitHub REFUSE en silence au-delà de 21 000 — course créée
+      #  puis tuée, zéro job, aucun message. Ce dépôt l'a déjà payé une fois ;
+      #  on scinde au premier avertissement, pas au premier échec.
+      # ----------------------------------------------------------------------
+      - name: Verify carriers (DPD, pallet, weight bounds)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' bash -s" << 'REMOTE'
+          fail=0
           echo "== drugi przewoźnik : DPD =="
           # DEUX TRANSPORTEURS, ET LE PIÈGE N'EST PAS OÙ L'ON CROIT. Ce qui
           # casse en ajoutant DPD, ce n'est pas DPD : ce sont les quatorze
@@ -1680,7 +1701,42 @@ jobs:
             OTWARTY*)   echo "  UWAGA : kanal DPD otwarty. Sprawdz, ze dane sa w config.local.php, nie w repozytorium." ;;
             *)          echo "  ^ ZLE : dpd.php nie laduje sie"; fail=1 ;;
           esac
-          if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
+          echo "== trzeci przewoznik : paleta od 200 kg =="
+          # Deux erreurs symetriques, et aucune ne leve quoi que ce soit :
+          # proposer un transport de palettes pour une tablette de chocolat, ou
+          # continuer a proposer un Paczkomat pour 30 kg alors que le colis sera
+          # refuse au depot. La liste se filtre donc AVANT d'etre montree.
+          COLW=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT COUNT(*) FROM information_schema.columns
+              WHERE table_schema='mrszoko' AND table_name='wsm_shipping_methods'
+                AND column_name='min_weight_g';" 2>/dev/null || echo 0)
+          [ "${COLW:-0}" = "1" ] \
+            && echo "  kolumna min_weight_g : obecna" \
+            || { echo "  ^ ZLE : brak min_weight_g — paleta bylaby proponowana na kazdy koszyk"; fail=1; }
+          FRESH=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT CONCAT(carrier,':',min_weight_g,':',max_weight_g,':',active)
+               FROM wsm_shipping_methods WHERE id='fresh_logistic';" 2>/dev/null || echo "")
+          echo "  fresh_logistic : ${FRESH:-BRAK}"
+          case "$FRESH" in
+            fresh:200000:*) echo "  ok — prog 200 kg zapisany" ;;
+            "")             echo "  ^ ZLE : metoda nie dojechala do bazy"; fail=1 ;;
+            *)              echo "  UWAGA : prog zmieniony w konsoli — to dozwolone" ;;
+          esac
+          # Le transporteur connu mais non pilote ne doit pas passer pour
+          # inconnu : « Nieznany przewoznik » enverrait chercher une faute de
+          # configuration la ou la commande est parfaitement normale.
+          MOUT=$(php -r '
+            require_once "'"$DIR_API"'/shipping.php";
+            $m = WSM_SHIP_MANUELS["fresh"] ?? "";
+            $b = wsm_ship_blockers_adresse(["phone"=>"600100200","email"=>"a@b.pl",
+                  "first_name"=>"Jan","weight_g"=>250000,
+                  "ship"=>["street"=>"Polna","building"=>"1","postcode"=>"00-001","city"=>"Wroclaw"]]);
+            echo ($m !== "" ? "reczny-ok" : "reczny-ZLE"), " ", ($b === [] ? "kontrole-ok" : "kontrole-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || MOUT="php-ZLE :: $MOUT"
+          echo "  $MOUT"
+          case "$MOUT" in *ZLE*|*Error*|*error*) echo "  ^ NOT OK"; fail=1 ;; esac
+
+          if [ "$fail" = "0" ]; then echo "ALL CARRIER CHECKS OK"; else echo "CARRIER CHECK FAILED"; exit 1; fi
           REMOTE
 
       - name: Verify public shop (SEO, contact)

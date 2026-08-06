@@ -308,6 +308,10 @@ function wsm_ensure_countries(PDO $pdo): void {
         //   'punkt' = le client désigne un point (Paczkomat, DPD Pickup)
         //   'adres' = le colis va à une adresse
         'kind'      => ["VARCHAR(12) NOT NULL DEFAULT 'adres'", "TEXT NOT NULL DEFAULT 'adres'"],
+        // LE POIDS PLANCHER. Sans lui, un transporteur de palettes se propose
+        // pour une commande d'une tablette : le client le choisit, et le
+        // transporteur refuse le colis — après la vente.
+        'min_weight_g' => ['INT NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
     ]);
     // Les deux services historiques n'ont jamais porté ce champ : on le pose
     // une fois, d'après ce qu'ils ont toujours été.

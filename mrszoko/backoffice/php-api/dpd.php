@@ -220,15 +220,11 @@ function wsm_dpd_payload(array $order): array {
  * chacun d'eux, et c'est précisément ce qu'on vient de lui retirer.
  */
 function wsm_dpd_blockers(array $order): array {
-    $out = [];
-    if (($order['phone'] ?? '') === '' || !wsm_valid_phone((string) $order['phone'])) $out[] = 'telefon';
-    if (($order['email'] ?? '') === '') $out[] = 'e-mail';
-    if (($order['first_name'] ?? '') === '' && ($order['company'] ?? '') === '') $out[] = 'odbiorca';
-    if (($order['weight_g'] ?? 0) <= 0) $out[] = 'waga';
-    foreach (['street', 'building', 'postcode', 'city'] as $k) {
-        if (($order['ship'][$k] ?? '') === '') $out[] = 'adres.' . $k;
-    }
-    return $out;
+    // La liste vivait ici en double de celle de shipping.php. Deux listes
+    // identiques dérivent, et celle qu'on oublie de corriger est celle qui
+    // laisse passer une commande incomplète.
+    require_once __DIR__ . '/shipping.php';
+    return wsm_ship_blockers_adresse($order);
 }
 
 /** Un objet SOAP en tableau, récursivement — la réponse arrive en stdClass. */

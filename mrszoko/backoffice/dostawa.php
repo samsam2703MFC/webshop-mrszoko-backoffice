@@ -29,6 +29,10 @@ $API = console_api_dir();
 require_once $API . '/shop.php';
 require_once $API . '/cms.php';           // wsm_cms_grosze()
 require_once $API . '/analytics.php';
+// WSM_SHIP_MANUELS : les transporteurs connus qu'aucune API ne pilote. Sans ce
+// require, la carte tombait en « Undefined constant » au premier tour de
+// boucle — page à moitié rendue, formulaire ouvert et jamais fermé.
+require_once $API . '/shipping.php';
 
 $csrf = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
 if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {
@@ -54,15 +58,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // laissait la moitié du travail en plan si l'on quittait la page.
         $up = $pdo->prepare("UPDATE wsm_shipping_methods
                                 SET active = ?, kind = ?, countries = ?, price_net = ?,
-                                    cost_net = ?, max_weight_g = ?, free_from = ?
+                                    cost_net = ?, min_weight_g = ?, max_weight_g = ?,
+                                    free_from = ?
                               WHERE id = ?");
+        /** Kilos saisis → grammes. La virgule polonaise vaut le point. */
+        $enGrammes = fn($v): int => (int) round(((float) str_replace(',', '.', trim((string) $v))) * 1000);
         // Les codes pays sont vérifiés CONTRE LA TABLE, pas contre une forme :
         // la règle et ses raisons vivent dans wsm_ship_codes() (shop.php), pour
         // qu'une suite puisse la tenir sans passer par un formulaire.
         $rejetes = []; $fermes = [];
         $n = 0;
         foreach ((array) ($_POST['d'] ?? []) as $id => $row) {
-            $v = wsm_ship_codes($pdo, (string) ($row['countries'] ?? ''));
+            // Les cases cochées arrivent en tableau ; on les repasse par la
+            // MÊME vérification que la saisie libre d'hier, pour qu'il n'y ait
+            // pas deux règles selon la façon dont le pays est entré.
+            $brut = is_array($row['kraje'] ?? null) ? implode(',', $row['kraje']) : '';
+            $v = wsm_ship_codes($pdo, $brut);
             $codes = $v['codes'];
             foreach ($v['inconnus'] as $c) $rejetes[$c] = true;
             foreach ($v['fermes'] as $c)   $fermes[$c]  = true;
@@ -73,9 +84,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 implode(',', $codes),
                 wsm_cms_grosze($row['price_net'] ?? ''),
                 wsm_cms_grosze($row['cost_net'] ?? ''),
+                // LE PLANCHER, saisi en kilos. Zéro veut dire « pas de
+                // minimum » — c'est le cas de tous les transporteurs sauf
+                // celui qui prend des palettes.
+                max(0, $enGrammes($row['min_weight_kg'] ?? '0')),
                 // Jamais zéro : un poids maximum à 0 refuserait TOUTES les
                 // commandes, y compris celles d'un seul carré de chocolat.
-                max(1, (int) ($row['max_weight_g'] ?? 25000)),
+                max(1, $enGrammes($row['max_weight_kg'] ?? '25')),
                 wsm_cms_grosze($row['free_from'] ?? ''),
                 (string) $id,
             ]);
@@ -125,6 +140,23 @@ $etiquette = function (string $id) use ($pdo): string {
     return (string) ($S['ship.' . $id . '.label'] ?? $id);
 };
 $zl2 = fn($g) => number_format(((int) $g) / 100, 2, '.', '');
+
+// LES PAYS, EN DEUX TAS. Ouverts d'abord — c'est là qu'on choisit ; fermés
+// repliés dessous, parce qu'on prépare parfois un transporteur avant d'ouvrir
+// le marché, et surtout parce qu'un pays coché mais fermé DOIT rester affiché :
+// une case non rendue n'est pas envoyée, donc l'enregistrement l'effacerait
+// sans un mot.
+$tousPaysBase = $pdo->query("SELECT code, name_pl, active FROM wsm_countries
+                             ORDER BY active DESC, name_pl")->fetchAll() ?: [];
+$ouverts = array_values(array_filter($tousPaysBase, fn($c) => (int) $c['active'] === 1));
+$fermes  = array_values(array_filter($tousPaysBase, fn($c) => (int) $c['active'] !== 1));
+
+/** Grammes → kilos, sans zéros inutiles. 31500 → « 31.5 », 0 → « 0 ». */
+$kg = function ($g): string {
+    $v = ((int) $g) / 1000;
+    $s = number_format($v, 3, '.', '');
+    return str_contains($s, '.') ? rtrim(rtrim($s, '0'), '.') : $s;
+};
 /**
  * Un pourcentage lisible. ON NE RONGE LES ZÉROS QU'APRÈS LA VIRGULE.
  *
@@ -154,6 +186,31 @@ console_head('Dostawa', $me, <<<'CSS'
   .prog b { font-family: var(--font-display); font-size: 19px; color: var(--text-strong); }
   .prog small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
   .impossible { color: var(--warning); font-size: 12.5px; }
+  /* UNE CARTE PAR MÉTHODE, et pas une ligne de tableau. Sept champs plus
+     vingt-sept pays ne tiennent pas dans une rangée — et surtout pas sur le
+     téléphone depuis lequel on regarde la boutique dans l'atelier. */
+  .met { border: 1px solid var(--border-subtle); border-radius: 12px;
+         padding: 14px 16px 16px; margin: 0 0 16px; min-width: 0; }
+  .met > legend { font-family: var(--font-display); font-size: 16px; padding: 0 8px; }
+  .met > legend small { display: block; font-family: var(--font-mono); font-size: 11px;
+                        font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+  .met .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 16px; }
+  @media (min-width: 640px)  { .met .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1100px) { .met .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .kraje { margin-top: 6px; border-top: 1px solid var(--border-subtle); padding-top: 12px; }
+  .kraje .tytul { display: block; font-size: 12px; color: var(--text-muted);
+                  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  /* Des colonnes qui s'adaptent : vingt-sept pays sur une seule colonne font
+     défiler la page trois écrans pour cocher une case. */
+  .kratka { display: grid; gap: 2px 14px;
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .kratka .check { display: flex; align-items: center; gap: 8px; min-height: 34px;
+                   font-size: 13.5px; }
+  .kratka code { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); }
+  .kraje details { margin-top: 10px; }
+  .kraje summary { font-size: 12.5px; color: var(--text-muted); cursor: pointer;
+                   min-height: 34px; display: flex; align-items: center; }
+  .zamk { font-style: normal; font-size: 10.5px; color: var(--warning); }
 CSS);
 console_crumbs(['Pulpit' => 'pulpit.php', 'Dostawa' => null]);
 console_flash($flash, $kind);
@@ -170,9 +227,13 @@ console_flash($flash, $kind);
 <div class="panel">
   <h2>Metody dostawy</h2>
   <p class="why">
-    Wszystko, co decyduje o dostawie, w jednym wierszu. <b>Kraje</b> to kody po przecinku
-    (<code>PL, DE, CZ</code>) — puste albo <code>*</code> znaczy „wszędzie”. Kraj otwarty na
-    sprzedaż, ale bez przewoźnika, <b>nie pozwoli złożyć zamówienia</b>, i kasa powie to wprost.
+    Wszystko, co decyduje o dostawie, w jednej karcie na metodę. <b>Kraje</b> zaznacza się
+    z listy — nie wpisuje. Kraj otwarty na sprzedaż, ale bez przewoźnika,
+    <b>nie pozwoli złożyć zamówienia</b>, i kasa powie to wprost.
+    <br>
+    <b>Waga od / do</b> decyduje, co klient w ogóle zobaczy. Paczkomat kończy się na 25 kg,
+    a transport paletowy <b>zaczyna</b> od 200 kg: metoda, która nie weźmie tego koszyka,
+    nie pokazuje się w kasie. Wcześniej pokazywała się i odmawiała po wyborze.
     <br>
     <b>Koszt u przewoźnika</b> to Wasz rachunek za paczkę — klient go nie widzi. Bez niego
     nie da się policzyć progu darmowej dostawy niżej, ani zobaczyć w
@@ -185,51 +246,115 @@ console_flash($flash, $kind);
   <form method="post">
     <input type="hidden" name="_t" value="<?= h($csrf) ?>">
     <input type="hidden" name="metody" value="1">
-    <div class="tablewrap">
-    <table class="rwd">
-      <thead><tr>
-        <th>Metoda</th><th>Czynna</th><th>Odbiór</th><th>Kraje</th>
-        <th class="num">Cena netto (zł)</th><th class="num">Koszt u przewoźnika (zł)</th>
-        <th class="num">Maks. waga (g)</th><th class="num">Gratis od (zł brutto)</th>
-      </tr></thead>
-      <tbody>
-      <?php foreach ($methods as $m): $id = (string) $m['id']; ?>
-        <tr>
-          <td data-l="Metoda"><b><?= h($etiquette($id)) ?></b><br>
-            <small style="color:var(--text-muted)"><?= h($id) ?> · <?= h((string) $m['carrier']) ?></small></td>
-          <td data-l="Czynna">
-            <label class="check"><input type="checkbox" name="d[<?= h($id) ?>][active]" value="1"
-              <?= (int) $m['active'] === 1 ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>
-              aria-label="Metoda <?= h($etiquette($id)) ?> czynna"><span></span></label></td>
-          <td data-l="Odbiór">
-            <?php // Point ou adresse : c'est CE champ qui décide si la caisse
-                  // demande un code de paczkomat ou une rue. Se tromper ici
-                  // réclame une rue pour un casier, ou l'inverse. ?>
-            <select name="d[<?= h($id) ?>][kind]"<?= $isAdmin ? '' : ' disabled' ?>
-                    aria-label="Rodzaj odbioru dla <?= h($etiquette($id)) ?>">
-              <option value="adres"<?= wsm_ship_kind_row($m) === 'adres' ? ' selected' : '' ?>>Pod adres</option>
-              <option value="punkt"<?= wsm_ship_kind_row($m) === 'punkt' ? ' selected' : '' ?>>Do punktu</option>
-            </select></td>
-          <td data-l="Kraje"><input name="d[<?= h($id) ?>][countries]" placeholder="PL"
-              value="<?= h((string) ($m['countries'] ?? '')) ?>"<?= $isAdmin ? '' : ' disabled' ?>
-              aria-label="Kraje obsługiwane przez <?= h($etiquette($id)) ?>"></td>
-          <td data-l="Cena netto (zł)" class="num"><input inputmode="decimal"
-              name="d[<?= h($id) ?>][price_net]" value="<?= h($zl2($m['price_net'])) ?>"
-              <?= $isAdmin ? '' : ' disabled' ?> aria-label="Cena netto dla <?= h($etiquette($id)) ?>"></td>
-          <td data-l="Koszt u przewoźnika (zł)" class="num"><input inputmode="decimal"
-              name="d[<?= h($id) ?>][cost_net]" value="<?= h($zl2($m['cost_net'] ?? 0)) ?>"
-              <?= $isAdmin ? '' : ' disabled' ?> aria-label="Koszt u przewoźnika dla <?= h($etiquette($id)) ?>"></td>
-          <td data-l="Maks. waga (g)" class="num"><input inputmode="numeric"
-              name="d[<?= h($id) ?>][max_weight_g]" value="<?= (int) $m['max_weight_g'] ?>"
-              <?= $isAdmin ? '' : ' disabled' ?> aria-label="Maksymalna waga dla <?= h($etiquette($id)) ?>"></td>
-          <td data-l="Gratis od (zł brutto)" class="num"><input inputmode="decimal"
-              name="d[<?= h($id) ?>][free_from]" value="<?= h($zl2($m['free_from'])) ?>"
-              <?= $isAdmin ? '' : ' disabled' ?> aria-label="Próg darmowej dostawy dla <?= h($etiquette($id)) ?>"></td>
-        </tr>
-      <?php endforeach; ?>
-      </tbody>
-    </table>
-    </div>
+    <?php foreach ($methods as $m): $id = (string) $m['id'];
+      $sien = array_filter(array_map('trim', explode(',', strtoupper((string) ($m['countries'] ?? '')))));
+      $aLui = fn(string $c) => in_array($c, $sien, true);
+      // LES CODES QUE LA TABLE DES PAYS NE CONNAÎT PAS DU TOUT — pas ceux qui
+      // sont simplement fermés à la vente : ceux-là ont leur case dans le
+      // repli, cochée, et survivent à l'enregistrement. La comparaison portait
+      // sur les seuls pays OUVERTS, si bien qu'un « DE » fermé s'annonçait
+      // « absent de la table » et promettait d'être effacé — alors qu'il est
+      // là et qu'il ne bougera pas.
+      $extras = array_values(array_diff($sien, array_map('strtoupper',
+                array_column($tousPaysBase, 'code'))));
+      $manuel = isset(WSM_SHIP_MANUELS[(string) $m['carrier']]); ?>
+    <fieldset class="met">
+      <legend><?= h($etiquette($id)) ?>
+        <small><?= h($id) ?> · <?= h((string) $m['carrier']) ?><?php
+          if ($manuel) echo ' · nadanie ręczne'; ?></small></legend>
+
+      <?php if ($manuel): ?>
+      <p class="why" style="margin:0 0 12px">
+        <?php // On le DIT ici et pas seulement dans la file : quelqu'un qui
+              // active cette méthode doit savoir tout de suite qu'aucune
+              // étiquette ne sortira toute seule. ?>
+        Ten przewoźnik nie ma automatycznego nadania: zamówienie przejdzie te same kontrole
+        danych co inne, ale <b>list przewozowy umawia się telefonicznie</b>. Wysyłka pokaże to
+        wprost, zamiast udawać błąd konfiguracji.
+      </p>
+      <?php endif; ?>
+
+      <div class="grid">
+        <label class="field"><span>Czynna</span>
+          <label class="check"><input type="checkbox" name="d[<?= h($id) ?>][active]" value="1"
+            <?= (int) $m['active'] === 1 ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>>
+            <span>widoczna w kasie</span></label></label>
+
+        <label class="field"><span>Odbiór</span>
+          <?php // Point ou adresse : c'est CE champ qui décide si la caisse
+                // demande un code de paczkomat ou une rue. ?>
+          <select name="d[<?= h($id) ?>][kind]"<?= $isAdmin ? '' : ' disabled' ?>>
+            <option value="adres"<?= wsm_ship_kind_row($m) === 'adres' ? ' selected' : '' ?>>Pod adres</option>
+            <option value="punkt"<?= wsm_ship_kind_row($m) === 'punkt' ? ' selected' : '' ?>>Do punktu</option>
+          </select></label>
+
+        <label class="field"><span>Cena netto (zł)</span>
+          <input inputmode="decimal" name="d[<?= h($id) ?>][price_net]"
+                 value="<?= h($zl2($m['price_net'])) ?>"<?= $isAdmin ? '' : ' disabled' ?>></label>
+
+        <label class="field"><span>Koszt u przewoźnika (zł)</span>
+          <input inputmode="decimal" name="d[<?= h($id) ?>][cost_net]"
+                 value="<?= h($zl2($m['cost_net'] ?? 0)) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+          <span class="hint">Wasz rachunek. Bez niego próg niżej się nie policzy.</span></label>
+
+        <?php // EN KILOS, PAS EN GRAMMES. « 1500000 » se saisit de travers une
+              // fois sur trois, et un zéro de trop ouvre un transporteur à des
+              // colis qu'il refusera au dépôt. La base garde des grammes. ?>
+        <label class="field"><span>Waga od (kg)</span>
+          <input inputmode="decimal" name="d[<?= h($id) ?>][min_weight_kg]"
+                 value="<?= h($kg($m['min_weight_g'] ?? 0)) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+          <span class="hint">0 = bez dolnej granicy</span></label>
+
+        <label class="field"><span>Waga do (kg)</span>
+          <input inputmode="decimal" name="d[<?= h($id) ?>][max_weight_kg]"
+                 value="<?= h($kg($m['max_weight_g'] ?? 0)) ?>"<?= $isAdmin ? '' : ' disabled' ?>></label>
+
+        <label class="field"><span>Gratis od (zł brutto)</span>
+          <input inputmode="decimal" name="d[<?= h($id) ?>][free_from]"
+                 value="<?= h($zl2($m['free_from'])) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+          <span class="hint">0 = nigdy za darmo</span></label>
+      </div>
+
+      <div class="kraje">
+        <span class="tytul">Kraje</span>
+        <?php if (!$ouverts): ?>
+          <p class="why" style="margin:0">Żaden kraj nie jest otwarty na sprzedaż —
+            otwórz go w <a href="kraje.php">Krajach</a>.</p>
+        <?php else: ?>
+        <div class="kratka">
+          <?php foreach ($ouverts as $c): $code = strtoupper((string) $c['code']); ?>
+          <label class="check"><input type="checkbox" name="d[<?= h($id) ?>][kraje][]"
+                 value="<?= h($code) ?>"<?= $aLui($code) ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>>
+            <span><?= h((string) $c['name_pl']) ?> <code><?= h($code) ?></code></span></label>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($fermes || $extras): ?>
+        <?php // Repliés, parce qu'on ne choisit presque jamais dedans — mais
+              // présents, parce qu'on prépare parfois un transporteur avant
+              // d'ouvrir le marché, et parce que ceux qui sont DÉJÀ cochés
+              // disparaîtraient à l'enregistrement s'ils n'étaient pas rendus. ?>
+        <details<?= $extras ? ' open' : '' ?>>
+          <summary>Kraje zamknięte na sprzedaż (<?= count($fermes) ?>)</summary>
+          <div class="kratka">
+            <?php foreach ($fermes as $c): $code = strtoupper((string) $c['code']); ?>
+            <label class="check"><input type="checkbox" name="d[<?= h($id) ?>][kraje][]"
+                   value="<?= h($code) ?>"<?= $aLui($code) ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>>
+              <span><?= h((string) $c['name_pl']) ?> <code><?= h($code) ?></code>
+                <em class="zamk">zamknięty</em></span></label>
+            <?php endforeach; ?>
+          </div>
+          <?php if ($extras): ?>
+          <p class="why" style="margin:8px 0 0">Ta metoda ma zapisane kody, których nie ma
+            w tabeli krajów: <b><?= h(implode(', ', $extras)) ?></b>. Zapis je usunie.</p>
+          <?php endif; ?>
+        </details>
+        <?php endif; ?>
+      </div>
+    </fieldset>
+    <?php endforeach; ?>
+
     <div class="actions">
       <button class="primary" type="submit"<?= $isAdmin ? '' : ' disabled' ?>>Zapisz metody</button>
     </div>
