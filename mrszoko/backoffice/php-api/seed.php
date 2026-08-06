@@ -35,18 +35,20 @@ function wsm_seed(PDO $pdo): void {
     }
 
     // ---- Shops --------------------------------------------------------------
-    $shops = [
-        ['bxl', "Mister Szoko — Bruxelles-Centre", 'Bruxelles 1000', 1, 'Oddział', 1, 29800, 8400, 96, 'var(--color-primary)'],
-        ['and', "Mister Szoko — Anderlecht", 'Anderlecht 1070', 1, 'Franczyza', 1, 18600, 6200, 88, 'var(--caramel-400)'],
-        ['ucc', "Mister Szoko — Uccle", 'Uccle 1180', 1, 'Franczyza', 1, 22100, 9400, 79, 'var(--choco-500)'],
-        ['sch', "Mister Szoko — Schaerbeek", 'Schaerbeek 1030', 0, 'Franczyza', 1, 0, 0, 0, 'var(--caramel-400)'],
-        ['lv', "Mister Szoko — Louvain", 'Louvain 3000', 1, 'Master', 0, 14200, 5200, 71, 'var(--choco-500)'],
-    ];
-    foreach ($shops as $i => $s) {
-        $ins('wsm_shops', ['id' => $s[0], 'nom' => $s[1], 'ville' => $s[2], 'web' => $s[3],
-            'contrat' => $s[4], 'act' => $s[5], 'ca_shop' => $s[6], 'ca_office' => $s[7],
-            'adoption' => $s[8], 'accent' => $s[9], 'sort_order' => $i]);
-    }
+    // AUCUNE. La maquette d'origine peuplait cinq boutiques belges — Bruxelles-
+    // Centre, Anderlecht, Uccle, Schaerbeek, Louvain — avec leur chiffre
+    // d'affaires et leur taux d'adoption. C'était le décor d'une démonstration
+    // de franchise ; l'affaire réelle est UNE boutique à Wrocław.
+    //
+    // Des données de démonstration qui ressemblent à des vraies sont pires que
+    // pas de données du tout : on lit « 29 800 » sur un tableau de bord et on
+    // en tire une conclusion. Elles sont retirées ici pour les installations
+    // neuves, et `php migrate.php --purge-demo-shops` les retire des bases
+    // déjà en service.
+    //
+    // La table reste : elle sert au périmètre des utilisateurs (wsm_user_shops)
+    // et aux zones de chalandise. Elle est simplement vide tant que personne
+    // n'ouvre un second point de vente.
 
     // ---- Categories (menu_default from the menu seed) -----------------------
     $catDefaults = ['Menu i zestawy' => 1, 'Katering' => 1];
@@ -148,11 +150,17 @@ function wsm_seed(PDO $pdo): void {
     ] as $t) $ins('wsm_email_templates', ['cle' => $t[0], 'langue' => $t[1], 'sujet' => $t[2]]);
 
     // ---- Users + user↔shop scopes -------------------------------------------
+    // Le périmètre des comptes franchise pointait sur les cinq boutiques
+    // belges de démonstration. Celles-ci n'existent plus (voir plus haut), donc
+    // les liens aussi disparaissent : une ligne wsm_user_shops qui désigne une
+    // boutique absente n'est pas une donnée, c'est un compte qui ne voit rien.
+    // Les comptes eux-mêmes restent — l'écran Użytkownicy a besoin de montrer
+    // autre chose qu'une seule ligne — mais leur portée redevient le réseau.
     $users = [
         ['Sophie Renard', 'sophie.renard@misterszoko.com', 'Centrala', 'Cała sieć', 1, []],
-        ['Thomas Legrand', 'thomas.legrand@misterszoko.com', 'Franczyza', 'Bruxelles-Centre', 1, ['bxl']],
-        ['Marek Kowalski', 'm.kowalski@misterszoko.com', 'Franczyza', 'Anderlecht, Uccle', 1, ['and', 'ucc']],
-        ['Julie Peeters', 'j.peeters@misterszoko.com', 'Franczyza', 'Louvain', 0, ['lv']],
+        ['Thomas Legrand', 'thomas.legrand@misterszoko.com', 'Franczyza', 'Cała sieć', 1, []],
+        ['Marek Kowalski', 'm.kowalski@misterszoko.com', 'Franczyza', 'Cała sieć', 1, []],
+        ['Julie Peeters', 'j.peeters@misterszoko.com', 'Franczyza', 'Cała sieć', 0, []],
     ];
     foreach ($users as $u) {
         $uid = $ins('wsm_users', ['nom' => $u[0], 'email' => $u[1], 'role' => $u[2], 'portee' => $u[3], 'act' => $u[4]]);
