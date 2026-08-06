@@ -124,6 +124,71 @@
     });
   }
 
+  // ---- Paczkomat : choisir sur la carte plutôt que taper un code ------------
+  //
+  // Le bloc est rendu `hidden` par le serveur et RÉVÉLÉ ici : sans JavaScript,
+  // un bouton « choisir sur la carte » qui n'ouvre rien serait pire que pas de
+  // bouton du tout. Le champ texte reste la source de vérité — la carte ne
+  // fait que le remplir, et on peut toujours corriger à la main.
+  var geo = document.querySelector('[data-geo]');
+  if (geo) {
+    var champ = document.querySelector('#f-inpost_point');
+    var boite = geo.querySelector('[data-geo-box]');
+    var choisi = geo.querySelector('[data-geo-chosen]');
+    geo.hidden = false;
+
+    var souci = geo.querySelector('[data-geo-fail]');
+
+    geo.querySelector('[data-geo-open]').addEventListener('click', function () {
+      boite.hidden = !boite.hidden;
+      if (boite.hidden) return;
+
+      // LE SCRIPT D'INPOST VIENT D'UN AUTRE DOMAINE, ET IL ARRIVE QU'IL NE
+      // VIENNE PAS : bloqueur de publicité, réseau d'entreprise, panne chez
+      // eux. On clique « choisir sur la carte » et il ne se passe RIEN.
+      // On le dit, et on renvoie au champ texte qui, lui, marche toujours.
+      //
+      // ON DEMANDE AU NAVIGATEUR, ON NE MESURE PAS. Le premier jet regardait
+      // la hauteur de la boîte : c'était juste tant que rien ne dimensionnait
+      // le composant, et faux dès qu'on lui a donné une hauteur en CSS — la
+      // balise inconnue prenait la hauteur, le repli mesurait 460 px et se
+      // taisait. `customElements.get()` répond à la vraie question : le script
+      // a-t-il défini le composant, oui ou non.
+      setTimeout(function () {
+        if (boite.hidden) return;
+        var pret = window.customElements && window.customElements.get('inpost-geowidget');
+        // Défini mais n'ayant rien dessiné compte aussi pour une panne.
+        var vide = !pret || boite.getBoundingClientRect().height < 20;
+        if (souci) souci.hidden = !vide;
+        if (vide) {
+          boite.hidden = true;
+          if (champ) champ.focus();
+        }
+      }, 1800);
+    });
+
+    // Le composant InPost appelle cette fonction par son NOM (attribut
+    // onpoint), pas par un écouteur : elle doit donc être globale.
+    window.wsmGeoPoint = function (point) {
+      var d = (point && point.detail) ? point.detail : point;
+      var code = d && (d.name || d.id);
+      if (!code) return;
+      if (champ) {
+        champ.value = code;
+        // `input` et pas seulement l'affectation : la validation du navigateur
+        // et tout écouteur en aval doivent voir la valeur changer.
+        champ.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (choisi) {
+        var adr = [d.address && d.address.line1, d.address && d.address.line2]
+          .filter(Boolean).join(', ');
+        choisi.textContent = code + (adr ? ' — ' + adr : '');
+        choisi.hidden = false;
+      }
+      boite.hidden = true;
+    };
+  }
+
   // ---- Panier : appliquer une quantité dès qu'elle change ------------------
   document.querySelectorAll('.cart-line input[type="number"]').forEach(function (input) {
     var timer = null;

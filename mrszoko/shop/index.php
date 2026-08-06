@@ -814,6 +814,11 @@ if ($page === 'koszyk') {
 
 // -------------------------------------------------------------------- CAISSE -
 if ($page === 'kasa') {
+    // Le jeton PUBLIC du sélecteur de Paczkomat vit dans l'adaptateur InPost.
+    // Chargé ici seulement : c'est la seule page qui en a besoin.
+    $gf = $WSM_API_DIR . '/inpost.php';
+    if (is_file($gf)) require_once $gf;
+
     $errors = $formErrors ?? [];
     $v = $formValues ?? [];
     $shipId  = (string) ($v['delivery_method'] ?? ($_GET['dostawa'] ?? 'inpost_locker'));
@@ -898,8 +903,48 @@ if ($page === 'kasa') {
         </label>
         <?php endforeach; ?>
 
+        <?php // PAS DE CHAMPS DE LIVRAISON QUAND IL N'Y A PAS DE LIVRAISON.
+              // Sans cette condition, un client allemand lisait « nous ne
+              // livrons pas encore dans ce pays » et trouvait juste dessous un
+              // champ « Paczkomat — KRA010 » à remplir. Les deux ne peuvent pas
+              // être vrais en même temps, et c'est le champ qu'on croit. ?>
+        <?php if ($q['methods']): ?>
         <div class="ship-locker"<?= $shipId === 'inpost_courier' ? ' hidden' : '' ?> data-ship-locker>
           <?php $field('inpost_point', $S['checkout.point'] ?? '', ['hint' => $S['checkout.point_hint'] ?? '', 'placeholder' => 'KRA010']); ?>
+          <?php
+          // LE SÉLECTEUR DE PACZKOMAT SUR CARTE.
+          //
+          // Sans lui, on demandait au client d'aller chercher « KRA010 » sur
+          // inpost.pl et de revenir le taper. Quitter une caisse pour trouver
+          // un code ailleurs, c'est l'endroit exact où l'on abandonne un
+          // panier — et un code recopié de travers, c'est un colis qui part
+          // au mauvais casier.
+          //
+          // C'est un ENRICHISSEMENT, pas un remplacement : le champ texte
+          // reste au-dessus et garde la valeur. Sans jeton, ou sans
+          // JavaScript, la caisse fonctionne exactement comme avant.
+          $geo = function_exists('wsm_inpost_geowidget_token') ? wsm_inpost_geowidget_token() : '';
+          if ($geo !== '' && strtolower($geo) !== 'xxxx'):
+          ?>
+          <div class="geo" data-geo hidden>
+            <button type="button" class="btn btn--ghost btn--sm" data-geo-open>
+              <?= e($S['checkout.point_map'] ?? '') ?></button>
+            <p class="geo-chosen mono" data-geo-chosen hidden></p>
+            <?php // Montré uniquement si la carte ne vient pas : sinon on
+                  // annonce une panne qui n'a pas eu lieu. ?>
+            <p class="geo-fail" data-geo-fail hidden><?= e($S['checkout.point_map_fail'] ?? '') ?></p>
+            <div class="geo-box" data-geo-box hidden>
+              <inpost-geowidget token="<?= e($geo) ?>" language="<?= e($lang) ?>"
+                                config="parcelCollect" onpoint="wsmGeoPoint"></inpost-geowidget>
+            </div>
+          </div>
+          <?php // Chargés ICI et nulle part ailleurs : uniquement sur la caisse,
+                // uniquement quand le jeton existe. Une boutique qui n'utilise
+                // pas les Paczkomat ne doit pas payer une requête vers un
+                // domaine tiers sur chacune de ses pages. ?>
+          <link rel="stylesheet" href="https://geowidget.inpost.pl/inpost-geowidget.css">
+          <script src="https://geowidget.inpost.pl/inpost-geowidget.js" defer></script>
+          <?php endif; ?>
         </div>
         <div class="ship-courier"<?= $shipId === 'inpost_courier' ? '' : ' hidden' ?> data-ship-courier>
           <div class="row">
@@ -911,6 +956,7 @@ if ($page === 'kasa') {
             <?php $field('ship_city', $S['checkout.city'] ?? '', ['autocomplete' => 'address-level2', 'required' => false]); ?>
           </div>
         </div>
+        <?php endif; ?>
       </fieldset>
 
       <fieldset>

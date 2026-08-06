@@ -1565,6 +1565,65 @@ jobs:
           echo "$KH" | grep -q 'contact\.' \
             && { echo "  ^ ATTENTION : klucz i18n wyświetlony zamiast tekstu"; fail=1; } \
             || echo "  etykiety przetłumaczone: potwierdzone"
+          # LE CHOIX DU PACZKOMAT. Sans le sélecteur sur carte, on demande au
+          # client d'aller chercher « KRA010 » sur inpost.pl et de revenir le
+          # taper : c'est l'endroit exact où l'on abandonne un panier, et un
+          # code recopié de travers envoie le colis au mauvais casier.
+          #
+          # ON NE DEMANDE PAS À /kasa À VIDE. Sans panier, la caisse affiche
+          # « Koszyk jest pusty » et ne rend aucun champ de livraison : un
+          # contrôle qui la lit conclut « pas de sélecteur » sur une boutique
+          # parfaitement configurée. Premier jet écrit comme ça, essayé, faux.
+          # On remplit donc un panier comme le ferait un client, puis on lit.
+          echo "== wybór paczkomatu =="
+          # 1. Le code est-il déployé ? Attention au motif : le champ est
+          #    produit par un assistant, `name="inpost_point"` n'apparaît
+          #    qu'au rendu et ne se trouve nulle part dans la source. Deuxième
+          #    faux négatif de ce même bloc — d'où la déclaration réelle.
+          grep -q 'inpost-geowidget' "$DIR_SHOP/index.php" \
+            && echo "  selektor na mapie: w kodzie" \
+            || { echo "  ^ NOT OK : sklep nie zawiera selektora paczkomatów"; fail=1; }
+          grep -q "field('inpost_point'" "$DIR_SHOP/index.php" \
+            && echo "  pole kodu paczkomatu: w kodzie" \
+            || { echo "  ^ NOT OK : brak pola kodu — nie da się wskazać paczkomatu"; fail=1; }
+          # 2. ET SURTOUT : le champ arrive-t-il vraiment dans la page ? Le
+          #    code présent dans un fichier ne prouve rien — il est sous une
+          #    condition. On met un article au panier et on ouvre la caisse.
+          JAR=$(mktemp)
+          ACC=$(curl -skL -c "$JAR" -b "$JAR" "$SH/")
+          PID=$(printf '%s' "$ACC" | grep -o 'name="add" value="[^"]*"' | head -1 | sed 's/.*value="//; s/"$//')
+          TOK=$(printf '%s' "$ACC" | grep -o 'name="_t" value="[^"]*"' | head -1 | sed 's/.*value="//; s/"$//')
+          if [ -z "$PID" ] || [ -z "$TOK" ]; then
+            echo "  ^ NOT OK : strona główna nie oferuje żadnego produktu do koszyka"; fail=1
+          else
+            curl -skL -c "$JAR" -b "$JAR" -o /dev/null \
+              -d "_t=$TOK" -d "add=$PID" -d "qty=1" "$SH/koszyk"
+            KA=$(curl -skL -c "$JAR" -b "$JAR" "$SH/kasa")
+            case "$KA" in
+              *'id="f-inpost_point"'*) echo "  pole paczkomatu w kasie: renderowane (koszyk z 1 produktem)";;
+              *'Koszyk jest pusty'*|*'cart.empty'*)
+                echo "  ^ NOT OK : dodanie do koszyka nie zadziałało — kasa pusta"; fail=1;;
+              *) echo "  ^ NOT OK : kasa nie pokazuje pola paczkomatu"; fail=1;;
+            esac
+            # Le sélecteur sur carte n'est un enrichissement que s'il ARRIVE.
+            case "$KA" in
+              *'<inpost-geowidget'*) echo "  selektor na mapie: w wyrenderowanej kasie";;
+              *) echo "  selektor na mapie: nieaktywny (brak tokenu) — pole tekstowe wystarcza";;
+            esac
+          fi
+          rm -f "$JAR"
+          # 3. Le jeton public est-il en place ? Il ne tient à aucune base.
+          GEO=$(php -r '
+            require_once "'"$DIR_API"'/inpost.php";
+            $t = wsm_inpost_geowidget_token();
+            echo ($t !== "" && strtolower($t) !== "xxxx") ? "jest" : "brak";
+          ' 2>/dev/null || echo "blad")
+          case "$GEO" in
+            jest) echo "  token geowidget: ustawiony — klient wybiera na mapie" ;;
+            brak) echo "  token geowidget: BRAK — klient wpisuje kod z pamięci (pole działa)" ;;
+            *)    echo "  ^ ATTENTION : nie udało się odczytać konfiguracji InPost"; fail=1 ;;
+          esac
+
           echo "== SEO : nic prywatnego w indeksie, hreflang bezwzględne =="
           # La page de suivi porte nom, adresse et détail d'achat. Un lien
           # partagé, ou suivi par un robot depuis une boîte mail, et la

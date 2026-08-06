@@ -436,3 +436,31 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
                   border-radius: var(--radius-md); background: var(--bg-page);
                   color: var(--text-body); resize: vertical; min-height: 96px; }
 .claim select { max-width: 100%; }
+
+/* ---- Sélecteur de Paczkomat sur carte ---------------------------------------
+   LE POINT QUI DÉCIDE DE TOUT : `inpost-geowidget` est un élément inconnu du
+   navigateur tant que le script d'InPost n'a pas défini le composant. Un
+   élément inconnu est `display: inline` et haut de ZÉRO pixel — sans hauteur
+   explicite, la carte se charge parfaitement et reste invisible. On la
+   dimensionne donc ici, et pas dans le script : le CSS arrive toujours, lui.
+
+   La hauteur est en `min()` parce qu'une carte de 520 px sur un téléphone
+   pousse le bouton « Zapłać » hors de l'écran, et qu'on ne fait pas défiler
+   une caisse pour retrouver le bouton qu'on cherchait. */
+.geo { margin: calc(var(--space-3) * -1) 0 var(--space-4); }
+.geo-chosen { margin-top: var(--space-3); padding: 9px 12px; font-size: var(--text-sm);
+              background: var(--surface-raised); border: 1px solid var(--border-subtle);
+              border-radius: var(--radius-md); color: var(--text-strong); }
+.geo-fail { margin-top: var(--space-3); padding: 9px 12px; font-size: var(--text-sm);
+            color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent);
+            border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+            border-radius: var(--radius-md); max-width: 62ch; }
+.geo-box { margin-top: var(--space-3); border: 1px solid var(--border-default);
+           border-radius: var(--radius-md); overflow: hidden; }
+/* `:defined` N'EST PAS UN DÉTAIL. Sans lui, la règle s'applique AUSSI quand le
+   script d'InPost n'est jamais arrivé : l'élément reste inconnu, mais il prend
+   quand même ses 460 px, et le client se retrouve devant un grand cadre vide
+   que rien n'explique. Pire, le repli qui devait le prévenir mesure une
+   hauteur — donc il se tait. On ne dimensionne qu'une fois le composant
+   réellement défini. */
+.geo-box inpost-geowidget:defined { display: block; width: 100%; height: min(60vh, 460px); }
