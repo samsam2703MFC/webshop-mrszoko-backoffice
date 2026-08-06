@@ -377,35 +377,6 @@ jobs:
           else
             echo "  global.css ne déclare aucune police : source unique respectée"
           fi
-          # LES ÉCRANS DE LA CONSOLE. Aucun n'était vérifié ici, et ça s'est
-          # payé : sept écrans livrés n'avaient jamais été copiés par l'étape
-          # d'assemblage, six d'entre eux étaient morts en production depuis
-          # leur mise en ligne, et rien ne le disait. Le build refuse désormais
-          # un rail incomplet ; ceci en est l'autre moitié — le fichier est là,
-          # mais répond-il ? Sans session la console renvoie vers sa page de
-          # connexion (200 après redirection) ; ce qu'on refuse, c'est 404 et
-          # 500. Une page absente ne redirige pas, et une page qui explose non
-          # plus.
-          # La liste n'est PAS écrite ici : elle est DEMANDÉE au rail déployé.
-          # Une seconde liste à tenir à jour reproduirait exactement la panne
-          # qu'on vient de réparer, avec un cran de retard supplémentaire.
-          echo "== ekrany konsoli =="
-          ECRANS=$(php -r '
-            require_once "'"$DIR_API"'/../console.php";
-            foreach (console_sections(["role" => "Centrala"]) as $i)
-              foreach (array_keys($i) as $f) echo $f, " ";
-          ' 2>/dev/null)
-          if [ -z "$ECRANS" ]; then
-            echo "  ^ NOT OK : impossible de lire le rail (console.php)"; fail=1
-          fi
-          for e in $ECRANS; do
-            EC=$(curl -skL -o /dev/null -w "%{http_code}" "$BO/$e")
-            case "$EC" in
-              200|302|303) echo "  $EC  $e" ;;
-              *) echo "  $EC  $e  ^ NOT OK"; fail=1 ;;
-            esac
-          done
-
           echo "== landing : fusionnée dans la boutique, ne doit plus que rediriger =="
           run "$LP/" 100
           LP_HTML=$(curl -skL "$LP/")
@@ -1451,6 +1422,50 @@ jobs:
             && { echo "  ^ FUITE : sitemap wymienia stronę prywatną"; fail=1; } \
             || echo "  sitemap nie wymienia stron prywatnych"
           if [ "$fail" = "0" ]; then echo "ALL SHOP CHECKS OK"; else echo "SHOP CHECK FAILED"; exit 1; fi
+          REMOTE
+
+
+      # Le pendant en ligne de la garde du build. Le build garantit que chaque
+      # entrée du rail a son FICHIER ; celle-ci garantit qu'elle a une PAGE.
+      # Étape à part, et pas ajoutée à « Verify web surfaces » : cette
+      # expression frôlait déjà les 17 000 caractères, et au-delà de 21 000
+      # GitHub rejette le fichier EN SILENCE — zéro job, aucun message. Le
+      # contrôle qui n'existe pas est celui qu'on a mis dans l'étape de trop.
+      - name: Verify console screens answer (rail-derived)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+          fail=0
+          BO="http://localhost/mrszoko/backoffice"
+          # Sept écrans livrés n'avaient jamais été copiés par l'assemblage, et
+          # six étaient morts en production depuis leur mise en ligne : aucun
+          # écran .php n'était vérifié en ligne. Sans session la console renvoie
+          # vers sa page de connexion ; ce qu'on refuse, c'est 404 et 500 — une
+          # page absente ne redirige pas, et une page qui explose non plus.
+          #
+          # La liste n'est PAS écrite ici : elle est DEMANDÉE au rail déployé.
+          # Une seconde liste à tenir à jour reproduirait exactement la panne
+          # qu'on vient de réparer, avec un cran de retard supplémentaire.
+          ECRANS=$(php -r '
+            require_once "'"$DIR_BO"'/console.php";
+            foreach (console_sections(["role" => "Centrala"]) as $i)
+              foreach (array_keys($i) as $f) echo $f, " ";
+          ' 2>/dev/null)
+          if [ -z "$ECRANS" ]; then
+            echo "  ^ NOT OK : impossible de lire le rail (console.php)"; fail=1
+          fi
+          for e in $ECRANS; do
+            EC=$(curl -skL -o /dev/null -w "%{http_code}" "$BO/$e")
+            case "$EC" in
+              200|302|303) echo "  $EC  $e" ;;
+              *) echo "  $EC  $e  ^ NOT OK"; fail=1 ;;
+            esac
+          done
+          if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
           REMOTE
 
 
