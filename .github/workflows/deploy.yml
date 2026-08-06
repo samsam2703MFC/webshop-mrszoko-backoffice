@@ -1270,6 +1270,41 @@ jobs:
             *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguly kanalu Allegro nie dzialaja"; fail=1;;
             *) ;;
           esac
+          echo "== przypomnienia : dwa listy, potem cisza =="
+          # Deux messages, puis silence. Le troisieme ne recupere personne et
+          # envoie l adresse d expedition dans les indesirables. Et le modele
+          # doit porter un LIEN : demander un virement a quelqu un qui allait
+          # payer par carte le fait renoncer une seconde fois.
+          POUT2=$(php -r '
+            require_once "'"$DIR_API"'/relance.php";
+            $deux = count(WSM_RELANCE_ETAPES) === 2;
+            $ecart = WSM_RELANCE_ODSTEP_H >= 48;
+            $abandon = WSM_RELANCE_ABANDON_JOURS <= 60;
+            $ferme = !wsm_relance_possible();
+            $dit = str_contains(wsm_relance_blocage(), "tpay");
+            echo ($deux ? "dwa-etapy-ok" : "dwa-etapy-ZLE"), " ",
+                 ($ecart ? "odstep-ok" : "odstep-ZLE"), " ",
+                 ($abandon ? "porzucenie-ok" : "porzucenie-ZLE"), " ",
+                 ($ferme === $dit || !$ferme ? "brama-ok" : "brama-ZLE");
+          ' 2>&1); [ $? -eq 0 ] || POUT2="php-ZLE :: $POUT2"
+          echo "  $POUT2"
+          case "$POUT2" in
+            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguly przypomnien nie dzialaja"; fail=1;;
+            *) ;;
+          esac
+          # Le modele doit EXISTER et porter le lien, sinon la relance est muette.
+          QP="SELECT CONCAT('wzorow=', COUNT(*), ' z_linkiem=', SUM(body LIKE '%{{link}}%')) FROM mrszoko.wsm_mail_templates WHERE code LIKE 'niedokonczone%'"
+          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+            PV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QP" 2>&1 || echo "sql-ZLE")
+          else
+            PV=$(mysql -N -e "$QP" 2>&1 || echo "sql-ZLE")
+          fi
+          echo "  $PV"
+          case "$PV" in
+            *ZLE*) echo "  ^ ATTENTION : nie udalo sie sprawdzic wzorow przypomnien"; fail=1;;
+            *wzorow=0*) echo "  ^ ATTENTION : brak wzoru — przypomnienie byloby nieme"; fail=1;;
+            *) ;;
+          esac
           if [ "$fail" = "0" ]; then echo "ALL RULE CHECKS OK"; else echo "RULE CHECK FAILED"; exit 1; fi
           REMOTE
 

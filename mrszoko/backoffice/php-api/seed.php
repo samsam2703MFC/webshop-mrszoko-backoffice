@@ -931,6 +931,97 @@ Mister Szoko
 Mister Szoko
 {{sklep}}", 'formularz'];
 
+    // ---- Commande abandonnée à la caisse -----------------------------------
+    //  ELLE PORTE LE LIEN, PAS UN RIB. Le client a choisi ses articles et
+    //  s'est arrêté au paiement : lui demander un virement le fait renoncer
+    //  une seconde fois. Et le ton reste celui d'un rappel, jamais d'une
+    //  relance de recouvrement — il ne doit rien, il n'a pas fini.
+    $t[] = ['niedokonczone', 'pl', 'Zamówienie czeka', 'Twoje zamówienie {{numer}} czeka na opłacenie',
+"Dzień dobry {{imie}},
+
+zamówienie {{numer}} jest gotowe, brakuje tylko płatności:
+
+{{pozycje}}
+
+Do zapłaty: {{kwota}}. Płatność zajmie chwilę:
+{{link}}
+
+Jeśli zmieniłeś zdanie — nic nie musisz robić, zamówienie samo wygaśnie.
+
+Mister Szoko
+{{sklep}}", 'niedokonczone'];
+
+    $t[] = ['niedokonczone', 'en', 'Your order is waiting', 'Your order {{numer}} is waiting for payment',
+"Hello {{imie}},
+
+order {{numer}} is ready — only the payment is missing:
+
+{{pozycje}}
+
+Amount: {{kwota}}. Paying takes a moment:
+{{link}}
+
+Changed your mind? Do nothing — the order will simply expire.
+
+Mister Szoko
+{{sklep}}", 'niedokonczone'];
+
+    $t[] = ['niedokonczone', 'uk', 'Замовлення чекає', 'Ваше замовлення {{numer}} чекає на оплату',
+"Доброго дня, {{imie}}!
+
+Замовлення {{numer}} готове — бракує лише оплати:
+
+{{pozycje}}
+
+До сплати: {{kwota}}. Оплата займе хвилину:
+{{link}}
+
+Передумали? Нічого не робіть — замовлення просто скасується.
+
+Mister Szoko
+{{sklep}}", 'niedokonczone'];
+
+    // Le dernier message le DIT. « Ostatnie » évite au client de se demander
+    // combien il en recevra encore, et nous évite d'en envoyer un troisième.
+    $t[] = ['niedokonczone2', 'pl', 'Ostatnie przypomnienie', 'Ostatnie przypomnienie — {{numer}}',
+"Dzień dobry {{imie}},
+
+to ostatnia wiadomość w sprawie zamówienia {{numer}} — więcej nie napiszemy.
+
+Do zapłaty: {{kwota}}
+{{link}}
+
+Jeśli nie chcesz go realizować, po prostu zignoruj ten list.
+
+Mister Szoko
+{{sklep}}", 'niedokonczone2'];
+
+    $t[] = ['niedokonczone2', 'en', 'Last reminder', 'Last reminder — {{numer}}',
+"Hello {{imie}},
+
+this is the last message about order {{numer}} — we will not write again.
+
+Amount: {{kwota}}
+{{link}}
+
+If you no longer want it, simply ignore this e-mail.
+
+Mister Szoko
+{{sklep}}", 'niedokonczone2'];
+
+    $t[] = ['niedokonczone2', 'uk', 'Останнє нагадування', 'Останнє нагадування — {{numer}}',
+"Доброго дня, {{imie}}!
+
+Це останній лист щодо замовлення {{numer}} — більше не писатимемо.
+
+До сплати: {{kwota}}
+{{link}}
+
+Якщо ви передумали, просто проігноруйте цей лист.
+
+Mister Szoko
+{{sklep}}", 'niedokonczone2'];
+
     // ---- Abonnement : l'échéance est PRÊTE, elle n'est pas PRÉLEVÉE --------
     //  Ce texte est le contrat. Rien n'est débité : la boutique n'enregistre
     //  aucune carte. Écrire « pobraliśmy » ferait du premier renouvellement

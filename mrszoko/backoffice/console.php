@@ -114,6 +114,7 @@ function console_sections(?array $me = null): array {
             'klienci.php'     => 'Klienci',
             'kontrahenci.php' => 'Kontrahenci',
             'poczta.php'      => 'Poczta',
+            'przypomnienia.php' => 'Przypomnienia',
             'kampanie.php'    => 'Kampanie',
         ],
 
