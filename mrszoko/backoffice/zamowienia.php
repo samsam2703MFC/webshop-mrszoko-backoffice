@@ -54,6 +54,41 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $id = (int) ($_POST['id'] ?? 0);
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może zmieniać zamówienia.'; $flashKind = 'err';
+    } elseif (isset($_POST['hurt'])) {
+        // ─── L'EXPÉDITION PAR LOT ────────────────────────────────────
+        //
+        // Vingt colis à sortir, c'était vingt allers-retours. On coche, on
+        // pousse une fois. Chaque commande passe par LA MÊME porte que le
+        // bouton d'une ligne — wsm_order_status_set() — donc chacune reçoit
+        // le document qui lui revient, son mail et son dépôt au registre.
+        //
+        // UNE COMMANDE BLOQUÉE NE PART PAS AVEC LE LOT. Sans les données
+        // du vendeur la facture ne peut pas naître : elle serait expédiée
+        // sans document, et on ne le verrait qu'au dépouillement. Le
+        // contrôle est refait ICI, côté serveur — la case décochée dans la
+        // page ne prouve rien.
+        $ids = array_slice(array_map('intval', (array) ($_POST['ids'] ?? [])), 0, 100);
+        $fait = 0; $refus = []; $docs = [];
+        foreach ($ids as $oid) {
+            $cmd = $oid > 0 ? wsm_order_by_id($pdo, $oid) : null;
+            if (!$cmd) continue;
+            $pf = wsm_order_preflight($pdo, $cmd);
+            if (!$pf['gotowe']) { $refus[] = $cmd['code'] . ' (' . implode(', ', $pf['blok']) . ')'; continue; }
+            $chg = wsm_order_status_set($pdo, $oid, 'wyslane', (string) ($me['nom'] ?? ''));
+            wsm_order_event($pdo, $oid, 'status', 'wyslane', (string) ($me['nom'] ?? ''));
+            wsm_mail_for_status($pdo, wsm_order_by_id($pdo, $oid) ?: $cmd, 'wyslane', (string) ($me['nom'] ?? ''));
+            $fait++;
+            if (($chg['doc'] ?? null)) $docs[] = (string) $chg['doc']['number'];
+        }
+        $flash = $fait . ' ' . ($fait === 1 ? 'zamówienie wysłane' : 'zamówień wysłanych')
+               . ($docs ? ' · dokumenty: ' . implode(', ', array_slice($docs, 0, 6))
+                          . (count($docs) > 6 ? ' …' : '') : '');
+        if ($refus) {
+            $flash .= ' · POMINIĘTE: ' . implode(' · ', array_slice($refus, 0, 4));
+            $flashKind = 'err';
+        }
+        if (!$fait && !$refus) { $flash = 'Nic nie zaznaczono.'; $flashKind = 'err'; }
+
     } else {
         $order = wsm_order_by_id($pdo, $id);
         if (!$order) {
@@ -162,8 +197,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     // L'ancre ramène à la ligne touchée, et le message survit dans la
     // session le temps d'un aller-retour.
     $_SESSION['zam_flash'] = [$flash, $flashKind];
+    // La file survit à l'action : sans elle, chaque geste renverrait sur la
+    // liste complète et il faudrait retrouver son tas à chaque colis.
+    $q = [];
+    if (isset($_GET['id']))      $q['id'] = (int) $_GET['id'];
+    if (isset($_GET['kolejka'])) $q['kolejka'] = (string) $_GET['kolejka'];
     $vers = 'zamowienia.php'
-          . (isset($_GET['id']) ? '?id=' . (int) $_GET['id'] : '')
+          . ($q ? '?' . http_build_query($q) : '')
           . ($id > 0 ? '#z' . $id : '');
     header('Location: ' . $vers, true, 303);
     exit;
@@ -179,7 +219,35 @@ $detail = isset($_GET['id']) ? wsm_order_by_id($pdo, (int) $_GET['id']) : null;
 // tout rendu de la console — ce sont des documents, pas des écrans.
 if ($detail && isset($_GET['druk']))     { $o = $detail; include __DIR__ . '/zamowienie_druk.php'; exit; }
 if ($detail && isset($_GET['etykieta'])) { $o = $detail; include __DIR__ . '/etykieta_druk.php'; exit; }
-$orders = wsm_orders_list($pdo, 200);
+// ─── LES FILES DE TRAVAIL ────────────────────────────────────────────────
+//
+// Deux mille commandes dans une seule liste, c'est une archive, pas un plan de
+// travail. Les gestes de la journée se rangent en trois tas : ce qu'il faut
+// préparer, ce qu'il faut sortir, et ce qui est parti. On ouvre le sien.
+//
+// La file « wysyłka » est celle où l'on agit par lot : toutes ses commandes
+// attendent exactement le même geste.
+$KOLEJKI = [
+    // Noms COURTS : « Do przygotowania » tombait sur trois lignes dans un
+    // onglet de 88 px, et trois lignes de titre au-dessus d'un chiffre, ça ne
+    // se lit plus d'un coup d'œil.
+    'przygotowanie' => ['Przygotowanie', ['nowe', 'oplacone']],
+    'wysylka'       => ['Do wysłania',      ['w_realizacji']],
+    'wyslane'       => ['Wysłane',          ['wyslane', 'dostarczone']],
+    'wszystkie'     => ['Wszystkie',        []],
+];
+$kolejka = (string) ($_GET['kolejka'] ?? 'wszystkie');
+if (!isset($KOLEJKI[$kolejka])) $kolejka = 'wszystkie';
+$hurtowa = $kolejka === 'wysylka';        // la seule où le lot a un sens
+
+$licznik = [];
+foreach ($KOLEJKI as $k => [$nazwa, $sts]) {
+    $licznik[$k] = $sts
+        ? (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders WHERE status IN ('" . implode("','", $sts) . "')")->fetchColumn()
+        : (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders")->fetchColumn();
+}
+
+$orders = wsm_orders_list($pdo, 200, $KOLEJKI[$kolejka][1]);
 $kpis   = wsm_shop_kpis($pdo);
 $cfg    = ['tpay' => wsm_tpay_enabled(), 'inpost' => wsm_inpost_enabled()];
 
@@ -404,6 +472,28 @@ console_crumbs($detail
   </div>
 <?php endif; ?>
 
+  <?php // ─── LES FILES ────────────────────────────────────────────────────
+        // Trois tas, et leur compte. Le compte n'est pas décoratif : c'est lui
+        // qui dit s'il reste du travail, et il évite d'ouvrir une file vide. ?>
+  <nav class="kolejki" aria-label="Kolejki zamówień">
+    <?php foreach ($KOLEJKI as $k => [$nazwa, $sts]): ?>
+    <a href="?kolejka=<?= h($k) ?>"<?= $k === $kolejka ? ' class="on" aria-current="page"' : '' ?>>
+      <b><?= (int) $licznik[$k] ?></b><span><?= h($nazwa) ?></span>
+    </a>
+    <?php endforeach; ?>
+  </nav>
+
+  <?php if ($hurtowa && $isAdmin): ?>
+  <?php // LE FORMULAIRE DU LOT VIT HORS DU TABLEAU, et les cases s'y rattachent
+        // par leur attribut « form ». Un formulaire qui envelopperait les
+        // lignes serait imbriqué dans ceux des étapes — interdit en HTML, et le
+        // navigateur en avale un des deux sans rien dire. ?>
+  <form method="post" id="hurt" class="hurt">
+    <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+    <input type="hidden" name="hurt" value="1">
+  </form>
+  <?php endif; ?>
+
   <div class="tablewrap">
   <?php // « dense » : neuf colonnes, dont une qui porte six boutons. Avec le
         // rembourrage habituel, ce tableau-là dépasse la largeur de la page et
@@ -411,14 +501,28 @@ console_crumbs($detail
         // le plus consulté de la maison, et quelle que soit la taille de
         // l'écran, puisque la zone de travail est plafonnée à 1180 px. ?>
   <table class="rwd dense zam">
-    <thead><tr><th>Numer</th><th>Data</th><th>Klient</th><th>Dostawa</th><th>Status</th><th>Płatność</th><th class="num">Poz.</th><th class="num">Brutto</th><th>Kontrolki</th></tr></thead>
+    <thead><tr><?php if ($hurtowa && $isAdmin): ?><th><span class="sr">Zaznacz</span></th><?php endif; ?><th>Numer</th><th>Data</th><th>Klient</th><th>Dostawa</th><th>Status</th><th>Płatność</th><th class="num">Brutto</th><th>Przed wysyłką</th></tr></thead>
     <tbody>
     <?php if (!$orders): ?>
     <tr><td class="muted">Brak zamówień.</td></tr>
     <?php endif; ?>
     <?php foreach ($orders as $o):
+      // Le contrôle d'avant-expédition, calculé UNE fois : la case, le repli
+      // et la ligne du document le lisent tous les trois.
+      $pf = wsm_order_preflight($pdo, $o);
       $payCls = $o['payment_status'] === 'oplacone' ? 'ok' : ($o['payment_status'] === 'oczekuje' ? 'wait' : 'bad'); ?>
-    <tr id="z<?= (int) $o['id'] ?>">
+    <tr id="z<?= (int) $o['id'] ?>"<?= $hurtowa && !$pf['gotowe'] ? ' class="zablok"' : '' ?>>
+      <?php if ($hurtowa && $isAdmin): ?>
+      <?php // Bloquée : la case est DÉSACTIVÉE et dit pourquoi. Le serveur
+            // refait le contrôle de toute façon — une case n'est pas une
+            // garantie, c'est une commodité. ?>
+      <td data-l="Wyślij" class="zazn">
+        <input type="checkbox" name="ids[]" form="hurt" value="<?= (int) $o['id'] ?>"
+               <?= $pf['gotowe'] ? '' : 'disabled' ?>
+               aria-label="Wyślij <?= h($o['code']) ?>"
+               title="<?= $pf['gotowe'] ? 'Zaznacz do wysyłki hurtem' : h(implode(' · ', $pf['blok'])) ?>">
+      </td>
+      <?php endif; ?>
       <td data-l="Numer"><a class="code" href="?id=<?= (int) $o['id'] ?>"><?= h($o['code']) ?></a></td>
       <?php // DATE ET HEURE, CHACUNE D'UN SEUL TENANT. En un seul morceau de
             // texte, la colonne se faisait couper par le tableau en « 2026- /
@@ -538,31 +642,88 @@ console_crumbs($detail
                   title="Zapłata przyszła przelewem — zapisz ją ręcznie">Opłacone ✓</button>
         </form>
         <?php endif; ?></td>
-      <td data-l="Pozycje" class="num"><?= (int) $o['units'] ?></td>
-      <td data-l="Brutto" class="num"><?= h(pln($o['total_gross'])) ?></td>
-      <?php
-      // LES DEUX VOYANTS, ET LE GESTE QUI LES DÉBLOQUE. Il fallait ouvrir
-      // chaque fiche pour savoir si une commande partirait avec une facture ou
-      // un e-paragon, si son numéro de TVA tenait toujours, et si le document
-      // était arrivé au registre. On ne le faisait donc pas.
-      $vy = wsm_order_voyants($pdo, $o); ?>
-      <td data-l="Kontrolki" class="wide"><div class="voyants">
-        <?php foreach ($vy as $k => $v): ?>
-          <?php if ($v['agir'] !== '' && $isAdmin): ?>
-          <form method="post" style="display:inline">
-            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
-            <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
-            <button class="tag <?= h($v['etat']) ?>" name="<?= h($v['agir']) ?>" value="1"
-                    title="<?= h($v['quoi']) ?>"><?= h($v['txt']) ?></button>
-          </form>
-          <?php else: ?>
-          <span class="tag <?= h($v['etat']) ?>" title="<?= h($v['quoi']) ?>"><?= h($v['txt']) ?></span>
-          <?php endif; ?>
-        <?php endforeach; ?>
-      </div></td>
+      <?php // Le nombre d'articles vit AVEC le montant : deux chiffres qu'on
+            // lit ensemble n'ont pas besoin de deux colonnes, et neuf colonnes
+            // poussaient déjà le tableau hors de la page. ?>
+      <td data-l="Brutto" class="num"><?= h(pln($o['total_gross'])) ?>
+        <small class="muted"><?= (int) $o['units'] ?> poz.</small></td>
+      <?php // ─── CE QUI VA PARTIR, AVANT QUE ÇA PARTE ──────────────────
+            // Replié, il coûte une ligne : la pastille du document suffit à
+            // dire ce qui sera émis. Ouvert, il montre les cinq points qui
+            // décident — l'encaissement, le numéro qui choisit le document, le
+            // document, le mail, le registre — et porte les deux gestes qui les
+            // débloquent, SUR la ligne qui les motive.
+            //
+            // Il remplace la colonne des voyants : elle disait les mêmes
+            // choses, plus court et sans les raisons, et il fallait relier les
+            // deux du regard.
+            //
+            // Quand un point manque, la commande n'est PAS expédiable et le
+            // trou est nommé — au lieu de se découvrir après le clic, colis
+            // déjà parti. ?>
+      <td data-l="Przed wysyłką" class="wide">
+        <details class="przed<?= $pf['gotowe'] ? '' : ' blok' ?>">
+          <summary>
+            <span class="dokchip <?= $pf['kind'] === 'faktura' ? 'f' : 'p' ?>"><?= h(strtoupper($pf['kind'])) ?></span>
+            <?= $pf['gotowe'] ? '' : '<b>Nie można wysłać</b>' ?>
+          </summary>
+          <ul class="przed-lista">
+            <?php foreach ($pf['lignes'] as $lg): ?>
+            <li class="<?= h($lg['etat']) ?>">
+              <i aria-hidden="true"><?= ['ok' => '✓', 'no' => '✗', 'wa' => '!', 'brak' => '—'][$lg['etat']] ?? '·' ?></i>
+              <span class="co"><?= h($lg['co']) ?></span>
+              <span class="val"><?= h($lg['val']) ?>
+                <?php if ($isAdmin && ($lg['agir'] ?? '') !== ''): ?>
+                <form method="post" class="lig">
+                  <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+                  <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+                  <button class="etap kasa" name="<?= h($lg['agir']) ?>" value="1"><?= h($lg['agirTxt'] ?? 'Zrób') ?></button>
+                </form>
+                <?php endif; ?>
+              </span>
+            </li>
+            <?php endforeach; ?>
+          </ul>
+        </details>
+      </td>
     </tr>
     <?php endforeach; ?>
     </tbody>
   </table>
   </div>
+
+<?php if ($hurtowa && $isAdmin && $orders): ?>
+  <?php // LA BARRE DU LOT. Le libellé se met à jour par un script minuscule ;
+        // sans lui il reste générique et le bouton marche quand même —
+        // l'envoi, lui, ne dépend d'aucun JavaScript. ?>
+  <div class="lot">
+    <div class="lot-in">
+      <button type="submit" form="hurt" id="lotbtn"
+              onclick="return confirm(this.dataset.pyt || 'Wysłać zaznaczone zamówienia? Wystawi to dokumenty i wyśle je do klientów.')"
+              data-pyt="Wysłać zaznaczone zamówienia? Wystawi to dokumenty i wyśle je do klientów.">
+        Wyślij zaznaczone
+      </button>
+      <p id="lotinfo">Zaznacz zamówienia, które wychodzą — dokument, mail i KSeF pójdą za każdym.</p>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var f = document.getElementById('hurt'), b = document.getElementById('lotbtn'),
+        i = document.getElementById('lotinfo');
+    if (!f || !b) return;
+    function maj() {
+      var c = document.querySelectorAll('input[name="ids[]"]:checked').length;
+      b.textContent = c ? 'Wyślij ' + c + ' zaznaczone' : 'Wyślij zaznaczone';
+      b.disabled = !c;
+      b.dataset.pyt = 'Wysłać ' + c + ' zamówień? Wystawi to dokumenty i wyśle je do klientów.';
+      if (i) i.textContent = c ? c + ' zaznaczonych · dokument, mail i KSeF pójdą za każdym'
+                              : 'Zaznacz zamówienia, które wychodzą.';
+    }
+    document.addEventListener('change', function (e) {
+      if (e.target && e.target.name === 'ids[]') maj();
+    });
+    maj();
+  })();
+  </script>
+<?php endif; ?>
 <?php console_foot();

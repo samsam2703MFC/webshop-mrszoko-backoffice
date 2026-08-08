@@ -794,6 +794,120 @@ function wsm_order_etapy(PDO $pdo, array $o): array {
 }
 
 /**
+ * CE QUI VA PARTIR, LIGNE PAR LIGNE, AVANT QUE ÇA PARTE.
+ *
+ * Passer une commande à « wysłane » déclenche quatre choses d'un coup : un
+ * document fiscal numéroté dans une série continue, un e-mail au client, un
+ * dépôt au registre national, et un colis qui s'en va. Aucune n'est
+ * rattrapable — un doublon de facture se corrige par un avoir, un e-mail parti
+ * ne revient pas, et le colis est chez le transporteur.
+ *
+ * On montre donc la liste AVANT. Pas un « Czy na pewno? » que personne ne lit :
+ * les cinq lignes qui décident, chacune avec son état et sa raison.
+ *
+ * ET ELLE BLOQUE. Sans les données du vendeur — le numéro de compte en
+ * particulier — la facture ne peut pas naître : `wsm_order_document()` refuse
+ * et rend « dokument nie powstał ». Aujourd'hui ça se découvre APRÈS, dans le
+ * message qui suit le clic, colis déjà expédié. Ici la commande n'est pas
+ * expédiable tant que le trou n'est pas bouché, et le trou est nommé.
+ *
+ * @return array{
+ *   lignes: list<array{co:string, etat:string, val:string}>,
+ *   kind: string, blok: list<string>, gotowe: bool
+ * }  etat : 'ok' vert · 'no' rouge · 'wa' orange · 'brak' neutre
+ */
+function wsm_order_preflight(PDO $pdo, array $o): array {
+    $reg  = wsm_orders_cfg();
+    $kind = wsm_invoice_kind_for($o);
+    $doc  = wsm_invoice_for_order($pdo, (int) ($o['id'] ?? 0));
+    $vs   = strtolower((string) ($o['vat_status'] ?? ($o['vat']['status'] ?? '')));
+    $ve   = trim((string) ($o['vat_eu'] ?? ''));
+    $nip  = trim((string) ($o['nip'] ?? ''));
+    $mail = trim((string) ($o['email'] ?? ''));
+    $fak  = ($kind['kind'] ?? '') === 'faktura';
+    $l = []; $blok = [];
+
+    // 1. L'argent. Expédier avant d'être payé est une décision, pas un oubli :
+    //    on ne bloque pas, on le dit en orange.
+    $paye = (string) ($o['payment_status'] ?? '') === 'oplacone';
+    $l[] = ['co' => 'Zapłata', 'etat' => $paye ? 'ok' : 'wa',
+            // Formaté ici, pas emprunté à la console : cette fonction sert
+            // aussi à l'API, qui n'a pas ses aides d'affichage.
+            'val' => $paye
+                ? number_format(((int) ($o['total_gross'] ?? 0)) / 100, 2, ',', "\u{202F}") . "\u{202F}zł"
+                  . (($o['paid_at'] ?? '') ? ' · ' . substr((string) $o['paid_at'], 0, 16) : '')
+                : 'brak wpłaty — wyślesz na własne ryzyko'];
+
+    // 2. Le numéro qui décide du document.
+    if ($ve !== '') {
+        // Le geste vit SUR la ligne qui le motive : on relit VIES là où on lit
+        // son verdict, pas dans une colonne à côté. Le contrôle qui compte est
+        // celui du jour de la livraison.
+        $l[] = ['co' => 'VIES', 'etat' => $vs === 'valid' ? 'ok' : ($vs === 'invalid' ? 'no' : 'wa'),
+                'agir' => 'vies', 'agirTxt' => 'Sprawdź teraz',
+                'val' => $ve . ' — ' . match ($vs) {
+                    'valid'   => 'potwierdzony',
+                    'invalid' => 'ODRZUCONY, faktura z odwrotnym obciążeniem byłaby błędna',
+                    default   => 'niesprawdzony albo VIES nie odpowiada',
+                }];
+    } elseif ($nip !== '') {
+        $l[] = ['co' => 'NIP', 'etat' => wsm_valid_nip($nip) ? 'ok' : 'no',
+                'val' => $nip . (wsm_valid_nip($nip) ? ' — sprzedaż krajowa' : ' — suma kontrolna się nie zgadza')];
+    }
+
+    // 3. Le document. Déjà émis, il ne se refait pas — et c'est une bonne
+    //    nouvelle, pas un blocage.
+    if ($doc) {
+        $l[] = ['co' => 'Dokument', 'etat' => 'ok',
+                'val' => strtoupper((string) $doc['kind']) . ' ' . (string) $doc['number'] . ' — już wystawiony'];
+        // Facture émise et pas encore au registre : c'est LE cas où l'on veut
+        // pousser à la main, et c'est ici qu'on l'apprend.
+        if ((string) $doc['kind'] === 'faktura' && trim((string) ($doc['ksef_number'] ?? '')) === '') {
+            $ksefFait = false;
+        } elseif ((string) $doc['kind'] === 'faktura') {
+            $ksefFait = (string) $doc['ksef_number'];
+        }
+    } else {
+        $manque = $fak ? wsm_invoice_blockers() : [];
+        if ($manque) {
+            $blok[] = 'brak danych sprzedawcy: ' . implode(', ', $manque);
+            $l[] = ['co' => 'Dokument', 'etat' => 'no',
+                    'val' => 'FAKTURA nie powstanie — brak: ' . implode(', ', $manque)];
+        } elseif ($reg['doc_status'] === 'nigdy') {
+            $l[] = ['co' => 'Dokument', 'etat' => 'wa',
+                    'val' => 'automat wyłączony w Superadminie — wystawisz ręcznie'];
+        } else {
+            $l[] = ['co' => 'Dokument', 'etat' => 'ok',
+                    'val' => strtoupper((string) $kind['kind']) . ' — ' . $kind['raison']];
+        }
+    }
+
+    // 4. Le courrier.
+    $l[] = ['co' => 'Mail', 'etat' => !$reg['doc_mail'] ? 'wa' : ($mail !== '' ? 'ok' : 'no'),
+            'val' => !$reg['doc_mail'] ? 'wysyłka dokumentu wyłączona' : ($mail !== '' ? $mail : 'brak adresu — dokument nigdzie nie pójdzie')];
+
+    // 5. Le registre national — un e-paragon n'y va pas, et ce n'est pas un
+    //    manque : c'est la règle.
+    if ($fak) {
+        $ks = function_exists('wsm_ksef_enabled') && wsm_ksef_enabled();
+        if (isset($ksefFait) && $ksefFait !== false) {
+            $l[] = ['co' => 'KSeF', 'etat' => 'ok', 'val' => 'w rejestrze: ' . $ksefFait];
+        } elseif (isset($ksefFait)) {
+            $l[] = ['co' => 'KSeF', 'etat' => 'no', 'agir' => 'ksef', 'agirTxt' => 'Zgłoś teraz',
+                    'val' => 'faktura NIE jest jeszcze w rejestrze'];
+        } else {
+            $l[] = ['co' => 'KSeF', 'etat' => !$reg['doc_ksef'] ? 'wa' : ($ks ? 'ok' : 'wa'),
+                    'val' => !$reg['doc_ksef'] ? 'zgłaszanie wyłączone' : ($ks ? 'kanał otwarty' : 'kanał zamknięty — faktura poczeka w kolejce')];
+        }
+    } else {
+        $l[] = ['co' => 'KSeF', 'etat' => 'brak', 'val' => 'paragon nie idzie do rejestru — tak ma być'];
+    }
+
+    return ['lignes' => $l, 'kind' => (string) ($kind['kind'] ?? 'paragon'),
+            'blok' => $blok, 'gotowe' => !$blok];
+}
+
+/**
  * Les deux voyants d'une commande : VIES et le document.
  *
  * Les deux gestes d'expédition vivaient ici aussi — « Do wysyłki » et

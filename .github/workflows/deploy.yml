@@ -2102,6 +2102,33 @@ jobs:
           grep -q 'name="powiadom"' "$DIR_BO/zamowienia.php" \
             && echo "  powiadomienie klienta z listy: tak" \
             || { echo "  ^ ATTENTION : zmiana statusu z listy nie powiadomi klienta"; fail=1; }
+          # LA LISTE DOIT PORTER CE QUE LES VOYANTS LISENT. Sans vat_eu ni
+          # vat_status, une commande B2B confirmée par VIES s'affiche « brak
+          # numeru VAT UE » et annonce un paragon, pendant qu'une FACTURE part
+          # au registre national. Aucune erreur nulle part — juste un écran qui
+          # dit le contraire de ce qu'il fait.
+          php -r '
+            require_once "'"$DIR_BO"'/api/shop.php";
+            $r = new ReflectionFunction("wsm_orders_list");
+            $src = implode("", array_slice(file($r->getFileName()),
+                     $r->getStartLine() - 1, $r->getEndLine() - $r->getStartLine() + 1));
+            $manque = [];
+            foreach (["vat_eu", "vat_status", "company", "paid_at"] as $c)
+              if (!str_contains($src, "\x27" . $c . "\x27")) $manque[] = $c;
+            if ($manque) { fwrite(STDERR, "  ^ ZLE : lista nie wozi: " . implode(", ", $manque) . "\n"); exit(1); }
+            echo "  lista wozi pola, które czytają kontrolki\n";
+          ' || fail=1
+          # Le contrôle d'avant-expédition et les files : trois pièces, même règle
+          # qu'au-dessus — deux sur trois donnent un écran qui a l'air de marcher.
+          php -r 'require_once "'"$DIR_BO"'/api/invoice.php";
+                  exit(function_exists("wsm_order_preflight") ? 0 : 1);' \
+            && echo "  wsm_order_preflight(): dojechało" \
+            || { echo "  ^ NOT OK : brak kontroli przed wysyłką"; fail=1; }
+          grep -q 'name="ids\[\]"' "$DIR_BO/zamowienia.php" \
+            && grep -q 'kolejka' "$DIR_BO/zamowienia.php" \
+            && grep -q '\.przed' "$DIR_BO/console.css" \
+            && echo "  kolejki, zaznaczanie i lista kontrolna: obecne" \
+            || { echo "  ^ NOT OK : wysyłka hurtem niekompletna"; fail=1; }
 
           if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
           REMOTE

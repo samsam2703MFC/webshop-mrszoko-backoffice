@@ -486,6 +486,77 @@ $rS = $pdo->query('SELECT status, payment_status FROM wsm_orders WHERE id = ' . 
 ok('… mais une commande neuve payée passe bien à « opłacone »',
    $rS['status'] === 'oplacone' && $rS['payment_status'] === 'oplacone', $rS);
 
+// ---- 7. CE QUE LA LISTE MONTRE DOIT ÊTRE CE QUI VA SE PASSER --------------
+//
+// LE DÉFAUT LE PLUS COÛTEUX DE CET ÉCRAN, et il ne provoquait aucune erreur :
+// wsm_orders_list() ne chargeait ni vat_eu ni vat_status. Les voyants et
+// l'annonce du document lisent EXACTEMENT ces champs-là. Une commande B2B au
+// numéro confirmé par VIES s'affichait donc « VIES — brak numeru VAT UE » et
+// annonçait un PARAGON… pendant que l'émission, qui travaille sur la commande
+// complète, produisait une FACTURE déposée au registre national. L'écran
+// disait le contraire de ce qu'il allait faire.
+echo "\n-- lista pokazuje to, co naprawdę się stanie --\n";
+
+$oL = $mk(['company' => 'Müller GmbH', 'vat_eu' => 'DE811569869', 'vat_status' => 'valid', 'invoice' => 1]);
+$ligne = null;
+foreach (wsm_orders_list($pdo, 400) as $r) if ($r['code'] === $oL['code']) $ligne = $r;
+ok('la commande est bien dans la liste', $ligne !== null);
+ok('la liste porte le numéro de TVA et son statut VIES',
+   ($ligne['vat_eu'] ?? '') === 'DE811569869' && ($ligne['vat_status'] ?? '') === 'valid', $ligne);
+ok('… donc la liste annonce le MÊME document que l\'émission',
+   wsm_invoice_kind_for($ligne)['kind'] === wsm_invoice_kind_for($oL)['kind'],
+   [wsm_invoice_kind_for($ligne)['kind'], wsm_invoice_kind_for($oL)['kind']]);
+ok('… et le voyant VIES dit vrai depuis la liste',
+   wsm_order_voyants($pdo, $ligne)['vies']['txt'] === wsm_order_voyants($pdo, $oL)['vies']['txt'],
+   wsm_order_voyants($pdo, $ligne)['vies']);
+
+// Les files : un filtre qui laisserait passer autre chose que des états connus
+// serait une injection dans un ORDER BY. La liste blanche est le contrôle.
+$pdo->prepare('UPDATE wsm_orders SET status = ? WHERE id = ?')->execute(['w_realizacji', (int) $oL['id']]);
+$file = wsm_orders_list($pdo, 400, ['w_realizacji']);
+ok('la file ne rend que son propre état',
+   $file && !array_filter($file, fn($r) => $r['status'] !== 'w_realizacji'), count($file));
+ok('un état inventé ne filtre rien plutôt que de casser',
+   count(wsm_orders_list($pdo, 5, ["' OR 1=1 --"])) === count(wsm_orders_list($pdo, 5)));
+
+// ---- 8. LE CONTRÔLE D'AVANT-EXPÉDITION ------------------------------------
+//
+// Il décide ce qui part et ce qui reste. Les deux cas qui comptent : celui où
+// tout est là, et celui où la facture ne peut pas naître — aujourd'hui ça se
+// découvre APRÈS le clic, colis déjà expédié.
+echo "\n-- lista kontrolna przed wysyłką --\n";
+
+$pf = wsm_order_preflight($pdo, $oL);
+ok('le contrôle nomme le document qui sera émis', $pf['kind'] === 'faktura', $pf['kind']);
+ok('… et il est expédiable quand les données du vendeur sont là', $pf['gotowe'], $pf['blok']);
+$vus = array_column($pf['lignes'], 'co');
+ok('les points qui décident y sont tous',
+   in_array('Zapłata', $vus, true) && in_array('VIES', $vus, true)
+   && in_array('Dokument', $vus, true) && in_array('Mail', $vus, true) && in_array('KSeF', $vus, true), $vus);
+ok('la ligne VIES porte le geste qui la relit',
+   ($pf['lignes'][1]['agir'] ?? '') === 'vies', $pf['lignes'][1] ?? null);
+
+// LE BLOCAGE. Sans numéro de compte, la facture ne peut pas naître : la
+// commande ne doit pas être expédiable, et le trou doit être NOMMÉ.
+wsm_config_overlay(['invoice' => ['iban' => '']]);
+$pfB = wsm_order_preflight($pdo, $oL);
+ok('sans numéro de compte, la commande n\'est pas expédiable', !$pfB['gotowe']);
+ok('… et le manque est nommé, pas seulement signalé',
+   str_contains(implode(' ', $pfB['blok']), 'rachunku'), $pfB['blok']);
+// La preuve que le blocage n'est pas décoratif : l'émission échoue vraiment.
+$dB = wsm_order_document($pdo, $mk(['company' => 'Zorza', 'nip' => $NIP_OK, 'invoice' => 1]), 'test');
+ok('et l\'émission refuse pour de bon — l\'écran ne bloque pas dans le vide',
+   ($dB['doc'] ?? null) === null, $dB['raison'] ?? '');
+wsm_config_overlay(['invoice' => ['iban' => 'PL61 1090 1014 0000 0712 1981 2874']]);
+
+// Un e-paragon n'a pas besoin des données du vendeur pour partir.
+$oPar = $mk(['invoice' => 0]);
+wsm_config_overlay(['invoice' => ['iban' => '']]);
+$pfP = wsm_order_preflight($pdo, $oPar);
+ok('un paragon reste expédiable sans les données de facturation',
+   $pfP['gotowe'] && $pfP['kind'] === 'paragon', [$pfP['kind'], $pfP['blok']]);
+wsm_config_overlay(['invoice' => ['iban' => 'PL61 1090 1014 0000 0712 1981 2874']]);
+
 // Les voyants ne refont plus le travail des étapes : « Do wysyłki » et
 // « Wysłane » y étaient les mêmes gestes sous d'autres noms.
 $vy = wsm_order_voyants($pdo, $oF);
