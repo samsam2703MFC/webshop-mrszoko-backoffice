@@ -53,6 +53,11 @@ command -v php     >/dev/null || { echo "php absent (il sert à vérifier le rai
 
 export SSHPASS="$SSH_PASSWORD"
 SSHOPT="-p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+# scp ne parle PAS la même langue que ssh : chez lui le port est « -P », et
+# « -p » veut dire « préserver les dates ». Réutiliser SSHOPT tel quel a donc
+# fait lire « 22 » comme un nom de fichier — « scp: stat local "22": No such
+# file or directory », en plein milieu d'un déploiement par ailleurs réussi.
+SCPOPT="-P $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 distant() { sshpass -e ssh $SSHOPT "$SSH_USER@$SSH_HOST" "$@"; }
 
 echo "══ 1/5 · assemblage ═══════════════════════════════════════════════════"
@@ -127,6 +132,25 @@ grep -q 'wsm_order_etapy' site/backoffice/api/invoice.php \
   && grep -q '\.etap' site/backoffice/console.css \
   || { echo "  les boutons de statut ne sont pas complets dans l'assemblage"; exit 1; }
 echo "  boutons de statut : les trois pièces sont là"
+# Les files, le contrôle d'avant-expédition et l'envoi par lot : même règle.
+grep -q 'wsm_order_preflight' site/backoffice/api/invoice.php \
+  && grep -q 'name="ids\[\]"' site/backoffice/zamowienia.php \
+  && grep -q '\.przed' site/backoffice/console.css \
+  || { echo "  la liste kontrolna / wysyłka hurtem n'est pas complète"; exit 1; }
+# LA LISTE DOIT PORTER CE QUE LES VOYANTS LISENT. Sans vat_eu ni vat_status,
+# une commande B2B confirmée par VIES s'affiche « brak numeru VAT UE » et
+# annonce un paragon, pendant qu'une FACTURE part au registre.
+php -r '
+  require_once "site/backoffice/api/shop.php";
+  $r = new ReflectionFunction("wsm_orders_list");
+  $src = implode("", array_slice(file($r->getFileName()),
+           $r->getStartLine() - 1, $r->getEndLine() - $r->getStartLine() + 1));
+  $m = [];
+  foreach (["vat_eu", "vat_status", "company", "paid_at"] as $c)
+    if (!str_contains($src, "\x27" . $c . "\x27")) $m[] = $c;
+  if ($m) { fwrite(STDERR, "  la liste ne transporte pas : " . implode(", ", $m) . "\n"); exit(1); }
+'
+echo "  files, contrôle avant expédition, envoi par lot : présents"
 echo "  login, tokens, htaccess : présents"
 
 echo "══ 3/5 · envoi vers $SSH_USER@$SSH_HOST:$DEPLOY_DIR ═══════════════════"
@@ -143,7 +167,7 @@ if [ -n "$DB_USER" ]; then
   # et l'échec était avalé — trois déploiements verts n'ont rien synchronisé.
   php "$BO"/php-api/migrate.php --sync-content-sql > /tmp/wsm-sync.sql
   echo "  $(wc -l < /tmp/wsm-sync.sql) instructions SQL"
-  sshpass -e scp $SSHOPT /tmp/wsm-sync.sql "$SSH_USER@$SSH_HOST:/tmp/wsm-sync.sql" >/dev/null
+  sshpass -e scp $SCPOPT /tmp/wsm-sync.sql "$SSH_USER@$SSH_HOST:/tmp/wsm-sync.sql" >/dev/null
   distant "DB_USER='$DB_USER' DB_PASS='$DB_PASS' bash -s" <<'REMOTE'
     if mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 mrszoko < /tmp/wsm-sync.sql 2>/tmp/wsm-sync.err; then
       echo "  contenu éditorial : synchronisé"
