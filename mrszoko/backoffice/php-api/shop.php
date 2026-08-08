@@ -1334,8 +1334,14 @@ function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bo
 }
 
 /** Liste pour le back-office. */
-function wsm_orders_list(PDO $pdo, int $limit = 200): array {
-    $rows = $pdo->query("SELECT * FROM wsm_orders ORDER BY id DESC LIMIT " . max(1, min(1000, $limit)))->fetchAll();
+function wsm_orders_list(PDO $pdo, int $limit = 200, array $statuts = []): array {
+    // Le filtre est une LISTE BLANCHE d'états connus, jamais du texte reçu :
+    // cette valeur vient d'un paramètre d'URL.
+    $ok = array_values(array_intersect($statuts, WSM_ORDER_STATUSES));
+    $ou = '';
+    if ($ok) $ou = " WHERE status IN ('" . implode("','", $ok) . "')";
+    $rows = $pdo->query("SELECT * FROM wsm_orders$ou ORDER BY id DESC LIMIT "
+                        . max(1, min(1000, $limit)))->fetchAll();
     return array_map(function ($o) use ($pdo) {
         $st = $pdo->prepare("SELECT COUNT(*), COALESCE(SUM(qty),0) FROM wsm_order_items WHERE order_id = ?");
         $st->execute([(int) $o['id']]);
@@ -1350,6 +1356,18 @@ function wsm_orders_list(PDO $pdo, int $limit = 200): array {
             'total_gross' => (int) $o['total_gross'], 'total_net' => (int) $o['total_net'],
             'weight_g' => (int) $o['weight_g'], 'parcel_template' => $o['parcel_template'],
             'invoice' => (int) $o['invoice'], 'nip' => $o['nip'],
+            // ─── CE QUE LA LISTE DOIT PORTER POUR NE PAS MENTIR ───────────
+            //
+            // Ces trois champs manquaient, et les voyants de la liste lisent
+            // exactement ceux-là. Résultat mesuré : une commande B2B au numéro
+            // de TVA confirmé par VIES s'affichait « VIES — brak numeru VAT UE »
+            // et annonçait un PARAGON… pendant que l'émission, elle, travaille
+            // sur la commande complète et produisait une FACTURE déposée au
+            // registre national. L'écran disait le contraire de ce qui allait
+            // se passer, sans la moindre erreur nulle part.
+            'company' => $o['company'] ?? '',
+            'vat_eu' => $o['vat_eu'] ?? '', 'vat_status' => $o['vat_status'] ?? '',
+            'paid_at' => $o['paid_at'] ?? null,
             'backorder' => (int) ($o['backorder'] ?? 0) === 1,
             'discount_percent' => (float) ($o['discount_percent'] ?? 0),
         ];

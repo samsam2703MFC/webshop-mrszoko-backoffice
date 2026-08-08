@@ -273,14 +273,32 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
   table.zam td[data-l="Data"]    { grid-area: 3 / 2; font-size: 12px; color: var(--text-muted);
                                    text-align: right; white-space: nowrap; }
   table.zam td[data-l="Data"] .tm { display: inline; }
-  table.zam td[data-l="Płatność"] { grid-area: 4 / 1; margin: 6px 0 0; }
+  table.zam td[data-l="Płatność"] { grid-area: 4 / 1 / 5 / -1; margin: 6px 0 0; }
   /* « 2 » tout seul ne veut rien dire une fois l'intitulé retiré. */
-  table.zam td[data-l="Pozycje"]  { grid-area: 4 / 2; font-size: 13px; text-align: right;
-                                    color: var(--text-muted); margin-top: 6px; }
-  table.zam td[data-l="Pozycje"]::after { content: " poz."; }
+  /* Le montant porte sa quantité en dessous, en petit. */
+  table.zam td[data-l="Brutto"] small { display: block; font-size: 11.5px; font-weight: 500; }
   /* Le chemin et les voyants prennent toute la largeur : c'est le travail. */
   table.zam td[data-l="Status"]    { grid-area: 5 / 1 / 6 / -1; margin-top: 10px; }
-  table.zam td[data-l="Kontrolki"] { grid-area: 6 / 1 / 7 / -1; margin-top: 8px; }
+  /* La case de sélection va CHERCHER le pouce : elle est en haut à droite de
+     la fiche, à côté du montant, pas perdue en fin de carte. */
+  /* Avec la case, la fiche passe à TROIS colonnes : [case][numéro][montant].
+     En deux colonnes, le montant se retrouvait seul sur sa ligne — une ligne
+     entière pour cinq caractères, sur une fiche qu'on veut courte. */
+  table.zam tr:has(td[data-l="Wyślij"]) { grid-template-columns: auto minmax(0, 1fr) auto; }
+  table.zam td[data-l="Wyślij"]    { grid-area: 1 / 1; align-self: center; }
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Numer"]  { grid-area: 1 / 2; }
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Brutto"] { grid-area: 1 / 3; }
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Klient"],
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Status"],
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Przed wysyłką"],
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Kontrolki"] { grid-column: 1 / -1; }
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Dostawa"]  { grid-area: 3 / 1 / 4 / 3; }
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Data"]     { grid-area: 3 / 3; }
+  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Płatność"] { grid-area: 4 / 1 / 5 / -1; }
+  table.zam td[data-l="Przed wysyłką"] { grid-area: 7 / 1 / 8 / -1; margin-top: 8px; }
+  table.zam tr:not(:has(td[data-l="Wyślij"])) td[data-l="Przed wysyłką"] { grid-area: 6 / 1 / 7 / -1; }
+  table.zam td[data-l="Przed wysyłką"]::before,
+  table.zam td[data-l="Wyślij"]::before { display: none; }
 }
 
 /* --- Étiquettes et bandeaux ---------------------------------------------- */
@@ -303,6 +321,79 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
    c'est le geste de la quasi-totalité des cas, il doit se toucher sans viser.
    Les étapes déjà franchies restent touchables mais s'effacent : un doigt qui
    glisse doit pouvoir se corriger sur place. */
+/* ═══ LES FILES DE TRAVAIL ═══════════════════════════════════════════════
+   Deux mille commandes dans une liste, c'est une archive. Trois tas avec leur
+   compte, c'est un plan de travail — et le compte dit s'il reste à faire. */
+.kolejki { display: flex; gap: 7px; margin: 0 0 14px; }
+.kolejki a {
+  flex: 1 1 0; min-width: 0; text-align: center; text-decoration: none;
+  border-radius: 11px; padding: 8px 4px 7px; min-height: 52px;
+  border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--text-strong);
+}
+.kolejki a b { display: block; font-family: var(--font-mono); font-size: 17px; line-height: 1.15; }
+.kolejki a span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+                  color: var(--text-muted); overflow-wrap: anywhere; }
+.kolejki a.on { background: var(--choco-700); border-color: var(--choco-700); color: var(--cream-50); }
+.kolejki a.on span { color: var(--choco-200); }
+
+/* ═══ CE QUI VA PARTIR, AVANT QUE ÇA PARTE ═══════════════════════════════
+   Replié : une ligne, avec le type de document. Ouvert : les cinq points qui
+   décident. Une commande bloquée le dit dans son résumé, pas au clic. */
+.przed > summary {
+  display: flex; align-items: center; gap: 7px; cursor: pointer; list-style: none;
+  min-height: 34px; font-size: 12.5px; color: var(--text-muted); width: max-content; max-width: 100%;
+}
+.przed > summary::-webkit-details-marker { display: none; }
+.przed > summary::after { content: "▸"; font-size: 10px; }
+/* Au bureau la colonne ne doit pas réclamer la largeur de sa phrase : neuf
+   colonnes tiennent tout juste, et une de trop pousse le tableau hors page. */
+@media (min-width: 700px) { .przed > summary { width: auto; min-height: 30px; gap: 5px; }
+                            .dokchip { font-size: 9.5px; padding: 3px 7px; } }
+.przed[open] > summary::after { content: "▾"; }
+.przed.blok > summary { color: var(--danger); }
+.dokchip { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; font-weight: 700;
+           padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.dokchip.f { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.dokchip.p { background: var(--cream-200); color: var(--choco-700); }
+.przed-lista { list-style: none; margin: 2px 0 6px; padding: 6px 0 2px;
+               border-top: 1px solid var(--border-subtle); }
+.przed-lista li { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 12.5px; }
+.przed-lista li i { font-style: normal; width: 13px; flex: none; text-align: center; font-weight: 700; }
+.przed-lista li .co { width: 68px; flex: none; color: var(--text-muted); font-size: 11.5px; }
+.przed-lista li .val { flex: 1 1 auto; overflow-wrap: anywhere; }
+/* Le geste, à droite de la valeur qu'il corrige — pas dans une colonne à part. */
+.przed-lista .lig { display: inline; margin-left: 6px; }
+.przed-lista .lig .etap.kasa { min-height: 28px; padding: 0 9px; font-size: 11.5px;
+                               border-color: var(--border-default); color: var(--brand); }
+.przed-lista li.ok i { color: var(--success); }
+.przed-lista li.no i, .przed-lista li.no .val { color: var(--danger); }
+.przed-lista li.wa i, .przed-lista li.wa .val { color: var(--caramel-600); }
+.przed-lista li.brak i, .przed-lista li.brak .val { color: var(--text-muted); }
+
+/* La sélection, et le lot. La barre colle en bas : on décide en regardant la
+   liste, pas en la quittant. */
+td.zazn input[type="checkbox"] { width: 24px; height: 24px; accent-color: var(--choco-700); }
+tr.zablok { background: color-mix(in srgb, var(--danger) 4%, transparent); }
+.hurt { margin: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.lot {
+  position: sticky; bottom: 0; z-index: 15; margin: 14px -16px -64px; padding: 11px 16px 16px;
+  background: color-mix(in srgb, var(--bg-page-alt) 93%, transparent);
+  backdrop-filter: blur(6px); border-top: 1px solid var(--border-subtle);
+}
+.lot-in { max-width: 1180px; margin: 0 auto; }
+.lot button {
+  width: 100%; min-height: 52px; border-radius: 999px; font-size: 15px; font-weight: 700;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--choco-900);
+}
+.lot button[disabled] { background: transparent; border-color: var(--border-default);
+                        color: var(--text-muted); opacity: 1; }
+.lot p { margin: 7px 2px 0; font-size: 11.5px; color: var(--text-muted); text-align: center; line-height: 1.45; }
+@media (min-width: 700px) {
+  .lot { margin: 14px -24px -72px; padding: 11px 24px 16px; }
+  .lot button { min-height: 44px; font-size: 14px; }
+}
+
 /* Un tableau de NEUF colonnes se serre les coudes. Le rembourrage courant
    (12 px de chaque côté) coûte 216 px rien qu'en marges : de quoi pousser
    l'écran Zamówienia hors de la page, quelle que soit la taille de l'écran —
@@ -311,6 +402,8 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 @media (min-width: 700px) {
   table.dense th, table.dense td { padding-left: 7px; padding-right: 7px; }
   table.dense th:first-child, table.dense td:first-child { padding-left: 12px; }
+  /* La case de sélection n'a pas besoin d'air : c'est une case, pas un texte. */
+  table.dense td.zazn, table.dense th:has(.sr) { padding-left: 8px; padding-right: 2px; }
   table.dense th:last-child,  table.dense td:last-child  { padding-right: 12px; }
   /* « 2026-08-06 17:01 » cassé en trois lignes se lit comme trois données.
      Date et heure gardent chacune leur bloc, et la seconde passe dessous : la
