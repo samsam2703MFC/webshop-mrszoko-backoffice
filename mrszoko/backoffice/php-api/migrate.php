@@ -14,6 +14,11 @@
 //        ne fait rien si un compte capable de se connecter existe déjà ;
 //        sinon crée ce compte administrateur. Idempotent : c'est l'amorçage
 //        utilisé par le déploiement.
+//    printf '%s' "$PASS" | php migrate.php --set-password-sql <email> [role] [nom]
+//        LA VOIE DU SERVEUR DE PRODUCTION : n'ouvre aucune base (son php-cli
+//        n'a pas pdo_mysql, les deux appels ci-dessus y échouent depuis
+//        toujours) et écrit sur la sortie standard le SQL à jouer par le
+//        client mysql. Le mot de passe entre par stdin et ne ressort pas.
 // ============================================================================
 require __DIR__ . '/db.php';
 require __DIR__ . '/delivery.php';   // wsm_audit(), utilisé par auth.php
@@ -59,6 +64,40 @@ if (in_array('--roles-sql', $args, true)) {
 if (in_array('--sync-content-sql', $args, true)) {
     require_once __DIR__ . '/seed.php';
     echo wsm_sync_content_sql();
+    exit(0);
+}
+// ---- Le mot de passe de la console, émis en SQL ----------------------------
+//
+//  LE MOT DE PASSE N'EST PAS UN ARGUMENT, et ce n'est pas un détail de style.
+//  Un argument de ligne de commande est lisible dans `ps` par n'importe quel
+//  compte de la machine pendant toute la durée de l'appel, il se dépose dans
+//  l'historique du shell de qui l'a tapé, et il ressort dans les traces d'un
+//  `set -x`. Il arrive donc par l'entrée standard — et il n'en ressort jamais :
+//  ce qui sort d'ici est du SQL qui ne porte qu'un hachage bcrypt.
+//
+//      printf '%s' "$MOT_DE_PASSE" \
+//        | php migrate.php --set-password-sql admin@example.com [role] [nom]
+//
+//  Refuser vaut mieux qu'émettre à moitié : un e-mail invalide ou un mot de
+//  passe trop court sort en code 2 SANS rien écrire sur la sortie standard,
+//  pour qu'un `> fichier.sql` ne laisse pas un fichier vide qu'on jouerait
+//  ensuite en croyant avoir posé quelque chose.
+if (($sp = array_search('--set-password-sql', $args, true)) !== false) {
+    require_once __DIR__ . '/seed.php';          // wsm_sql_txt()
+    $email = (string) ($args[$sp + 1] ?? '');
+    $role  = (string) ($args[$sp + 2] ?? WSM_ROLE_ADMIN);
+    $nom   = (string) ($args[$sp + 3] ?? '');
+    // rtrim sur les seules fins de ligne : un mot de passe a le droit de finir
+    // par une espace, et `printf '%s'` n'en ajoute pas — mais un `echo` d'un
+    // opérateur pressé, si.
+    $pass  = rtrim((string) stream_get_contents(STDIN), "\r\n");
+    try {
+        echo wsm_set_password_sql($email, $pass, $role, $nom);
+    } catch (InvalidArgumentException $e) {
+        fwrite(STDERR, "erreur : " . $e->getMessage() . " — rien n'a été émis\n");
+        fwrite(STDERR, "usage: printf '%s' \"\$PASS\" | php migrate.php --set-password-sql <email> [role] [nom]\n");
+        exit(2);
+    }
     exit(0);
 }
 

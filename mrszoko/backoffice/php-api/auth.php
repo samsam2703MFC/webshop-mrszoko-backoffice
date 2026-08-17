@@ -382,6 +382,79 @@ function wsm_set_password(PDO $pdo, string $email, string $password, string $rol
     return "compte créé : $email (rôle $role)";
 }
 
+/**
+ * LE MÊME TRAVAIL, ÉMIS EN SQL AU LIEU D'ÊTRE EXÉCUTÉ.
+ *
+ * POURQUOI CETTE VOIE EXISTE — et pourquoi le mot de passe administrateur
+ * n'est JAMAIS arrivé en production jusqu'ici. Le php en ligne de commande du
+ * serveur n'a pas pdo_mysql : `wsm_pdo()` y lève « could not find driver »
+ * avant la première requête. Le déploiement appelait pourtant
+ * `php migrate.php --set-password` sur cette machine, dans un `if` dont
+ * l'échec était rattrapé — il affichait « WSM_ADMIN_PASSWORD refusé », passait
+ * au vert, et le compte gardait le mot de passe d'avant. Le secret pouvait
+ * être posé, changé, refait : rien n'atteignait la base. C'est exactement la
+ * panne de `--sync-content`, sur un autre objet.
+ *
+ * Émettre du SQL ne demande aucune connexion. password_hash() non plus. La
+ * machine qui déploie peut donc calculer le hachage, et le client mysql — qui,
+ * lui, marche là-bas — pose le résultat.
+ *
+ * CE QUI VOYAGE EST UN HACHAGE, JAMAIS LE MOT DE PASSE. Le SQL produit ici
+ * peut traverser un scp, dormir dans /tmp et finir dans un journal sans rien
+ * livrer : bcrypt ne se relit pas. Le mot de passe en clair, lui, ne quitte
+ * pas la mémoire du processus qui appelle cette fonction.
+ *
+ * POURQUOI PAS `ON DUPLICATE KEY UPDATE`, qui tiendrait en une instruction :
+ * il repose ENTIÈREMENT sur la clé unique uq_wsm_users_email. Elle est bien
+ * dans le fichier de schéma — mais rien, dans aucun contrôle de déploiement,
+ * ne vérifie qu'elle est en base sur ce serveur-là, dont les tables ont
+ * plusieurs générations. Si elle manquait, l'instruction n'échouerait pas :
+ * elle créerait un SECOND compte avec la même adresse, et la connexion
+ * prendrait l'un des deux au hasard. Un doublon silencieux vaut moins qu'une
+ * dépendance en moins. On compte d'abord, on écrit ensuite, et l'insertion se
+ * lit dans une table dérivée — elle ne touche donc jamais wsm_users.
+ *
+ * On ne réécrit ni le nom ni le rôle d'un compte existant : seulement de quoi
+ * entrer, et le déverrouillage qui va avec — reprendre la main sur un compte
+ * verrouillé par cinq essais ratés est justement le jour où l'on se sert de
+ * ceci.
+ */
+function wsm_set_password_sql(string $email, string $password, string $role = WSM_ROLE_ADMIN, string $nom = ''): string {
+    $email = strtolower(trim($email));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('e-mail invalide');
+    if (strlen($password) < WSM_PASSWORD_MIN) throw new InvalidArgumentException('mot de passe trop court (min ' . WSM_PASSWORD_MIN . ')');
+    if (!function_exists('wsm_sql_txt')) require_once __DIR__ . '/seed.php';
+
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    $e = wsm_sql_txt($email);
+    $h = wsm_sql_txt($hash);
+    $n = wsm_sql_txt($nom !== '' ? $nom : $email);
+    $r = wsm_sql_txt($role);
+    $p = wsm_sql_txt('Cała sieć');          // portée par défaut, comme wsm_set_password()
+
+    // Le SELECT final n'est pas décoratif : c'est la PREUVE que la ligne porte
+    // bien ce hachage-là. Sans lui on saurait que le SQL a tourné, pas qu'il a
+    // touché quelque chose — et c'est précisément la nuance qui a laissé trois
+    // déploiements se dire verts. Il ne sort ni le mot de passe ni le hachage.
+    return <<<SQL
+-- Mister Szoko — mot de passe d'un compte de la console.
+-- Produit par migrate.php --set-password-sql. Ne contient AUCUN mot de passe
+-- en clair : seul le hachage bcrypt voyage, et il ne se relit pas.
+SELECT COUNT(*) INTO @wsm_konto FROM wsm_users WHERE LOWER(email) = $e;
+UPDATE wsm_users
+   SET password_hash = $h, act = 1, failed_attempts = 0, locked_until = NULL
+ WHERE LOWER(email) = $e;
+INSERT INTO wsm_users (nom, email, role, portee, act, password_hash)
+SELECT $n, $e, $r, $p, 1, $h
+  FROM (SELECT @wsm_konto AS istnieje) AS q
+ WHERE q.istnieje = 0;
+SELECT CONCAT('  konto ', email, ' (', role, ') : hasło ustawione, konto odblokowane') AS wynik
+  FROM wsm_users
+ WHERE LOWER(email) = $e AND password_hash = $h AND act = 1;
+
+SQL;
+}
+
 /** Existe-t-il au moins un compte actif capable de se connecter ? */
 function wsm_has_login_account(PDO $pdo): bool {
     try {

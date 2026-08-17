@@ -22,16 +22,41 @@
 #      curl -fsSL https://raw.githubusercontent.com/samsam2703MFC/webshop-mrszoko-backoffice/main/tools/deploy-serwer.sh | bash
 #  ou, si le fichier est déjà là :
 #      bash deploy-serwer.sh
+#
+#  Pour reposer AU PASSAGE le mot de passe de la console (compte bloqué, mot de
+#  passe perdu) :
+#      bash deploy-serwer.sh --haslo
+#  Il le demande alors sans l'afficher, et le redemande pour confirmer. Il n'est
+#  ni tapé sur la ligne de commande, ni gardé dans l'historique du shell : une
+#  faute de frappe sur un mot de passe qu'on ne relit pas, c'est la console
+#  perdue jusqu'au prochain passage.
 # =============================================================================
 set -euo pipefail
 
+HASLO=0
+for a in "$@"; do case "$a" in --haslo|--hasło) HASLO=1 ;; esac; done
+
 DEPLOY_DIR="${DEPLOY_DIR:-/var/www/html/mrszoko}"
+ADM_EMAIL="${ADM_EMAIL:-admin@misterszoko.com}"
 DEPOT="${DEPOT:-https://github.com/samsam2703MFC/webshop-mrszoko-backoffice.git}"
 BRANCHE="${BRANCHE:-main}"
 TRAVAIL="$(mktemp -d /tmp/wsm-deploy.XXXXXX)"
 # Le ménage est un piège, PAS une politesse : sans lui, un échec en cours de
 # route laisse un clone de plusieurs dizaines de méga sur un disque à 93 %.
 trap 'rm -rf "$TRAVAIL"' EXIT
+
+# On demande AVANT de rien faire : une saisie refusée doit coûter dix secondes,
+# pas un déploiement complet suivi d'un « au fait, non ».
+if [ "$HASLO" = 1 ] && [ -z "${ADM_PASS:-}" ]; then
+  [ -t 0 ] || { echo "  ^ --haslo demande un terminal. En script : ADM_PASS='…' bash deploy-serwer.sh"; exit 1; }
+  printf 'Nowe hasło do konsoli (%s), min. 10 znaków : ' "$ADM_EMAIL" >&2
+  read -rs ADM_PASS; echo >&2
+  printf 'Powtórz : ' >&2
+  read -rs ADM_PASS2; echo >&2
+  [ "$ADM_PASS" = "$ADM_PASS2" ] || { echo "  ^ les deux saisies diffèrent — rien n'a été fait"; exit 1; }
+  [ "${#ADM_PASS}" -ge 10 ] || { echo "  ^ moins de 10 caractères — rien n'a été fait"; exit 1; }
+  unset ADM_PASS2
+fi
 
 echo "══ 0/6 · place disponible ═════════════════════════════════════════════"
 DISPO=$(df -Pm /tmp | awk 'NR==2 {print $4}')
@@ -117,7 +142,12 @@ grep -q 'wsm_order_etapy' site/backoffice/api/invoice.php \
   && grep -q 'name="status"' site/backoffice/zamowienia.php \
   && grep -q '\.etap' site/backoffice/console.css \
   || { echo "  boutons de statut incomplets dans l'assemblage"; exit 1; }
-echo "  login, tokens, boutons de statut : présents"
+# Ce script émet le SQL du mot de passe depuis le migrate.php qu'il vient de
+# poser : sans ce drapeau, --haslo n'aurait rien à appeler.
+grep -q 'set-password-sql' site/backoffice/api/migrate.php \
+  && grep -q 'function wsm_set_password_sql' site/backoffice/api/auth.php \
+  || { echo "  voie « mot de passe en SQL » absente de l'assemblage"; exit 1; }
+echo "  login, tokens, boutons de statut, reprise du compte : présents"
 
 echo "══ 4/6 · mise en place dans $DEPLOY_DIR ═══════════════════════════════"
 # On NE SUPPRIME RIEN : les photos envoyées depuis la console vivent ici et ne
@@ -159,6 +189,50 @@ if [ -f "$CFG" ]; then
       echo "  ^ ATTENTION : synchronisation échouée"
       head -3 "$TRAVAIL/sync.err" | sed 's/^/    MySQL: /'
     fi
+
+    # ── Le mot de passe de la console, par la même porte ──────────────────
+    #
+    # PAR LE CLIENT mysql, pour la RAISON EXACTE d'au-dessus : le php de cette
+    # machine n'a pas pdo_mysql. Le déploiement appelait pourtant
+    # `migrate.php --set-password` — qui levait « could not find driver », dans
+    # un `if` qui rattrapait. Le secret pouvait être posé, changé, refait : rien
+    # n'arrivait jamais en base, et l'étape se disait verte.
+    #
+    # password_hash(), lui, n'a besoin d'aucune base. Le mot de passe entre par
+    # stdin (jamais dans `ps`), le SQL qui en sort ne porte qu'un hachage.
+    if [ -n "${ADM_PASS:-}" ]; then
+      if ( umask 077; printf '%s' "$ADM_PASS" \
+             | php "$DEPLOY_DIR/backoffice/api/migrate.php" --set-password-sql "$ADM_EMAIL" \
+             > "$TRAVAIL/adm.sql" ) 2> "$TRAVAIL/adm.err"; then
+        # Le SELECT final ne rend une ligne QUE si le compte porte bien ce
+        # hachage : on mesure l'effet, pas l'exécution.
+        OUT=$(mysql --defaults-extra-file="$OPT" --default-character-set=utf8mb4 -N -B "$BASE" \
+                < "$TRAVAIL/adm.sql" 2> "$TRAVAIL/adm.err") && RC=0 || RC=1
+        if [ "$RC" = 0 ] && [ -n "$OUT" ]; then
+          echo "$OUT"
+        else
+          echo "  ^ ATTENTION : mot de passe de la console NON posé"
+          head -3 "$TRAVAIL/adm.err" | sed 's/^/    MySQL: /'
+        fi
+      else
+        echo "  ^ ATTENTION : mot de passe refusé — $(head -1 "$TRAVAIL/adm.err")"
+        echo "    Le compte existant n'a PAS été touché."
+      fi
+    fi
+
+    # QUELQU'UN PEUT-IL ENTRER ? Dit à chaque passage, avec ou sans --haslo :
+    # c'est la première question quand la console refuse, et personne ne la
+    # posait. Zéro ici veut dire « la console est murée » — et l'amorçage du
+    # compte a justement échoué en silence pendant des mois.
+    ENTREE=$(mysql --defaults-extra-file="$OPT" -N -B "$BASE" -e \
+      "SELECT COUNT(*) FROM wsm_users
+        WHERE act = 1 AND password_hash IS NOT NULL AND password_hash <> ''
+          AND (locked_until IS NULL OR locked_until < NOW());" 2>/dev/null || echo ZLE)
+    case "$ENTREE" in
+      0)   echo "  ^ ZLE : AUCUN compte ne peut se connecter — relancez avec --haslo" ;;
+      ZLE) echo "  ^ comptes de connexion non vérifiables" ;;
+      *)   echo "  connexion : $ENTREE compte(s) peuvent entrer dans la console" ;;
+    esac
   else
     echo "  ^ config.local.php ne décrit pas MySQL — contenu NON synchronisé"
   fi
