@@ -2154,6 +2154,20 @@ jobs:
             && grep -q '\.przed' "$DIR_BO/console.css" \
             && echo "  kolejki, zaznaczanie i lista kontrolna: obecne" \
             || { echo "  ^ NOT OK : wysyłka hurtem niekompletna"; fail=1; }
+          # LES DEUX VUES PARTENT ENSEMBLE. Le sélecteur sans la tablica donne
+          # un onglet qui mène à une page vide ; la tablica sans son CSS donne
+          # trois colonnes empilées sur toute la hauteur. Aucun des deux ne
+          # lève d'erreur : l'écran répond 200 et devient inutilisable.
+          grep -q 'class="tablica"' "$DIR_BO/zamowienia.php" \
+            && grep -q '\.widoki' "$DIR_BO/console.css" \
+            && grep -q 'tr\.szuflada' "$DIR_BO/console.css" \
+            && echo "  dwa widoki (lista + tablica) i szuflada: obecne" \
+            || { echo "  ^ NOT OK : brakuje jednego z widoków zamówień"; fail=1; }
+          # Le tiroir doit être FERMÉ au repos. Ouvert par défaut, on retombe
+          # sur la panne qu'on vient de réparer : 420 px par commande.
+          grep -q 'tr\.szuflada { display: none' "$DIR_BO/console.css" \
+            && echo "  szuflada domyślnie zamknięta: potwierdzone" \
+            || { echo "  ^ ZLE : szuflada otwarta domyślnie — wraca 420 px na zamówienie"; fail=1; }
 
           if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
           REMOTE

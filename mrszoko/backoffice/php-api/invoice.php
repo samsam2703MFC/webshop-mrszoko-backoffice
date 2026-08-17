@@ -836,7 +836,13 @@ function wsm_order_preflight(PDO $pdo, array $o): array {
             'val' => $paye
                 ? number_format(((int) ($o['total_gross'] ?? 0)) / 100, 2, ',', "\u{202F}") . "\u{202F}zł"
                   . (($o['paid_at'] ?? '') ? ' · ' . substr((string) $o['paid_at'], 0, 16) : '')
-                : 'brak wpłaty — wyślesz na własne ryzyko'];
+                : 'brak wpłaty — wyślesz na własne ryzyko',
+            // Le geste qui répare, SUR la ligne qui le motive — comme VIES et
+            // KSeF juste en dessous. Il vivait dans une colonne à lui, ce qui
+            // obligeait à relier du regard « brak wpłaty » ici et un bouton
+            // trois colonnes plus loin. L'écran décide qui a le droit de
+            // l'afficher ; cette fonction dit seulement ce qu'il y a à faire.
+            'agir' => $paye ? '' : 'oplac', 'agirTxt' => 'Opłacone ✓'];
 
     // 2. Le numéro qui décide du document.
     if ($ve !== '') {

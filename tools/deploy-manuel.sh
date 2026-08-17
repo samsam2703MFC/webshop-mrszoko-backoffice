@@ -164,6 +164,15 @@ echo "  files, contrôle avant expédition, envoi par lot : présents"
 grep -q 'set-password-sql' site/backoffice/api/migrate.php \
   && grep -q 'function wsm_set_password_sql' site/backoffice/api/auth.php \
   || { echo "  la voie « mot de passe en SQL » n'est pas dans l'assemblage"; exit 1; }
+# LES DEUX VUES PARTENT ENSEMBLE. Le sélecteur sans la tablica donne un
+# onglet qui mène à une page vide ; la tablica sans son CSS donne trois
+# colonnes empilées sur toute la hauteur. Ni l'un ni l'autre ne fait d'erreur.
+grep -q 'widok' site/backoffice/zamowienia.php \
+  && grep -q 'class="tablica"' site/backoffice/zamowienia.php \
+  && grep -q '\.widoki' site/backoffice/console.css \
+  && grep -q 'tr\.szuflada' site/backoffice/console.css \
+  || { echo "  les deux vues (lista / tablica) ne sont pas complètes"; exit 1; }
+echo "  dwa widoki zamówień (lista + tablica) : obecne"
 echo "  reprise en main du compte console : présente"
 echo "  login, tokens, htaccess : présents"
 

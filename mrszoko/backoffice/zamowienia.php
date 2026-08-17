@@ -202,6 +202,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $q = [];
     if (isset($_GET['id']))      $q['id'] = (int) $_GET['id'];
     if (isset($_GET['kolejka'])) $q['kolejka'] = (string) $_GET['kolejka'];
+    // La vue survit elle aussi : un geste depuis la tablica qui renverrait
+    // sur la liste ferait perdre sa place à chaque colis, exactement comme
+    // la file avant elle.
+    if (isset($_GET['widok']))   $q['widok'] = (string) $_GET['widok'];
     $vers = 'zamowienia.php'
           . ($q ? '?' . http_build_query($q) : '')
           . ($id > 0 ? '#z' . $id : '');
@@ -247,7 +251,86 @@ foreach ($KOLEJKI as $k => [$nazwa, $sts]) {
         : (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders")->fetchColumn();
 }
 
-$orders = wsm_orders_list($pdo, 200, $KOLEJKI[$kolejka][1]);
+// ─── DEUX VUES POUR UN MÊME TRAVAIL ─────────────────────────────────────────
+//
+// Elles ne répondent pas à la même question, et c'est pour ça qu'elles
+// coexistent au lieu de se remplacer :
+//
+//  · LISTA — une commande par ligne, 46 px. Pour chercher, comparer des
+//    montants, trier, cocher un lot. C'est la vue de bureau.
+//  · TABLICA — trois colonnes, une par étape. La POSITION dit l'état, donc
+//    plus rien ne le répète, et l'on voit LA CHARGE : trois à préparer, une
+//    coincée à l'expédition. Aucune liste ne montre ça. C'est la vue de
+//    l'atelier — au prix du tri et de la recherche, qu'elle n'a pas.
+//
+// Le même calcul nourrit les deux. Un seul wsm_order_preflight() et un seul
+// wsm_order_etapy() par commande, dans $dane() : deux vues qui calculeraient
+// chacune de leur côté finiraient par ne plus dire la même chose du même
+// colis, et c'est exactement le bug qu'on vient de payer sur cette page.
+$WIDOKI = ['lista' => 'Lista', 'tablica' => 'Tablica'];
+$widok = (string) ($_GET['widok'] ?? 'lista');
+if (!isset($WIDOKI[$widok])) $widok = 'lista';
+
+// La tablica montre les trois files À LA FOIS : la file choisie n'a plus de
+// sens pour elle, et le lot non plus — on ne coche pas dans un tableau dont
+// les colonnes sont déjà le tri.
+$TABL = ['przygotowanie', 'wysylka', 'wyslane'];
+if ($widok === 'tablica') $hurtowa = false;
+
+$orders = $widok === 'tablica'
+    ? wsm_orders_list($pdo, 200, array_merge(...array_map(fn($k) => $KOLEJKI[$k][1], $TABL)))
+    : wsm_orders_list($pdo, 200, $KOLEJKI[$kolejka][1]);
+
+$kubelki = [];
+if ($widok === 'tablica') {
+    foreach ($TABL as $k) $kubelki[$k] = [];
+    foreach ($orders as $o) {
+        foreach ($TABL as $k) {
+            if (in_array($o['status'], $KOLEJKI[$k][1], true)) { $kubelki[$k][] = $o; break; }
+        }
+    }
+}
+
+/**
+ * Tout ce qu'une ligne — ou une carte — doit savoir, calculé UNE fois.
+ *
+ * Le verdict se lit sur $pf['blok'], pas sur un comptage refait ici : c'est
+ * la même liste qui décide si la case du lot est cochable et si le serveur
+ * acceptera l'envoi. Un deuxième comptage, écrit à côté, aurait dérivé au
+ * premier point ajouté au contrôle — et l'écran aurait annoncé « gotowe »
+ * sur une commande que l'envoi refuse.
+ */
+$dane = function (array $o) use ($pdo): array {
+    $pf    = wsm_order_preflight($pdo, $o);
+    $etapy = wsm_order_etapy($pdo, $o);
+    // « wyjdzie z uwagą » ne dit rien : on garde le texte du PREMIER
+    // avertissement, qui lui dit quelque chose — « brak wpłaty », et non un
+    // adjectif. Une alerte qu'on ne peut pas lire est une alerte qu'on cesse
+    // de lire, et elle apparaît sur presque chaque commande.
+    $uwagi = 0; $uwagaTxt = '';
+    foreach ($pf['lignes'] as $lg) {
+        if (!in_array($lg['etat'], ['wa', 'brak'], true)) continue;
+        $uwagi++;
+        if ($uwagaTxt === '') $uwagaTxt = (string) $lg['val'];
+    }
+    return [
+        'uwagaTxt' => $uwagaTxt,
+        'pf'     => $pf,
+        'teraz'  => current(array_filter($etapy, fn($e) => $e['etat'] === 'teraz')) ?: null,
+        'suiv'   => current(array_filter($etapy, fn($e) => $e['etat'] === 'nastepny')) ?: null,
+        'autres' => array_values(array_filter($etapy,
+                        fn($e) => !in_array($e['etat'], ['teraz', 'nastepny'], true))),
+        'blok'   => count($pf['blok']),
+        'uwagi'  => $uwagi,
+    ];
+};
+
+/** L'adresse de cet écran, en gardant vue et file. */
+$lien = function (array $zmiana = []) use ($kolejka, $widok): string {
+    $q = array_merge(['kolejka' => $kolejka, 'widok' => $widok], $zmiana);
+    return '?' . http_build_query($q);
+};
+
 $kpis   = wsm_shop_kpis($pdo);
 $cfg    = ['tpay' => wsm_tpay_enabled(), 'inpost' => wsm_inpost_enabled()];
 
@@ -475,13 +558,30 @@ console_crumbs($detail
   <?php // ─── LES FILES ────────────────────────────────────────────────────
         // Trois tas, et leur compte. Le compte n'est pas décoratif : c'est lui
         // qui dit s'il reste du travail, et il évite d'ouvrir une file vide. ?>
-  <nav class="kolejki" aria-label="Kolejki zamówień">
-    <?php foreach ($KOLEJKI as $k => [$nazwa, $sts]): ?>
-    <a href="?kolejka=<?= h($k) ?>"<?= $k === $kolejka ? ' class="on" aria-current="page"' : '' ?>>
-      <b><?= (int) $licznik[$k] ?></b><span><?= h($nazwa) ?></span>
-    </a>
-    <?php endforeach; ?>
-  </nav>
+  <div class="pasek">
+    <?php // La tablica porte ses files EN COLONNES : garder les onglets à côté
+          // donnerait deux commandes du même tri, dont une sans effet. ?>
+    <?php if ($widok === 'lista'): ?>
+    <nav class="kolejki" aria-label="Kolejki zamówień">
+      <?php foreach ($KOLEJKI as $k => [$nazwa, $sts]): ?>
+      <a href="<?= h($lien(['kolejka' => $k])) ?>"<?= $k === $kolejka ? ' class="on" aria-current="page"' : '' ?>>
+        <b><?= (int) $licznik[$k] ?></b><span><?= h($nazwa) ?></span>
+      </a>
+      <?php endforeach; ?>
+    </nav>
+    <?php else: ?>
+    <p class="kolejki-zast">Trzy kolumny, trzy etapy — <b><?= (int) $licznik['wszystkie'] ?></b> zamówień w bazie.</p>
+    <?php endif; ?>
+
+    <?php // DEUX VUES, PAS DEUX ÉCRANS. Le choix vit dans l'adresse : un
+          // signet, un lien envoyé à quelqu'un, un retour arrière — tout
+          // retombe sur la vue qu'on avait. ?>
+    <nav class="widoki" aria-label="Widok listy">
+      <?php foreach ($WIDOKI as $w => $nazwa): ?>
+      <a href="<?= h($lien(['widok' => $w])) ?>"<?= $w === $widok ? ' class="on" aria-current="true"' : '' ?>><?= h($nazwa) ?></a>
+      <?php endforeach; ?>
+    </nav>
+  </div>
 
   <?php if ($hurtowa && $isAdmin): ?>
   <?php // LE FORMULAIRE DU LOT VIT HORS DU TABLEAU, et les cases s'y rattachent
@@ -494,203 +594,230 @@ console_crumbs($detail
   </form>
   <?php endif; ?>
 
+  <?php
+  // ─── UN BOUTON D'ÉTAPE, ÉCRIT UNE FOIS ────────────────────────────────────
+  //
+  // Il sert aux deux vues et aux deux endroits de chaque vue (le geste du
+  // jour, en grand ; les autres étapes, repliées). Écrit deux fois, il aurait
+  // divergé sur la confirmation — celle qui empêche d'expédier par erreur.
+  $przycisk = function (array $e, array $o, string $extra = '') use ($csrf) { ?>
+    <button class="etap <?= h($e['etat']) ?><?= $extra !== '' ? ' ' . $extra : '' ?>"
+            name="status" value="<?= h($e['code']) ?>"
+            <?= $e['pyt'] !== '' ? 'data-pyt="' . h($e['pyt']) . '" onclick="return confirm(this.dataset.pyt)"' : '' ?>
+            title="<?= h($o['code']) ?> → <?= h($e['txt']) ?><?= $e['doc'] ? ' · wystawi dokument' : '' ?>">
+      <?= h($e['txt']) ?><?= $e['doc'] ? '<span class="doc" aria-hidden="true">•</span>' : '' ?>
+    </button>
+  <?php };
+
+  // ─── LE VERDICT D'AVANT-EXPÉDITION, EN UN JETON ───────────────────────────
+  //
+  // C'est LE changement. Ces cinq points dépliés en permanence dans une
+  // colonne trop étroite donnaient quatre lignes de texte orange par
+  // commande — 420 px de haut pour un colis, deux colis par écran, sur la
+  // vue la plus utilisée de la maison. Or ce sont des informations de
+  // DIAGNOSTIC (« pourquoi celui-là ne part pas »), posées au milieu d'un
+  // outil de BALAYAGE (« qu'est-ce qu'il y a à faire aujourd'hui »).
+  //
+  // Réduites à trois caractères, elles disent la seule chose qu'on lit en
+  // balayant : est-ce que ça part, oui ou non. Le reste s'ouvre à la demande.
+  $werdykt = function (array $d) {
+      if ($d['blok'] > 0) return ['no', '✗ ' . $d['blok'], 'nie wyjdzie'];
+      if ($d['uwagi'] > 0) return ['wa', '! ' . $d['uwagi'], 'wyjdzie z uwagą'];
+      return ['ok', '✓ gotowe', 'gotowe do wysyłki'];
+  };
+
+  // ─── LE TIROIR ────────────────────────────────────────────────────────────
+  //
+  // Ouvert par :target — donc par le navigateur, sans une ligne de
+  // JavaScript, et sur le téléphone de la réserve comme ailleurs. Il porte
+  // les cinq points AVEC leurs gestes, et le reste du chemin : la ligne
+  // au-dessus n'a plus qu'un seul bouton, toujours à la même place.
+  $tiroir = function (array $o, array $d) use ($przycisk, $csrf, $isAdmin) { ?>
+    <div class="szuf-in">
+      <ul class="przed-lista">
+        <?php foreach ($d['pf']['lignes'] as $lg): ?>
+        <li class="<?= h($lg['etat']) ?>">
+          <span class="co"><i aria-hidden="true"><?= ['ok' => '✓', 'no' => '✗', 'wa' => '!', 'brak' => '—'][$lg['etat']] ?? '·' ?></i><?= h($lg['co']) ?></span>
+          <span class="val"><?= h($lg['val']) ?></span>
+          <?php if ($isAdmin && ($lg['agir'] ?? '') !== ''): ?>
+          <button class="etap kasa" name="<?= h($lg['agir']) ?>" value="1"><?= h($lg['agirTxt'] ?? 'Zrób') ?></button>
+          <?php endif; ?>
+        </li>
+        <?php endforeach; ?>
+      </ul>
+      <?php if ($isAdmin && $d['autres']): ?>
+      <div class="inne">
+        <span class="inne-l">Inny status:</span>
+        <?php foreach ($d['autres'] as $e): ?>
+          <?php if ($e['etat'] === 'niemozliwy'): ?>
+          <span class="etap niemozliwy" title="Zamówienie anulowane — stanu już nie zmienisz"><?= h($e['txt']) ?></span>
+          <?php else: $przycisk($e, $o); endif; ?>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+    </div>
+  <?php }; ?>
+
+<?php if ($widok === 'lista'): ?>
+  <?php // ═══ VUE « LISTA » ═══════════════════════════════════════════════════
+        // Une commande, une ligne, 46 px. Le tableau garde ce que seul un
+        // tableau sait faire : comparer des montants alignés, cocher un lot,
+        // retrouver un numéro. ?>
   <div class="tablewrap">
-  <?php // « dense » : neuf colonnes, dont une qui porte six boutons. Avec le
-        // rembourrage habituel, ce tableau-là dépasse la largeur de la page et
-        // s'offre une barre de défilement horizontale PERMANENTE — sur l'écran
-        // le plus consulté de la maison, et quelle que soit la taille de
-        // l'écran, puisque la zone de travail est plafonnée à 1180 px. ?>
-  <table class="rwd dense zam">
-    <thead><tr><?php if ($hurtowa && $isAdmin): ?><th><span class="sr">Zaznacz</span></th><?php endif; ?><th>Numer</th><th>Data</th><th>Klient</th><th>Dostawa</th><th>Status</th><th>Płatność</th><th class="num">Brutto</th><th>Przed wysyłką</th></tr></thead>
+  <table class="rwd dense zam2">
+    <thead><tr>
+      <?php if ($hurtowa && $isAdmin): ?><th class="zazn"><span class="sr">Zaznacz</span></th><?php endif; ?>
+      <th>Numer</th><th>Klient</th><th>Dostawa</th><th class="num">Brutto</th>
+      <th>Stan</th><th>Płatność</th><th>Przed wysyłką</th><th class="num">Ruch</th>
+    </tr></thead>
     <tbody>
     <?php if (!$orders): ?>
-    <tr><td class="muted">Brak zamówień.</td></tr>
+    <tr><td class="muted" colspan="9">Brak zamówień w tej kolejce.</td></tr>
     <?php endif; ?>
     <?php foreach ($orders as $o):
-      // Le contrôle d'avant-expédition, calculé UNE fois : la case, le repli
-      // et la ligne du document le lisent tous les trois.
-      $pf = wsm_order_preflight($pdo, $o);
+      $d = $dane($o);
+      [$wKl, $wTxt, $wTyt] = $werdykt($d);
       $payCls = $o['payment_status'] === 'oplacone' ? 'ok' : ($o['payment_status'] === 'oczekuje' ? 'wait' : 'bad'); ?>
-    <tr id="z<?= (int) $o['id'] ?>"<?= $hurtowa && !$pf['gotowe'] ? ' class="zablok"' : '' ?>>
+    <tr id="z<?= (int) $o['id'] ?>" class="wiersz<?= $hurtowa && $d['blok'] ? ' zablok' : '' ?>">
       <?php if ($hurtowa && $isAdmin): ?>
-      <?php // Bloquée : la case est DÉSACTIVÉE et dit pourquoi. Le serveur
-            // refait le contrôle de toute façon — une case n'est pas une
-            // garantie, c'est une commodité. ?>
       <td data-l="Wyślij" class="zazn">
         <input type="checkbox" name="ids[]" form="hurt" value="<?= (int) $o['id'] ?>"
-               <?= $pf['gotowe'] ? '' : 'disabled' ?>
+               <?= $d['blok'] ? 'disabled' : '' ?>
                aria-label="Wyślij <?= h($o['code']) ?>"
-               title="<?= $pf['gotowe'] ? 'Zaznacz do wysyłki hurtem' : h(implode(' · ', $pf['blok'])) ?>">
+               title="<?= $d['blok'] ? h(implode(' · ', $d['pf']['blok'])) : 'Zaznacz do wysyłki hurtem' ?>">
       </td>
       <?php endif; ?>
-      <td data-l="Numer"><a class="code" href="?id=<?= (int) $o['id'] ?>"><?= h($o['code']) ?></a></td>
-      <?php // DATE ET HEURE, CHACUNE D'UN SEUL TENANT. En un seul morceau de
-            // texte, la colonne se faisait couper par le tableau en « 2026- /
-            // 08-06 / 17:01 » — trois lignes qui se lisent comme trois données.
-            // Séparées, chacune reste entière : deux lignes au bureau, une
-            // seule sur la fiche du téléphone, jamais d'escalier. ?>
-      <td data-l="Data" class="num"><span class="dt"><?= h(substr((string) $o['created_at'], 0, 10)) ?></span>
-        <span class="tm"><?= h(substr((string) $o['created_at'], 11, 5)) ?></span></td>
-      <td data-l="Klient"><?= h($o['client']) ?><br><small class="muted"><?= h($o['email']) ?></small></td>
-      <?php // « Kurier » tout court ne dit plus lequel : avec deux transporteurs,
-            // c'est l'information qu'on cherche en premier quand un colis coince. ?>
-      <td data-l="Dostawa"><?= h(wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'
+      <?php // Numéro et date dans UNE colonne : deux données qu'on lit ensemble
+            // n'ont pas besoin de deux colonnes, et c'est 90 px rendus au client. ?>
+      <td data-l="Numer" class="ident">
+        <a class="code" href="<?= h($lien(['id' => (int) $o['id']])) ?>"><?= h($o['code']) ?></a>
+        <span class="dt"><?= h(substr((string) $o['created_at'], 0, 10)) ?> · <?= h(substr((string) $o['created_at'], 11, 5)) ?></span>
+      </td>
+      <td data-l="Klient" class="kli"><span class="im"><?= h($o['client']) ?></span><span class="ml"><?= h($o['email']) ?></span></td>
+      <td data-l="Dostawa" class="dost"><?= h(wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'
             ? 'Paczkomat' : 'Kurier ' . strtoupper(wsm_ship_carrier($pdo, (string) $o['delivery_method']))) ?>
-        <?= $o['inpost_point'] !== '' ? '<br><small class="muted">' . h($o['inpost_point']) . '</small>' : '' ?></td>
-      <?php
-      // ─── LE STATUT EST LE BOUTON — MAIS UN SEUL EST GROS ────────────────
-      //
-      // Première version : les six étapes en pastilles sur chaque ligne. Ça
-      // marchait, et c'était illisible — deux cents commandes, mille deux
-      // cents boutons, et sur un téléphone UNE seule commande par écran. Le
-      // geste de tous les jours (avancer d'un cran) avait exactement le même
-      // poids visuel que celui qu'on fait trois fois par an (revenir à
-      // « Nowe »), et que celui qu'on ne veut jamais faire par erreur.
-      //
-      // Donc : l'étape SUIVANTE est un grand bouton, seule en vue. Le reste du
-      // chemin se replie derrière un « Inny status » — un <details>, c'est-à-
-      // dire du HTML, qui s'ouvre sans une ligne de JavaScript et fonctionne
-      // sur le téléphone de la réserve.
-      //
-      // UN SEUL formulaire pour toute la ligne, et autant de boutons de
-      // soumission que d'étapes : un formulaire par bouton aurait multiplié
-      // par six le poids d'une page qui en porte déjà deux cents.
-      $etapy = wsm_order_etapy($pdo, $o);
-      $teraz = current(array_filter($etapy, fn($e) => $e['etat'] === 'teraz')) ?: null;
-      $suiv  = current(array_filter($etapy, fn($e) => $e['etat'] === 'nastepny')) ?: null;
-      $autres = array_values(array_filter($etapy,
-                    fn($e) => !in_array($e['etat'], ['teraz', 'nastepny'], true)));
-      // Un bouton d'étape, rendu une seule fois pour les deux endroits où il
-      // apparaît : le grand devant, et les petits dans le repli.
-      $bouton = function (array $e, string $extra = '') use ($o) { ?>
-        <button class="etap <?= h($e['etat']) ?><?= $extra !== '' ? ' ' . $extra : '' ?>"
-                name="status" value="<?= h($e['code']) ?>"
-                <?= $e['pyt'] !== '' ? 'data-pyt="' . h($e['pyt']) . '" onclick="return confirm(this.dataset.pyt)"' : '' ?>
-                title="<?= h($o['code']) ?> → <?= h($e['txt']) ?><?= $e['doc'] ? ' · wystawi dokument' : '' ?>">
-          <?= h($e['txt']) ?><?= $e['doc'] ? '<span class="doc" aria-hidden="true">•</span>' : '' ?>
-        </button>
-      <?php }; ?>
-      <td data-l="Status" class="wide">
-        <?php if ($isAdmin): ?>
-        <form method="post" class="etapy" role="group"
-              aria-label="Zmień status zamówienia <?= h($o['code']) ?>">
+        <?= $o['inpost_point'] !== '' ? '<span class="pkt">' . h($o['inpost_point']) . '</span>' : '' ?></td>
+      <td data-l="Brutto" class="num kasa2"><span class="kw"><?= h(pln($o['total_gross'])) ?></span>
+        <span class="dt"><?= (int) $o['units'] ?> poz.</span></td>
+      <?php // L'ÉTAT SE LIT, IL NE SE CLIQUE PAS. La pastille noire pleine se
+            // lisait comme un bouton et n'en était pas un : on cliquait dessus,
+            // il ne se passait rien, on cherchait la panne. ?>
+      <td data-l="Stan"><span class="stan s-<?= h($o['status']) ?>"><i class="kropka"></i><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
+        <?php if (!empty($o['backorder'])): ?><span class="tag no">do potwierdzenia</span><?php endif; ?>
+        <?php if (($o['discount_percent'] ?? 0) > 0): ?><span class="tag">−<?= (int) $o['discount_percent'] ?> %</span><?php endif; ?></td>
+      <td data-l="Płatność"><span class="stan p-<?= h($payCls) ?>"><i class="kropka"></i><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span></td>
+      <?php // Le jeton EST le lien qui ouvre le tiroir : une cible de plus à
+            // viser au pouce serait une cible de trop. ?>
+      <td data-l="Przed wysyłką">
+        <a class="werd w-<?= h($wKl) ?>" href="#s<?= (int) $o['id'] ?>" title="<?= h($wTyt) ?> — pokaż szczegóły">
+          <span class="dokchip <?= $d['pf']['kind'] === 'faktura' ? 'f' : 'p' ?>"><?= h(strtoupper($d['pf']['kind'])) ?></span>
+          <b><?= h($wTxt) ?></b><i aria-hidden="true">▾</i>
+        </a>
+      </td>
+      <?php // UN SEUL bouton par ligne, toujours au même endroit : le pouce et
+            // l'œil apprennent une position, pas six. ?>
+      <td data-l="Ruch" class="num ruch">
+        <?php if ($isAdmin && $d['suiv'] && $d['blok'] && !empty($d['suiv']['doc'])): ?>
+        <?php // UN BOUTON QUI VA ÉCHOUER EST PIRE QU'AUCUN BOUTON : il fait
+              // cliquer, attendre, puis lire une erreur. L'étape qui émet le
+              // document, sur une commande que le contrôle bloque, part en
+              // erreur — et l'envoi par lot refuse DÉJÀ ces commandes côté
+              // serveur. La ligne disait le contraire du lot. ?>
+        <a class="etap zablokowany" href="#s<?= (int) $o['id'] ?>"
+           title="<?= h(implode(' · ', $d['pf']['blok'])) ?>">Nie wyjdzie</a>
+        <?php elseif ($isAdmin && $d['suiv']): ?>
+        <form method="post">
           <input type="hidden" name="_t" value="<?= h($csrf) ?>">
           <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
-          <?php // ON PRÉVIENT LE CLIENT D'ICI AUSSI.
-                //
-                // La fiche coche « Powiadom klienta » par défaut ; la liste,
-                // elle, n'a jamais rien envoyé. Tant que la liste ne portait que
-                // deux boutons de secours, la différence ne se voyait pas. Elle
-                // devient le chemin principal : sans cette ligne, « votre colis
-                // est parti » cesserait de partir du jour au lendemain, et
-                // personne ne saurait pourquoi.
-                //
-                // Un seul e-mail par (commande, état) — wsm_mail_for_status()
-                // le garantit par sa clé d'événement, donc revenir en arrière et
-                // ré-avancer ne renvoie rien. La fiche garde sa case pour les
-                // cas où l'on veut justement se taire. ?>
           <input type="hidden" name="powiadom" value="1">
-
-          <?php // Où l'on est. Pas un bouton : appuyer dessus ne ferait rien, et
-                // un bouton qui ne fait rien envoie chercher une panne. ?>
-          <?php if ($teraz): ?>
-          <?php // Une commande annulée porte SA couleur, pleine. Marquée avec la
-                // classe du bouton « Anuluj », elle ressortait en lien rouge
-                // souligné : l'état d'une commande morte se lisait comme une
-                // action à faire. ?>
-          <span class="etap teraz<?= $o['status'] === 'anulowane' ? ' anulowana' : '' ?>"
-                aria-current="step"><?= h($teraz['txt']) ?></span>
-          <?php endif; ?>
-
-          <?php // Le geste de tous les jours, en grand. ?>
-          <?php if ($suiv) $bouton($suiv, 'glowny'); ?>
-
-          <?php // Et tout le reste du chemin, replié. Fermé, il coûte une ligne. ?>
-          <?php if ($autres): ?>
-          <details class="etapy-wiecej">
-            <summary>Inny status</summary>
-            <div class="etapy-lista">
-              <?php foreach ($autres as $e): ?>
-                <?php if ($e['etat'] === 'niemozliwy'): ?>
-                <?php // Grisé SANS explication, on cherche la panne. Le titre dit
-                      // que c'est la règle, pas un bouton cassé. ?>
-                <span class="etap niemozliwy"
-                      title="Zamówienie anulowane — stanu już nie zmienisz"><?= h($e['txt']) ?></span>
-                <?php else: $bouton($e); endif; ?>
-              <?php endforeach; ?>
-            </div>
-          </details>
-          <?php endif; ?>
+          <?php $przycisk($d['suiv'], $o, 'glowny'); ?>
         </form>
-        <?php else: ?>
-        <span class="tag"><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
-        <?php endif; ?>
-        <?php if (!empty($o['backorder'])): ?> <span class="tag no">do potwierdzenia</span><?php endif; ?>
-        <?php if (($o['discount_percent'] ?? 0) > 0): ?> <span class="tag">−<?= (int) $o['discount_percent'] ?> %</span><?php endif; ?></td>
-      <?php // L'ARGENT A SA COLONNE, ET SON GESTE. La plupart des commandes
-            // sont réglées par tpay, qui écrit tout seul. Le virement, lui,
-            // arrive sur un relevé : quelqu'un doit pouvoir dire « c'est
-            // encaissé » sans passer par le chemin du colis. ?>
-      <td data-l="Płatność"><span class="tag <?= h($payCls) ?>"><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span>
-        <?php if ($isAdmin && $o['payment_status'] !== 'oplacone' && $o['status'] !== 'anulowane'): ?>
-        <form method="post" class="oplac">
-          <input type="hidden" name="_t" value="<?= h($csrf) ?>">
-          <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
-          <button class="etap kasa" name="oplac" value="1"
-                  data-pyt="<?= h($o['code']) ?> — odnotować zapłatę <?= h(pln($o['total_gross'])) ?>? Tego nie cofniesz z tego ekranu."
-                  onclick="return confirm(this.dataset.pyt)"
-                  title="Zapłata przyszła przelewem — zapisz ją ręcznie">Opłacone ✓</button>
-        </form>
-        <?php endif; ?></td>
-      <?php // Le nombre d'articles vit AVEC le montant : deux chiffres qu'on
-            // lit ensemble n'ont pas besoin de deux colonnes, et neuf colonnes
-            // poussaient déjà le tableau hors de la page. ?>
-      <td data-l="Brutto" class="num"><?= h(pln($o['total_gross'])) ?>
-        <small class="muted"><?= (int) $o['units'] ?> poz.</small></td>
-      <?php // ─── CE QUI VA PARTIR, AVANT QUE ÇA PARTE ──────────────────
-            // Replié, il coûte une ligne : la pastille du document suffit à
-            // dire ce qui sera émis. Ouvert, il montre les cinq points qui
-            // décident — l'encaissement, le numéro qui choisit le document, le
-            // document, le mail, le registre — et porte les deux gestes qui les
-            // débloquent, SUR la ligne qui les motive.
-            //
-            // Il remplace la colonne des voyants : elle disait les mêmes
-            // choses, plus court et sans les raisons, et il fallait relier les
-            // deux du regard.
-            //
-            // Quand un point manque, la commande n'est PAS expédiable et le
-            // trou est nommé — au lieu de se découvrir après le clic, colis
-            // déjà parti. ?>
-      <td data-l="Przed wysyłką" class="wide">
-        <details class="przed<?= $pf['gotowe'] ? '' : ' blok' ?>">
-          <summary>
-            <span class="dokchip <?= $pf['kind'] === 'faktura' ? 'f' : 'p' ?>"><?= h(strtoupper($pf['kind'])) ?></span>
-            <?= $pf['gotowe'] ? '' : '<b>Nie można wysłać</b>' ?>
-          </summary>
-          <ul class="przed-lista">
-            <?php foreach ($pf['lignes'] as $lg): ?>
-            <li class="<?= h($lg['etat']) ?>">
-              <i aria-hidden="true"><?= ['ok' => '✓', 'no' => '✗', 'wa' => '!', 'brak' => '—'][$lg['etat']] ?? '·' ?></i>
-              <span class="co"><?= h($lg['co']) ?></span>
-              <span class="val"><?= h($lg['val']) ?>
-                <?php if ($isAdmin && ($lg['agir'] ?? '') !== ''): ?>
-                <form method="post" class="lig">
-                  <input type="hidden" name="_t" value="<?= h($csrf) ?>">
-                  <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
-                  <button class="etap kasa" name="<?= h($lg['agir']) ?>" value="1"><?= h($lg['agirTxt'] ?? 'Zrób') ?></button>
-                </form>
-                <?php endif; ?>
-              </span>
-            </li>
-            <?php endforeach; ?>
-          </ul>
-        </details>
+        <?php else: ?><span class="dt">—</span><?php endif; ?>
       </td>
     </tr>
+    <?php // Le tiroir : une ligne de tableau à part, pleine largeur. C'est
+          // toute la différence — cinq points côte à côte au lieu de cinq
+          // paragraphes empilés dans une colonne de 180 px. ?>
+    <tr id="s<?= (int) $o['id'] ?>" class="szuflada"><td colspan="9">
+      <form method="post">
+        <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+        <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+        <input type="hidden" name="powiadom" value="1">
+        <?php $tiroir($o, $d); ?>
+      </form>
+      <a class="zwin" href="#z<?= (int) $o['id'] ?>">Zwiń ▴</a>
+    </td></tr>
     <?php endforeach; ?>
     </tbody>
   </table>
   </div>
+
+<?php else: ?>
+  <?php // ═══ VUE « TABLICA » ═════════════════════════════════════════════════
+        // La position dit l'état : plus une seule pastille ne le répète. Et
+        // l'on voit LA CHARGE — trois à préparer, une coincée à l'expédition —
+        // ce qu'aucune liste ne montre. En échange, pas de tri et pas de lot :
+        // c'est l'écran de l'atelier, pas celui de la recherche. ?>
+  <div class="tablica">
+    <?php foreach ($TABL as $k): [$nazwa, ] = $KOLEJKI[$k]; ?>
+    <section class="kol<?= $k === 'przygotowanie' ? ' pilne' : '' ?>">
+      <?php // PAS DE PLAFOND SILENCIEUX. La tablica lit 200 commandes : une
+            // colonne qui en compte 2264 en montre 186, et « 186 » se lisait
+            // comme le total. On annonce le vrai nombre, et ce qu'on montre. ?>
+      <header><b><?= h($nazwa) ?></b>
+        <span class="ile"><?= (int) $licznik[$k] ?><?= count($kubelki[$k]) < (int) $licznik[$k]
+              ? '<em> · widać ' . count($kubelki[$k]) . '</em>' : '' ?></span></header>
+      <div class="tresc">
+        <?php if (!$kubelki[$k]): ?><p class="pusto">Nic tutaj.</p><?php endif; ?>
+        <?php foreach ($kubelki[$k] as $o):
+          $d = $dane($o);
+          [$wKl, $wTxt, $wTyt] = $werdykt($d); ?>
+        <article id="z<?= (int) $o['id'] ?>" class="karta<?= $d['blok'] ? ' blok' : '' ?>">
+          <div class="gora">
+            <a class="code" href="<?= h($lien(['id' => (int) $o['id']])) ?>"><?= h($o['code']) ?></a>
+            <span class="kw"><?= h(pln($o['total_gross'])) ?></span>
+          </div>
+          <p class="im"><?= h($o['client']) ?></p>
+          <div class="sz">
+            <span class="dokchip <?= $d['pf']['kind'] === 'faktura' ? 'f' : 'p' ?>"><?= h(strtoupper($d['pf']['kind'])) ?></span>
+            <?= h(wsm_ship_kind($pdo, (string) $o['delivery_method']) === 'punkt'
+                  ? 'Paczkomat' : 'Kurier ' . strtoupper(wsm_ship_carrier($pdo, (string) $o['delivery_method']))) ?>
+            · <?= (int) $o['units'] ?> poz.
+          </div>
+          <?php // Le blocage tient en UNE ligne sur la carte, et nomme le trou.
+                // Le détail complet reste à un clic, comme dans la liste. ?>
+          <?php if ($d['blok'] || $d['uwagi']): ?>
+          <a class="stop w-<?= h($wKl) ?>" href="#s<?= (int) $o['id'] ?>">
+            <i class="kropka"></i><?= h($d['pf']['blok'] ? implode(' · ', $d['pf']['blok']) : $d['uwagaTxt']) ?>
+          </a>
+          <?php endif; ?>
+          <?php if ($isAdmin && $d['suiv'] && $d['blok'] && !empty($d['suiv']['doc'])): ?>
+          <a class="etap zablokowany" href="#s<?= (int) $o['id'] ?>"
+             title="<?= h(implode(' · ', $d['pf']['blok'])) ?>">Nie wyjdzie</a>
+          <?php elseif ($isAdmin && $d['suiv']): ?>
+          <form method="post">
+            <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+            <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+            <input type="hidden" name="powiadom" value="1">
+            <?php $przycisk($d['suiv'], $o, 'glowny'); ?>
+          </form>
+          <?php endif; ?>
+          <div id="s<?= (int) $o['id'] ?>" class="szuflada">
+            <form method="post">
+              <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+              <input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
+              <input type="hidden" name="powiadom" value="1">
+              <?php $tiroir($o, $d); ?>
+            </form>
+            <a class="zwin" href="#z<?= (int) $o['id'] ?>">Zwiń ▴</a>
+          </div>
+        </article>
+        <?php endforeach; ?>
+      </div>
+    </section>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
 
 <?php if ($hurtowa && $isAdmin && $orders): ?>
   <?php // LA BARRE DU LOT. Le libellé se met à jour par un script minuscule ;
