@@ -239,66 +239,6 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
      n'a besoin qu'on lui dise qu'un prix est un prix. Le reste tient sur deux
      lignes serrées, et le chemin des étapes récupère la place. Trois
      commandes par écran au lieu d'une. */
-  table.zam tr {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto;
-    gap: 1px 10px; padding: 12px 14px 14px;
-  }
-  table.zam td { padding: 0; display: block; }
-  /* Les évidences perdent leur étiquette ; le reste garde un mot, en petit. */
-  table.zam td[data-l="Numer"]::before, table.zam td[data-l="Brutto"]::before,
-  table.zam td[data-l="Klient"]::before, table.zam td[data-l="Data"]::before,
-  table.zam td[data-l="Dostawa"]::before, table.zam td[data-l="Płatność"]::before,
-  table.zam td[data-l="Status"]::before, table.zam td[data-l="Kontrolki"]::before,
-  table.zam td[data-l="Pozycje"]::before { display: none; }
-  table.zam td small { margin-left: 0; }
-
-  /* CHAQUE CELLULE À SA PLACE, NOMMÉE. Sans grid-row explicite, les cellules
-     se rangent dans l'ordre du HTML : le chemin des étapes se retrouvait
-     AVANT le mode de paiement, parce que la colonne Status vient avant la
-     colonne Płatność dans le tableau. L'ordre d'un tableau sert le bureau ;
-     la fiche du téléphone a le sien. */
-  table.zam td[data-l="Numer"]  { grid-area: 1 / 1; font-size: 15px; }
-  table.zam td[data-l="Brutto"] { grid-area: 1 / 2; font-weight: 700;
-                                  font-size: 15px; text-align: right; white-space: nowrap; }
-  table.zam td[data-l="Numer"] a.code { font-size: 15px; }
-  table.zam td[data-l="Klient"] { grid-area: 2 / 1 / 3 / -1; font-size: 14px; margin-top: 3px; }
-  table.zam td[data-l="Klient"] small { display: block; font-size: 12px; }
-  /* Le point de retrait tient sur la même ligne que le mode : deux lignes pour
-     « Paczkomat » et « WRO01A » sur une fiche qu'on veut courte, non. */
-  table.zam td[data-l="Dostawa"] { grid-area: 3 / 1; font-size: 13px; color: var(--text-muted); }
-  table.zam td[data-l="Dostawa"] br { display: none; }
-  table.zam td[data-l="Dostawa"] small::before { content: " · "; }
-  /* Sur la fiche, la place ne manque pas sur cette ligne : date et heure
-     restent côte à côte. */
-  table.zam td[data-l="Data"]    { grid-area: 3 / 2; font-size: 12px; color: var(--text-muted);
-                                   text-align: right; white-space: nowrap; }
-  table.zam td[data-l="Data"] .tm { display: inline; }
-  table.zam td[data-l="Płatność"] { grid-area: 4 / 1 / 5 / -1; margin: 6px 0 0; }
-  /* « 2 » tout seul ne veut rien dire une fois l'intitulé retiré. */
-  /* Le montant porte sa quantité en dessous, en petit. */
-  table.zam td[data-l="Brutto"] small { display: block; font-size: 11.5px; font-weight: 500; }
-  /* Le chemin et les voyants prennent toute la largeur : c'est le travail. */
-  table.zam td[data-l="Status"]    { grid-area: 5 / 1 / 6 / -1; margin-top: 10px; }
-  /* La case de sélection va CHERCHER le pouce : elle est en haut à droite de
-     la fiche, à côté du montant, pas perdue en fin de carte. */
-  /* Avec la case, la fiche passe à TROIS colonnes : [case][numéro][montant].
-     En deux colonnes, le montant se retrouvait seul sur sa ligne — une ligne
-     entière pour cinq caractères, sur une fiche qu'on veut courte. */
-  table.zam tr:has(td[data-l="Wyślij"]) { grid-template-columns: auto minmax(0, 1fr) auto; }
-  table.zam td[data-l="Wyślij"]    { grid-area: 1 / 1; align-self: center; }
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Numer"]  { grid-area: 1 / 2; }
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Brutto"] { grid-area: 1 / 3; }
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Klient"],
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Status"],
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Przed wysyłką"],
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Kontrolki"] { grid-column: 1 / -1; }
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Dostawa"]  { grid-area: 3 / 1 / 4 / 3; }
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Data"]     { grid-area: 3 / 3; }
-  table.zam tr:has(td[data-l="Wyślij"]) td[data-l="Płatność"] { grid-area: 4 / 1 / 5 / -1; }
-  table.zam td[data-l="Przed wysyłką"] { grid-area: 7 / 1 / 8 / -1; margin-top: 8px; }
-  table.zam tr:not(:has(td[data-l="Wyślij"])) td[data-l="Przed wysyłką"] { grid-area: 6 / 1 / 7 / -1; }
-  table.zam td[data-l="Przed wysyłką"]::before,
-  table.zam td[data-l="Wyślij"]::before { display: none; }
 }
 
 /* --- Étiquettes et bandeaux ---------------------------------------------- */
@@ -339,18 +279,6 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 /* ═══ CE QUI VA PARTIR, AVANT QUE ÇA PARTE ═══════════════════════════════
    Replié : une ligne, avec le type de document. Ouvert : les cinq points qui
    décident. Une commande bloquée le dit dans son résumé, pas au clic. */
-.przed > summary {
-  display: flex; align-items: center; gap: 7px; cursor: pointer; list-style: none;
-  min-height: 34px; font-size: 12.5px; color: var(--text-muted); width: max-content; max-width: 100%;
-}
-.przed > summary::-webkit-details-marker { display: none; }
-.przed > summary::after { content: "▸"; font-size: 10px; }
-/* Au bureau la colonne ne doit pas réclamer la largeur de sa phrase : neuf
-   colonnes tiennent tout juste, et une de trop pousse le tableau hors page. */
-@media (min-width: 700px) { .przed > summary { width: auto; min-height: 30px; gap: 5px; }
-                            .dokchip { font-size: 9.5px; padding: 3px 7px; } }
-.przed[open] > summary::after { content: "▾"; }
-.przed.blok > summary { color: var(--danger); }
 .dokchip { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; font-weight: 700;
            padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
 .dokchip.f { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
@@ -362,8 +290,6 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 .przed-lista li .co { width: 68px; flex: none; color: var(--text-muted); font-size: 11.5px; }
 .przed-lista li .val { flex: 1 1 auto; overflow-wrap: anywhere; }
 /* Le geste, à droite de la valeur qu'il corrige — pas dans une colonne à part. */
-.przed-lista .lig { display: inline; margin-left: 6px; }
-.przed-lista .lig .etap.kasa { min-height: 28px; padding: 0 9px; font-size: 11.5px;
                                border-color: var(--border-default); color: var(--brand); }
 .przed-lista li.ok i { color: var(--success); }
 .przed-lista li.no i, .przed-lista li.no .val { color: var(--danger); }
@@ -408,9 +334,6 @@ tr.zablok { background: color-mix(in srgb, var(--danger) 4%, transparent); }
   /* « 2026-08-06 17:01 » cassé en trois lignes se lit comme trois données.
      Date et heure gardent chacune leur bloc, et la seconde passe dessous : la
      colonne tient en 90 px au lieu de 144, et rien n'est en escalier. */
-  table.zam td[data-l="Data"] .dt,
-  table.zam td[data-l="Data"] .tm { white-space: nowrap; }
-  table.zam td[data-l="Data"] .tm { display: block; color: var(--text-muted); }
 }
 
 /* Après une action on revient à la ligne par son ancre. Sans cette marge le
@@ -419,30 +342,6 @@ tr.zablok { background: color-mix(in srgb, var(--danger) 4%, transparent); }
    et on doit remonter à la main juste après avoir cliqué. */
 table.rwd tr[id], table tr[id] { scroll-margin-top: 88px; }
 
-.etapy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; }
-/* LE GESTE DE TOUS LES JOURS PREND TOUTE LA LARGEUR. Sur un téléphone tenu à
-   une main, la cible qu'on vise sans regarder doit être la plus grande de la
-   fiche — pas une pastille parmi six, alignée avec celle qui annule la
-   commande. 52 px : au-dessus du minimum tactile, sous la hauteur d'un bloc. */
-/* Sur la MÊME ligne que l'étape actuelle : « [Nowe] [→ Opłacone] » se lit
-   comme une phrase — où l'on est, ce qu'on va faire — et économise une ligne
-   entière sur une fiche qu'on veut courte. Sous 180 px de place restante le
-   grand bouton repasse à la ligne plutôt que de se comprimer. */
-.etap.glowny { flex: 1 1 180px; min-height: 52px; font-size: 15px; justify-content: center; }
-.etap.glowny::before { content: "→"; margin-right: 8px; font-weight: 400; opacity: .8; }
-
-/* Le reste du chemin, replié. <details> : pas une ligne de JavaScript, donc
-   ça s'ouvre aussi quand le réseau de la réserve avale un script. */
-.etapy-wiecej { flex: 1 0 100%; margin-top: 2px; }
-.etapy-wiecej > summary {
-  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-  min-height: 36px; padding: 0 4px; font-size: 13px; color: var(--text-muted);
-  list-style: none; width: max-content;
-}
-.etapy-wiecej > summary::-webkit-details-marker { display: none; }
-.etapy-wiecej > summary::before { content: "▸"; font-size: 11px; }
-.etapy-wiecej[open] > summary::before { content: "▾"; }
-.etapy-lista { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 4px; }
 .etap {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   min-height: 44px; padding: 0 14px; border-radius: 999px;
@@ -489,17 +388,8 @@ span.etap { cursor: default; }
 .etap .doc { font-size: 18px; line-height: 0; opacity: .75; }
 @media (min-width: 700px) {
   .etap { min-height: 34px; font-size: 12.5px; padding: 0 10px; }
-  /* La colonne doit RÉCLAMER sa place, sinon la mise en page automatique du
-     tableau la comprime jusqu'à une pastille par ligne. Il ne lui faut plus
-     que de quoi tenir « [Nowe] [→ Opłacone] » : le reste du chemin est
-     replié. */
-  .etapy { gap: 5px; min-width: 15rem; }
-  /* À la souris, pas besoin des 52 px du pouce — et le repli tient sur la
-     même ligne : toute la colonne se lit en une rangée. */
+  /* À la souris, pas besoin des 52 px du pouce. */
   .etap.glowny { min-height: 38px; font-size: 13.5px; flex: 1 1 auto; }
-  .etapy-wiecej { flex: 0 0 auto; margin-top: 0; }
-  .etapy-wiecej > summary { min-height: 30px; font-size: 12px; }
-  .etapy-lista { flex-basis: 100%; }
 }
 
 .flash { border-radius: 10px; padding: 11px 15px; margin: 0 0 16px; font-size: 14px; }
@@ -575,3 +465,186 @@ a.code { font-family: var(--font-mono); color: var(--brand); font-weight: 600; t
          white-space: nowrap; }
 a.code:hover { text-decoration: underline; }
 a.back { display: inline-block; margin-top: 16px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEUX VUES POUR LES COMMANDES — « lista » et « tablica »
+
+   CE QU'ON RÉPARE ICI. La liste de contrôle d'avant-expédition était dépliée
+   en permanence, dans une colonne trop étroite pour elle : cinq points, quatre
+   retours à la ligne chacun, tout en orange. UNE commande faisait 420 px de
+   haut. Sur l'écran le plus utilisé de la maison, on en voyait deux.
+
+   La cause n'est pas le style, c'est un mélange de genres : ces cinq points
+   sont du DIAGNOSTIC (« pourquoi celui-là ne part pas »), posé au milieu d'un
+   outil de BALAYAGE (« qu'est-ce qu'il y a à faire aujourd'hui »). Le
+   diagnostic descend donc dans un tiroir, et la ligne ne garde que le verdict.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* --- La barre : files à gauche, choix de la vue à droite ------------------ */
+.pasek { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between;
+         flex-wrap: wrap; margin: 0 0 14px; }
+.pasek .kolejki { margin: 0; }
+.kolejki-zast { margin: 0; font-size: 12.5px; color: var(--text-muted); align-self: center; }
+.kolejki-zast b { color: var(--text-strong); font-family: var(--font-mono); }
+.widoki { display: flex; gap: 2px; padding: 3px; border-radius: 10px;
+          background: var(--cream-100); border: 1px solid var(--border-subtle); align-self: center; }
+.widoki a { padding: 7px 13px; border-radius: 8px; font-size: 12.5px; color: var(--text-muted);
+            text-decoration: none; min-height: 32px; display: flex; align-items: center; }
+.widoki a.on { background: var(--surface-card); color: var(--text-strong); font-weight: 600;
+               box-shadow: var(--shadow-xs); }
+
+/* --- L'état SE LIT, il ne se clique pas ----------------------------------- */
+/* La pastille noire pleine se lisait comme un bouton et n'en était pas un : on
+   appuyait dessus, rien ne se passait, on cherchait la panne. */
+.stan { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.stan .kropka { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--choco-200); }
+.s-oplacone .kropka, .s-wyslane .kropka, .s-dostarczone .kropka, .p-ok .kropka { background: var(--success); }
+.s-w_realizacji .kropka, .p-wait .kropka { background: var(--warning); }
+.s-anulowane .kropka, .p-bad .kropka { background: var(--danger); }
+
+/* --- Le verdict, en trois caractères -------------------------------------- */
+/* C'est LE changement. Ce qu'on lit en balayant, c'est « est-ce que ça part,
+   oui ou non ». Le reste s'ouvre à la demande, et seulement pour une ligne. */
+.werd { display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+        font-size: 12px; color: var(--text-muted); min-height: 34px; }
+.werd b { font-weight: 600; }
+.werd i { font-style: normal; font-size: 9px; opacity: .55; }
+.werd.w-ok b { color: var(--success); }
+.werd.w-wa b { color: var(--caramel-600); }
+.werd.w-no b { color: var(--danger); }
+.werd:hover b { text-decoration: underline; }
+
+/* --- Le tiroir : PLEINE LARGEUR, ouvert par :target ----------------------- */
+/* Ouvert par le navigateur, sans une ligne de JavaScript — donc sur le
+   téléphone de la réserve comme ailleurs. Pleine largeur : c'est là que les
+   quatre retours à la ligne par point disparaissent. Un seul à la fois, ce
+   qui est aussi bien : on diagnostique une commande, pas douze. */
+tr.szuflada { display: none; }
+tr.szuflada:target { display: table-row; }
+tr.szuflada > td { padding: 0 12px 14px !important; background: var(--cream-50);
+                   border-bottom: 2px solid var(--border-default); }
+.karta > .szuflada { display: none; }
+.karta > .szuflada:target { display: block; }
+.szuf-in { display: block; }
+.szuflada .przed-lista { display: grid; gap: 8px; margin: 0; padding: 10px 0 0; border: 0;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.szuflada .przed-lista li { display: block; padding: 9px 11px; border-radius: 10px;
+  background: var(--surface-card); border: 1px solid var(--border-subtle); font-size: 12.5px; }
+.szuflada .przed-lista li .co { display: flex; align-items: center; gap: 6px; width: auto;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted);
+  font-weight: 600; margin-bottom: 4px; }
+.szuflada .przed-lista li .co i { font-style: normal; font-weight: 700; width: 12px; text-align: center; }
+.szuflada .przed-lista li .val { display: block; line-height: 1.4; overflow-wrap: anywhere; }
+.szuflada .przed-lista li .etap.kasa { min-height: 28px; padding: 0 10px; font-size: 11.5px; margin-top: 7px; }
+.szuflada .przed-lista li.no { border-color: var(--danger); }
+.inne { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 11px 0 2px; }
+.inne-l { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.inne .etap { min-height: 32px; font-size: 12px; padding: 0 11px; }
+.zwin { display: inline-block; margin-top: 8px; font-size: 11.5px; color: var(--text-muted); }
+
+/* --- La ligne : 46 px, et un seul bouton ---------------------------------- */
+table.zam2 td { vertical-align: middle; }
+table.zam2 .ident a.code { display: block; font-size: 12.5px; }
+table.zam2 .ident .dt, table.zam2 .kasa2 .dt { display: block; font-size: 11px; color: var(--text-muted); }
+table.zam2 .kli .im { display: block; }
+table.zam2 .kli .ml { display: block; font-size: 11px; color: var(--text-muted);
+  max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.zam2 .dost { font-size: 12px; color: var(--text-muted); }
+table.zam2 .dost .pkt { display: block; font-size: 11px; }
+table.zam2 .kasa2 .kw { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
+table.zam2 .ruch form { margin: 0; }
+table.zam2 .ruch .etap.glowny { min-height: 34px; font-size: 12.5px; width: 100%; }
+
+@media (min-width: 700px) {
+  /* Le geste garde une largeur stable : un bouton qui change de taille d'une
+     ligne à l'autre oblige à viser à chaque fois. */
+  table.zam2 td.ruch { width: 165px; }
+  table.zam2 td.zazn { width: 34px; }
+  table.zam2 .ruch .etap.glowny::before { content: none; }
+}
+
+/* --- Téléphone : deux lignes par commande, pas neuf ----------------------- */
+@media (max-width: 699px) {
+  table.zam2 thead { display: none; }
+  table.zam2 tr.wiersz { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 10px; padding: 11px 13px; border-bottom: 1px solid var(--border-subtle); }
+  table.zam2 tr.wiersz td { display: block; padding: 0; border: 0; }
+  table.zam2 tr.wiersz td::before { display: none !important; }
+  table.zam2 td.zazn   { grid-area: 1 / 1; }
+  table.zam2 td.ident  { grid-area: 1 / 1; }
+  table.zam2 tr:has(td.zazn) td.ident { grid-column: 1; margin-left: 32px; }
+  table.zam2 td.kasa2  { grid-area: 1 / 2; text-align: right; }
+  table.zam2 td.kli    { grid-column: 1 / -1; font-size: 13.5px; }
+  table.zam2 td.dost, table.zam2 td[data-l="Stan"], table.zam2 td[data-l="Płatność"] {
+    display: inline-flex !important; margin-right: 10px; font-size: 11.5px; }
+  table.zam2 td.dost .pkt { display: inline; }
+  table.zam2 td.dost .pkt::before { content: " · "; }
+  table.zam2 td[data-l="Przed wysyłką"] { grid-column: 1 / -1; }
+  table.zam2 td.ruch { grid-column: 1 / -1; margin-top: 6px; }
+  table.zam2 .ruch .etap.glowny { min-height: 46px; font-size: 14px; }
+  table.zam2 tr.szuflada:target { display: block; }
+  table.zam2 tr.szuflada > td { display: block; }
+}
+
+/* --- La tablica : la position dit l'état ---------------------------------- */
+/* On y voit LA CHARGE — trois à préparer, une coincée à l'expédition — ce
+   qu'aucune liste ne montre. En échange : pas de tri, pas de lot. C'est
+   l'écran de l'atelier, pas celui de la recherche. */
+.tablica { display: grid; gap: 12px; align-items: start; }
+@media (min-width: 900px) { .tablica { grid-template-columns: repeat(3, 1fr); } }
+.tablica .kol { background: var(--surface-card); border: 1px solid var(--border-subtle);
+  border-radius: 14px; box-shadow: var(--shadow-xs); overflow: hidden; padding: 0; margin: 0; }
+.tablica .kol > header { display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; background: var(--cream-50); border-bottom: 1px solid var(--border-default); }
+.tablica .kol.pilne > header { background: color-mix(in srgb, var(--accent) 20%, var(--cream-50)); }
+.tablica .kol > header b { font-size: 13px; color: var(--text-strong); }
+.tablica .kol > header .ile { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.tablica .tresc { padding: 10px; display: flex; flex-direction: column; gap: 9px; }
+.tablica .pusto { margin: 4px 2px; font-size: 12px; color: var(--text-muted); }
+.karta { border: 1px solid var(--border-subtle); border-radius: 11px; padding: 10px 11px; }
+.karta.blok { box-shadow: inset 3px 0 0 var(--danger);
+              background: color-mix(in srgb, var(--danger) 3%, transparent); }
+.karta .gora { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.karta .gora .kw { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
+.karta .im { margin: 3px 0 0; font-size: 13.5px; color: var(--text-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.karta .sz { margin-top: 3px; font-size: 11.5px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.karta .stop { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px;
+  font-size: 11.5px; line-height: 1.35; text-decoration: none; }
+.karta .stop .kropka { width: 7px; height: 7px; border-radius: 50%; flex: none; margin-top: 4px; }
+.karta .stop.w-no { color: var(--danger); } .karta .stop.w-no .kropka { background: var(--danger); }
+.karta .stop.w-wa { color: var(--caramel-600); } .karta .stop.w-wa .kropka { background: var(--warning); }
+.karta form { margin: 9px 0 0; }
+.karta .etap.glowny { width: 100%; min-height: 38px; font-size: 13px; }
+.karta .szuflada { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border-subtle); }
+.karta .szuflada .przed-lista { grid-template-columns: 1fr; }
+
+/* « PRZYGOTOWANIE » coupé en « PRZYGOTOW / ANIE » : l'onglet le plus large
+   décidait de la largeur de tous, et le sélecteur de vue lui a pris sa place.
+   Les libellés ne se coupent plus ; c'est la barre qui passe à la ligne. */
+.kolejki { flex-wrap: wrap; }
+.kolejki a span { white-space: nowrap; }
+
+/* Téléphone : la fiche tenait sur 238 px pour cinq informations. Les trois
+   qui se lisent d'un coup — transport, état, paiement — vivent sur UNE
+   rangée qui se replie, au lieu de trois blocs empilés. */
+@media (max-width: 699px) {
+  table.zam2 tr.wiersz { gap: 1px 10px; padding: 10px 13px; }
+  table.zam2 td.kli { margin-top: 2px; }
+  table.zam2 td.dost, table.zam2 td[data-l="Stan"], table.zam2 td[data-l="Płatność"] {
+    margin-right: 9px; margin-top: 2px; }
+  table.zam2 td[data-l="Przed wysyłką"] { margin-top: 2px; }
+  table.zam2 td[data-l="Przed wysyłką"] .werd { min-height: 26px; }
+  table.zam2 td.ruch { margin-top: 4px; }
+  table.zam2 .ruch .etap.glowny { min-height: 42px; }
+}
+
+/* Le geste refusé : il ressemble à un bouton mais n'en est pas un — il mène
+   au trou à boucher. Rouge et creux, pour qu'on ne le vise pas par réflexe. */
+.etap.zablokowany { border-color: var(--danger); color: var(--danger); background: transparent;
+  text-decoration: none; cursor: pointer; }
+.etap.zablokowany:hover { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+table.zam2 .ruch .etap.zablokowany { width: 100%; min-height: 34px; font-size: 12.5px; }
+.karta .etap.zablokowany { width: 100%; min-height: 38px; font-size: 13px; margin-top: 9px; }
+.tablica .kol > header .ile em { font-style: normal; color: var(--text-muted); opacity: .75; }
