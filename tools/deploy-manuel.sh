@@ -34,6 +34,12 @@
 #  WSM_DB_USER / WSM_DB_PASS). Sans eux, le code part quand même mais les
 #  textes de la vitrine ne sont pas synchronisés — le script le dit.
 #
+#  ADM_EMAIL / ADM_PASS (secrets WSM_ADMIN_EMAIL / WSM_ADMIN_PASSWORD) sont
+#  FACULTATIFS : fournis, ils reposent le mot de passe de la console à chaque
+#  passage — c'est ainsi qu'on reprend la main sans SSH. Absents, on ne touche
+#  à aucun compte. Le hachage est calculé ICI ; le mot de passe en clair ne
+#  part jamais vers le serveur.
+#
 #  Rien n'est écrit en dur ici : aucun mot de passe ne doit ENTRER dans ce
 #  fichier. Le dépôt est public.
 # =============================================================================
@@ -151,6 +157,14 @@ php -r '
   if ($m) { fwrite(STDERR, "  la liste ne transporte pas : " . implode(", ", $m) . "\n"); exit(1); }
 '
 echo "  files, contrôle avant expédition, envoi par lot : présents"
+# La voie « mot de passe » doit partir AVEC le code : le serveur, lui, émet le
+# SQL depuis le migrate.php DÉPLOYÉ (deploy-serwer.sh, et le workflow de
+# référence). Un tronc sans ce drapeau rendrait la console irrécupérable
+# depuis la machine elle-même.
+grep -q 'set-password-sql' site/backoffice/api/migrate.php \
+  && grep -q 'function wsm_set_password_sql' site/backoffice/api/auth.php \
+  || { echo "  la voie « mot de passe en SQL » n'est pas dans l'assemblage"; exit 1; }
+echo "  reprise en main du compte console : présente"
 echo "  login, tokens, htaccess : présents"
 
 echo "══ 3/5 · envoi vers $SSH_USER@$SSH_HOST:$DEPLOY_DIR ═══════════════════"
@@ -160,7 +174,7 @@ sshpass -e rsync -rltDz --omit-dir-times \
   -e "ssh $SSHOPT" site/ "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/"
 echo "  envoyé"
 
-echo "══ 4/5 · contenu éditorial (SQL) ══════════════════════════════════════"
+echo "══ 4/5 · contenu éditorial + compte de la console (SQL) ═══════════════"
 if [ -n "$DB_USER" ]; then
   # PAR LE CLIENT mysql, et pas par migrate.php : le php en ligne de commande
   # de ce serveur n'a pas pdo_mysql. `--sync-content` n'y a JAMAIS rien fait,
@@ -181,6 +195,52 @@ REMOTE
 else
   echo "  DB_USER absent — textes de la vitrine NON synchronisés."
   echo "  Le nouveau bloc B2B n'apparaîtra pas tant que ce SQL n'aura pas tourné."
+fi
+
+# ── Le mot de passe de la console ────────────────────────────────────────────
+#
+#  PENDANT DES MOIS, RIEN N'ARRIVAIT. Le workflow appelait sur le serveur
+#  `php migrate.php --set-password` — or ce php-là n'a pas pdo_mysql : l'appel
+#  levait « could not find driver », le `if` rattrapait, l'étape écrivait
+#  « WSM_ADMIN_PASSWORD refusé » et le déploiement continuait au vert. Poser le
+#  secret, le changer, le refaire : la base ne bougeait pas d'un octet.
+#
+#  Ici le hachage est calculé SUR CETTE MACHINE, et seul le SQL part. Le mot de
+#  passe en clair ne touche jamais le serveur — ni son disque, ni son `ps`, ni
+#  ses journaux. C'est mieux que ce que faisait le workflow, qui l'exportait
+#  dans l'environnement du shell distant.
+if [ -n "${ADM_PASS:-}" ]; then
+  ADM_EMAIL="${ADM_EMAIL:-admin@misterszoko.com}"
+  if [ -z "$DB_USER" ]; then
+    echo "  ^ ADM_PASS fourni mais DB_USER absent : le mot de passe N'EST PAS posé."
+  elif ( umask 077; printf '%s' "$ADM_PASS" \
+           | php "$BO"/php-api/migrate.php --set-password-sql "$ADM_EMAIL" > /tmp/wsm-adm.sql ); then
+    sshpass -e scp $SCPOPT /tmp/wsm-adm.sql "$SSH_USER@$SSH_HOST:/tmp/wsm-adm.sql" >/dev/null
+    # Le SELECT final du SQL ne rend une ligne QUE si le compte porte bien ce
+    # hachage : c'est la preuve, pas la promesse. Zéro ligne = rien n'a été posé.
+    distant "DB_USER='$DB_USER' DB_PASS='$DB_PASS' bash -s" <<'REMOTE'
+      OUT=$(mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 -N -B mrszoko \
+              < /tmp/wsm-adm.sql 2>/tmp/wsm-adm.err) && RC=0 || RC=1
+      rm -f /tmp/wsm-adm.sql
+      if [ "$RC" = 0 ] && [ -n "$OUT" ]; then
+        echo "$OUT"
+      else
+        echo "  ^ ATTENTION : mot de passe de la console NON posé"
+        head -3 /tmp/wsm-adm.err 2>/dev/null | sed 's/^/    MySQL: /'
+      fi
+      rm -f /tmp/wsm-adm.err
+REMOTE
+  else
+    # Refusé à l'émission (trop court, e-mail invalide) : on le dit fort, on ne
+    # fait pas tomber le déploiement — le reste du site est sain — et surtout on
+    # ne touche pas au compte existant, qui reste utilisable.
+    echo "  ^ ATTENTION : WSM_ADMIN_PASSWORD refusé (min 10 caractères, e-mail valide)."
+    echo "    Le compte existant n'a PAS été touché."
+  fi
+  rm -f /tmp/wsm-adm.sql
+else
+  echo "  ADM_PASS absent — mot de passe de la console inchangé (c'est la règle :"
+  echo "  sans secret, on ne touche à rien)."
 fi
 
 echo "══ 5/5 · l'effet, sur les pages réelles ═══════════════════════════════"

@@ -119,6 +119,10 @@ if ! curl -fsSL "$BRUT/deploy-serwer.sh" -o "$ETAT/deploy-serwer.sh"; then
 fi
 chmod 750 "$ETAT/deploy-serwer.sh"
 
+# SANS --haslo, et sans ADM_PASS : une tâche planifiée ne repose pas un mot de
+# passe. Il n'y a ici aucun secret à lire, et un cron qui réécrit les comptes
+# toutes les minutes est une porte, pas un déploiement. deploy-serwer.sh dira
+# quand même, à chaque passage, si quelqu'un peut encore entrer dans la console.
 if bash "$ETAT/deploy-serwer.sh"; then
     # LE REPÈRE N'AVANCE QU'EN CAS DE SUCCÈS. Noté trop tôt, un déploiement
     # raté serait oublié jusqu'au prochain commit — c'est-à-dire jusqu'à ce

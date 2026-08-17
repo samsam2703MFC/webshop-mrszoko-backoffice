@@ -452,44 +452,54 @@ jobs:
             echo 'ATTENTION : mysql injoignable — boutiques de démonstration NON retirées'
           fi
 
-          # ── Compte administrateur : créé UNE SEULE FOIS. --ensure-admin ne fait
-          # rien si un compte capable de se connecter existe déjà, donc les
-          # mots de passe changés par la suite ne sont jamais réécrasés.
+          # ── Compte administrateur ────────────────────────────────────────────
+          #
+          # CE BLOC N'A JAMAIS RIEN FAIT, ET IL SE DISAIT VERT. Il appelait ici
+          # `php migrate.php --set-password` : ce php-là n'a pas pdo_mysql (le
+          # contrôle voisin le mesure et l'écrit à chaque passage), donc l'appel
+          # levait « could not find driver » avant la première requête. Le `if`
+          # rattrapait, on écrivait « WSM_ADMIN_PASSWORD refusé », et la suite se
+          # déroulait normalement. Poser le secret, le changer, le refaire : la
+          # base ne bougeait pas d'un octet, et rien ne le disait clairement.
+          # C'est la panne de `--sync-content`, sur un autre objet.
+          #
+          # `--set-password-sql` n'ouvre AUCUNE base : password_hash() n'en a pas
+          # besoin. Il écrit le SQL, le client mysql — qui, lui, marche ici — le
+          # joue. Le mot de passe entre par stdin (jamais dans `ps`, jamais dans
+          # un `set -x`) et ne ressort pas : ce qui voyage est un hachage bcrypt.
           EMAIL="${ADM_EMAIL:-admin@misterszoko.com}"
-          PASS="${ADM_PASS:-$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)}"
-          # Si le secret WSM_ADMIN_PASSWORD est renseigné, il FAIT FOI : chaque
-          # déploiement repose ce mot de passe. C'est ainsi qu'on reprend la main
-          # sur le compte sans accès SSH — on change le secret, on redéploie.
-          # Sans secret, --ensure-admin ne touche à rien si un compte existe.
-          if [ -n "${ADM_PASS:-}" ]; then
-            # Un secret refusé (trop court, adresse invalide) ne doit PAS faire
-            # tomber le déploiement : le site est par ailleurs sain et doit
-            # encore passer la vérification. On le dit fort, et on garde le
-            # compte existant intact.
-            if OUT=$(cd "$API" && php migrate.php --set-password "$EMAIL" "$PASS" 2>&1); then
-              echo "$OUT"
-            else
-              echo "  ^ ATTENTION : WSM_ADMIN_PASSWORD refusé — $OUT"
-              echo "  Le mot de passe n'a PAS été changé ; le compte existant reste utilisable."
-              # Sur une machine neuve, il n'y a justement PAS de compte existant :
-              # on en crée un avec un mot de passe tiré au hasard plutôt que de
-              # laisser la console sans aucun accès.
-              PASS=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)
-              OUT=$(cd "$API" && php migrate.php --ensure-admin "$EMAIL" "$PASS" 2>&1) || true
-              echo "$OUT"
-            fi
+          if [ -z "${ADM_PASS:-}" ]; then
+            echo "WSM_ADMIN_PASSWORD absent — aucun compte touché."
+            echo "  Pour (re)prendre la main sur la console : poser ce secret et relancer."
+          elif [ -z "${DB_USER:-}" ]; then
+            echo "  ^ ATTENTION : WSM_ADMIN_PASSWORD posé mais WSM_DB_USER absent —"
+            echo "    le mot de passe N'A PAS été changé (aucun accès à la base)."
+          elif ! ( umask 077; printf '%s' "$ADM_PASS" \
+                     | php "$API/migrate.php" --set-password-sql "$EMAIL" > /tmp/wsm-adm.sql ) 2>/tmp/wsm-adm.err; then
+            # Refusé à l'émission (moins de 10 caractères, adresse invalide).
+            # Cela ne doit PAS faire tomber le déploiement : le site est par
+            # ailleurs sain. On le dit fort, et le compte existant reste intact.
+            echo "  ^ ATTENTION : WSM_ADMIN_PASSWORD refusé — $(head -1 /tmp/wsm-adm.err)"
+            echo "    Le compte existant n'a PAS été touché (min 10 caractères, e-mail valide)."
           else
-            OUT=$(cd "$API" && php migrate.php --ensure-admin "$EMAIL" "$PASS" 2>&1) || { echo "$OUT"; exit 1; }
-            echo "$OUT"
-          fi
-          case "$OUT" in
-            *"compte créé"*)
-              # Identifiants déposés hors racine web, lisibles par root seul.
-              printf 'Mister Szoko — konsola marki\nURL   : /mrszoko/backoffice\nE-mail: %s\nHasło : %s\n' "$EMAIL" "$PASS" > /root/mrszoko-admin.txt
+            # Le SELECT final du SQL ne rend une ligne QUE si le compte porte
+            # bien ce hachage : preuve, et non promesse. Zéro ligne = rien posé.
+            OUT=$(mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 -N -B mrszoko \
+                    < /tmp/wsm-adm.sql 2>/tmp/wsm-adm.err) && RC=0 || RC=1
+            if [ "$RC" = 0 ] && [ -n "$OUT" ]; then
+              echo "$OUT"
+              # Rappel de l'adresse, hors racine web et lisible par root seul.
+              # LE MOT DE PASSE N'Y EST PAS : il vit dans le secret GitHub, qui
+              # est sa seule source. Un fichier qui le répète est une copie de
+              # plus à perdre.
+              printf 'Mister Szoko — konsola marki\nURL    : /mrszoko/backoffice\nE-mail : %s\nHasło  : secret GitHub WSM_ADMIN_PASSWORD (posé à chaque déploiement)\n' "$EMAIL" > /root/mrszoko-admin.txt
               chmod 600 /root/mrszoko-admin.txt
-              echo "identifiants écrits dans /root/mrszoko-admin.txt (chmod 600) — e-mail : $EMAIL"
-              ;;
-          esac
+            else
+              echo "  ^ ATTENTION : mot de passe de la console NON posé"
+              head -3 /tmp/wsm-adm.err 2>/dev/null | sed 's/^/    MySQL: /'
+            fi
+          fi
+          rm -f /tmp/wsm-adm.sql /tmp/wsm-adm.err
 
           # ── HTTPS : on ne l'impose QUE s'il répond réellement. Sinon une
           # redirection rendrait le site inaccessible.
@@ -1043,6 +1053,21 @@ jobs:
                  fi ;;
             esac
           done
+
+          # QUELQU'UN PEUT-IL ENTRER DANS LA CONSOLE ? La question n'était posée
+          # nulle part, et l'amorçage du compte a échoué en silence pendant des
+          # mois (php-cli sans pdo_mysql, échec rattrapé par un `if`). Une
+          # console à laquelle personne ne se connecte est une console morte :
+          # ce contrôle-là ne prévient pas, il fait tomber.
+          ENTREE=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT COUNT(*) FROM wsm_users
+              WHERE act = 1 AND password_hash IS NOT NULL AND password_hash <> ''
+                AND (locked_until IS NULL OR locked_until < NOW());" 2>/dev/null || echo ZLE)
+          case "$ENTREE" in
+            0)   echo "  ^ ZLE : AUCUN compte ne peut se connecter à la console"; fail=1 ;;
+            ZLE) echo "  ^ ATTENTION : comptes de connexion non vérifiables"; fail=1 ;;
+            *)   echo "  connexion : $ENTREE compte(s) peuvent entrer dans la console" ;;
+          esac
 
           if [ "$fail" = "0" ]; then echo "ALL BOOTSTRAP EFFECTS OK"; else echo "BOOTSTRAP EFFECTS FAILED"; exit 1; fi
           REMOTE

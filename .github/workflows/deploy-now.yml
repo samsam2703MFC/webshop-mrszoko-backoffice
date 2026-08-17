@@ -55,4 +55,10 @@ jobs:
           DEPLOY_DIR:   ${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}
           DB_USER:      ${{ secrets.WSM_DB_USER }}
           DB_PASS:      ${{ secrets.WSM_DB_PASS }}
+          # Facultatifs : posés, ils reposent le mot de passe de la console à
+          # chaque passage — c'est la reprise en main sans SSH. Absents, aucun
+          # compte n'est touché. Le hachage est calculé sur le runner ; le mot
+          # de passe en clair ne part pas vers le serveur.
+          ADM_EMAIL:    ${{ secrets.WSM_ADMIN_EMAIL }}
+          ADM_PASS:     ${{ secrets.WSM_ADMIN_PASSWORD }}
         run: bash tools/deploy-manuel.sh
