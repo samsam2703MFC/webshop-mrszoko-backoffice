@@ -2168,6 +2168,19 @@ jobs:
           grep -q 'tr\.szuflada { display: none' "$DIR_BO/console.css" \
             && echo "  szuflada domyślnie zamknięta: potwierdzone" \
             || { echo "  ^ ZLE : szuflada otwarta domyślnie — wraca 420 px na zamówienie"; fail=1; }
+          # UNE SEULE FAMILLE DE TEXTE, et elle doit le rester. Plus Jakarta
+          # Sans a quitté la marque ; elle était déjà revenue une fois par une
+          # régénération de fonts.css, et personne ne l'a signalé — deux sans
+          # humanistes qui se ressemblent ne cassent rien, ils fatiguent.
+          # Le contrôle vit ICI aussi : les deux voies de secours le portaient
+          # déjà, la voie de référence non, donc la garantie n'en était pas une.
+          grep -q "Plus Jakarta Sans'" "$DIR_BO/_ds/mister-szoko/tokens/fonts.css" \
+            && { echo "  ^ ZLE : Plus Jakarta Sans wróciła — marka ma jedną rodzinę tekstu"; fail=1; } \
+            || echo "  typografia: jedna rodzina tekstu (Mulish) — potwierdzone"
+          # Et le plancher de taille : 29 % des règles vivaient sous 12 px.
+          grep -qE 'font-size: *(9|10|11)(\.[0-9])?px' "$DIR_BO/console.css" \
+            && { echo "  ^ ZLE : wróciły rozmiary poniżej 12 px"; fail=1; } \
+            || echo "  skala: nic poniżej 12 px — potwierdzone"
 
           if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
           REMOTE
