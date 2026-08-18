@@ -173,6 +173,15 @@ grep -q 'widok' site/backoffice/zamowienia.php \
   && grep -q 'tr\.szuflada' site/backoffice/console.css \
   || { echo "  les deux vues (lista / tablica) ne sont pas complètes"; exit 1; }
 echo "  dwa widoki zamówień (lista + tablica) : obecne"
+# UNE SEULE FAMILLE DE TEXTE. Plus Jakarta Sans a quitté la marque ; elle est
+# revenue une fois déjà par une régénération de fonts.css. Si son @font-face
+# reparaît, le site sert deux sans humanistes qui se ressemblent — le décalage
+# qu'on vient de retirer — et trois fichiers de police en plus.
+grep -q "Plus Jakarta Sans'" site/shop/tokens.css \
+  && { echo "  Plus Jakarta Sans est revenue dans tokens.css — la marque n'a qu'une famille de texte"; exit 1; }
+grep -q "font-family: 'Plus Jakarta Sans'" site/backoffice/_ds/mister-szoko/tokens/fonts.css \
+  && { echo "  Plus Jakarta Sans est revenue dans la console"; exit 1; }
+echo "  typografia: jedna rodzina tekstu (Mulish) — potwierdzone"
 echo "  reprise en main du compte console : présente"
 echo "  login, tokens, htaccess : présents"
 

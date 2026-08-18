@@ -12,11 +12,12 @@
    domaine, les fichiers arrivent avec le reste de la page, et le site ne
    dépend plus de la disponibilité d'un tiers.
 
-   CE QUI EST EMBARQUÉ. Trois familles seulement, celles que typography.css
-   utilise réellement : Plus Jakarta Sans (titres), Mulish (texte courant),
-   DM Mono (chiffres et codes). DM Serif Display a été retirée de la marque
-   il y a longtemps mais continuait d'être téléchargée à chaque visite : elle
-   ne l'est plus.
+   CE QUI EST EMBARQUÉ. DEUX familles, celles que typography.css utilise
+   réellement : Mulish (tout le texte, titres compris) et DM Mono (les
+   identifiants). Plus Jakarta Sans portait les titres ; une seule famille de
+   texte se lit mieux que deux qui se ressemblent, et ses trois fichiers ne
+   sont plus téléchargés. DM Serif Display avait quitté la marque de la même
+   façon, en continuant d'être servie.
 
    SOUS-ENSEMBLES. latin (anglais), latin-ext (polonais), cyrillic et
    cyrillic-ext (ukrainien). Le vietnamien, que Google sert d'office, a été
@@ -133,32 +134,5 @@
   font-weight: 300 800;
   font-display: swap;
   src: url(fonts/mulish-normal-300_800-latin.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Plus Jakarta Sans';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url(fonts/plus-jakarta-sans-normal-400_800-cyrillic-ext.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Plus Jakarta Sans';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url(fonts/plus-jakarta-sans-normal-400_800-latin-ext.woff2) format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Plus Jakarta Sans';
-  font-style: normal;
-  font-weight: 400 800;
-  font-display: swap;
-  src: url(fonts/plus-jakarta-sans-normal-400_800-latin.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }

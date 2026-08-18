@@ -44,7 +44,7 @@ body {
   border-bottom: 1px solid var(--choco-600); flex: none; overflow: hidden;
 }
 .side .brand img { height: 30px !important; width: auto; max-width: none; display: block; }
-.side .brand span { font-size: 9.5px; line-height: 1.3; color: var(--choco-200);
+.side .brand span { font-size: 12px; line-height: 1.3; color: var(--choco-200);
                     text-transform: uppercase; letter-spacing: .09em; }
 .side .brand b { font-family: var(--font-display); font-size: 14px; letter-spacing: 0;
                  text-transform: none; color: var(--cream-50); }
@@ -52,35 +52,35 @@ body {
 .side-close {
   position: absolute; top: 10px; right: 10px; z-index: 1;
   width: 40px; height: 40px; display: grid; place-items: center;
-  border-radius: 999px; cursor: pointer; font-size: 22px; line-height: 1;
+  border-radius: 999px; cursor: pointer; font-size: 24px; line-height: 1;
   color: var(--cream-100); background: var(--choco-600);
 }
 
 .menu { display: flex; flex-direction: column; padding: 8px 10px 18px; flex: 1 1 auto; }
 .menu a {
   display: block; color: var(--cream-100); text-decoration: none;
-  font-size: 14.5px; font-weight: 600; padding: 11px 12px; border-radius: 9px;
+  font-size: 14px; font-weight: 600; padding: 11px 12px; border-radius: 9px;
   min-height: 44px; line-height: 1.5;
 }
 .menu a:hover { background: var(--choco-700, rgba(255,255,255,.06)); }
 .menu a.on { background: var(--choco-600); color: var(--cream-50); }
 .menu .sep {
-  font: 600 10px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+  font: 700 12px/1 var(--font-sans); letter-spacing: .1em; text-transform: uppercase;
   color: var(--choco-200); padding: 16px 12px 6px;
 }
 
 .side-foot {
   flex: none; display: flex; align-items: center; gap: 10px;
   padding: 12px 16px; border-top: 1px solid var(--choco-600);
-  font-family: var(--font-mono); font-size: 11.5px; color: var(--choco-200);
+  font-size: 12px; color: var(--choco-200);
   position: sticky; bottom: 0; background: var(--choco-800);
 }
 .side-foot .who { flex: 1 1 auto; line-height: 1.5; }
-.side-foot b { color: var(--cream-50); font-family: var(--font-sans); font-size: 12.5px; }
+.side-foot b { color: var(--cream-50); font-family: var(--font-sans); font-size: 13px; }
 /* 34 px : sous la barre du tactile. Se déconnecter par erreur en visant le
    nom juste au-dessus fait perdre le travail en cours d'un formulaire. */
 .side-foot button {
-  flex: none; min-height: 44px; padding: 0 14px; font-size: 12px; border-radius: 999px;
+  flex: none; min-height: 44px; padding: 0 14px; font-size: 13px; border-radius: 999px;
   background: transparent; color: var(--cream-100); border: 1px solid var(--choco-600);
 }
 
@@ -104,11 +104,11 @@ header.bar {
   border-bottom: 1px solid var(--choco-600);
 }
 header.bar h1 {
-  font-family: var(--font-display); font-size: 18px; margin: 0; font-weight: 600;
+  font-family: var(--font-display); font-size: 19px; margin: 0; font-weight: 600;
   flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 header.bar h1 .badge {
-  font-family: var(--font-mono); font-size: 11px; vertical-align: middle; white-space: nowrap;
+  font-size: 12px; vertical-align: middle; white-space: nowrap;
   background: var(--choco-600); color: var(--cream-100); border-radius: 999px; padding: 2px 8px;
 }
 .menu-btn {
@@ -116,9 +116,9 @@ header.bar h1 .badge {
   min-height: 38px; display: inline-flex; align-items: center; gap: 8px;
   padding: 0 14px; border-radius: 999px;
   background: var(--choco-600); color: var(--cream-50);
-  font-size: 13.5px; font-weight: 600;
+  font-size: 14px; font-weight: 600;
 }
-.menu-btn::before { content: "☰"; font-size: 15px; }
+.menu-btn::before { content: "☰"; font-size: 16px; }
 .menu-toggle:focus-visible ~ .shell .menu-btn { outline: 2px solid var(--cream-100); outline-offset: 2px; }
 
 /* --- À partir d'un écran de portable : la colonne est là, tout le temps ---- */
@@ -129,13 +129,13 @@ header.bar h1 .badge {
   .side { position: sticky; top: 0; height: 100vh; transform: none; width: auto; }
   .scrim, .menu-btn, .side-close { display: none !important; }
   header.bar { padding: 0 24px; }
-  header.bar h1 { font-size: 20px; }
+  header.bar h1 { font-size: 19px; }
   .wrap { padding: 24px 24px 72px; }
 }
 
 /* Fil d'Ariane : le chemin, et le retour. */
 .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
-          font-size: 13px; margin: 0 0 16px; color: var(--text-muted); }
+          font-size: 14px; margin: 0 0 16px; color: var(--text-muted); }
 .crumbs a { color: var(--brand); text-decoration: none; font-weight: 600; }
 .crumbs a:hover { text-decoration: underline; }
 .crumbs .sepc { color: var(--border-default); }
@@ -147,8 +147,8 @@ header.bar h1 .badge {
   background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
   padding: 14px 16px; box-shadow: var(--shadow-xs);
 }
-.kpi b { display: block; font-family: var(--font-mono); font-size: 22px; color: var(--text-strong); }
-.kpi span { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
+.kpi b { display: block; font-family: var(--font-mono); font-size: 24px; color: var(--text-strong); }
+.kpi span { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
 
 /* SUR TÉLÉPHONE, LES CHIFFRES NE DOIVENT PAS MANGER L'ÉCRAN. Empilés en
    grandes cartes, les cinq indicateurs de Zamówienia occupaient 322 px des
@@ -164,30 +164,30 @@ header.bar h1 .badge {
      quand il le faut ; jamais plus large que le téléphone. */
   .kpi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
          padding: 9px 12px; border-radius: 11px; }
-  .kpi b { font-size: 17px; min-width: 0; }
-  .kpi span { font-size: 10px; letter-spacing: .05em; min-width: 0; overflow-wrap: anywhere; }
+  .kpi b { font-size: 16px; min-width: 0; }
+  .kpi span { font-size: 12px; letter-spacing: .05em; min-width: 0; overflow-wrap: anywhere; }
 }
 
 .panel {
   background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
   padding: 18px 16px; margin-bottom: 20px; box-shadow: var(--shadow-xs);
 }
-.panel h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 12px; color: var(--text-strong); }
-.panel h3 { font-family: var(--font-display); font-size: 15px; margin: 20px 0 8px; color: var(--text-strong); }
+.panel h2 { font-family: var(--font-display); font-size: 19px; margin: 0 0 12px; color: var(--text-strong); }
+.panel h3 { font-family: var(--font-display); font-size: 16px; margin: 20px 0 8px; color: var(--text-strong); }
 .panel > p { font-size: 14px; line-height: 1.55; }
 .muted { color: var(--text-muted); }
-.small { font-size: 12.5px; }
+.small { font-size: 13px; }
 
 .cols { display: grid; grid-template-columns: 1fr; gap: 18px; }
 @media (min-width: 800px) { .cols { grid-template-columns: 1fr 1fr; gap: 24px; } .panel { padding: 20px 22px; } }
 
-dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13.5px; }
+dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
 dl.kv dt { color: var(--text-muted); }
 dl.kv dd { margin: 0; color: var(--text-strong); overflow-wrap: anywhere; }
 
 pre {
   background: var(--surface-sunken); border-radius: 10px; padding: 12px; overflow: auto;
-  font-family: var(--font-mono); font-size: 12px; line-height: 1.5;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.5;
 }
 
 /* --- Tableaux ------------------------------------------------------------- */
@@ -196,9 +196,9 @@ table {
   width: 100%; border-collapse: collapse; background: var(--surface-card);
   border: 1px solid var(--border-subtle); border-radius: 14px; overflow: hidden;
 }
-th, td { text-align: left; padding: 10px 12px; font-size: 13.5px; border-bottom: 1px solid var(--border-subtle); }
+th, td { text-align: left; padding: 10px 12px; font-size: 14px; border-bottom: 1px solid var(--border-subtle); }
 th {
-  background: var(--surface-raised); font-size: 11px; text-transform: uppercase;
+  background: var(--surface-raised); font-size: 12px; text-transform: uppercase;
   letter-spacing: .08em; color: var(--text-muted); white-space: nowrap;
 }
 tr:last-child td { border-bottom: 0; }
@@ -220,7 +220,7 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
   table.rwd td small { flex: 1 0 100%; margin-left: 40%; }
   table.rwd td::before {
     content: attr(data-l); flex: 0 0 40%; color: var(--text-muted);
-    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
   }
   table.rwd td.num { text-align: left; justify-content: flex-start; }
   table.rwd td:empty { display: none; }
@@ -243,7 +243,7 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 
 /* --- Étiquettes et bandeaux ---------------------------------------------- */
 .tag {
-  display: inline-block; font-family: var(--font-mono); font-size: 11px; padding: 3px 9px;
+  display: inline-block; font-size: 12px; padding: 3px 9px;
   border-radius: 999px; background: var(--cream-200); color: var(--choco-700);
 }
 .tag.ok   { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
@@ -264,30 +264,34 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 /* ═══ LES FILES DE TRAVAIL ═══════════════════════════════════════════════
    Deux mille commandes dans une liste, c'est une archive. Trois tas avec leur
    compte, c'est un plan de travail — et le compte dit s'il reste à faire. */
-.kolejki { display: flex; gap: 7px; margin: 0 0 14px; }
+.kolejki { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 14px; }
 .kolejki a {
-  flex: 1 1 0; min-width: 0; text-align: center; text-decoration: none;
-  border-radius: 11px; padding: 8px 4px 7px; min-height: 52px;
+  /* flex: 1 1 0 découpait toutes les files à la même largeur, celle de la
+     plus étroite : « PRZYGOTOWANIE » y rentrait à 10,5 px et s'y faisait
+     couper net à 12. Chaque onglet prend maintenant la place de son mot, et
+     c'est la barre qui passe à la ligne. */
+  flex: 0 1 auto; text-align: center; text-decoration: none;
+  border-radius: 11px; padding: 8px 13px 7px; min-height: 52px;
   border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--text-strong);
 }
-.kolejki a b { display: block; font-family: var(--font-mono); font-size: 17px; line-height: 1.15; }
-.kolejki a span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
-                  color: var(--text-muted); overflow-wrap: anywhere; }
+.kolejki a b { display: block; font-family: var(--font-mono); font-size: 16px; line-height: 1.15; }
+.kolejki a span { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+                  color: var(--text-muted); white-space: nowrap; }
 .kolejki a.on { background: var(--choco-700); border-color: var(--choco-700); color: var(--cream-50); }
 .kolejki a.on span { color: var(--choco-200); }
 
 /* ═══ CE QUI VA PARTIR, AVANT QUE ÇA PARTE ═══════════════════════════════
    Replié : une ligne, avec le type de document. Ouvert : les cinq points qui
    décident. Une commande bloquée le dit dans son résumé, pas au clic. */
-.dokchip { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; font-weight: 700;
+.dokchip { font-size: 12px; letter-spacing: .04em; font-weight: 700;
            padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
 .dokchip.f { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
 .dokchip.p { background: var(--cream-200); color: var(--choco-700); }
 .przed-lista { list-style: none; margin: 2px 0 6px; padding: 6px 0 2px;
                border-top: 1px solid var(--border-subtle); }
-.przed-lista li { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 12.5px; }
+.przed-lista li { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 13px; }
 .przed-lista li i { font-style: normal; width: 13px; flex: none; text-align: center; font-weight: 700; }
-.przed-lista li .co { width: 68px; flex: none; color: var(--text-muted); font-size: 11.5px; }
+.przed-lista li .co { width: 68px; flex: none; color: var(--text-muted); font-size: 12px; }
 .przed-lista li .val { flex: 1 1 auto; overflow-wrap: anywhere; }
 /* Le geste, à droite de la valeur qu'il corrige — pas dans une colonne à part. */
                                border-color: var(--border-default); color: var(--brand); }
@@ -309,12 +313,12 @@ tr.zablok { background: color-mix(in srgb, var(--danger) 4%, transparent); }
 }
 .lot-in { max-width: 1180px; margin: 0 auto; }
 .lot button {
-  width: 100%; min-height: 52px; border-radius: 999px; font-size: 15px; font-weight: 700;
+  width: 100%; min-height: 52px; border-radius: 999px; font-size: 16px; font-weight: 700;
   border: 1px solid var(--accent); background: var(--accent); color: var(--choco-900);
 }
 .lot button[disabled] { background: transparent; border-color: var(--border-default);
                         color: var(--text-muted); opacity: 1; }
-.lot p { margin: 7px 2px 0; font-size: 11.5px; color: var(--text-muted); text-align: center; line-height: 1.45; }
+.lot p { margin: 7px 2px 0; font-size: 12px; color: var(--text-muted); text-align: center; line-height: 1.45; }
 @media (min-width: 700px) {
   .lot { margin: 14px -24px -72px; padding: 11px 24px 16px; }
   .lot button { min-height: 44px; font-size: 14px; }
@@ -378,18 +382,18 @@ span.etap { cursor: default; }
    version précédente, où « Opłacone » trônait au milieu des étapes. */
 .oplac { display: inline; }
 .etap.kasa {
-  min-height: 36px; padding: 0 11px; font-size: 12.5px; font-weight: 600;
+  min-height: 36px; padding: 0 11px; font-size: 13px; font-weight: 600;
   border-color: color-mix(in srgb, var(--success) 45%, transparent);
   color: var(--success); background: transparent;
 }
-@media (max-width: 760px) { .etap.kasa { min-height: 44px; font-size: 13px; } }
+@media (max-width: 760px) { .etap.kasa { min-height: 44px; font-size: 14px; } }
 /* Le repère de l'étape qui ÉMET un document fiscal. Discret, mais présent
    avant le clic — pas après, quand la facture est déjà partie au registre. */
-.etap .doc { font-size: 18px; line-height: 0; opacity: .75; }
+.etap .doc { font-size: 19px; line-height: 0; opacity: .75; }
 @media (min-width: 700px) {
-  .etap { min-height: 34px; font-size: 12.5px; padding: 0 10px; }
+  .etap { min-height: 34px; font-size: 13px; padding: 0 10px; }
   /* À la souris, pas besoin des 52 px du pouce. */
-  .etap.glowny { min-height: 38px; font-size: 13.5px; flex: 1 1 auto; }
+  .etap.glowny { min-height: 38px; font-size: 14px; flex: 1 1 auto; }
 }
 
 .flash { border-radius: 10px; padding: 11px 15px; margin: 0 0 16px; font-size: 14px; }
@@ -397,7 +401,7 @@ span.etap { cursor: default; }
 .flash.err { background: color-mix(in srgb, var(--danger) 13%, transparent);  color: var(--danger); }
 .warnbox {
   background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--caramel-600);
-  border-radius: 10px; padding: 11px 15px; margin-bottom: 16px; font-size: 13.5px; line-height: 1.5;
+  border-radius: 10px; padding: 11px 15px; margin-bottom: 16px; font-size: 14px; line-height: 1.5;
 }
 
 /* --- Formulaires ---------------------------------------------------------- */
@@ -433,10 +437,10 @@ a.btn--brand { background: var(--brand); color: var(--cream-50); border-color: v
 @media (min-width: 700px) { a.btn { font-size: 14px; padding: 8px 11px; min-height: 40px; } }
 
 .field { display: block; margin-bottom: 14px; }
-.field > span { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px;
+.field > span { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 5px;
                 text-transform: uppercase; letter-spacing: .06em; }
 .field input:not([type="checkbox"]):not([type="radio"]), .field select, .field textarea { width: 100%; }
-.field .hint { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; display: block;
+.field .hint { font-size: 13px; color: var(--text-muted); margin-top: 4px; display: block;
                text-transform: none; letter-spacing: 0; }
 .grid2 { display: grid; grid-template-columns: 1fr; gap: 0 18px; }
 @media (min-width: 700px) { .grid2 { grid-template-columns: 1fr 1fr; } }
@@ -484,11 +488,11 @@ a.back { display: inline-block; margin-top: 16px; }
 .pasek { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between;
          flex-wrap: wrap; margin: 0 0 14px; }
 .pasek .kolejki { margin: 0; }
-.kolejki-zast { margin: 0; font-size: 12.5px; color: var(--text-muted); align-self: center; }
+.kolejki-zast { margin: 0; font-size: 13px; color: var(--text-muted); align-self: center; }
 .kolejki-zast b { color: var(--text-strong); font-family: var(--font-mono); }
 .widoki { display: flex; gap: 2px; padding: 3px; border-radius: 10px;
           background: var(--cream-100); border: 1px solid var(--border-subtle); align-self: center; }
-.widoki a { padding: 7px 13px; border-radius: 8px; font-size: 12.5px; color: var(--text-muted);
+.widoki a { padding: 7px 13px; border-radius: 8px; font-size: 13px; color: var(--text-muted);
             text-decoration: none; min-height: 32px; display: flex; align-items: center; }
 .widoki a.on { background: var(--surface-card); color: var(--text-strong); font-weight: 600;
                box-shadow: var(--shadow-xs); }
@@ -496,7 +500,7 @@ a.back { display: inline-block; margin-top: 16px; }
 /* --- L'état SE LIT, il ne se clique pas ----------------------------------- */
 /* La pastille noire pleine se lisait comme un bouton et n'en était pas un : on
    appuyait dessus, rien ne se passait, on cherchait la panne. */
-.stan { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.stan { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
 .stan .kropka { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--choco-200); }
 .s-oplacone .kropka, .s-wyslane .kropka, .s-dostarczone .kropka, .p-ok .kropka { background: var(--success); }
 .s-w_realizacji .kropka, .p-wait .kropka { background: var(--warning); }
@@ -506,9 +510,9 @@ a.back { display: inline-block; margin-top: 16px; }
 /* C'est LE changement. Ce qu'on lit en balayant, c'est « est-ce que ça part,
    oui ou non ». Le reste s'ouvre à la demande, et seulement pour une ligne. */
 .werd { display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
-        font-size: 12px; color: var(--text-muted); min-height: 34px; }
+        font-size: 13px; color: var(--text-muted); min-height: 34px; }
 .werd b { font-weight: 600; }
-.werd i { font-style: normal; font-size: 9px; opacity: .55; }
+.werd i { font-style: normal; font-size: 12px; opacity: .55; }
 .werd.w-ok b { color: var(--success); }
 .werd.w-wa b { color: var(--caramel-600); }
 .werd.w-no b { color: var(--danger); }
@@ -529,31 +533,31 @@ tr.szuflada > td { padding: 0 12px 14px !important; background: var(--cream-50);
 .szuflada .przed-lista { display: grid; gap: 8px; margin: 0; padding: 10px 0 0; border: 0;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .szuflada .przed-lista li { display: block; padding: 9px 11px; border-radius: 10px;
-  background: var(--surface-card); border: 1px solid var(--border-subtle); font-size: 12.5px; }
+  background: var(--surface-card); border: 1px solid var(--border-subtle); font-size: 13px; }
 .szuflada .przed-lista li .co { display: flex; align-items: center; gap: 6px; width: auto;
-  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted);
+  font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted);
   font-weight: 600; margin-bottom: 4px; }
 .szuflada .przed-lista li .co i { font-style: normal; font-weight: 700; width: 12px; text-align: center; }
 .szuflada .przed-lista li .val { display: block; line-height: 1.4; overflow-wrap: anywhere; }
-.szuflada .przed-lista li .etap.kasa { min-height: 28px; padding: 0 10px; font-size: 11.5px; margin-top: 7px; }
+.szuflada .przed-lista li .etap.kasa { min-height: 28px; padding: 0 10px; font-size: 12px; margin-top: 7px; }
 .szuflada .przed-lista li.no { border-color: var(--danger); }
 .inne { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 11px 0 2px; }
-.inne-l { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
-.inne .etap { min-height: 32px; font-size: 12px; padding: 0 11px; }
-.zwin { display: inline-block; margin-top: 8px; font-size: 11.5px; color: var(--text-muted); }
+.inne-l { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.inne .etap { min-height: 32px; font-size: 13px; padding: 0 11px; }
+.zwin { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
 
 /* --- La ligne : 46 px, et un seul bouton ---------------------------------- */
 table.zam2 td { vertical-align: middle; }
-table.zam2 .ident a.code { display: block; font-size: 12.5px; }
-table.zam2 .ident .dt, table.zam2 .kasa2 .dt { display: block; font-size: 11px; color: var(--text-muted); }
+table.zam2 .ident a.code { display: block; font-size: 13px; }
+table.zam2 .ident .dt, table.zam2 .kasa2 .dt { display: block; font-size: 12px; color: var(--text-muted); }
 table.zam2 .kli .im { display: block; }
-table.zam2 .kli .ml { display: block; font-size: 11px; color: var(--text-muted);
+table.zam2 .kli .ml { display: block; font-size: 12px; color: var(--text-muted);
   max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-table.zam2 .dost { font-size: 12px; color: var(--text-muted); }
-table.zam2 .dost .pkt { display: block; font-size: 11px; }
+table.zam2 .dost { font-size: 13px; color: var(--text-muted); }
+table.zam2 .dost .pkt { display: block; font-size: 12px; }
 table.zam2 .kasa2 .kw { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
 table.zam2 .ruch form { margin: 0; }
-table.zam2 .ruch .etap.glowny { min-height: 34px; font-size: 12.5px; width: 100%; }
+table.zam2 .ruch .etap.glowny { min-height: 34px; font-size: 13px; width: 100%; }
 
 @media (min-width: 700px) {
   /* Le geste garde une largeur stable : un bouton qui change de taille d'une
@@ -574,9 +578,9 @@ table.zam2 .ruch .etap.glowny { min-height: 34px; font-size: 12.5px; width: 100%
   table.zam2 td.ident  { grid-area: 1 / 1; }
   table.zam2 tr:has(td.zazn) td.ident { grid-column: 1; margin-left: 32px; }
   table.zam2 td.kasa2  { grid-area: 1 / 2; text-align: right; }
-  table.zam2 td.kli    { grid-column: 1 / -1; font-size: 13.5px; }
+  table.zam2 td.kli    { grid-column: 1 / -1; font-size: 14px; }
   table.zam2 td.dost, table.zam2 td[data-l="Stan"], table.zam2 td[data-l="Płatność"] {
-    display: inline-flex !important; margin-right: 10px; font-size: 11.5px; }
+    display: inline-flex !important; margin-right: 10px; font-size: 12px; }
   table.zam2 td.dost .pkt { display: inline; }
   table.zam2 td.dost .pkt::before { content: " · "; }
   table.zam2 td[data-l="Przed wysyłką"] { grid-column: 1 / -1; }
@@ -597,34 +601,32 @@ table.zam2 .ruch .etap.glowny { min-height: 34px; font-size: 12.5px; width: 100%
 .tablica .kol > header { display: flex; align-items: center; justify-content: space-between;
   padding: 11px 14px; background: var(--cream-50); border-bottom: 1px solid var(--border-default); }
 .tablica .kol.pilne > header { background: color-mix(in srgb, var(--accent) 20%, var(--cream-50)); }
-.tablica .kol > header b { font-size: 13px; color: var(--text-strong); }
-.tablica .kol > header .ile { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.tablica .kol > header b { font-size: 14px; color: var(--text-strong); }
+.tablica .kol > header .ile { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
 .tablica .tresc { padding: 10px; display: flex; flex-direction: column; gap: 9px; }
-.tablica .pusto { margin: 4px 2px; font-size: 12px; color: var(--text-muted); }
+.tablica .pusto { margin: 4px 2px; font-size: 13px; color: var(--text-muted); }
 .karta { border: 1px solid var(--border-subtle); border-radius: 11px; padding: 10px 11px; }
 .karta.blok { box-shadow: inset 3px 0 0 var(--danger);
               background: color-mix(in srgb, var(--danger) 3%, transparent); }
 .karta .gora { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .karta .gora .kw { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
-.karta .im { margin: 3px 0 0; font-size: 13.5px; color: var(--text-strong);
+.karta .im { margin: 3px 0 0; font-size: 14px; color: var(--text-strong);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.karta .sz { margin-top: 3px; font-size: 11.5px; color: var(--text-muted);
+.karta .sz { margin-top: 3px; font-size: 12px; color: var(--text-muted);
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .karta .stop { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px;
-  font-size: 11.5px; line-height: 1.35; text-decoration: none; }
+  font-size: 12px; line-height: 1.35; text-decoration: none; }
 .karta .stop .kropka { width: 7px; height: 7px; border-radius: 50%; flex: none; margin-top: 4px; }
 .karta .stop.w-no { color: var(--danger); } .karta .stop.w-no .kropka { background: var(--danger); }
 .karta .stop.w-wa { color: var(--caramel-600); } .karta .stop.w-wa .kropka { background: var(--warning); }
 .karta form { margin: 9px 0 0; }
-.karta .etap.glowny { width: 100%; min-height: 38px; font-size: 13px; }
+.karta .etap.glowny { width: 100%; min-height: 38px; font-size: 14px; }
 .karta .szuflada { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border-subtle); }
 .karta .szuflada .przed-lista { grid-template-columns: 1fr; }
 
 /* « PRZYGOTOWANIE » coupé en « PRZYGOTOW / ANIE » : l'onglet le plus large
    décidait de la largeur de tous, et le sélecteur de vue lui a pris sa place.
    Les libellés ne se coupent plus ; c'est la barre qui passe à la ligne. */
-.kolejki { flex-wrap: wrap; }
-.kolejki a span { white-space: nowrap; }
 
 /* Téléphone : la fiche tenait sur 238 px pour cinq informations. Les trois
    qui se lisent d'un coup — transport, état, paiement — vivent sur UNE
@@ -645,6 +647,22 @@ table.zam2 .ruch .etap.glowny { min-height: 34px; font-size: 12.5px; width: 100%
 .etap.zablokowany { border-color: var(--danger); color: var(--danger); background: transparent;
   text-decoration: none; cursor: pointer; }
 .etap.zablokowany:hover { background: color-mix(in srgb, var(--danger) 8%, transparent); }
-table.zam2 .ruch .etap.zablokowany { width: 100%; min-height: 34px; font-size: 12.5px; }
-.karta .etap.zablokowany { width: 100%; min-height: 38px; font-size: 13px; margin-top: 9px; }
+table.zam2 .ruch .etap.zablokowany { width: 100%; min-height: 34px; font-size: 13px; }
+.karta .etap.zablokowany { width: 100%; min-height: 38px; font-size: 14px; margin-top: 9px; }
 .tablica .kol > header .ile em { font-style: normal; color: var(--text-muted); opacity: .75; }
+
+/* ═══ LES CHIFFRES QU'ON COMPARE ════════════════════════════════════════════
+   DM Mono partait sur les montants, les compteurs et les tuiles. C'est une
+   mono claire et large : à 12 px, c'est le texte le moins lisible de l'écran,
+   et c'était celui qu'on lit le plus.
+
+   Le mono garde ce pour quoi il existe — les IDENTIFIANTS qu'on recopie à la
+   main (numéro de commande, NIP, IBAN), où confondre 0 et O coûte un colis.
+   Les montants passent au sans en chiffres TABULAIRES : même chasse d'un
+   chiffre à l'autre, donc les colonnes restent alignées, et ça se lit. */
+.kpi b, td.num, th.num, .kolejki a b, .kolejki-zast b,
+table.zam2 .kasa2 .kw, .tablica .kol > header .ile, .karta .gora .kw {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
