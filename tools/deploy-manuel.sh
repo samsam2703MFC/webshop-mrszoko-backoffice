@@ -182,6 +182,16 @@ grep -q "Plus Jakarta Sans'" site/shop/tokens.css \
 grep -q "font-family: 'Plus Jakarta Sans'" site/backoffice/_ds/mister-szoko/tokens/fonts.css \
   && { echo "  Plus Jakarta Sans est revenue dans la console"; exit 1; }
 echo "  typografia: jedna rodzina tekstu (Mulish) — potwierdzone"
+# KSeF DOIT ÊTRE RÉGLABLE DEPUIS LA CONSOLE. Sans ses champs, l'intégration
+# existe et reste inatteignable — c'est l'état dans lequel elle a vécu, et
+# aucun contrôle ne le disait. La clé publique se colle : sans le type « pem »
+# il faudrait déposer un fichier sur la machine.
+grep -q "'ksef.token'" site/backoffice/api/settings.php \
+  && grep -q "'ksef.public_key'" site/backoffice/api/settings.php \
+  && grep -q 'function wsm_setting_pem_store' site/backoffice/api/settings.php \
+  && grep -q "ksef" site/backoffice/ustawienia.php \
+  || { echo "  KSeF n'est pas réglable depuis l'écran Ustawienia"; exit 1; }
+echo "  KSeF w Ustawieniach (token, klucz PEM, środowisko) : obecne"
 echo "  reprise en main du compte console : présente"
 echo "  login, tokens, htaccess : présents"
 

@@ -26,6 +26,7 @@ require_once $API . '/dpd.php';
 require_once $API . '/mail.php';
 require_once $API . '/shop.php';
 require_once $API . '/invoice.php';
+require_once $API . '/ksef.php';   // wsm_ksef_enabled() : la tuile « KSeF gotowy »
 
 $flash = ''; $flashKind = 'ok';
 
@@ -49,8 +50,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $flashKind = $ok ? 'ok' : 'err';
         }
     } else {
-        $changed = wsm_settings_save($pdo, $_POST, (string) ($me['nom'] ?? ''));
-        if ($changed) {
+        $refus = [];
+        $changed = wsm_settings_save($pdo, $_POST, (string) ($me['nom'] ?? ''), $refus);
+        // UN REFUS SE DIT, ET IL PASSE AVANT LE SUCCÈS. Une clé PEM mal collée
+        // enregistrée « en partie » laisserait croire KSeF configuré, et la
+        // session échouerait beaucoup plus tard, sur une facture réelle.
+        if ($refus) {
+            $flash = 'Odrzucone: ' . implode(' · ', array_map(
+                fn($k, $e) => $k . ' — ' . $e, array_keys($refus), $refus));
+            $flashKind = 'err';
+            if ($changed) $flash .= ' · zapisano pozostałe (' . count($changed) . ')';
+            wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Ustawienia integracji',
+                      'odrzucone: ' . implode(', ', array_keys($refus)), 'Sieć');
+        } elseif ($changed) {
             // L'audit retient les CLÉS, jamais les valeurs.
             wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Ustawienia integracji',
                       implode(', ', $changed), 'Sieć');
@@ -72,6 +84,7 @@ $groups = [
     'inpost' => ['InPost ShipX — wysyłka', 'Token serwerowy służy do tworzenia etykiet. Token Geowidget trafia do strony sklepu — to token przeglądarkowy.'],
     'dpd'    => ['DPD Polska — wysyłka pod adres', 'Login, hasło i numer klienta (FID) z panelu DPD. Adres nadawcy jest drukowany na etykiecie: bez niego paczka odrzucona w doręczeniu nie ma dokąd wrócić. API DPD to SOAP — serwer musi mieć rozszerzenie php-soap.'],
     'mail'   => ['Poczta — wiadomości do klientów', 'Bez adresu nadawcy wiadomości czekają w kolejce w zakładce Poczta i nic nie ginie.'],
+    'ksef'   => ['KSeF — krajowy rejestr faktur', 'NIP bierze się z sekcji Faktury — nie powtarzamy go tutaj. Paragony nie idą do rejestru i tak ma być: zgłoszenie paragonu wpisałoby do rejestru dokument, który dla urzędu nie istnieje.'],
     'faktura' => ['Faktury', 'Te dane trafiają na każdy wystawiony dokument. Zmiana nie przepisuje faktur już wystawionych — każda z nich trzyma własną kopię.'],
     'sklep'  => ['Sklep', ''],
 ];
@@ -82,6 +95,7 @@ $state = [
     'dpd'     => function_exists('wsm_dpd_enabled') && wsm_dpd_enabled(),
     'mail'    => wsm_mail_enabled(),
     'faktura' => wsm_invoice_blockers() === [],
+    'ksef'    => function_exists('wsm_ksef_enabled') && wsm_ksef_enabled(),
 ];
 
 console_head('Integracje', $me);
@@ -93,6 +107,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Integracje' => null]);
   <div class="kpi"><b><?= $state['tpay'] ? 'TAK' : 'NIE' ?></b><span>tpay gotowy</span></div>
   <div class="kpi"><b><?= $state['inpost'] ? 'TAK' : 'NIE' ?></b><span>InPost gotowy</span></div>
   <div class="kpi"><b><?= $state['mail'] ? 'TAK' : 'NIE' ?></b><span>Poczta gotowa</span></div>
+  <div class="kpi"><b><?= $state['ksef'] ? 'TAK' : 'NIE' ?></b><span>KSeF gotowy</span></div>
   <div class="kpi"><b><?= $state['faktura'] ? 'TAK' : 'NIE' ?></b><span>Faktury gotowe</span></div>
 </div>
 
@@ -174,6 +189,12 @@ if ($orphelins): ?>
             <option value="<?= h($o) ?>"<?= (string) $f['show'] === $o ? ' selected' : '' ?>><?= h($o) ?></option>
             <?php endforeach; ?>
           </select>
+        <?php elseif ($f['type'] === 'pem'): ?>
+          <textarea name="<?= h($f['form']) ?>" rows="4" class="pem" spellcheck="false"
+                    placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----"></textarea>
+          <small class="muted">Wklej klucz, żeby go zmienić. Puste pole = bez zmian.<?php
+            $dep = (string) ($f['show'] ?? '');
+            if ($dep !== '' && $dep !== 'xxxx') echo ' Zapisany: <code>' . h($dep) . '</code>'; ?></small>
         <?php elseif ($f['type'] === 'secret'): ?>
           <input type="password" name="<?= h($f['form']) ?>" autocomplete="new-password"
                  placeholder="<?= h((string) $f['show']) ?>"<?= $f['locked'] ? ' disabled' : '' ?>>

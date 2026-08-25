@@ -167,7 +167,11 @@ $cfg = [
         'nip'        => getenv('WSM_KSEF_NIP') ?: '',
         'token'      => getenv('WSM_KSEF_TOKEN') ?: '',
         'public_key' => getenv('WSM_KSEF_PUBLIC_KEY') ?: '',
-        'env'        => getenv('WSM_KSEF_ENV') ?: 'test',
+        // VIDE, pas 'test' : une valeur en dur ici rendrait le champ de
+        // l'écran Ustawienia inopérant — wsm_settings_apply() laisse la main
+        // au fichier dès qu'il a parlé. Le repli sur 'test' vit dans
+        // wsm_ksef_cfg(), qui valide aussi la valeur contre test|demo|prod.
+        'env'        => getenv('WSM_KSEF_ENV') ?: '',
     ],
 
     // ---- Superadmin : le propriétaire de la plateforme ---------------------

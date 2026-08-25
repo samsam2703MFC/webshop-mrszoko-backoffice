@@ -48,6 +48,22 @@ function wsm_settings_fields(): array {
         'tpay.security_code' => ['tpay', 'Kod bezpieczeństwa (powiadomienia)', ['tpay', 'security_code'], 'WSM_TPAY_SECURITY_CODE', 'secret', 'Bez niego żadne powiadomienie o płatności nie zostanie przyjęte.'],
         'tpay.sandbox'       => ['tpay', 'Środowisko', ['tpay', 'sandbox'], 'WSM_TPAY_SANDBOX', 'select:1|0', '1 = sandbox (testy), 0 = produkcja (prawdziwe pieniądze).'],
 
+        // KSeF ÉTAIT LA SEULE INTÉGRATION SANS ÉCRAN. tpay, InPost, DPD, la
+        // poste et la facturation se règlent depuis la console ; le registre
+        // national, lui, ne se réglait que par variables d'environnement —
+        // donc par un accès au serveur. « Fail-closed » veut dire fermé tant
+        // qu'on n'a pas les identifiants ; encore faut-il pouvoir les poser.
+        //
+        // Le NIP n'est PAS répété ici : il vient de la section « faktura »
+        // (seller_nip). Deux champs pour un même numéro finissent par ne plus
+        // dire la même chose, et c'est le registre national qui trancherait.
+        'ksef.token'      => ['ksef', 'Token autoryzacyjny', ['ksef', 'token'], 'WSM_KSEF_TOKEN', 'secret',
+                              'Generowany w aplikacji KSeF na NIP sprzedawcy. Nigdy nie opuszcza serwera.'],
+        'ksef.public_key' => ['ksef', 'Klucz publiczny Ministerstwa Finansów', ['ksef', 'public_key'], 'WSM_KSEF_PUBLIC_KEY', 'pem',
+                              'Wklej zawartość pliku .pem. Bez niego tokenu nie da się zaszyfrować, więc sesji nie da się otworzyć.'],
+        'ksef.env'        => ['ksef', 'Środowisko', ['ksef', 'env'], 'WSM_KSEF_ENV', 'select:test|demo|prod',
+                              'test = piaskownica, demo = przedprodukcyjne, prod = prawdziwy rejestr.'],
+
         'inpost.token'           => ['inpost', 'Token ShipX (serwerowy)',  ['inpost', 'token'],           'WSM_INPOST_TOKEN',           'secret', 'Nigdy nie opuszcza serwera.'],
         'inpost.organization_id' => ['inpost', 'ID organizacji',           ['inpost', 'organization_id'], 'WSM_INPOST_ORG_ID',          'text',   'Numer organizacji w ShipX.'],
         'inpost.geowidget_token' => ['inpost', 'Token Geowidget (publiczny)', ['inpost', 'geowidget_token'], 'WSM_INPOST_GEOWIDGET_TOKEN', 'text', 'Trafia do strony — to token przeglądarkowy.'],
@@ -160,11 +176,49 @@ function wsm_settings_apply(PDO $pdo): void {
 }
 
 /**
+ * Range une clé PEM collée dans le formulaire et rend SON CHEMIN.
+ *
+ * Le certificat public du Ministère n'est pas un secret — il est publié. Mais
+ * c'est un FICHIER que la configuration désigne par un chemin, pas une valeur :
+ * le poser demandait donc un accès au serveur, et l'écran ne servait à rien.
+ * On le colle, on l'écrit sous data/ — répertoire exclu du rsync, donc il
+ * survit aux déploiements, et refusé par le .htaccess de l'API, donc il ne se
+ * télécharge pas.
+ *
+ * Le contenu est vérifié AVANT d'être écrit : un fichier qui n'est pas une clé
+ * ferait échouer l'ouverture de session KSeF sans jamais dire pourquoi.
+ *
+ * @return array{0:string,1:string} [chemin, erreur] — l'un des deux est vide.
+ */
+function wsm_setting_pem_store(string $pem): array {
+    $pem = trim($pem);
+    if (!preg_match('/^-----BEGIN (PUBLIC KEY|CERTIFICATE)-----/', $pem)
+        || !preg_match('/-----END (PUBLIC KEY|CERTIFICATE)-----$/', $pem)) {
+        return ['', 'to nie wygląda na klucz PEM — brak linii BEGIN/END'];
+    }
+    if (function_exists('openssl_pkey_get_public')) {
+        $ok = @openssl_pkey_get_public($pem) !== false
+           || (function_exists('openssl_x509_read') && @openssl_x509_read($pem) !== false);
+        if (!$ok) return ['', 'OpenSSL nie potrafi odczytać tego klucza'];
+    }
+    $dir = __DIR__ . '/data';
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true)) return ['', 'nie da się utworzyć katalogu data/'];
+    $path = $dir . '/ksef-mf.pem';
+    $umask = @umask(0077);
+    $ok = @file_put_contents($path, $pem . "\n") !== false;
+    @umask($umask);
+    if (!$ok) return ['', 'zapis pliku nie powiódł się: ' . $path];
+    @chmod($path, 0640);
+    return [$path, ''];
+}
+
+/**
  * Enregistre le formulaire. Un champ laissé sur son masque (•••) ne touche à
  * rien : c'est la façon de modifier un réglage sans retaper les secrets.
  * Renvoie la liste des clés modifiées — les VALEURS ne sont jamais renvoyées.
  */
-function wsm_settings_save(PDO $pdo, array $post, string $actor = ''): array {
+function wsm_settings_save(PDO $pdo, array $post, string $actor = '', array &$refus = []): array {
+    $refus = [];
     $fields = wsm_settings_fields();
     $now = date('Y-m-d H:i:s');
     $changed = [];
@@ -175,6 +229,16 @@ function wsm_settings_save(PDO $pdo, array $post, string $actor = ''): array {
         if (!array_key_exists($formKey, $post)) continue;
         $v = trim((string) $post[$formKey]);
         if ($type === 'secret' && ($v === '' || str_starts_with($v, '•'))) continue;   // inchangé
+        if ($type === 'pem') {
+            // Vide = on ne touche à rien : le champ s'affiche toujours vide,
+            // sinon il faudrait recoller la clé à chaque enregistrement.
+            if ($v === '') continue;
+            [$chemin, $err] = wsm_setting_pem_store($v);
+            // UN REFUS SE DIT. Écrit en silence, il laisserait croire la clé
+            // posée, et la session KSeF échouerait plus tard, ailleurs.
+            if ($err !== '') { $refus[$key] = $err; continue; }
+            $v = $chemin;
+        }
         if ($type === 'text' && $v === '') $v = WSM_SETTING_PLACEHOLDER;               // vider = revenir au masque
 
         $up->execute([$v, $type === 'secret' ? 1 : 0, $now, mb_substr($actor, 0, 120), $key]);
