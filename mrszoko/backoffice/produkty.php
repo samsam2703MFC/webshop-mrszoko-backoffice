@@ -15,6 +15,7 @@ require_once __DIR__ . '/console.php';
 [$pdo, $me, $isAdmin] = console_boot();
 $API = console_api_dir();
 require_once $API . '/shop.php';
+require_once $API . '/cms.php';   // les textes du produit vivent dans wsm_shop_i18n
 require_once $API . '/media.php';
 require_once $API . '/stock.php';
 require_once $API . '/brand.php';
@@ -170,7 +171,37 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                             'actor'  => (string) ($me['nom'] ?? ''),
                         ]);
                     }
-                    wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zmiana', 'wsm_products ' . $id, 'Sieć');
+                    // ── Les trois textes, dans la langue de base ──────────
+                    //
+                    // wsm_cms_save() refuse une clé absente de la base — garde
+                    // juste, elle empêche un POST d'inventer des clés. Mais un
+                    // produit peut n'avoir jamais eu de description : on pose
+                    // donc la ligne vide AVANT, sinon la saisie serait avalée
+                    // en silence, ce qui est exactement le défaut qu'on répare.
+                    $vals = [];
+                    foreach (['nazwa' => 'name', 'podtytul' => 'subtitle', 'opis' => 'desc'] as $champ => $suf) {
+                        if (!isset($_POST[$champ])) continue;
+                        $cle = 'product.' . $id . '.' . $suf;
+                        $st2 = $pdo->prepare("SELECT COUNT(*) FROM wsm_shop_i18n WHERE lang = ? AND k = ?");
+                        $st2->execute([WSM_CMS_BASE_LANG, $cle]);
+                        if (!(int) $st2->fetchColumn()) {
+                            $pdo->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES (?,?,'')")
+                                ->execute([WSM_CMS_BASE_LANG, $cle]);
+                        }
+                        $vals[$cle] = [WSM_CMS_BASE_LANG => (string) $_POST[$champ]];
+                    }
+                    $nTxt = 0;
+                    if ($vals) {
+                        [$nTxt, ] = wsm_cms_save($pdo, 'wsm_shop_i18n', $vals,
+                                                 [WSM_CMS_BASE_LANG], (string) ($me['nom'] ?? ''));
+                        // La console liste et trie sur wsm_products.nom : le
+                        // laisser en arrière ferait dire deux noms différents
+                        // au même produit, selon l'écran qu'on regarde.
+                        $nn = trim((string) ($_POST['nazwa'] ?? ''));
+                        if ($nn !== '') $pdo->prepare("UPDATE wsm_products SET nom = ? WHERE id = ?")->execute([$nn, $id]);
+                    }
+                    wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zmiana',
+                              'wsm_products ' . $id . ($nTxt ? ' · teksty: ' . $nTxt : ''), 'Sieć');
                     // L'ancienne photo n'est effacée qu'une fois la nouvelle
                     // réellement enregistrée en base.
                     if ($newUrl !== null && $old !== '' && $old !== $newUrl) wsm_media_delete($old);
@@ -187,6 +218,47 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 $brands = wsm_brands_all($pdo);
 $brandCounts = wsm_brand_counts($pdo);
+
+// ─── LES TEXTES DU PRODUIT ─────────────────────────────────────────────────
+//
+// Le nom, le sous-titre et la description d'un produit ne sont PAS des
+// colonnes de wsm_products : ce sont des textes traduits, `product.<id>.name`
+// et compagnie, que la boutique lit dans wsm_shop_i18n (shop.php : `$S[...]
+// ?? $r['nom']`). Ils vivaient donc uniquement dans l'écran Treści, à l'autre
+// bout de la console — et cet écran-ci, celui du produit, n'en portait aucun.
+//
+// Résultat, rapporté depuis la boutique : « zdjęcie się dodaje ale opis nie
+// chce się zmienić ». La photo est sur cet écran, le texte non. Rien n'était
+// écrasé : il n'y avait simplement nulle part où l'écrire.
+// ─── LE SLUG MANQUANT BLOQUAIT TOUT ────────────────────────────────────────
+//
+// 13 produits sur 22 n'ont pas de slug — des lignes d'avant la boutique, que
+// personne n'a jamais rouvertes. Or wsm_validate_product_shop() le déclare
+// « wymagany », et le formulaire le poste toujours, même vide : TOUT
+// enregistrement sur ces produits était donc refusé en bloc, avec l'erreur
+// posée sur un champ que personne n'éditait. On changeait un prix, une
+// description, et rien n'entrait — « jakby były nadpisane ».
+//
+// On propose donc une adresse, VISIBLE dans le champ avant d'enregistrer. Pas
+// de génération silencieuse : le slug est l'adresse publique du produit, on
+// ne l'invente pas dans le dos de qui appuie sur le bouton.
+$slugProp = function (string $nom, string $id) use ($pdo): string {
+    $tr = ['ą'=>'a','ć'=>'c','ę'=>'e','ł'=>'l','ń'=>'n','ó'=>'o','ś'=>'s','ź'=>'z','ż'=>'z',
+           'Ą'=>'a','Ć'=>'c','Ę'=>'e','Ł'=>'l','Ń'=>'n','Ó'=>'o','Ś'=>'s','Ź'=>'z','Ż'=>'z'];
+    $v = strtolower(strtr(trim($nom), $tr));
+    $v = trim((string) preg_replace('/[^a-z0-9]+/', '-', $v), '-');
+    if ($v === '') $v = strtolower($id);
+    $v = substr($v, 0, 80);
+    // Deux produits ne peuvent pas partager une adresse : l'un deviendrait
+    // inatteignable. En cas de collision, l'identifiant tranche.
+    $st = $pdo->prepare("SELECT id FROM wsm_products WHERE slug = ? AND id <> ?");
+    $st->execute([$v, $id]);
+    return $st->fetchColumn() ? substr($v . '-' . strtolower($id), 0, 80) : $v;
+};
+
+$T = wsm_cms_load($pdo, 'wsm_shop_i18n', [WSM_CMS_BASE_LANG]);
+$txt = fn(string $id, string $champ): string
+     => (string) ($T['product.' . $id . '.' . $champ][WSM_CMS_BASE_LANG] ?? '');
 
 $rows = $pdo->query(
     "SELECT p.*, c.name AS cat FROM wsm_products p
@@ -313,8 +385,29 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
             <?php else: ?><small>Tylko https — inaczej przeglądarka zablokuje obraz.</small><?php endif; ?>
           </label>
 
+          <?php // LE NOM ET LA DESCRIPTION EN PREMIER. Ce sont les deux
+                // choses qu'on vient changer le plus souvent sur un produit,
+                // et elles n'étaient sur AUCUN écran de produit. ?>
+          <label class="f" style="grid-column:1/-1">Nazwa produktu
+            <input type="text" name="nazwa" value="<?= h($txt((string) $p['id'], 'name')) ?>"
+                   maxlength="120"<?= $isAdmin ? '' : ' disabled' ?>>
+            <small>Widoczna w sklepie i na dokumentach. Tłumaczenia — w <a class="view" href="tresci.php?sekcja=product">Treściach</a>.</small>
+          </label>
+          <label class="f" style="grid-column:1/-1">Podtytuł
+            <input type="text" name="podtytul" value="<?= h($txt((string) $p['id'], 'subtitle')) ?>"
+                   maxlength="200"<?= $isAdmin ? '' : ' disabled' ?>>
+            <small>Jedna linia pod nazwą na karcie produktu.</small>
+          </label>
+          <label class="f" style="grid-column:1/-1">Opis
+            <textarea name="opis" rows="4"<?= $isAdmin ? '' : ' disabled' ?>><?= h($txt((string) $p['id'], 'desc')) ?></textarea>
+            <small>Tekst na stronie produktu. Puste pole = bez opisu.</small>
+          </label>
+
           <label class="f">Adres w sklepie (slug)
-            <input type="text" name="slug" value="<?= h((string) $p['slug']) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+            <?php $slugVal = (string) $p['slug'] !== ''
+                    ? (string) $p['slug']
+                    : $slugProp($txt((string) $id, 'name') ?: (string) $p['nom'], (string) $id); ?>
+            <input type="text" name="slug" value="<?= h($slugVal) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
             <?php if (isset($fieldErrors['slug']) && $open): ?>
               <small class="err"><?= h($fieldErrors['slug']) ?></small>
             <?php else: ?><small>/shop/p/<b><?= h((string) $p['slug'] ?: '…') ?></b></small><?php endif; ?>
