@@ -22,7 +22,7 @@
  */
 function layout_head(array $S, string $lang, array $langs, string $title = '',
                      string $desc = '', string $page = '', string $image = ''): void {
-    $title = $title !== '' ? $title . ' — ' . ($S['brand'] ?? 'Mister Szoko') : ($S['meta.title'] ?? 'Mister Szoko');
+    $title = $title !== '' ? $title . ', ' . ($S['brand'] ?? 'Mister Szoko') : ($S['meta.title'] ?? 'Mister Szoko');
     $desc  = $desc !== '' ? $desc : ($S['meta.desc'] ?? '');
     ?><!DOCTYPE html>
 <html lang="<?= e($lang) ?>">
