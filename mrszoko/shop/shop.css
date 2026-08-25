@@ -144,8 +144,7 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
    extrémités du produit, précisément ce qu'on regarde avant d'acheter.
    « contain » garde la photo entière ; c'est le CADRE qui tient le rythme de
    la grille, plus l'image. Le fond crème fait de la marge une intention. */
-.card-photo { aspect-ratio: 4 / 3; width: 100%; object-fit: contain;
-              background: var(--cream-100); padding: var(--space-2); }
+.card-photo { aspect-ratio: 4 / 3; width: 100%; object-fit: contain; }
 .badge { position: absolute; top: 12px; left: 12px; font-family: var(--font-mono); font-size: var(--text-2xs);
          text-transform: uppercase; letter-spacing: var(--tracking-wide);
          background: var(--gold-500); color: var(--choco-900); border-radius: var(--radius-pill); padding: 4px 10px; }
@@ -180,9 +179,13 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 /* Sur la fiche, c'est encore plus vrai : on décide d'acheter en regardant.
    Une photo recadrée montre le milieu d'un produit dont on ne verra jamais
    les bords — et rien ne signale qu'il manque quelque chose. */
+/* SANS FOND ni ombre. Le cadre crème rendait le vide visible : une photo
+   haute flottait dans un panneau clair qui se lisait comme un défaut, pas
+   comme une marge. Le cadre garde sa place (aspect-ratio), l'image s'y centre,
+   et rien ne se dessine autour — l'ombre aurait tracé un rectangle plus grand
+   que la photo. */
 .product-photo { aspect-ratio: 1 / 1; width: 100%; object-fit: contain;
-                 background: var(--cream-100); padding: var(--space-4);
-                 border-radius: var(--radius-xl); box-shadow: var(--shadow-md); }
+                 border-radius: var(--radius-xl); }
 .product-buy .eyebrow { color: var(--caramel-600); margin-bottom: var(--space-2); }
 .product-buy h1 { margin-bottom: var(--space-3); }
 .product-buy .lead { margin-bottom: var(--space-5); max-width: 46ch; }

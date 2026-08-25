@@ -492,6 +492,16 @@ function wsm_sync_content(PDO $pdo): array {
                         $m['min_weight_g'], $m['max_weight_g']]);
         $ship++;
     }
+
+    // Les remplacements en place, après les ajouts : un libellé tout juste
+    // inséré doit être nettoyé comme les autres.
+    foreach (wsm_content_remplacements() as [$table, $col, $de, $vers]) {
+        try {
+            $st = $pdo->prepare("UPDATE $table SET $col = REPLACE($col, ?, ?) WHERE $col LIKE ?");
+            $st->execute([$de, $vers, '%' . $de . '%']);
+            $maj += $st->rowCount();
+        } catch (Throwable $e) { /* table absente : rien à nettoyer */ }
+    }
     return [$added, $ship, $maj, $sup];
 }
 
@@ -517,6 +527,33 @@ function wsm_sync_content(PDO $pdo): array {
  *
  * @return array<string, array{force: list<string>, purge: list<string>}>
  */
+/**
+ * DES REMPLACEMENTS EN PLACE, pas des réécritures.
+ *
+ * « force » remplace une valeur entière par celle du fichier — donc écrase ce
+ * que quelqu'un a tapé dans Treści. Pour retirer un CARACTÈRE de tout le site,
+ * c'est trop brutal : on perdrait les descriptions écrites à la main pour
+ * corriger une ponctuation.
+ *
+ * Ici on retouche la valeur telle qu'elle est en base, où qu'elle vienne :
+ * REPLACE() sur la colonne. Le tiret cadratin part, le reste du texte — y
+ * compris ce qui a été écrit après la livraison — ne bouge pas.
+ *
+ * Idempotent : rejoué, il ne trouve plus rien à remplacer.
+ *
+ * @return list<array{0:string,1:string,2:string,3:string}> [table, colonne, de, vers]
+ */
+function wsm_content_remplacements(): array {
+    return [
+        // Le tiret cadratin ne doit plus paraître sur la vitrine. Les 86
+        // occurrences livrées étaient toutes de la forme « espace — espace »,
+        // donc une seule règle suffit, et la virgule se lit naturellement en
+        // polonais : « Dostawa gratis — próg osiągnięty » devient « Dostawa
+        // gratis, próg osiągnięty ».
+        ['wsm_shop_i18n', 'v', ' — ', ', '],
+    ];
+}
+
 function wsm_content_forces(): array {
     return [
         'wsm_shop_i18n' => [
@@ -719,6 +756,15 @@ function wsm_sync_content_sql(): string {
                . $m['sort_order'] . ', ' . $m['active'] . ', ' . $m['price_net'] . ', '
                . $m['vat_rate'] . ', ' . $m['free_from'] . ', '
                . $m['min_weight_g'] . ', ' . $m['max_weight_g'] . ');';
+    }
+    // Même nettoyage que la voie « base ouverte ». En SQL les motifs passent
+    // en hexadécimal : un tiret cadratin recopié dans un fichier .sql traverse
+    // trois encodages avant d'arriver à MySQL, et il suffit d'un pour que le
+    // REPLACE ne trouve rien et se taise.
+    foreach (wsm_content_remplacements() as [$table, $col, $de, $vers]) {
+        $out[] = "UPDATE $table SET $col = REPLACE($col, " . wsm_sql_txt($de) . ', '
+               . wsm_sql_txt($vers) . ') WHERE ' . $col . ' LIKE CONCAT(\'%\', '
+               . wsm_sql_txt($de) . ", '%');";
     }
     return $out ? implode("\n", $out) . "\n" : '';
 }
