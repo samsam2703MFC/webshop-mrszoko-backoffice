@@ -175,6 +175,16 @@ grep -q "'ksef.token'" site/backoffice/api/settings.php \
   && grep -q "ksef" site/backoffice/ustawienia.php \
   || { echo "  KSeF n'est pas réglable depuis l'écran Ustawienia"; exit 1; }
 echo "  KSeF w Ustawieniach (token, klucz PEM, środowisko) : obecne"
+# LA FICHE PRODUIT DOIT PORTER CE QU'ON Y CHANGE. La gramatura et les
+# dimensions n'ont eu de champ nulle part pendant des mois, alors qu'elles
+# choisissent le gabarit InPost — donc le prix payé pour expédier. Et le prix
+# doit passer par wsm_parse_price() : « 1 234,50 » lu par (float) donnait 1,00.
+grep -q 'name="weight_g"' site/backoffice/produkty.php \
+  && grep -q 'name="length_mm"' site/backoffice/produkty.php \
+  && grep -q 'wsm_parse_price' site/backoffice/produkty.php \
+  && grep -q 'function wsm_parse_price' site/backoffice/api/shop.php \
+  || { echo "  fiche produit incomplète : gramatura, wymiary ou lecture du prix"; exit 1; }
+echo "  fiszka produktu: gramatura, wymiary, cena z separatorem — obecne"
 echo "  login, tokens, boutons de statut, reprise du compte : présents"
 
 echo "══ 4/6 · mise en place dans $DEPLOY_DIR ═══════════════════════════════"
