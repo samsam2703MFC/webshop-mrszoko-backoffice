@@ -136,8 +136,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 [$url, $err] = wsm_media_store($_FILES['photo']);
                 if ($err !== null) { $fieldErrors['photo'] = $err; }
                 else { $body['image_url'] = $url; $newUrl = $url; }
-            } elseif (isset($_POST['image_url']) && trim((string) $_POST['image_url']) !== $old) {
-                $body['image_url'] = trim((string) $_POST['image_url']);
+            } elseif (isset($_POST['image_url'])) {
+                // LE CHAMP VIDE VEUT DIRE « JE N'Y TOUCHE PAS », JAMAIS
+                // « efface ». Quand la photo est un fichier envoyé, le
+                // formulaire rend ce champ VIDE — c'est un champ d'adresse
+                // externe, une adresse media/ n'a rien à y faire. La condition
+                // d'avant comparait ce vide à « media/xyz.webp », les trouvait
+                // différents, et posait une chaîne vide : chaque « Zapisz »
+                // effaçait la photo qu'on venait de mettre.
+                //
+                // Effacer reste possible, mais par la case « Usuń zdjęcie » :
+                // un geste explicite, coché exprès. Une destruction ne doit pas
+                // être le comportement par défaut d'un bouton d'enregistrement.
+                $v = trim((string) $_POST['image_url']);
+                if ($v !== '' && $v !== $old) $body['image_url'] = $v;
             }
 
             if (!$fieldErrors) {
