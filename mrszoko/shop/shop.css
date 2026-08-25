@@ -139,7 +139,13 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
                     border-color var(--dur-base) var(--ease-out); }
 .card:hover { transform: var(--lift); box-shadow: var(--shadow-md); border-color: var(--choco-300); }
 .card-media { display: block; position: relative; }
-.card-photo { aspect-ratio: 4 / 3; width: 100%; object-fit: cover; }
+/* « cover » remplit le cadre en COUPANT ce qui dépasse. Sur une photo de
+   tablette prise debout — 600 × 1000 — le cadre 4/3 en jetait 40 % : les deux
+   extrémités du produit, précisément ce qu'on regarde avant d'acheter.
+   « contain » garde la photo entière ; c'est le CADRE qui tient le rythme de
+   la grille, plus l'image. Le fond crème fait de la marge une intention. */
+.card-photo { aspect-ratio: 4 / 3; width: 100%; object-fit: contain;
+              background: var(--cream-100); padding: var(--space-2); }
 .badge { position: absolute; top: 12px; left: 12px; font-family: var(--font-mono); font-size: var(--text-2xs);
          text-transform: uppercase; letter-spacing: var(--tracking-wide);
          background: var(--gold-500); color: var(--choco-900); border-radius: var(--radius-pill); padding: 4px 10px; }
@@ -171,7 +177,12 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 
 /* ---- Fiche produit --------------------------------------------------------- */
 .product { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); align-items: start; margin-top: var(--space-5); }
-.product-photo { aspect-ratio: 1 / 1; width: 100%; object-fit: cover; border-radius: var(--radius-xl); box-shadow: var(--shadow-md); }
+/* Sur la fiche, c'est encore plus vrai : on décide d'acheter en regardant.
+   Une photo recadrée montre le milieu d'un produit dont on ne verra jamais
+   les bords — et rien ne signale qu'il manque quelque chose. */
+.product-photo { aspect-ratio: 1 / 1; width: 100%; object-fit: contain;
+                 background: var(--cream-100); padding: var(--space-4);
+                 border-radius: var(--radius-xl); box-shadow: var(--shadow-md); }
 .product-buy .eyebrow { color: var(--caramel-600); margin-bottom: var(--space-2); }
 .product-buy h1 { margin-bottom: var(--space-3); }
 .product-buy .lead { margin-bottom: var(--space-5); max-width: 46ch; }
