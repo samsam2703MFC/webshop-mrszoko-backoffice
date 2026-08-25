@@ -853,6 +853,38 @@ function wsm_shop_parcel_template(PDO $pdo, array $lines): string {
  *
  * @return array [colonnes à écrire, erreurs par champ]
  */
+/**
+ * Un prix tapé par un humain, en nombre.
+ *
+ * `(float) str_replace(',', '.', $v)` suffisait tant que personne n'écrivait
+ * un millier. « 1 234,50 » donnait 1.0 — mille deux cent trente-quatre zlotys
+ * vendus un zloty, sans un mot. PHP arrête la conversion à la première espace,
+ * et l'espace fine insécable des claviers polonais compte comme telle.
+ *
+ * On retire donc tout ce qui n'est ni chiffre ni séparateur, puis on tranche :
+ * le DERNIER séparateur est le décimal, les autres étaient des milliers.
+ *
+ * @return float|null null si rien d'exploitable — l'appelant ne touche alors
+ *                    pas au prix, plutôt que d'écrire zéro.
+ */
+function wsm_parse_price(string $v): ?float {
+    $v = str_replace(["\u{00A0}", "\u{202F}", "\u{2009}", ' '], '', trim($v));
+    $v = (string) preg_replace('/[^0-9.,-]/', '', $v);
+    if ($v === '' || !preg_match('/[0-9]/', $v)) return null;
+    $lastC = strrpos($v, ','); $lastD = strrpos($v, '.');
+    $cut = max($lastC === false ? -1 : $lastC, $lastD === false ? -1 : $lastD);
+    if ($cut >= 0) {
+        $ent = preg_replace('/[.,]/', '', substr($v, 0, $cut));
+        $dec = preg_replace('/[^0-9]/', '', substr($v, $cut + 1));
+        // « 1.234 » sans décimales : trois chiffres après le point, c'est un
+        // millier, pas des millièmes de zloty.
+        $v = strlen($dec) === 3 && $lastC === false && substr_count($v, '.') === 1
+             ? $ent . $dec
+             : $ent . '.' . $dec;
+    }
+    return is_numeric($v) ? (float) $v : null;
+}
+
 function wsm_validate_product_shop(PDO $pdo, array $in, string $id): array {
     require_once __DIR__ . '/media.php';
     $e = []; $out = [];

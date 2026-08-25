@@ -112,7 +112,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
         }
         else {
-        $st = $pdo->prepare("SELECT id, image_url FROM wsm_products WHERE id = ?");
+        $st = $pdo->prepare("SELECT id, image_url, weight_g, length_mm, width_mm, height_mm
+                               FROM wsm_products WHERE id = ?");
         $st->execute([$id]);
         $cur = $st->fetch();
         if (!$cur) {
@@ -121,6 +122,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $body = [];
             foreach (['slug', 'origin', 'cocoa', 'unit_label', 'badge', 'vat_rate'] as $k) {
                 if (isset($_POST[$k])) $body[$k] = $_POST[$k];
+            }
+            // ── LA GRAMATURE ET LES DIMENSIONS ───────────────────────────
+            //
+            // Elles n'étaient éditables sur AUCUN écran, alors qu'elles
+            // décident du gabarit InPost et du coût d'expédition. Un produit
+            // resté à 0 g part au tarif d'un gabarit choisi sur du vide.
+            $mesures = [];
+            foreach (['weight_g' => 200000, 'length_mm' => 3000, 'width_mm' => 3000, 'height_mm' => 3000] as $k => $max) {
+                if (!isset($_POST[$k]) || trim((string) $_POST[$k]) === '') continue;
+                $n = (int) round(wsm_parse_price((string) $_POST[$k]) ?? -1);
+                if ($n < 0 || $n > $max) { $fieldErrors[$k] = 'od 0 do ' . $max; continue; }
+                $mesures[$k] = $n;
             }
             // Le stock ne se pose plus directement : il se corrige, et la
             // correction laisse une trace dans le magasin (qui, quand, pourquoi).
@@ -163,8 +176,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 } else {
                     $set = []; $vals = [];
                     foreach ($cols as $k => $v) { $set[] = "$k = ?"; $vals[] = $v; }
-                    if (isset($_POST['prix']) && $_POST['prix'] !== '') {
-                        $set[] = 'prix = ?'; $vals[] = (float) str_replace(',', '.', (string) $_POST['prix']);
+                    // null = saisie inexploitable : on NE TOUCHE PAS au prix.
+                    // L'ancien code écrivait (float) d'une chaîne à espaces —
+                    // « 1 234,50 » devenait 1,00 zł, en silence.
+                    if (isset($_POST['prix']) && trim((string) $_POST['prix']) !== '') {
+                        $pr = wsm_parse_price((string) $_POST['prix']);
+                        if ($pr === null) $fieldErrors['prix'] = 'nie rozumiem tej ceny';
+                        elseif ($pr < 0)  $fieldErrors['prix'] = 'nie może być ujemna';
+                        else { $set[] = 'prix = ?'; $vals[] = $pr; }
                     }
                     // La marque est une référence : la chaîne vide veut dire
                     // « aucune », et NULL est le bon marqueur en base — 0
@@ -172,6 +191,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     if (isset($_POST['brand_id'])) {
                         $bid = (int) $_POST['brand_id'];
                         $set[] = 'brand_id = ?'; $vals[] = $bid > 0 ? $bid : null;
+                    }
+                    foreach ($mesures as $k => $v) { $set[] = "$k = ?"; $vals[] = $v; }
+                    // Le gabarit se DÉDUIT des dimensions : le laisser en
+                    // arrière ferait payer un tarif qui ne correspond plus au
+                    // colis. Même règle que le semis (wsm_seed_shop).
+                    if ($mesures && function_exists('wsm_inpost_template')) {
+                        $dim = fn(string $k) => (int) ($mesures[$k] ?? $cur[$k] ?? 0);
+                        $set[] = 'parcel_template = ?';
+                        $vals[] = wsm_inpost_template($dim('length_mm'), $dim('width_mm'), $dim('height_mm'));
                     }
                     $vals[] = $id;
                     if ($set) {
@@ -266,6 +294,20 @@ $slugProp = function (string $nom, string $id) use ($pdo): string {
     $st = $pdo->prepare("SELECT id FROM wsm_products WHERE slug = ? AND id <> ?");
     $st->execute([$v, $id]);
     return $st->fetchColumn() ? substr($v . '-' . strtolower($id), 0, 80) : $v;
+};
+
+// UN CHAMP REFUSÉ NE DOIT PAS EFFACER LES DOUZE AUTRES.
+//
+// En cas d'erreur, la fiche se rechargeait depuis la BASE : tout ce qui venait
+// d'être tapé — prix, description, gramatura — disparaissait, et seul un petit
+// « wymagany » sous un champ qu'on n'éditait pas expliquait pourquoi. De
+// l'extérieur, ça se lit exactement comme « zmiany nie chcą wejść ».
+//
+// $vv() redonne donc la saisie quand l'enregistrement a échoué SUR CE
+// produit-là. Ailleurs, la base fait foi.
+$vv = function (string $champ, string $defaut) use (&$fieldErrors, &$openId, &$id) {
+    $vise = ($openId !== '' && isset($id) && $openId === $id);
+    return ($fieldErrors && $vise && isset($_POST[$champ])) ? (string) $_POST[$champ] : $defaut;
 };
 
 $T = wsm_cms_load($pdo, 'wsm_shop_i18n', [WSM_CMS_BASE_LANG]);
@@ -401,17 +443,17 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
                 // choses qu'on vient changer le plus souvent sur un produit,
                 // et elles n'étaient sur AUCUN écran de produit. ?>
           <label class="f" style="grid-column:1/-1">Nazwa produktu
-            <input type="text" name="nazwa" value="<?= h($txt((string) $p['id'], 'name')) ?>"
+            <input type="text" name="nazwa" value="<?= h($vv('nazwa', $txt((string) $p['id'], 'name'))) ?>"
                    maxlength="120"<?= $isAdmin ? '' : ' disabled' ?>>
             <small>Widoczna w sklepie i na dokumentach. Tłumaczenia — w <a class="view" href="tresci.php?sekcja=product">Treściach</a>.</small>
           </label>
           <label class="f" style="grid-column:1/-1">Podtytuł
-            <input type="text" name="podtytul" value="<?= h($txt((string) $p['id'], 'subtitle')) ?>"
+            <input type="text" name="podtytul" value="<?= h($vv('podtytul', $txt((string) $p['id'], 'subtitle'))) ?>"
                    maxlength="200"<?= $isAdmin ? '' : ' disabled' ?>>
             <small>Jedna linia pod nazwą na karcie produktu.</small>
           </label>
           <label class="f" style="grid-column:1/-1">Opis
-            <textarea name="opis" rows="4"<?= $isAdmin ? '' : ' disabled' ?>><?= h($txt((string) $p['id'], 'desc')) ?></textarea>
+            <textarea name="opis" rows="4"<?= $isAdmin ? '' : ' disabled' ?>><?= h($vv('opis', $txt((string) $p['id'], 'desc'))) ?></textarea>
             <small>Tekst na stronie produktu. Puste pole = bez opisu.</small>
           </label>
 
@@ -419,18 +461,38 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
             <?php $slugVal = (string) $p['slug'] !== ''
                     ? (string) $p['slug']
                     : $slugProp($txt((string) $id, 'name') ?: (string) $p['nom'], (string) $id); ?>
-            <input type="text" name="slug" value="<?= h($slugVal) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+            <input type="text" name="slug" value="<?= h($vv('slug', $slugVal)) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
             <?php if (isset($fieldErrors['slug']) && $open): ?>
               <small class="err"><?= h($fieldErrors['slug']) ?></small>
             <?php else: ?><small>/shop/p/<b><?= h((string) $p['slug'] ?: '…') ?></b></small><?php endif; ?>
           </label>
           <label class="f">Cena brutto (zł)
-            <input type="text" name="prix" value="<?= h(number_format((float) $p['prix'], 2, ',', '')) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+            <input type="text" name="prix" value="<?= h($vv('prix', number_format((float) $p['prix'], 2, ',', ''))) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
             <small>Cena widoczna dla klienta, z VAT.</small>
           </label>
 
           <?php $rate = (float) ($p['vat_rate'] ?? 0.23);
                 [$netG, $vatG] = wsm_split_vat(wsm_grosze($p['prix']), $rate); ?>
+          <?php // GRAMATURA ET WYMIARY. Absents de tous les écrans jusqu'ici,
+                // alors qu'ils choisissent le gabarit InPost et donc le prix
+                // payé pour expédier. ?>
+          <label class="f">Gramatura (g)
+            <input type="text" name="weight_g" value="<?= h($vv('weight_g', (string) (int) ($p['weight_g'] ?? 0))) ?>"
+                   placeholder="1000"<?= $isAdmin ? '' : ' disabled' ?>>
+            <?php if (isset($fieldErrors['weight_g']) && $open): ?>
+              <small class="err"><?= h($fieldErrors['weight_g']) ?></small>
+            <?php else: ?><small>Waga produktu. Wchodzi w wagę paczki.</small><?php endif; ?>
+          </label>
+          <label class="f">Wymiary (mm) — dł. × szer. × wys.
+            <span class="wym">
+              <input type="text" name="length_mm" value="<?= h($vv('length_mm', (string) (int) ($p['length_mm'] ?? 0))) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+              <input type="text" name="width_mm"  value="<?= h($vv('width_mm',  (string) (int) ($p['width_mm'] ?? 0))) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+              <input type="text" name="height_mm" value="<?= h($vv('height_mm', (string) (int) ($p['height_mm'] ?? 0))) ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+            </span>
+            <small>Gabaryt paczkomatu wylicza się z tych trzech liczb<?php
+              $gab = (string) ($p['parcel_template'] ?? ''); echo $gab !== '' ? ' — teraz: <b>' . h($gab) . '</b>' : ''; ?>.</small>
+          </label>
+
           <label class="f">Stawka VAT
             <select name="vat_rate"<?= $isAdmin ? '' : ' disabled' ?>>
               <?php foreach (WSM_VAT_RATES as $r): ?>
@@ -459,7 +521,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
             <small>Zapisywany w <a class="view" href="magazyn.php">Magazynie</a>. Zostaw puste, jeśli stanu nie zmieniasz.</small>
           </label>
           <label class="f">Gramatura
-            <input type="text" name="unit_label" value="<?= h((string) $p['unit_label']) ?>" placeholder="1 kg"<?= $isAdmin ? '' : ' disabled' ?>>
+            <input type="text" name="unit_label" value="<?= h($vv('unit_label', (string) $p['unit_label'])) ?>" placeholder="1 kg"<?= $isAdmin ? '' : ' disabled' ?>>
             <small>Pokazywana na karcie produktu.</small>
           </label>
 
@@ -477,14 +539,14 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
           </label>
 
           <label class="f">Pochodzenie
-            <input type="text" name="origin" value="<?= h((string) $p['origin']) ?>" placeholder="Madagaskar"<?= $isAdmin ? '' : ' disabled' ?>>
+            <input type="text" name="origin" value="<?= h($vv('origin', (string) $p['origin'])) ?>" placeholder="Madagaskar"<?= $isAdmin ? '' : ' disabled' ?>>
           </label>
           <label class="f">Kakao
-            <input type="text" name="cocoa" value="<?= h((string) $p['cocoa']) ?>" placeholder="70 %"<?= $isAdmin ? '' : ' disabled' ?>>
+            <input type="text" name="cocoa" value="<?= h($vv('cocoa', (string) $p['cocoa'])) ?>" placeholder="70 %"<?= $isAdmin ? '' : ' disabled' ?>>
           </label>
 
           <label class="f">Etykieta
-            <input type="text" name="badge" value="<?= h((string) $p['badge']) ?>" placeholder="bestseller"<?= $isAdmin ? '' : ' disabled' ?>>
+            <input type="text" name="badge" value="<?= h($vv('badge', (string) $p['badge'])) ?>" placeholder="bestseller"<?= $isAdmin ? '' : ' disabled' ?>>
             <small>bestseller · nowosc · prezent — tłumaczone w wsm_shop_i18n.</small>
           </label>
           <div></div>

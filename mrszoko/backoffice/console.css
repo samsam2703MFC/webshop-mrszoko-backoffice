@@ -666,3 +666,8 @@ table.zam2 .kasa2 .kw, .tablica .kol > header .ile, .karta .gora .kw {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
+
+/* Les trois dimensions se lisent ensemble : dł. × szer. × wys. Trois lignes
+   empilées obligeraient à relire l'étiquette à chaque champ. */
+.wym { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.wym input { width: 100%; }
