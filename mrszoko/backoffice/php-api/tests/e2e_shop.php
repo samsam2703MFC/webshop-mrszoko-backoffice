@@ -598,5 +598,26 @@ http('POST', "$BASE/franchisor/product", ['id' => $prod['id'], 'image_url' => ''
 @unlink($png); @unlink($fake);
 
 
+// ── LE PRIX AU KILO ─────────────────────────────────────────────────────────
+//
+// La boutique vend la même chocolat en 1 kg et en 3 kg. 64,90 et 169,90 ne se
+// comparent pas de tête, et c'est exactement le moment où le client décide :
+// 61,81 zł/kg contre 54,81 zł/kg, la réponse est immédiate.
+echo "\n-- cena za kilogram --\n";
+ok('1 kg à 64,90 fait 61,81 zł/kg', wsm_price_per_kg(6490, 1050) === 6181, wsm_price_per_kg(6490, 1050));
+ok('3 kg à 169,90 fait 54,81 zł/kg', wsm_price_per_kg(16990, 3100) === 5481, wsm_price_per_kg(16990, 3100));
+ok('le format 3 kg est bien moins cher au kilo',
+   wsm_price_per_kg(16990, 3100) < wsm_price_per_kg(6490, 1050));
+// UN POIDS INCONNU SE TAIT. « 0,00 zł/kg » sur une carte se lit comme une
+// gratuité, et l'affichage doit pouvoir distinguer « rien à dire » de « zéro ».
+ok('poids à zéro : rien, pas zéro', wsm_price_per_kg(6490, 0) === null);
+ok('poids négatif : rien non plus', wsm_price_per_kg(6490, -100) === null);
+ok('prix à zéro : rien', wsm_price_per_kg(0, 1000) === null);
+// Un kilo pile ne doit pas dériver d'un grosz.
+ok('1000 g rend exactement le prix', wsm_price_per_kg(6490, 1000) === 6490);
+// L'arrondi tombe au grosz le plus proche, jamais en dessous par troncature.
+ok('l\'arrondi se fait au plus proche', wsm_price_per_kg(1000, 3000) === 333, wsm_price_per_kg(1000, 3000));
+
 echo "\n" . ($fail === 0 ? "ALL GREEN: $pass passed, 0 failed" : "FAILURES: $pass passed, $fail FAILED") . "\n";
 exit($fail === 0 ? 0 : 1);
+

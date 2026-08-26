@@ -497,3 +497,9 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .rayons a:hover { border-color: var(--choco-300); }
 .rayons a.on { background: var(--choco-800); border-color: var(--choco-800); color: var(--cream-50); }
 .rayons a i { font-style: normal; font-family: var(--font-mono); font-size: var(--text-2xs); opacity: .65; }
+
+/* Le prix au kilo : discret, mais lisible. Il répond à la question qu'on se
+   pose entre un format 1 kg et un format 3 kg — sans obliger à la calculer. */
+.za-kg { display: block; font-size: var(--text-2xs); color: var(--text-muted);
+         font-weight: var(--weight-regular); letter-spacing: 0; margin-top: 2px; }
+.price--lg .za-kg { font-size: var(--text-xs); margin-top: 4px; }
