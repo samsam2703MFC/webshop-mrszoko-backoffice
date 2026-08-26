@@ -51,6 +51,34 @@ function wsm_invoice_cfg(): array {
 }
 
 /** Ce qui manque pour émettre une facture opposable. */
+/**
+ * La ventilation d'un ticket PAR TAUX de TVA, pas par ligne.
+ *
+ * C'est ce que porte un paragon, et ce qu'un comptable y cherche : combien de
+ * ventes à 23 %, combien de TVA dessus. Les lettres sont la convention
+ * polonaise — A = 23 %, B = 8 %, C = 5 %, D = 0 % — et un taux inconnu
+ * retombe sur A plutôt que de disparaître : une ligne sans groupe serait une
+ * vente absente du total des taux, donc un ticket qui ne s'additionne plus.
+ *
+ * Les montants sont SOMMÉS depuis les lignes figées du document, jamais
+ * recalculés : le document dit ce qu'il disait le jour de son émission.
+ *
+ * @return array<string, array{taux:float, brut:int, vat:int}> trié par lettre
+ */
+function wsm_paragon_ptu(array $items): array {
+    $lettres = [23 => 'A', 8 => 'B', 5 => 'C', 0 => 'D'];
+    $out = [];
+    foreach ($items as $l) {
+        $taux = (float) ($l['vat_rate'] ?? 0);
+        $k = $lettres[(int) round($taux * 100)] ?? 'A';
+        $out[$k] ??= ['taux' => $taux, 'brut' => 0, 'vat' => 0];
+        $out[$k]['brut'] += (int) ($l['line_gross'] ?? 0);
+        $out[$k]['vat']  += (int) ($l['line_vat'] ?? 0);
+    }
+    ksort($out);
+    return $out;
+}
+
 function wsm_invoice_blockers(): array {
     $c = wsm_invoice_cfg();
     $out = [];

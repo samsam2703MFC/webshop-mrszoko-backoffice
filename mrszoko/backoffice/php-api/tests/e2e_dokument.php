@@ -575,5 +575,47 @@ foreach ($ids as $i) {
     $pdo->prepare("DELETE FROM wsm_orders WHERE id = ?")->execute([(int) $i]);
 }
 
+
+// ── LE TICKET : ventilation par taux ────────────────────────────────────────
+//
+// Un paragon s'imprimait dans la mise en page d'une FACTURE : une pleine
+// feuille A4 pour deux lignes d'achat, avec des colonnes et un cadre de
+// paiement qui ne le concernent pas. Il a maintenant sa forme de ticket, et
+// la seule vraie logique de cette page est le regroupement par taux — ce
+// qu'un ticket porte, et ce qu'un comptable y cherche.
+echo "\n-- paragon: rozbicie PTU wedlug stawek --\n";
+$art = fn(float $taux, int $brut, int $vat) => ['vat_rate' => $taux, 'line_gross' => $brut, 'line_vat' => $vat];
+
+$g = wsm_paragon_ptu([$art(0.23, 12300, 2300), $art(0.23, 5000, 935), $art(0.05, 1000, 48)]);
+ok('deux taux donnent deux groupes', count($g) === 2, array_keys($g));
+ok('23 % porte la lettre A', isset($g['A']) && abs($g['A']['taux'] - 0.23) < 1e-9);
+ok('5 % porte la lettre C', isset($g['C']) && abs($g['C']['taux'] - 0.05) < 1e-9);
+ok('les lignes d\'un même taux sont ADDITIONNÉES', $g['A']['brut'] === 17300, $g['A']['brut']);
+ok('… la TVA aussi', $g['A']['vat'] === 3235, $g['A']['vat']);
+ok('les groupes sortent triés', array_keys($g) === ['A', 'C'], array_keys($g));
+
+// Les quatre lettres de la convention polonaise.
+//
+// EN PAIRES, PAS EN TABLEAU ASSOCIATIF : PHP convertit une clé flottante en
+// entier, donc [0.23 => 'A', 0.08 => 'B', …] s'effondre sur la clé 0 et seule
+// la dernière survit. Écrit ainsi, ce test n'en vérifiait qu'un sur quatre —
+// et il passait au vert.
+foreach ([[0.23, 'A'], [0.08, 'B'], [0.05, 'C'], [0.0, 'D']] as [$t, $lettre]) {
+    $u = wsm_paragon_ptu([$art((float) $t, 1000, 0)]);
+    ok(sprintf('%s %% → lettre %s', wsm_vat_percent((float) $t), $lettre), isset($u[$lettre]), array_keys($u));
+}
+// UN TAUX INCONNU NE DISPARAÎT PAS. Une ligne sans groupe serait une vente
+// absente du total des taux : le ticket cesserait de s'additionner, et rien
+// ne le dirait.
+$x = wsm_paragon_ptu([$art(0.17, 5000, 727)]);
+ok('un taux hors barème est rangé, pas perdu', count($x) === 1 && reset($x)['brut'] === 5000, $x);
+// Le total des groupes doit égaler le total du document, sinon le pied ment.
+$tout = wsm_paragon_ptu([$art(0.23, 12300, 2300), $art(0.08, 5400, 400), $art(0.0, 900, 0)]);
+ok('la somme des groupes fait le brut total',
+   array_sum(array_column($tout, 'brut')) === 12300 + 5400 + 900);
+ok('… et la somme des TVA fait la TVA totale',
+   array_sum(array_column($tout, 'vat')) === 2300 + 400);
+ok('un document sans ligne ne produit aucun groupe', wsm_paragon_ptu([]) === []);
+
 echo "\n" . ($fail === 0 ? "OK" : "FAILED") . " — $pass passed, $fail failed\n";
 exit($fail === 0 ? 0 : 1);
