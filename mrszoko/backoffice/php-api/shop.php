@@ -160,6 +160,25 @@ function wsm_split_vat(int $gross, float $vatRate): array {
 }
 
 /** Un produit de la boutique, textes résolus dans la langue demandée. */
+/**
+ * Le prix au kilo, en groszy — ou null quand on ne peut pas le dire.
+ *
+ * POURQUOI IL COMPTE ICI. La boutique vend la même chocolat en 1 kg et en
+ * 3 kg : 64,90 et 169,90 ne se comparent pas de tête, et c'est justement le
+ * moment où l'on décide. Le prix au kilo répond à la question sans calculette.
+ *
+ * Calculé sur le BRUT, celui que le client paie — comparer des nets quand
+ * l'étiquette affiche des bruts ferait deux chiffres qui ne se recoupent pas.
+ *
+ * Un poids à zéro rend null, jamais zéro : « 0,00 zł/kg » sur une carte se
+ * lit comme une gratuité, et un produit dont on ignore le poids doit se taire
+ * plutôt que mentir.
+ */
+function wsm_price_per_kg(int $brutGrosze, int $poidsG): ?int {
+    if ($poidsG <= 0 || $brutGrosze <= 0) return null;
+    return (int) round($brutGrosze * 1000 / $poidsG);
+}
+
 function wsm_shop_row_to_product(array $r, array $S): array {
     $id    = (string) $r['id'];
     $gross = wsm_grosze($r['prix']);
@@ -194,6 +213,7 @@ function wsm_shop_row_to_product(array $r, array $S): array {
             'site' => (string) ($r['brand_site'] ?? ''),
         ] : null,
         'weight_g'  => (int) ($r['weight_g'] ?? 0),
+        'price_per_kg' => wsm_price_per_kg($gross, (int) ($r['weight_g'] ?? 0)),
         'sku'       => (string) ($r['sku'] ?? ''),
         'ean'       => (string) ($r['ean'] ?? ''),
         'category'  => (string) ($r['category_name'] ?? ''),

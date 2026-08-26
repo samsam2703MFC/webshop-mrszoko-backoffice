@@ -176,7 +176,12 @@ function upsell_block(PDO $pdo, array $ids, string $lang, array $S): void {
           <p class="card-meta mono"><?= e($S[wsm_upsell_cle($x['source'])] ?? '') ?></p>
           <h3><a href="<?= e(u('p/' . $p['slug'])) ?>"><?= e($p['name']) ?></a></h3>
           <div class="card-buy">
-            <span class="price"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></span>
+            <span class="price"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></span><?php
+              // LE PRIX AU KILO, EN PETIT. La même chocolat existe en 1 kg et
+              // en 3 kg : 64,90 et 169,90 ne se comparent pas de tête, et c'est
+              // le moment où le client décide. Rien ne s'affiche quand le poids
+              // manque — « 0,00 zł/kg » se lirait comme une gratuité.
+              if (!empty($p['price_per_kg'])): ?><span class="za-kg mono"><?= e(zl($p['price_per_kg'])) ?><?= e($S['price.per_kg'] ?? '') ?></span><?php endif; ?>
             <form method="post" action="<?= e(u('koszyk')) ?>" data-add>
               <?= csrf_field() ?>
               <input type="hidden" name="add" value="<?= e($p['id']) ?>">
@@ -418,7 +423,12 @@ if ($page === '') {
           <p class="card-meta mono"><?= e($p['subtitle']) ?></p>
           <h3><a href="<?= e(u('p/' . $p['slug'])) ?>"><?= e($p['name']) ?></a></h3>
           <div class="card-buy">
-            <span class="price"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></span>
+            <span class="price"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></span><?php
+              // LE PRIX AU KILO, EN PETIT. La même chocolat existe en 1 kg et
+              // en 3 kg : 64,90 et 169,90 ne se comparent pas de tête, et c'est
+              // le moment où le client décide. Rien ne s'affiche quand le poids
+              // manque — « 0,00 zł/kg » se lirait comme une gratuité.
+              if (!empty($p['price_per_kg'])): ?><span class="za-kg mono"><?= e(zl($p['price_per_kg'])) ?><?= e($S['price.per_kg'] ?? '') ?></span><?php endif; ?>
             <?php // Rupture : on prend la commande quand même et on prévient.
                   // Refuser faute de stock, c'est perdre le client. ?>
             <?php if ($p['stock'] <= 0): ?><span class="mono ondemand"><?= e($S['product.on_demand'] ?? '') ?></span><?php endif; ?>
@@ -531,7 +541,8 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
       <p class="mono eyebrow"><?= e($p['subtitle']) ?></p>
       <h1><?= e($p['name']) ?></h1>
       <p class="lead"><?= e($p['desc']) ?></p>
-      <p class="price price--lg"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small></p>
+      <p class="price price--lg"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small><?php
+        if (!empty($p['price_per_kg'])): ?><span class="za-kg mono"><?= e(zl($p['price_per_kg'])) ?><?= e($S['price.per_kg'] ?? '') ?></span><?php endif; ?></p>
       <p class="mono muted"><?= e(zl($p['price_net'])) ?> <?= e($S['price.net'] ?? '') ?>
         · VAT <?= e(wsm_vat_percent((float) $p['vat_rate'])) ?> %
         · <?= e($S['product.' . ($p['stock'] <= 0 ? 'stock_out' : 'stock_in')] ?? '') ?></p>
