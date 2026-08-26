@@ -37,7 +37,8 @@ if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {
         'httponly' => true, 'samesite' => 'Lax', 'secure' => wsm_is_https()]);
 }
 
-$flash = ''; $kind = 'ok'; $fieldErrors = []; $openId = (string) ($_GET['id'] ?? '');
+$flash = ''; $kind = 'ok'; $fieldErrors = []; $creation = false;
+$openId = (string) ($_GET['id'] ?? '');
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!hash_equals($csrf, (string) ($_POST['_t'] ?? ''))) {
@@ -65,59 +66,127 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // ET IL NAÎT INVISIBLE. shop_visible = 0 : un produit sans photo, sans
         // description et sans poids n'a rien à faire en vente. On le rend
         // visible quand il est prêt, d'un clic sur sa fiche.
+        // ---- CRÉER UN PRODUIT ----------------------------------------------
+        //
+        // La création ne fait QUE poser la ligne minimale : identifiant,
+        // catégorie, nom. Tout le reste — prix, photo, textes, gramatura,
+        // dimensions — est appliqué juste après par le chemin d'EDITION, avec
+        // ses validations. C'est ce qui rend les deux formulaires identiques
+        // par construction : il n'y a pas deux codes d'enregistrement, il y en
+        // a un, et la creation lui donne un produit sur lequel travailler.
+        $creation = false;
         if (isset($_POST['nowy'])) {
-            $nazwa = trim((string) ($_POST['n_nazwa'] ?? ''));
-            $kat   = (int) ($_POST['n_kategoria'] ?? 0);
-            $cena  = wsm_parse_price((string) ($_POST['n_cena'] ?? ''));
-            if ($nazwa === '') {
-                $fieldErrors['n_nazwa'] = 'wymagana';
-            }
+            $nazwa = trim((string) ($_POST['nazwa'] ?? ''));
+            $kat   = (int) ($_POST['category_id'] ?? 0);
+            if ($nazwa === '') $fieldErrors['nazwa'] = 'wymagana';
             if ($kat <= 0) {
-                $fieldErrors['n_kategoria'] = 'wybierz kategorię';
+                $fieldErrors['category_id'] = 'wybierz kategorie';
             } else {
-                $st = $pdo->prepare("SELECT 1 FROM wsm_categories WHERE id = ?");
-                $st->execute([$kat]);
-                if (!$st->fetchColumn()) $fieldErrors['n_kategoria'] = 'nie ma takiej kategorii';
-            }
-            if (($_POST['n_cena'] ?? '') !== '' && $cena === null) {
-                $fieldErrors['n_cena'] = 'nie rozumiem tej ceny';
+                $stC = $pdo->prepare("SELECT 1 FROM wsm_categories WHERE id = ?");
+                $stC->execute([$kat]);
+                if (!$stC->fetchColumn()) $fieldErrors['category_id'] = 'nie ma takiej kategorii';
             }
 
             if (!$fieldErrors) {
-                // L'identifiant est une CLÉ, pas une adresse : commandes,
-                // stock et factures le portent pour toujours. Il se dérive du
-                // nom comme le slug, et se rend unique de la même façon.
-                $base = wsm_slugify($nazwa, 'produkt');
-                $newId = wsm_slug_libre($pdo, $base, 'id');
-                $slug  = wsm_slug_libre($pdo, $base, 'slug', $newId);
+                // L'identifiant est une CLE : commandes, magasin, factures et
+                // documents le portent pour toujours. Il se derive du nom et
+                // se rend unique — deux produits qui le partagent, ce sont
+                // deux histoires qui se melangent.
+                $newId = wsm_slug_libre($pdo, wsm_slugify($nazwa, 'produkt'), 'id');
+                // L'ADRESSE EST POSEE DES L'INSERTION. Derivee apres coup, elle
+                // laissait la ligne sans slug quand la suite refusait un autre
+                // champ : un produit orphelin, invisible et invendable, cree a
+                // chaque tentative ratee. Le champ du formulaire est forcement
+                // vide a la creation — le produit n'avait pas encore de nom
+                // quand la fiche a ete rendue.
+                $newSlug = trim((string) ($_POST['slug'] ?? ''));
+                $newSlug = wsm_slug_libre($pdo,
+                    wsm_slugify($newSlug !== '' ? $newSlug : $nazwa, $newId), 'slug', $newId);
                 try {
                     $pdo->prepare("INSERT INTO wsm_products
-                            (id, category_id, nom, slug, prix, statut, active, shop_visible, sort_order)
-                            VALUES (?,?,?,?,?,?,1,0,?)")
-                        ->execute([$newId, $kat, $nazwa, $slug, $cena ?? 0, 'Szkic',
-                                   (int) $pdo->query("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM wsm_products")->fetchColumn()]);
-
-                    // Les trois textes, créés VIDES sauf le nom. Sans ces
-                    // lignes, wsm_cms_save() refuserait plus tard de les
-                    // écrire — « pas de clé inventée par un POST » — et la
+                            (id, category_id, nom, slug, statut, active, shop_visible, sort_order)
+                            VALUES (?,?,?,?,?,1,0,?)")
+                        ->execute([$newId, $kat, $nazwa, $newSlug, 'Szkic',
+                                   (int) $pdo->query("SELECT COALESCE(MAX(sort_order),0)+1 FROM wsm_products")->fetchColumn()]);
+                    // Les trois textes naissent avec lui : wsm_cms_save()
+                    // refuse une cle absente, donc sans ces lignes la
                     // description saisie sur la fiche partirait en silence.
                     $insT = $pdo->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES (?,?,?)");
-                    foreach (['name' => $nazwa, 'subtitle' => '', 'desc' => ''] as $suf => $val) {
-                        try { $insT->execute([WSM_CMS_BASE_LANG, 'product.' . $newId . '.' . $suf, $val]); }
-                        catch (Throwable $e) { /* déjà là : rien à faire */ }
+                    foreach (['name' => $nazwa, 'subtitle' => '', 'desc' => ''] as $suf => $v) {
+                        try { $insT->execute([WSM_CMS_BASE_LANG, 'product.' . $newId . '.' . $suf, $v]); }
+                        catch (Throwable $e) { /* deja la */ }
                     }
-
-                    wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Dodanie produktu',
-                              'wsm_products ' . $newId, 'Sieć');
-                    $openId = $newId;
-                    $flash = 'Utworzono ' . $newId . '. Uzupełnij zdjęcie, opis i gramaturę, '
-                           . 'potem włącz widoczność w sklepie.';
+                    wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Dodanie produktu', 'wsm_products ' . $newId, 'Siec');
+                    // LE SLUG NE PEUT PAS ÊTRE SAISI À LA CRÉATION : au moment
+                    // où la fiche est rendue, le produit n'a pas encore de nom,
+                    // donc le champ part vide — et le validateur le refuse, à
+                    // juste titre, puisqu'un produit sans adresse ne se vend
+                    // pas. On le dérive donc du nom qui vient d'être tapé. Il
+                    // reste visible et modifiable sur la fiche qui se rouvre.
+                    $_POST['slug'] = $newSlug;
+                    // On enchaine sur l'edition, avec le produit tout neuf.
+                    $id = $newId; $openId = $newId; $_POST['id'] = $newId; $creation = true;
                 } catch (Throwable $e) {
-                    $flash = 'Nie udało się utworzyć produktu.'; $kind = 'err';
+                    $flash = 'Nie udalo sie utworzyc produktu.'; $kind = 'err';
                 }
             } else {
                 $flash = 'Popraw zaznaczone pola.'; $kind = 'err';
             }
+        }
+
+        // ---- CATÉGORIES ----------------------------------------------------
+        //
+        // Elles n'étaient éditables NULLE PART. Six lignes posées au semis,
+        // dont cinq héritées d'une maquette de boulangerie — Pieczywo, Lody,
+        // Katering — pour une chocolaterie. Le champ est obligatoire sur
+        // chaque produit : on choisissait donc forcément une étiquette fausse.
+        //
+        // On ne SUPPRIME pas : une catégorie effacée laisserait ses produits
+        // avec une référence morte, et la colonne est NOT NULL. On désactive,
+        // ce qui la retire des listes sans toucher à ce qui la nomme déjà.
+        if (isset($_POST['kat_zapisz'])) {
+            $kid  = (int) $_POST['kat_zapisz'];
+            $knom = trim((string) ($_POST['kat_nazwa'] ?? ''));
+            if ($knom === '') {
+                $flash = 'Nazwa kategorii jest wymagana.'; $kind = 'err';
+            } else {
+                if ($kid > 0) {
+                    try {
+                        $pdo->prepare("UPDATE wsm_categories SET name = ? WHERE id = ?")->execute([$knom, $kid]);
+                        $flash = 'Zapisano kategorię ' . $knom . '.';
+                    } catch (Throwable $e) {
+                        $flash = 'Inna kategoria nazywa sie juz tak samo.'; $kind = 'err';
+                    }
+                } else {
+                    try {
+                        $pdo->prepare("INSERT INTO wsm_categories (name, sort_order, active) VALUES (?,?,1)")
+                            ->execute([$knom, (int) $pdo->query("SELECT COALESCE(MAX(sort_order),0)+1 FROM wsm_categories")->fetchColumn()]);
+                        $kid = (int) $pdo->lastInsertId();
+                        $flash = 'Dodano kategorię ' . $knom . '.';
+                    } catch (Throwable $e) {
+                        // Le nom est unique en base. Sans ce rattrapage, une
+                        // saisie en double renvoyait une page 500 : l'ecran
+                        // disparaissait au lieu de dire ce qui n'allait pas.
+                        $kid = 0;
+                        $flash = 'Kategoria o tej nazwie juz istnieje.'; $kind = 'err';
+                    }
+                }
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), $kid ? 'Zmiana' : 'Dodanie',
+                          'wsm_categories #' . $kid, 'Sieć');
+            }
+        }
+        elseif (isset($_POST['kat_akt'])) {
+            $kid = (int) $_POST['kat_akt'];
+            $on  = ((string) ($_POST['kat_on'] ?? '1')) === '1' ? 1 : 0;
+            // COMBIEN DE PRODUITS EN DÉPENDENT ? Désactiver une catégorie
+            // encore portée par des produits ne les casse pas, mais il faut le
+            // dire : ils ne se rangeront plus nulle part de visible.
+            $n = (int) $pdo->query("SELECT COUNT(*) FROM wsm_products WHERE category_id = " . $kid)->fetchColumn();
+            $pdo->prepare("UPDATE wsm_categories SET active = ? WHERE id = ?")->execute([$on, $kid]);
+            $flash = ($on ? 'Włączono' : 'Wyłączono') . ' kategorię'
+                   . ($n && !$on ? ' — nosi ją nadal ' . $n . ' produkt(ów)' : '') . '.';
+            wsm_audit($pdo, (string) ($me['nom'] ?? ''), $on ? 'Włączenie' : 'Wyłączenie',
+                      'wsm_categories #' . $kid, 'Sieć');
         }
 
         // ---- Marques -------------------------------------------------------
@@ -151,7 +220,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // Désactiver retire le produit du catalogue et du magasin sans toucher
         // à l'histoire : les commandes passées, les factures et les mouvements
         // continuent de le nommer. C'est presque toujours ce qu'on veut.
-        if (isset($_POST['nowy']) || isset($_POST['marka_zapisz']) || isset($_POST['marka_usun'])) {
+        if (isset($_POST['marka_zapisz']) || isset($_POST['marka_usun'])
+            || isset($_POST['kat_zapisz']) || isset($_POST['kat_akt'])) {
             // déjà traité au-dessus
         }
         elseif (isset($_POST['aktywacja'])) {
@@ -269,6 +339,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     // La marque est une référence : la chaîne vide veut dire
                     // « aucune », et NULL est le bon marqueur en base — 0
                     // pointerait vers une ligne qui n'existe pas.
+                    // La categorie n'etait modifiable NULLE PART : posee au
+                    // semis, figee pour toujours. Elle est obligatoire en base,
+                    // donc une valeur absente ou inconnue est refusee plutot
+                    // qu'ecrite.
+                    if (isset($_POST['category_id']) && (int) $_POST['category_id'] > 0) {
+                        $kc = (int) $_POST['category_id'];
+                        $stK = $pdo->prepare("SELECT 1 FROM wsm_categories WHERE id = ?");
+                        $stK->execute([$kc]);
+                        if ($stK->fetchColumn()) { $set[] = 'category_id = ?'; $vals[] = $kc; }
+                        else $fieldErrors['category_id'] = 'nie ma takiej kategorii';
+                    }
                     if (isset($_POST['brand_id'])) {
                         $bid = (int) $_POST['brand_id'];
                         $set[] = 'brand_id = ?'; $vals[] = $bid > 0 ? $bid : null;
@@ -327,7 +408,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     // réellement enregistrée en base.
                     if ($newUrl !== null && $old !== '' && $old !== $newUrl) wsm_media_delete($old);
                     if (!empty($_POST['remove_image']) && $old !== '') wsm_media_delete($old);
-                    $flash = 'Zapisano: ' . $id; $kind = 'ok';
+                    $flash = $creation
+                        ? 'Utworzono ' . $id . '. Produkt jest NIEWIDOCZNY w sklepie — '
+                          . 'sprawdź fiszkę i zaznacz „W sprzedaży", gdy będzie gotowy.'
+                        : 'Zapisano: ' . $id;
+                    $kind = 'ok';
                 }
             } else {
                 $flash = 'Popraw zaznaczone pola.'; $kind = 'err';
@@ -393,6 +478,13 @@ $vv = function (string $champ, string $defaut) use (&$fieldErrors, &$openId, &$i
 
 $kategorie = $pdo->query("SELECT id, name FROM wsm_categories WHERE active = 1 ORDER BY sort_order, name")
                  ->fetchAll(PDO::FETCH_ASSOC);
+// Toutes, actives ou non, avec le nombre de produits qui les portent : on ne
+// désactive pas une catégorie sans savoir ce qu'elle tient.
+$katWszystkie = $pdo->query(
+    "SELECT c.id, c.name, c.active, COUNT(p.id) AS ile
+       FROM wsm_categories c LEFT JOIN wsm_products p ON p.category_id = c.id
+      GROUP BY c.id, c.name, c.active
+      ORDER BY c.sort_order, c.name")->fetchAll(PDO::FETCH_ASSOC);
 
 $T = wsm_cms_load($pdo, 'wsm_shop_i18n', [WSM_CMS_BASE_LANG]);
 $txt = fn(string $id, string $champ): string
@@ -467,43 +559,36 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
         // redemanderait tout serait un second endroit à tenir à jour, et il
         // divergerait au premier champ ajouté.
         $nErr = fn(string $k) => isset($fieldErrors[$k]) ? '<small class="err">' . h($fieldErrors[$k]) . '</small>' : ''; ?>
-  <details class="nowy"<?= isset($fieldErrors['n_nazwa']) || isset($fieldErrors['n_kategoria']) || isset($fieldErrors['n_cena']) ? ' open' : '' ?>>
-    <summary>+ Nowy produkt</summary>
-    <form method="post" class="nowy-in">
-      <input type="hidden" name="_t" value="<?= h($csrf) ?>">
-      <label class="f">Nazwa
-        <input type="text" name="n_nazwa" value="<?= h((string) ($_POST['n_nazwa'] ?? '')) ?>"
-               maxlength="120" required>
-        <?= $nErr('n_nazwa') ?: '<small>Z niej powstaje adres w sklepie i identyfikator.</small>' ?>
-      </label>
-      <label class="f">Kategoria
-        <select name="n_kategoria" required>
-          <option value="">— wybierz —</option>
-          <?php foreach ($kategorie as $k): ?>
-          <option value="<?= (int) $k['id'] ?>"<?= (int) ($_POST['n_kategoria'] ?? 0) === (int) $k['id'] ? ' selected' : '' ?>><?= h((string) $k['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <?= $nErr('n_kategoria') ?>
-      </label>
-      <label class="f">Cena brutto (zł)
-        <input type="text" name="n_cena" value="<?= h((string) ($_POST['n_cena'] ?? '')) ?>" placeholder="64,90">
-        <?= $nErr('n_cena') ?: '<small>Można uzupełnić później.</small>' ?>
-      </label>
-      <div class="nowy-akcja">
-        <button name="nowy" value="1">Utwórz produkt</button>
-        <small>Powstaje NIEWIDOCZNY w sklepie. Uzupełniasz zdjęcie, opis i gramaturę, potem włączasz sprzedaż.</small>
-      </div>
-    </form>
-  </details>
   <?php endif; ?>
 
-  <?php foreach ($rows as $p):
-    $id = (string) $p['id'];
-    $img = (string) $p['image_url'];
-    $vis = (int) $p['shop_visible'] === 1;
+  <?php
+  // ─── UNE SEULE FICHE, POUR CRÉER COMME POUR MODIFIER ──────────────────────
+  //
+  // « Le nouveau produit doit avoir exactement le même formulaire que la
+  // fiche » — et la bonne façon de le tenir n'est pas de recopier le
+  // formulaire, c'est de n'en avoir qu'UN. Deux copies divergent au premier
+  // champ ajouté, et c'est celle qu'on utilise le moins qui devient fausse :
+  // ici la création, donc le moment où l'on décide de tout.
+  //
+  // $nowy ne change que trois choses : le titre du repli, le bouton posté, et
+  // les gestes qui n'ont pas de sens sur un produit qui n'existe pas encore
+  // (supprimer, désactiver, voir en boutique).
+  $fiszka = function (array $p, bool $nowy = false) use (&$fieldErrors, $openId, $isAdmin, $csrf, $kategorie, $brands, $txt, $vv, $slugProp, $pdo) {
+
+    // Un produit qui n'existe pas encore n'a aucune de ces valeurs : tout
+    // passe par ?? pour que la MÊME fiche serve les deux cas.
+    $id  = (string) ($p['id'] ?? '');
+    $img = (string) ($p['image_url'] ?? '');
+    $vis = (int) ($p['shop_visible'] ?? 0) === 1;
     $act = (int) ($p['active'] ?? 1) === 1;
-    $open = $openId === $id; ?>
-  <details class="item"<?= $open ? ' open' : '' ?> id="p-<?= h($id) ?>">
+    // À la création, la fiche s'ouvre seule si l'enregistrement a été refusé :
+    // sinon la saisie conservée resterait cachée derrière un repli fermé.
+    $open = $nowy ? (bool) $fieldErrors : ($openId !== '' && $openId === $id);
+    $p += ['id' => '', 'nom' => '', 'prix' => 0, 'slug' => '', 'unit_label' => '', 'origin' => '',
+           'cocoa' => '', 'badge' => '', 'vat_rate' => 0.23, 'stock' => 0, 'cat' => '',
+           'weight_g' => 0, 'length_mm' => 0, 'width_mm' => 0, 'height_mm' => 0,
+           'parcel_template' => '', 'brand_id' => null, 'category_id' => 0]; ?>
+  <details class="item<?= $nowy ? ' nowa' : '' ?>"<?= $open ? ' open' : '' ?> id="p-<?= h($id ?: 'nowy') ?>">
     <summary>
       <?php if ($img !== ''): ?>
         <img class="thumb" src="<?= h(img_src($img)) ?>" alt="">
@@ -511,9 +596,10 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
         <div class="thumb empty">brak<br>zdjęcia</div>
       <?php endif; ?>
       <div>
-        <div class="sum-name"><?= h((string) $p['nom']) ?></div>
-        <div class="sum-meta"><?= h($id) ?> · <?= h((string) ($p['cat'] ?? '')) ?> · <?= h(zl($p['prix'])) ?>
-          · VAT <?= h(wsm_vat_percent((float) ($p['vat_rate'] ?? 0.23))) ?> %</div>
+        <div class="sum-name"><?= $nowy ? '+ Nowy produkt' : h((string) $p['nom']) ?></div>
+        <div class="sum-meta"><?php if ($nowy): ?>Ta sama fiszka co przy edycji — wypełniasz, co wiesz, resztę później.<?php else: ?>
+          <?= h($id) ?> · <?= h((string) ($p['cat'] ?? '')) ?> · <?= h(zl($p['prix'])) ?>
+          · VAT <?= h(wsm_vat_percent((float) ($p['vat_rate'] ?? 0.23))) ?> %<?php endif; ?></div>
       </div>
       <div class="sum-right">
         <?php if ($vis && $img === ''): ?><span class="tag no">bez zdjęcia</span><?php endif; ?>
@@ -538,7 +624,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
         <?php else: ?>
           <div class="ph">Bez zdjęcia</div>
         <?php endif; ?>
-        <?php if ($vis && $p['slug'] !== ''): ?>
+        <?php if (!$nowy && $vis && $p['slug'] !== ''): ?>
           <p style="margin:12px 0 0"><a class="view" href="../shop/p/<?= h(urlencode((string) $p['slug'])) ?>" target="_blank" rel="noopener">Zobacz w sklepie ↗</a></p>
         <?php endif; ?>
       </div>
@@ -565,6 +651,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
           <label class="f" style="grid-column:1/-1">Nazwa produktu
             <input type="text" name="nazwa" value="<?= h($vv('nazwa', $txt((string) $p['id'], 'name'))) ?>"
                    maxlength="120"<?= $isAdmin ? '' : ' disabled' ?>>
+            <?php if (isset($fieldErrors['nazwa']) && $open): ?><small class="err"><?= h($fieldErrors['nazwa']) ?></small><?php endif; ?>
             <small>Widoczna w sklepie i na dokumentach. Tłumaczenia — w <a class="view" href="tresci.php?sekcja=product">Treściach</a>.</small>
           </label>
           <label class="f" style="grid-column:1/-1">Podtytuł
@@ -611,6 +698,22 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
             </span>
             <small>Gabaryt paczkomatu wylicza się z tych trzech liczb<?php
               $gab = (string) ($p['parcel_template'] ?? ''); echo $gab !== '' ? ' — teraz: <b>' . h($gab) . '</b>' : ''; ?>.</small>
+          </label>
+
+          <?php // LA CATÉGORIE N'ÉTAIT MODIFIABLE NULLE PART. Obligatoire en
+                // base, posée au semis, figée ensuite : un produit rangé au
+                // mauvais endroit y restait. ?>
+          <label class="f">Kategoria
+            <select name="category_id"<?= $isAdmin ? '' : ' disabled' ?><?= $nowy ? ' required' : '' ?>>
+              <?php if ($nowy): ?><option value="">— wybierz —</option><?php endif; ?>
+              <?php $catAkt = (int) $vv('category_id', (string) (int) $p['category_id']);
+                    foreach ($kategorie as $k): ?>
+              <option value="<?= (int) $k['id'] ?>"<?= $catAkt === (int) $k['id'] ? ' selected' : '' ?>><?= h((string) $k['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <?php if (isset($fieldErrors['category_id']) && $open): ?>
+              <small class="err"><?= h($fieldErrors['category_id']) ?></small>
+            <?php else: ?><small>Kategorie zmieniasz <a class="view" href="#kategorie">niżej na tej stronie</a>.</small><?php endif; ?>
           </label>
 
           <label class="f">Stawka VAT
@@ -678,12 +781,21 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
         </label>
 
         <?php if ($isAdmin): ?>
-        <div class="actions"><button class="primary" type="submit">Zapisz</button></div>
+        <div class="actions">
+          <?php if ($nowy): ?>
+          <button class="primary" type="submit" name="nowy" value="1">Utwórz produkt</button>
+          <small style="color:var(--text-muted)">Powstaje NIEWIDOCZNY w sklepie — sprzedaż włączasz sam, gdy fiszka jest gotowa.</small>
+          <?php else: ?>
+          <button class="primary" type="submit">Zapisz</button>
+          <?php endif; ?>
+        </div>
         <?php endif; ?>
       </div>
     </form>
 
-    <?php if ($isAdmin): ?>
+    <?php // Désactiver et supprimer n'ont pas de sens sur un produit qui
+          // n'existe pas encore. ?>
+    <?php if ($isAdmin && !$nowy): ?>
     <div class="edit" style="padding-top:0">
       <div></div>
       <div>
@@ -712,7 +824,13 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
     </div>
     <?php endif; ?>
   </details>
-  <?php endforeach; ?>
+  <?php }; ?>
+
+  <?php // La fiche de création, en tête : on la trouve là où on la cherche. ?>
+  <?php if ($isAdmin) $fiszka([], true); ?>
+
+  <?php foreach ($rows as $p) $fiszka($p); ?>
+
 
 <?php
 // ---------------------------------------------------------------------------
@@ -724,6 +842,51 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
 // ---------------------------------------------------------------------------
 $editB = isset($_GET['marka']) ? wsm_brand($pdo, (int) $_GET['marka']) : null;
 ?>
+<div class="panel" id="kategorie">
+  <h2>Kategorie</h2>
+  <p class="lead">
+    Każdy produkt musi mieć kategorię — to pole obowiązkowe w bazie. Kategorii się NIE USUWA:
+    produkty, które ją noszą, zostałyby z martwym odwołaniem. Wyłączona kategoria znika z list
+    wyboru, ale nie rusza tego, co już jest do niej przypisane.
+  </p>
+  <table class="rwd dense">
+    <thead><tr><th>Nazwa</th><th class="num">Produkty</th><th>Stan</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($katWszystkie as $k): ?>
+    <tr>
+      <td data-l="Nazwa">
+        <?php if ($isAdmin): ?>
+        <form method="post" class="kat-in">
+          <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+          <input type="text" name="kat_nazwa" value="<?= h((string) $k['name']) ?>" maxlength="80" required>
+          <button type="submit" name="kat_zapisz" value="<?= (int) $k['id'] ?>">Zapisz</button>
+        </form>
+        <?php else: ?><?= h((string) $k['name']) ?><?php endif; ?>
+      </td>
+      <td data-l="Produkty" class="num"><?= (int) $k['ile'] ?></td>
+      <td data-l="Stan"><span class="stan <?= (int) $k['active'] ? 'p-ok' : 'p-bad' ?>"><i class="kropka"></i><?= (int) $k['active'] ? 'Aktywna' : 'Wyłączona' ?></span></td>
+      <td>
+        <?php if ($isAdmin): ?>
+        <form method="post">
+          <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+          <input type="hidden" name="kat_on" value="<?= (int) $k['active'] ? '0' : '1' ?>">
+          <button type="submit" name="kat_akt" value="<?= (int) $k['id'] ?>"><?= (int) $k['active'] ? 'Wyłącz' : 'Włącz' ?></button>
+        </form>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php if ($isAdmin): ?>
+  <form method="post" class="kat-in" style="margin-top:14px">
+    <input type="hidden" name="_t" value="<?= h($csrf) ?>">
+    <input type="text" name="kat_nazwa" placeholder="Nowa kategoria" maxlength="80" required>
+    <button class="primary" type="submit" name="kat_zapisz" value="0">Dodaj kategorię</button>
+  </form>
+  <?php endif; ?>
+</div>
+
 <div class="panel" id="marki">
   <h2>Marki</h2>
   <p class="muted small">
