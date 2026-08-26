@@ -338,7 +338,19 @@ $cartCount = cart_count($cart);
 
 // ---------------------------------------------------------------- CATALOGUE -
 if ($page === '') {
-    $products = wsm_shop_products($pdo, $lang);
+    // ─── LE RAYON DEMANDÉ ────────────────────────────────────────────────────
+    //
+    // Les catégories viennent de la BASE, pas d'une liste écrite dans le code :
+    // celles qu'on ajoute dans la console apparaissent ici sans qu'on redéploie.
+    // Un identifiant inconnu — lien périmé, catégorie désactivée depuis — ne
+    // renvoie pas le catalogue entier sous un titre de rayon : il ramène
+    // simplement à « tout », ce qui est vrai et ne fait acheter personne à côté.
+    $kategorie = wsm_shop_categories($pdo);
+    $katId = isset($_GET['k']) ? (int) $_GET['k'] : 0;
+    if ($katId > 0 && !in_array($katId, array_map(fn($c) => (int) $c['id'], $kategorie), true)) {
+        $katId = 0;
+    }
+    $products = wsm_shop_products($pdo, $lang, $katId > 0 ? $katId : null);
     layout_head($S, $lang, $langs, '', '', '');
     layout_header($S, $lang, $langs, $cartCount);
     // La carte d'identité du vendeur, une seule fois, sur la page d'entrée.
@@ -377,6 +389,20 @@ if ($page === '') {
       <h2><?= e($S['catalog.title'] ?? '') ?></h2>
       <p class="sub"><?= e($S['catalog.sub'] ?? '') ?></p>
     </div>
+    <?php // UN RAYON PAR CATÉGORIE, s'il y en a plus d'une à montrer. Avec une
+          // seule, le filtre ne filtre rien : il ferait cliquer pour rien.
+          // Des liens, pas du JavaScript — ils marchent partout, se partagent,
+          // et le navigateur sait déjà les mettre en signet. ?>
+    <?php if (count($kategorie) > 1): ?>
+    <nav class="rayons" aria-label="<?= e($S['catalog.title'] ?? '') ?>">
+      <a href="<?= e(u()) ?>#katalog"<?= $katId === 0 ? ' class="on" aria-current="true"' : '' ?>><?= e($S['catalog.all'] ?? 'Wszystkie') ?></a>
+      <?php foreach ($kategorie as $c): ?>
+      <a href="<?= e(u('', ['k' => (int) $c['id']])) ?>#katalog"<?= $katId === (int) $c['id'] ? ' class="on" aria-current="true"' : '' ?>>
+        <?= e((string) $c['name']) ?> <i><?= (int) $c['ile'] ?></i>
+      </a>
+      <?php endforeach; ?>
+    </nav>
+    <?php endif; ?>
     <?php if (!$products): ?>
       <p class="muted"><?= e($S['catalog.empty'] ?? '') ?></p>
     <?php else: ?>

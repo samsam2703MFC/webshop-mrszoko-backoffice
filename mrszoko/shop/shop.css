@@ -484,3 +484,16 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
    hauteur — donc il se tait. On ne dimensionne qu'une fois le composant
    réellement défini. */
 .geo-box inpost-geowidget:defined { display: block; width: 100%; height: min(60vh, 460px); }
+
+/* ---- Rayons du catalogue ---------------------------------------------------
+   Des liens, pas des onglets : ils se partagent, se mettent en signet, et
+   fonctionnent sans JavaScript. Le compte à côté du nom évite d'ouvrir un
+   rayon pour découvrir qu'il tient deux articles. */
+.rayons { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-5); }
+.rayons a { display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: var(--radius-pill);
+            border: 1px solid var(--border-default); font-size: var(--text-sm);
+            color: var(--text-body); transition: border-color var(--dur-base) var(--ease-out); }
+.rayons a:hover { border-color: var(--choco-300); }
+.rayons a.on { background: var(--choco-800); border-color: var(--choco-800); color: var(--cream-50); }
+.rayons a i { font-style: normal; font-family: var(--font-mono); font-size: var(--text-2xs); opacity: .65; }

@@ -201,20 +201,56 @@ function wsm_shop_row_to_product(array $r, array $S): array {
     ];
 }
 
-/** Le catalogue visible en boutique, dans l'ordre voulu par le back-office. */
-function wsm_shop_products(PDO $pdo, string $lang): array {
+/**
+ * Les rayons de la boutique — LUS EN BASE, et seulement ceux qui tiennent
+ * quelque chose.
+ *
+ * La catégorie est obligatoire sur chaque produit depuis toujours, mais la
+ * vitrine l'ignorait complètement : pas de filtre, pas de menu, tout dans un
+ * seul catalogue à plat. On rangeait donc les produits dans des tiroirs que
+ * personne n'ouvrait jamais.
+ *
+ * Une catégorie VIDE n'apparaît pas : un rayon qui mène à « aucun produit »
+ * est une impasse, et il s'en crée mécaniquement dès qu'on retire le dernier
+ * article d'une gamme.
+ *
+ * @return list<array{id:int,name:string,ile:int}>
+ */
+function wsm_shop_categories(PDO $pdo): array {
+    return $pdo->query(
+        "SELECT c.id, c.name, COUNT(p.id) AS ile
+           FROM wsm_categories c
+           JOIN wsm_products p ON p.category_id = c.id
+                              AND p.shop_visible = 1 AND p.active = 1
+          WHERE c.active = 1
+          GROUP BY c.id, c.name
+          HAVING COUNT(p.id) > 0
+          ORDER BY c.sort_order, c.name"
+    )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * Le catalogue visible en boutique, dans l'ordre voulu par le back-office.
+ *
+ * @param int|null $cat filtre par catégorie. Une catégorie inconnue ou vide
+ *                      ne renvoie RIEN plutôt que tout : afficher le catalogue
+ *                      complet sous un titre de rayon ferait acheter à côté.
+ */
+function wsm_shop_products(PDO $pdo, string $lang, ?int $cat = null): array {
     $S = wsm_shop_strings($pdo, $lang);
-    $rows = $pdo->query(
+    $sql =
         "SELECT p.*, c.name AS category_name,
                 b.name AS brand_name, b.slug AS brand_slug, b.logo_url AS brand_logo,
                 b.site_url AS brand_site, b.active AS brand_active
            FROM wsm_products p
            LEFT JOIN wsm_categories c ON c.id = p.category_id
            LEFT JOIN wsm_brands b ON b.id = p.brand_id
-          WHERE p.shop_visible = 1 AND p.active = 1
-          ORDER BY p.sort_order, p.nom"
-    )->fetchAll();
-    return array_map(fn($r) => wsm_shop_row_to_product($r, $S), $rows);
+          WHERE p.shop_visible = 1 AND p.active = 1"
+        . ($cat !== null ? " AND p.category_id = ?" : '')
+        . " ORDER BY p.sort_order, p.nom";
+    if ($cat !== null) { $st = $pdo->prepare($sql); $st->execute([$cat]); }
+    else               { $st = $pdo->query($sql); }
+    return array_map(fn($r) => wsm_shop_row_to_product($r, $S), $st->fetchAll());
 }
 
 /** Un produit par slug ou par identifiant. */

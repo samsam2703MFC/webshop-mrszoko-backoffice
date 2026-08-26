@@ -422,7 +422,8 @@
       "stop.bad": "Ten link jest nieprawidłowy lub wygasł. Napisz do nas, wypiszemy Cię ręcznie.",
       "checkout.point_map": "Wybierz paczkomat na mapie",
       "checkout.point_map_fail": "Mapa nie chce się załadować. Wpisz kod paczkomatu ręcznie, pole powyżej.",
-      "checkout.point_map_help": "Mapa nie działa albo pisze „Brak dostępu”? Wpisz kod paczkomatu w polu powyżej, zamówienie przyjmiemy tak samo."
+      "checkout.point_map_help": "Mapa nie działa albo pisze „Brak dostępu”? Wpisz kod paczkomatu w polu powyżej, zamówienie przyjmiemy tak samo.",
+      "catalog.all": "Wszystkie"
     },
     "uk": {
       "meta.title": "Mister Szoko, крамниця шоколаду",
@@ -645,7 +646,8 @@
       "stop.bad": "Це посилання недійсне або застаріло. Напишіть нам, і ми відпишемо вас вручну.",
       "checkout.point_map": "Обрати Paczkomat на карті",
       "checkout.point_map_fail": "Карта не завантажується. Введіть код Paczkomat вручну, поле вище.",
-      "checkout.point_map_help": "Карта не працює або пише «Немає доступу»? Введіть код Paczkomat у полі вище, замовлення приймемо так само."
+      "checkout.point_map_help": "Карта не працює або пише «Немає доступу»? Введіть код Paczkomat у полі вище, замовлення приймемо так само.",
+      "catalog.all": "Усі"
     },
     "en": {
       "meta.title": "Mister Szoko, chocolate shop",
@@ -868,7 +870,8 @@
       "stop.bad": "This link is invalid or has expired. Write to us and we will remove you by hand.",
       "checkout.point_map": "Pick a locker on the map",
       "checkout.point_map_fail": "The map will not load. Type the locker code by hand, the field above.",
-      "checkout.point_map_help": "Map not working, or showing “No access”? Type the locker code in the field above, we will take the order just the same."
+      "checkout.point_map_help": "Map not working, or showing “No access”? Type the locker code in the field above, we will take the order just the same.",
+      "catalog.all": "All"
     }
   }
 }
