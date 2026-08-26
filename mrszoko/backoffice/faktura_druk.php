@@ -59,8 +59,32 @@ $zl = fn(int $g) => number_format($g / 100, 2, ',', ' ');
   .noprint { text-align: center; margin: 18px; }
   .noprint button { font: 600 14px var(--font-sans); padding: 11px 20px; border-radius: 999px;
                     border: none; background: var(--brand); color: #fff; cursor: pointer; }
+  /* ── LE PARAGON S'IMPRIME EN TICKET, PAS EN A4 ──────────────────────────
+     Il sortait dans la mise en page d'une facture : une pleine feuille pour
+     deux lignes d'achat, avec des colonnes de facture et un cadre de paiement
+     qui ne le concernent pas. Un ticket se lit en colonne étroite, chiffres
+     alignés à droite, et se plie dans un colis. */
+  .ticket { max-width: 340px; margin: 20px auto; background: #fff; padding: 26px 24px;
+            box-shadow: var(--shadow-sm, 0 8px 30px rgba(0,0,0,.08)); border-radius: 6px;
+            font-family: var(--font-mono); font-size: 12px; line-height: 1.55; color: #111; }
+  .t-head { text-align: center; margin-bottom: 14px; }
+  .t-head .nom { font-family: var(--font-sans); font-weight: 700; font-size: 14px; }
+  .t-meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 12px; }
+  .t-tit { text-align: center; font-family: var(--font-sans); font-weight: 700; letter-spacing: .04em;
+           font-size: 14px; margin: 14px 0; }
+  .t-l { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; }
+  .t-l .r { text-align: right; white-space: nowrap; }
+  .t-art { margin: 3px 0 7px; }
+  .t-art .nazwa { font-family: var(--font-sans); }
+  .t-art .det { font-size: 11px; color: #555; }
+  .t-sep { border-top: 1px dashed #999; margin: 10px 0; }
+  .t-suma { font-family: var(--font-sans); font-weight: 700; font-size: 15px; }
+  .t-note { margin-top: 14px; font-family: var(--font-sans); font-size: 10.5px;
+            line-height: 1.5; color: #444; text-align: center; }
+
   @media print {
     body { background: #fff; }
+    .ticket { margin: 0; padding: 0; box-shadow: none; max-width: 78mm; }
     .sheet { margin: 0; padding: 0; box-shadow: none; max-width: none; }
     .noprint { display: none; }
     @page { size: A4; margin: 16mm; }
@@ -70,6 +94,62 @@ $zl = fn(int $g) => number_format($g / 100, 2, ',', ' ');
 <body>
 <div class="noprint"><button type="button" onclick="window.print()">Drukuj / zapisz PDF</button></div>
 
+<?php if ($i['kind'] === 'paragon'):
+  // La ventilation par TAUX, pas par ligne : c'est ce que porte un ticket, et
+  // c'est ce qu'un comptable y cherche. Les lettres A/B/C/D sont la convention
+  // polonaise — A = 23 %, B = 8 %, C = 5 %, D = 0 %.
+  $lettre = fn(float $t): string => [23 => 'A', 8 => 'B', 5 => 'C', 0 => 'D'][(int) round($t * 100)] ?? 'A';
+  $parTaux = wsm_paragon_ptu($i['items']); ?>
+<div class="ticket">
+  <div class="t-head">
+    <div class="nom"><?= h($i['seller_name']) ?></div>
+    <div><?= h($i['seller_address']) ?></div>
+  </div>
+  <div class="t-meta">
+    <span>NIP <?= h($i['seller_nip']) ?></span>
+    <span>nr dok. <?= h($i['number']) ?></span>
+  </div>
+
+  <div class="t-tit"><?= h($kindTitle[$i['kind']]) ?></div>
+
+  <div class="t-sep"></div>
+  <?php foreach ($i['items'] as $l): ?>
+  <div class="t-art">
+    <div class="nazwa"><?= h($l['name']) ?></div>
+    <div class="t-l det">
+      <span><?= (int) $l['qty'] ?> × <?= $zl((int) $l['unit_gross']) ?></span>
+      <span class="r"><?= $zl((int) $l['line_gross']) ?> <?= h($lettre((float) $l['vat_rate'])) ?></span>
+    </div>
+  </div>
+  <?php endforeach; ?>
+
+  <div class="t-sep"></div>
+  <?php foreach ($parTaux as $k => $t): ?>
+  <div class="t-l"><span>Sprzedaż opodatkowana <?= h($k) ?></span><span class="r"><?= $zl($t['brut']) ?></span></div>
+  <?php endforeach; ?>
+  <?php foreach ($parTaux as $k => $t): ?>
+  <div class="t-l"><span>PTU <?= h($k) ?> <?= h(wsm_vat_percent($t['taux'])) ?> %</span><span class="r"><?= $zl($t['vat']) ?></span></div>
+  <?php endforeach; ?>
+  <div class="t-l"><span>Suma PTU</span><span class="r"><?= $zl((int) $i['total_vat']) ?></span></div>
+
+  <div class="t-sep"></div>
+  <div class="t-l t-suma"><span>SUMA <?= h($i['currency']) ?></span><span class="r"><?= $zl((int) $i['total_gross']) ?></span></div>
+
+  <div class="t-sep"></div>
+  <div class="t-l"><span><?= $i['paid'] ? 'Zapłacono' : 'Do zapłaty' ?></span><span class="r"><?= $zl((int) $i['total_gross']) ?></span></div>
+  <div class="t-l det"><span><?= h($i['issued_at']) ?></span><span class="r"><?= h($i['buyer_name']) ?></span></div>
+
+  <?php // CE QUE CE DOCUMENT N'EST PAS. Il ressemble maintenant à un ticket ;
+        // il faut donc dire, sur le papier, qu'il ne sort pas d'une caisse
+        // enregistreuse et qu'il ne porte aucun numéro fiscal. Un document qui
+        // en a l'air sans l'être se retrouve produit à l'administration. ?>
+  <div class="t-note">
+    Dokument sprzedaży dla klienta indywidualnego bez NIP.<br>
+    <b>Nie jest paragonem fiskalnym</b> — nie pochodzi z kasy rejestrującej.
+    <?php if ($i['note'] !== ''): ?><br><?= h($i['note']) ?><?php endif; ?>
+  </div>
+</div>
+<?php else: ?>
 <div class="sheet">
   <div class="top">
     <div>
@@ -171,5 +251,6 @@ $zl = fn(int $g) => number_format($g / 100, 2, ',', ' ');
     Dokument wystawiony elektronicznie w sklepie <?= h($i['seller_name']) ?>.
   </div>
 </div>
+<?php endif; ?>
 </body>
 </html>
