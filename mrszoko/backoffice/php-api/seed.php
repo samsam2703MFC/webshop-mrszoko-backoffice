@@ -493,6 +493,12 @@ function wsm_sync_content(PDO $pdo): array {
         $ship++;
     }
 
+    // Le ménage : nommé, idempotent, et jamais destructeur.
+    foreach (wsm_content_menage() as [$sql, $args]) {
+        try { $st = $pdo->prepare($sql); $st->execute($args); $maj += $st->rowCount(); }
+        catch (Throwable $e) { /* table absente : rien à nettoyer */ }
+    }
+
     // Les remplacements en place, après les ajouts : un libellé tout juste
     // inséré doit être nettoyé comme les autres.
     foreach (wsm_content_remplacements() as [$table, $col, $de, $vers]) {
@@ -552,6 +558,54 @@ function wsm_content_remplacements(): array {
         // gratis, próg osiągnięty ».
         ['wsm_shop_i18n', 'v', ' — ', ', '],
     ];
+}
+
+/**
+ * LE MÉNAGE : ce qui reste d'une maquette et qu'on ne veut plus voir.
+ *
+ * Cinq catégories — Pieczywo, Lody, Katering… — sont arrivées avec la maquette
+ * de boulangerie qui a précédé la chocolaterie. Le champ est obligatoire sur
+ * chaque produit, donc on choisissait forcément une étiquette fausse. Et deux
+ * produits « test-dpd-… », nés d'une mise au point du transporteur, se
+ * retrouvaient achetables en vitrine.
+ *
+ * DEUX RÈGLES, ET ELLES COMPTENT :
+ *
+ *  · ON NE SUPPRIME RIEN. La colonne category_id est NOT NULL : une catégorie
+ *    effacée laisserait ses produits avec une référence morte. Un produit
+ *    effacé emporterait le sens des commandes et des factures qui le nomment.
+ *    On désactive, on masque — l'histoire reste lisible.
+ *  · UNE CATÉGORIE QUI TIENT ENCORE UN PRODUIT N'EST PAS TOUCHÉE. Si quelqu'un
+ *    s'en sert pour de vrai, la maquette n'est plus une maquette.
+ *
+ * Idempotent : rejoué, il ne trouve plus rien à changer.
+ *
+ * @return list<array{0:string,1:list<string>}> [sql, paramètres]
+ */
+function wsm_content_menage(): array {
+    // L'ORDRE COMPTE. On masque d'abord les produits de test, puis on regarde
+    // quelles catégories ne tiennent plus rien de visible : l'inverse laisserait
+    // une catégorie active parce qu'un produit qu'on s'apprête à masquer y était
+    // encore rangé.
+    $ops = [
+        // Les produits de mise au point DPD : masqués, pas effacés — une
+        // commande de test peut les nommer, et un document doit rester lisible.
+        ['UPDATE wsm_products SET shop_visible = 0 WHERE id LIKE ? AND shop_visible = 1',
+         ['test-dpd-%']],
+    ];
+    foreach (['Pieczywo', 'Ciasta świeże', 'Katering', 'Lody', 'Menu i zestawy'] as $nom) {
+        // « Aucun produit VISIBLE », pas « aucun produit » : les articles de
+        // l'ancienne maquette dorment déjà, masqués, dans ces rayons. Exiger
+        // la table vide n'aurait jamais rien retiré — la boutique garderait
+        // pour toujours un menu déroulant qui propose surtout du faux.
+        //
+        // Les produits gardent leur référence : la colonne est NOT NULL, et
+        // une catégorie désactivée reste lisible partout où elle est nommée.
+        $ops[] = ['UPDATE wsm_categories SET active = 0 WHERE name = ? AND active = 1'
+                . ' AND id NOT IN (SELECT category_id FROM wsm_products'
+                . '                 WHERE shop_visible = 1 AND active = 1)', [$nom]];
+    }
+    return $ops;
 }
 
 function wsm_content_forces(): array {
@@ -757,6 +811,15 @@ function wsm_sync_content_sql(): string {
                . $m['vat_rate'] . ', ' . $m['free_from'] . ', '
                . $m['min_weight_g'] . ', ' . $m['max_weight_g'] . ');';
     }
+    foreach (wsm_content_menage() as [$sql, $args]) {
+        foreach ($args as $v) {
+            $pos = strpos($sql, '?');
+            if ($pos === false) break;
+            $sql = substr($sql, 0, $pos) . wsm_sql_txt((string) $v) . substr($sql, $pos + 1);
+        }
+        $out[] = $sql . ';';
+    }
+
     // Même nettoyage que la voie « base ouverte ». En SQL les motifs passent
     // en hexadécimal : un tiret cadratin recopié dans un fichier .sql traverse
     // trois encodages avant d'arriver à MySQL, et il suffit d'un pour que le
