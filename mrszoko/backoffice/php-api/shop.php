@@ -885,6 +885,40 @@ function wsm_parse_price(string $v): ?float {
     return is_numeric($v) ? (float) $v : null;
 }
 
+/**
+ * Un texte polonais rendu en adresse : « Czekolada ciemna 70 % » →
+ * « czekolada-ciemna-70 ».
+ *
+ * Les diacritiques sont TRANSLITTÉRÉS, pas jetés. preg_replace() sur [^a-z0-9]
+ * transformait « Świąteczna » en « wi-teczna » : une adresse que personne ne
+ * relie au produit, et qu'on ne peut plus corriger une fois indexée.
+ *
+ * @param string $repli servi quand il ne reste rien de lisible.
+ */
+function wsm_slugify(string $texte, string $repli = ''): string {
+    $tr = ['ą'=>'a','ć'=>'c','ę'=>'e','ł'=>'l','ń'=>'n','ó'=>'o','ś'=>'s','ź'=>'z','ż'=>'z',
+           'Ą'=>'a','Ć'=>'c','Ę'=>'e','Ł'=>'l','Ń'=>'n','Ó'=>'o','Ś'=>'s','Ź'=>'z','Ż'=>'z'];
+    $v = mb_strtolower(strtr(trim($texte), $tr), 'UTF-8');
+    $v = trim((string) preg_replace('/[^a-z0-9]+/', '-', $v), '-');
+    if ($v === '') $v = trim((string) preg_replace('/[^a-z0-9]+/', '-', mb_strtolower($repli, 'UTF-8')), '-');
+    return substr($v, 0, 80);
+}
+
+/**
+ * La même chose, mais garantie libre dans une colonne : deux produits qui
+ * partagent une adresse en rendent un inatteignable.
+ */
+function wsm_slug_libre(PDO $pdo, string $base, string $colonne, string $saufId = ''): string {
+    $base = $base !== '' ? $base : 'produkt';
+    $st = $pdo->prepare("SELECT 1 FROM wsm_products WHERE $colonne = ? AND id <> ?");
+    for ($i = 0; $i < 50; $i++) {
+        $essai = $i === 0 ? $base : substr($base, 0, 74) . '-' . ($i + 1);
+        $st->execute([$essai, $saufId]);
+        if (!$st->fetchColumn()) return $essai;
+    }
+    return substr($base, 0, 68) . '-' . bin2hex(random_bytes(4));
+}
+
 function wsm_validate_product_shop(PDO $pdo, array $in, string $id): array {
     require_once __DIR__ . '/media.php';
     $e = []; $out = [];

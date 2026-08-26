@@ -202,6 +202,18 @@ grep -q 'name="weight_g"' site/backoffice/produkty.php \
   && grep -q 'function wsm_parse_price' site/backoffice/api/shop.php \
   || { echo "  fiche produit incomplète : gramatura, wymiary ou lecture du prix"; exit 1; }
 echo "  fiszka produktu: gramatura, wymiary, cena z separatorem — obecne"
+# CRÉER UN PRODUIT. Le chemin n'existait pas : les 22 produits venaient du
+# semis ou d'anciennes maquettes, et l'écran n'en disait rien. Les trois pièces
+# partent ensemble — sans wsm_slug_libre() deux produits pourraient partager
+# une clé que portent commandes, stock et factures.
+grep -q "name=\"nowy\"" site/backoffice/produkty.php \
+  && grep -q 'function wsm_slugify' site/backoffice/api/shop.php \
+  && grep -q 'function wsm_slug_libre' site/backoffice/api/shop.php \
+  || { echo "  création de produit incomplète dans l'assemblage"; exit 1; }
+# ET IL NAÎT INVISIBLE : un produit sans photo ni poids n'a rien à faire en vente.
+grep -q "shop_visible, sort_order)" site/backoffice/produkty.php \
+  || { echo "  la création ne pose plus shop_visible — un brouillon partirait en vente"; exit 1; }
+echo "  tworzenie produktu (klucz, slug, niewidoczny na starcie) : obecne"
 echo "  reprise en main du compte console : présente"
 echo "  login, tokens, htaccess : présents"
 

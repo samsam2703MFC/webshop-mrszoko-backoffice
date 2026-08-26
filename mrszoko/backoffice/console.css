@@ -671,3 +671,16 @@ table.zam2 .kasa2 .kw, .tablica .kol > header .ile, .karta .gora .kw {
    empilées obligeraient à relire l'étiquette à chaque champ. */
 .wym { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .wym input { width: 100%; }
+
+/* Créer un produit : replié par défaut. Ouvert en permanence, il pousserait la
+   liste — qu'on vient consulter cent fois pour une création. */
+.nowy { margin: 0 0 16px; border: 1px solid var(--border-subtle); border-radius: 12px;
+        background: var(--surface-card); }
+.nowy > summary { cursor: pointer; padding: 12px 14px; font-weight: 600; font-size: 14px;
+                  color: var(--text-strong); list-style: none; }
+.nowy > summary::-webkit-details-marker { display: none; }
+.nowy[open] > summary { border-bottom: 1px solid var(--border-subtle); }
+.nowy-in { display: grid; gap: 12px; padding: 14px; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .nowy-in { grid-template-columns: 2fr 1fr 1fr; align-items: start; } }
+.nowy-akcja { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.nowy-akcja small { color: var(--text-muted); font-size: 12px; }
