@@ -214,6 +214,14 @@ grep -q "name=\"nowy\"" site/backoffice/produkty.php \
 grep -q "shop_visible, sort_order)" site/backoffice/produkty.php \
   || { echo "  la création ne pose plus shop_visible — un brouillon partirait en vente"; exit 1; }
 echo "  tworzenie produktu (klucz, slug, niewidoczny na starcie) : obecne"
+# UNE SEULE FICHE POUR CRÉER ET MODIFIER. Deux formulaires recopiés divergent
+# au premier champ ajouté, et c'est celui qu'on utilise le moins — la création,
+# donc le moment où l'on décide de tout — qui devient faux.
+grep -q 'fiszka = function' site/backoffice/produkty.php \
+  && grep -q 'name="category_id"' site/backoffice/produkty.php \
+  && grep -q 'id="kategorie"' site/backoffice/produkty.php \
+  || { echo "  fiche partagée ou gestion des catégories absente"; exit 1; }
+echo "  jedna fiszka (tworzenie + edycja) i zarzadzanie kategoriami : obecne"
 echo "  reprise en main du compte console : présente"
 echo "  login, tokens, htaccess : présents"
 

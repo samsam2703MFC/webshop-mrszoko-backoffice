@@ -684,3 +684,7 @@ table.zam2 .kasa2 .kw, .tablica .kol > header .ile, .karta .gora .kw {
 @media (min-width: 700px) { .nowy-in { grid-template-columns: 2fr 1fr 1fr; align-items: start; } }
 .nowy-akcja { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .nowy-akcja small { color: var(--text-muted); font-size: 12px; }
+
+/* Renommer une catégorie : le champ et son bouton sur une ligne. */
+.kat-in { display: flex; gap: 8px; align-items: center; margin: 0; }
+.kat-in input { flex: 1 1 auto; min-width: 0; }
