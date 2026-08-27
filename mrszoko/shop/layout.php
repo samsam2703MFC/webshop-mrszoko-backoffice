@@ -92,6 +92,10 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
     <nav class="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
       <a class="navlink" href="<?= e(u()) ?>#katalog"><?= e($S['nav.shop'] ?? '') ?></a>
       <a class="navlink" href="<?= e(u()) ?>#pro"><?= e($S['story.pro.eyebrow'] ?? '') ?></a>
+      <?php // La page existe depuis longtemps et n'était atteignable que par le
+            // pied de page : un client qui a une question ne fait pas défiler
+            // toute la boutique pour la poser. ?>
+      <a class="navlink" href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? 'Kontakt') ?></a>
     </nav>
     <div class="head-right">
       <div class="langs" role="group" aria-label="<?= e($S['a11y.lang'] ?? '') ?>">

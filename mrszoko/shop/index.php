@@ -369,10 +369,10 @@ if ($page === '') {
       <p class="lead"><?= e($S['home.lead'] ?? '') ?></p>
       <a class="btn btn--accent" href="#katalog"><?= e($S['home.cta'] ?? '') ?></a>
     </div>
-    <?php if (isset($S['story.strip.1'])): ?>
+    <?php if (isset($S['promise.1.t']  /* MÊME champ que le bloc des promesses : deux textes pour un seul engagement divergent toujours */)): ?>
     <div class="hero-strip">
       <div class="wrap hero-strip-in mono">
-        <span><?= e($S['story.strip.1']) ?></span>
+        <span><?= e($S['promise.1.t']  /* MÊME champ que le bloc des promesses : deux textes pour un seul engagement divergent toujours */) ?></span>
         <span><?= e($S['story.strip.2'] ?? '') ?></span>
         <span><?= e($S['story.strip.3'] ?? '') ?></span>
       </div>
