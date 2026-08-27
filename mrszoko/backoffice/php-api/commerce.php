@@ -250,3 +250,53 @@ function wsm_validate_product_logistics(array $in): array {
 
     return [$out, $e];
 }
+
+/**
+ * LE RAYON QUI PORTE CE NOM, quitte à le créer ou à le rallumer.
+ *
+ * POURQUOI CETTE FONCTION EXISTE. Le nom d'une catégorie arrive de deux
+ * endroits — le panneau « Kategorie » et le champ « albo wpisz nową kategorię »
+ * de la fiche produit — et les deux doivent traiter les mêmes trois cas de la
+ * même façon. Écrite deux fois, la règle aurait divergé au premier correctif,
+ * et la moitié des gens auraient eu l'ancienne.
+ *
+ * TROIS CAS, ET LE DEUXIÈME EST CELUI QU'ON OUBLIE :
+ *
+ *  · le nom est libre → on crée le rayon ;
+ *  · le nom existe mais le rayon est ÉTEINT → on le rallume. C'est le cas de
+ *    Pieczywo, Lody, Katering et des deux autres, désactivés au ménage :
+ *    répondre « ce nom existe déjà » sans rien faire serait une impasse sur un
+ *    rayon qu'on a sous les yeux et qu'on ne peut pas prendre ;
+ *  · le nom existe et le rayon est allumé → on le rend tel quel, sans rien
+ *    toucher.
+ *
+ * LA COMPARAISON SE FAIT EN PHP, PAS EN SQL. MySQL compare sans tenir compte
+ * de la casse, SQLite en tient compte dès qu'il y a un accent : « Mąka » et
+ * « mąka » créeraient deux rayons sur un serveur et un seul sur l'autre.
+ *
+ * On ne supprime jamais : wsm_products.category_id est NOT NULL.
+ *
+ * @return array{0:int,1:string} identifiant (0 si refus), et ce qui s'est
+ *         passé : 'cree' | 'rallume' | 'trouve' | 'refuse'
+ */
+function wsm_categorie_assure(PDO $pdo, string $nom): array {
+    $nom = trim($nom);
+    if ($nom === '' || mb_strlen($nom) > 80) return [0, 'refuse'];
+
+    foreach ($pdo->query("SELECT id, name, active FROM wsm_categories") as $r) {
+        if (mb_strtolower(trim((string) $r['name'])) !== mb_strtolower($nom)) continue;
+        $id = (int) $r['id'];
+        if ((int) $r['active']) return [$id, 'trouve'];
+        $pdo->prepare("UPDATE wsm_categories SET active = 1 WHERE id = ?")->execute([$id]);
+        return [$id, 'rallume'];
+    }
+    try {
+        $pdo->prepare("INSERT INTO wsm_categories (name, sort_order, active) VALUES (?,?,1)")
+            ->execute([$nom, (int) $pdo->query("SELECT COALESCE(MAX(sort_order),0)+1 FROM wsm_categories")->fetchColumn()]);
+        return [(int) $pdo->lastInsertId(), 'cree'];
+    } catch (Throwable $e) {
+        // Le nom est unique en base. Une exception qui remonte jusqu'à l'écran
+        // rendrait une page 500 — la saisie du produit disparaîtrait avec.
+        return [0, 'refuse'];
+    }
+}

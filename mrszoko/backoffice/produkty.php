@@ -19,6 +19,10 @@ require_once $API . '/cms.php';   // les textes du produit vivent dans wsm_shop_
 require_once $API . '/media.php';
 require_once $API . '/stock.php';
 require_once $API . '/brand.php';
+// La règle « ce rayon existe-t-il, faut-il le créer ou le rallumer » vit avec
+// le reste du domaine produit, pas dans cet écran : le panneau Kategorie et la
+// fiche produit l'appellent tous les deux.
+require_once $API . '/commerce.php';
 
 /** La table produits stocke des złotys, pas des grosze : conversion locale. */
 function zl($v): string { return number_format((float) $v, 2, ',', "\u{202F}") . "\u{202F}zł"; }
@@ -43,6 +47,52 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } else {
         $id = (string) ($_POST['id'] ?? '');
         $openId = $id;
+
+        // ---- « ALBO NOWA KATEGORIA », DEPUIS LA FICHE ----------------------
+        //
+        // LE PROBLÈME EXACT, RAPPORTÉ PAR LA MAISON : « je crée un produit,
+        // j'ouvre la liste des catégories, et je ne peux choisir que
+        // Czekolada ». C'était vrai. Le ménage a désactivé les cinq catégories
+        // héritées de la maquette de boulangerie — Pieczywo, Lody, Katering… —
+        // et il n'en restait plus qu'une seule active. La liste déroulante
+        // disait donc la vérité, et cette vérité était un cul-de-sac : un
+        // champ obligatoire avec un seul choix possible.
+        //
+        // Le panneau qui crée des catégories existait déjà, plus bas sur la
+        // page. Mais renvoyer quelqu'un ailleurs au milieu d'une saisie, c'est
+        // lui faire perdre ce qu'il a tapé et lui demander de comprendre
+        // l'architecture de l'écran avant de pouvoir ranger un produit.
+        //
+        // ON RÉSOUT LE NOM ICI, AVANT TOUT LE RESTE, et on le pose dans
+        // category_id : les deux chemins d'enregistrement — création et
+        // édition — lisent ce champ-là et n'ont pas à savoir d'où il vient.
+        // Un troisième endroit où traiter la catégorie aurait divergé.
+        $katNowa = trim((string) ($_POST['kat_nowa'] ?? ''));
+        // ON NE CRÉE PAS UN RAYON POUR UNE SAISIE QUI VA ÊTRE REFUSÉE. À la
+        // création, le nom du produit est le seul champ qui peut tout faire
+        // échouer ; sans cette garde, une fiche envoyée sans nom laisserait
+        // derrière elle une catégorie neuve — et une catégorie ne se supprime
+        // pas, elle s'éteint. La corbeille se remplirait de « Mąk », « Maka »,
+        // « Mąka  » au premier tâtonnement.
+        if ($katNowa !== '' && !(isset($_POST['nowy']) && trim((string) ($_POST['nazwa'] ?? '')) === '')) {
+            [$kidN, $quoi] = wsm_categorie_assure($pdo, $katNowa);
+            if ($kidN > 0) {
+                // Le nom tapé l'emporte sur la liste déroulante : les deux
+                // chemins d'enregistrement — création et édition — lisent
+                // category_id et n'ont pas à savoir d'où il vient. Un
+                // troisième endroit où traiter la catégorie aurait divergé.
+                $_POST['category_id'] = (string) $kidN;
+                if ($quoi === 'cree') {
+                    wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Dodanie', 'wsm_categories #' . $kidN, 'Sieć');
+                    $flash = 'Dodano kategorię ' . $katNowa . '.';
+                } elseif ($quoi === 'rallume') {
+                    wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Zmiana', 'wsm_categories #' . $kidN, 'Sieć');
+                    $flash = 'Włączono z powrotem kategorię ' . $katNowa . '.';
+                }
+            } else {
+                $fieldErrors['category_id'] = 'nie udalo sie dodac kategorii';
+            }
+        }
 
         // ---- CRÉER UN PRODUIT ----------------------------------------------
         //
@@ -152,17 +202,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                         $flash = 'Inna kategoria nazywa sie juz tak samo.'; $kind = 'err';
                     }
                 } else {
-                    try {
-                        $pdo->prepare("INSERT INTO wsm_categories (name, sort_order, active) VALUES (?,?,1)")
-                            ->execute([$knom, (int) $pdo->query("SELECT COALESCE(MAX(sort_order),0)+1 FROM wsm_categories")->fetchColumn()]);
-                        $kid = (int) $pdo->lastInsertId();
-                        $flash = 'Dodano kategorię ' . $knom . '.';
-                    } catch (Throwable $e) {
-                        // Le nom est unique en base. Sans ce rattrapage, une
-                        // saisie en double renvoyait une page 500 : l'ecran
-                        // disparaissait au lieu de dire ce qui n'allait pas.
-                        $kid = 0;
-                        $flash = 'Kategoria o tej nazwie juz istnieje.'; $kind = 'err';
+                    // MÊME RÈGLE QUE DEPUIS LA FICHE PRODUIT. Avant, taper ici
+                    // le nom d'un rayon éteint répondait « ce nom existe
+                    // déjà » — vrai, et parfaitement inutile : le rayon était
+                    // dans le tableau juste au-dessus, avec son bouton
+                    // « Włącz ». Deux gestes pour un, et il fallait avoir
+                    // compris pourquoi.
+                    [$kid, $quoi] = wsm_categorie_assure($pdo, $knom);
+                    if ($kid === 0) {
+                        $flash = 'Nie udało się dodać kategorii ' . $knom . '.'; $kind = 'err';
+                    } else {
+                        $flash = $quoi === 'rallume' ? 'Włączono z powrotem kategorię ' . $knom . '.'
+                               : ($quoi === 'trouve' ? 'Kategoria ' . $knom . ' już jest na liście.'
+                                                     : 'Dodano kategorię ' . $knom . '.');
                     }
                 }
                 wsm_audit($pdo, (string) ($me['nom'] ?? ''), $kid ? 'Zmiana' : 'Dodanie',
@@ -215,8 +267,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // à l'histoire : les commandes passées, les factures et les mouvements
         // continuent de le nommer. C'est presque toujours ce qu'on veut.
         if (isset($_POST['marka_zapisz']) || isset($_POST['marka_usun'])
-            || isset($_POST['kat_zapisz']) || isset($_POST['kat_akt'])) {
-            // déjà traité au-dessus
+            || isset($_POST['kat_zapisz']) || isset($_POST['kat_akt'])
+            || (isset($_POST['nowy']) && !$creation)) {
+            // Déjà traité au-dessus.
+            //
+            // LA CRÉATION REFUSÉE FAIT PARTIE DE CETTE LISTE. Quand elle
+            // réussit, elle se poursuit volontairement dans le chemin
+            // d'édition — c'est ce qui fait qu'il n'y a qu'un seul code
+            // d'enregistrement. Quand elle échoue, l'identifiant est vide, et
+            // la fiche tombait ici avec « Nie znaleziono produktu » : un
+            // message qui parle d'un produit inexistant à quelqu'un qui
+            // essayait justement d'en créer un, et qui EFFAÇAIT au passage la
+            // vraie raison du refus — « nazwa wymagana » — affichée sous le
+            // champ concerné.
         }
         elseif (isset($_POST['aktywacja'])) {
             $on = $_POST['aktywacja'] === '1' ? 1 : 0;
@@ -465,8 +528,18 @@ $slugProp = function (string $nom, string $id) use ($pdo): string {
 //
 // $vv() redonne donc la saisie quand l'enregistrement a échoué SUR CE
 // produit-là. Ailleurs, la base fait foi.
-$vv = function (string $champ, string $defaut) use (&$fieldErrors, &$openId, &$id) {
-    $vise = ($openId !== '' && isset($id) && $openId === $id);
+// Vrai UNIQUEMENT pendant le rendu de la fiche de création, et seulement si
+// cette création vient d'être refusée. Posé par $fiszka avant de dessiner.
+$enCreation = false;
+
+$vv = function (string $champ, string $defaut) use (&$fieldErrors, &$openId, &$id, &$enCreation) {
+    // LA FICHE DE CRÉATION N'A PAS D'IDENTIFIANT, et c'est par l'identifiant
+    // qu'on reconnaît la fiche à re-remplir. Sans ce premier cas, une création
+    // refusée — un nom oublié, une catégorie non choisie — renvoyait un
+    // formulaire vierge : tout ce qui avait été tapé était à retaper. Le
+    // drapeau est indispensable, car un identifiant vide « vise » aussi les
+    // vingt-deux fiches produit qui se dessinent juste après.
+    $vise = $enCreation || ($openId !== '' && isset($id) && $openId === $id);
     return ($fieldErrors && $vise && isset($_POST[$champ])) ? (string) $_POST[$champ] : $defaut;
 };
 
@@ -567,7 +640,10 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
   // $nowy ne change que trois choses : le titre du repli, le bouton posté, et
   // les gestes qui n'ont pas de sens sur un produit qui n'existe pas encore
   // (supprimer, désactiver, voir en boutique).
-  $fiszka = function (array $p, bool $nowy = false) use (&$fieldErrors, $openId, $isAdmin, $csrf, $kategorie, $brands, $txt, $vv, $slugProp, $pdo) {
+  $fiszka = function (array $p, bool $nowy = false) use (&$fieldErrors, &$enCreation, $openId, $isAdmin, $csrf, $kategorie, $brands, $txt, $vv, $slugProp, $pdo) {
+    // Les fiches se dessinent l'une après l'autre : ce drapeau ne vaut que
+    // pour celle qu'on est en train de rendre.
+    $enCreation = $nowy && (bool) $fieldErrors;
 
     // Un produit qui n'existe pas encore n'a aucune de ces valeurs : tout
     // passe par ?? pour que la MÊME fiche serve les deux cas.
@@ -698,7 +774,11 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
                 // base, posée au semis, figée ensuite : un produit rangé au
                 // mauvais endroit y restait. ?>
           <label class="f">Kategoria
-            <select name="category_id"<?= $isAdmin ? '' : ' disabled' ?><?= $nowy ? ' required' : '' ?>>
+            <?php // PAS de « required » : on peut tout aussi bien taper un nom neuf
+                  // dans le champ d'à côté, et le navigateur refuserait d'envoyer
+                  // le formulaire en réclamant un choix dans la liste. Le
+                  // contrôle reste côté serveur, où il voit les deux champs. ?>
+            <select name="category_id"<?= $isAdmin ? '' : ' disabled' ?>>
               <?php if ($nowy): ?><option value="">— wybierz —</option><?php endif; ?>
               <?php $catAkt = (int) $vv('category_id', (string) (int) $p['category_id']);
                     foreach ($kategorie as $k): ?>
@@ -707,6 +787,15 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
             </select>
             <?php if (isset($fieldErrors['category_id']) && $open): ?>
               <small class="err"><?= h($fieldErrors['category_id']) ?></small>
+            <?php endif; ?>
+            <?php if ($isAdmin): ?>
+            <?php // Taper un nom ici crée le rayon et y range le produit, du
+                  // même geste. Un nom déjà pris — y compris un rayon éteint —
+                  // rallume celui qui existe au lieu de refuser. ?>
+            <input type="text" name="kat_nowa" maxlength="80" placeholder="albo wpisz nową kategorię"
+                   value="<?= h($vv('kat_nowa', '')) ?>">
+            <small>Nowa nazwa tworzy kategorię i przypisuje do niej produkt.
+              Wszystkie kategorie <a class="view" href="#kategorie">niżej na tej stronie</a>.</small>
             <?php else: ?><small>Kategorie zmieniasz <a class="view" href="#kategorie">niżej na tej stronie</a>.</small><?php endif; ?>
           </label>
 
