@@ -503,3 +503,11 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .za-kg { display: block; font-size: var(--text-2xs); color: var(--text-muted);
          font-weight: var(--weight-regular); letter-spacing: 0; margin-top: 2px; }
 .price--lg .za-kg { font-size: var(--text-xs); margin-top: 4px; }
+
+/* La photo du hero, quand elle est posée dans la console. Le dégradé reste
+   par-dessous : si le fichier manque ou tarde, le haut de page ne devient pas
+   un rectangle blanc avec du texte blanc dessus. */
+.hero--foto { position: relative; background-image:
+    linear-gradient(90deg, rgba(43,26,18,.92) 0%, rgba(43,26,18,.72) 45%, rgba(43,26,18,.45) 100%),
+    var(--hero-foto);
+  background-size: cover; background-position: center; }

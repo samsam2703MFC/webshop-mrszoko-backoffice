@@ -149,7 +149,7 @@ if ($orphelins): ?>
 </p>
 <?php endif; ?>
 
-<form method="post">
+<form method="post" enctype="multipart/form-data">
 <?php foreach ($groups as $g => [$title, $intro]):
   $fields = array_filter($view, fn($f) => $f['group'] === $g); ?>
   <div class="panel">
@@ -189,6 +189,16 @@ if ($orphelins): ?>
             <option value="<?= h($o) ?>"<?= (string) $f['show'] === $o ? ' selected' : '' ?>><?= h($o) ?></option>
             <?php endforeach; ?>
           </select>
+        <?php elseif ($f['type'] === 'image'): ?>
+          <?php $img = (string) ($f['show'] ?? ''); $aImg = $img !== '' && $img !== 'xxxx'; ?>
+          <?php if ($aImg): ?>
+            <img src="<?= h(img_src($img)) ?>" alt="" class="ust-foto">
+          <?php endif; ?>
+          <input type="file" name="<?= h($f['form']) ?>" accept="image/jpeg,image/png,image/webp">
+          <?php if ($aImg): ?>
+          <label class="chk"><input type="checkbox" name="<?= h($f['form']) ?>__usun" value="1"><span>Usuń zdjęcie przy zapisie</span></label>
+          <?php endif; ?>
+          <small><?= $aImg ? 'Wybierz plik, żeby podmienić. Puste pole = bez zmian.' : 'JPEG · PNG · WebP, maks. 8 MB.' ?></small>
         <?php elseif ($f['type'] === 'pem'): ?>
           <textarea name="<?= h($f['form']) ?>" rows="4" class="pem" spellcheck="false"
                     placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----"></textarea>

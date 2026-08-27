@@ -154,6 +154,41 @@ ok('un document deja depose n y retourne pas', wsm_ksef_blockers($sq, ['ksef_num
 $pdo->exec("DELETE FROM wsm_settings WHERE cle LIKE 'ksef.%'");
 echo "\n(remis en etat : $avant reglage(s) ksef au depart, 0 laisse)\n";
 
+// ---- Le champ image : vide ne veut pas dire « efface » ---------------------
+//
+// C'est la même règle que pour la photo d'un produit, et le même piège : là,
+// le formulaire rendait le champ vide et chaque « Zapisz » effaçait l'image.
+// Ici l'écran poste un <input type="file"> qui reste vide tant qu'on ne
+// choisit rien — enregistrer les réglages ne doit pas décrocher la photo du
+// haut de page.
+echo "\n-- pole obrazu: puste to nie znaczy skasuj --\n";
+$champs = wsm_settings_fields();
+ok('le champ image existe', ($champs['hero_image'][4] ?? '') === 'image', $champs['hero_image'][4] ?? null);
+ok('… et il vise la configuration de la vitrine',
+   ($champs['hero_image'][2] ?? []) === ['shop', 'hero_image'], $champs['hero_image'][2] ?? null);
+
+$pdo->prepare("DELETE FROM wsm_settings WHERE cle = ?")->execute(['hero_image']);
+$pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES (?,?,0,?,?)")
+    ->execute(['hero_image', 'media/aaaaaaaaaaaaaaaaaaaaaaaa.webp', date('Y-m-d H:i:s'), 'test']);
+
+// Enregistrement SANS fichier ni case « supprimer » : l'image doit rester.
+//
+// On repasse la valeur EXISTANTE d'un autre champ : il faut bien poster
+// quelque chose pour que la boucle tourne, mais un test ne doit rien laisser
+// derrière lui. Écrit en dur, « https://example.test » restait en base et
+// faisait échouer une autre suite, qui vérifie l'adresse de la boutique.
+$r = [];
+$urlAvant = (string) ($pdo->query("SELECT val FROM wsm_settings WHERE cle = 'shop_url'")->fetchColumn() ?: '');
+wsm_settings_save($pdo, ['shop_url' => $urlAvant], 'test', $r);
+$reste = (string) $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'hero_image'")->fetchColumn();
+ok('un enregistrement sans fichier laisse l\'image en place', $reste === 'media/aaaaaaaaaaaaaaaaaaaaaaaa.webp', $reste);
+
+// La case « supprimer », elle, est un geste explicite.
+wsm_settings_save($pdo, ['hero_image__usun' => '1'], 'test', $r);
+$apres = (string) $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'hero_image'")->fetchColumn();
+ok('la case « Usuń » retire l\'image', wsm_setting_blank($apres), $apres);
+$pdo->prepare("DELETE FROM wsm_settings WHERE cle = ?")->execute(['hero_image']);
+
 echo "\n" . str_repeat('-', 60) . "\n";
 echo "  $pass passed, $fail failed\n";
 exit($fail === 0 ? 0 : 1);

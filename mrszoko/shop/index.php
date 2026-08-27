@@ -362,7 +362,17 @@ if ($page === '') {
     seo_org($S, $lang, WSM_SHOP_DEFAULT_LANG);
     ?>
 <main>
-  <section class="hero">
+  <?php // LA PHOTO DU HERO, si elle est posée dans Ustawienia.
+        //
+        // Le voile n'est pas décoratif : le titre est blanc, et une photo
+        // claire le rendrait illisible. Il est posé EN CSS par-dessus l'image,
+        // pas incrusté dans le fichier, pour qu'on puisse changer la photo
+        // sans refaire le montage. Sans photo, le dégradé d'origine reste —
+        // la page ne dépend pas d'un fichier qui peut manquer.
+        $heroImg = trim((string) (wsm_config()['shop']['hero_image'] ?? ''));
+        if ($heroImg === '' || strtolower($heroImg) === 'xxxx') $heroImg = ''; ?>
+  <section class="hero<?= $heroImg !== '' ? ' hero--foto' : '' ?>"<?= $heroImg !== ''
+      ? ' style="--hero-foto:url(' . e($heroImg) . ')"' : '' ?>>
     <div class="wrap hero-in">
       <p class="eyebrow"><?= e($S['home.eyebrow'] ?? '') ?></p>
       <h1><?= e($S['home.title'] ?? '') ?></h1>

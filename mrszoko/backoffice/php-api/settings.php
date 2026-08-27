@@ -106,6 +106,13 @@ function wsm_settings_fields(): array {
         'mail.smtp_pass'   => ['mail', 'Hasło SMTP',     ['mail', 'smtp_pass'], 'WSM_MAIL_SMTP_PASS', 'secret', 'Zapisane w bazie, nigdy nie pokazywane ponownie.'],
         'mail.smtp_secure' => ['mail', 'Szyfrowanie',    ['mail', 'smtp_secure'], 'WSM_MAIL_SMTP_SECURE', 'select:tls|ssl|brak', 'tls dla portu 587, ssl dla 465.'],
 
+        // L'IMAGE DU HERO. Le haut de la page d'accueil était un dégradé :
+        // joli, mais muet. Une photo y dit en une seconde ce que le texte met
+        // trois lignes à expliquer. Elle se dépose ici, comme une photo de
+        // produit — même stockage, mêmes contrôles, même limite de 8 Mo.
+        'hero_image' => ['sklep', 'Zdjęcie na stronie głównej', ['shop', 'hero_image'], 'WSM_SHOP_HERO', 'image',
+                         'Szerokie zdjęcie w tle nagłówka. Najlepiej ciemne albo ze spokojnym miejscem po lewej — tam stoi tytuł. Puste = gradient jak dotąd.'],
+
         'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z tpay.'],
 
         // ---- Faktury : ce qui figure sur le document ----------------------
@@ -226,9 +233,31 @@ function wsm_settings_save(PDO $pdo, array $post, string $actor = '', array &$re
     $ins = $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES (?,?,?,?,?)");
     foreach ($fields as $key => [$grp, $label, $path, $env, $type, $help]) {
         $formKey = str_replace('.', '__', $key);
-        if (!array_key_exists($formKey, $post)) continue;
-        $v = trim((string) $post[$formKey]);
+        // Un <input type="file"> seul n'apparaît PAS dans $_POST : sans cette
+        // exception, le champ image sortait de la boucle avant d'être lu, et
+        // l'envoi ne faisait rien sans rien dire.
+        $poste = array_key_exists($formKey, $post)
+              || ($type === 'image' && (isset($_FILES[$formKey]) || !empty($post[$formKey . '__usun'])));
+        if (!$poste) continue;
+        $v = trim((string) ($post[$formKey] ?? ''));
         if ($type === 'secret' && ($v === '' || str_starts_with($v, '•'))) continue;   // inchangé
+        if ($type === 'image') {
+            // Le formulaire poste un champ texte VIDE et, à côté, un fichier.
+            // Vide + aucun fichier = on ne touche à rien : sinon enregistrer
+            // l'écran effacerait l'image à chaque passage, exactement comme le
+            // « Zapisz » qui effaçait la photo d'un produit.
+            $sup = !empty($post[$formKey . '__usun']);
+            $f = $_FILES[$formKey] ?? null;
+            if (!$sup && (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE)) continue;
+            if ($sup) {
+                $v = WSM_SETTING_PLACEHOLDER;
+            } else {
+                require_once __DIR__ . '/media.php';
+                [$url, $err] = wsm_media_store($f);
+                if ($err !== null) { $refus[$key] = $err; continue; }
+                $v = (string) $url;
+            }
+        }
         if ($type === 'pem') {
             // Vide = on ne touche à rien : le champ s'affiche toujours vide,
             // sinon il faudrait recoller la clé à chaque enregistrement.
