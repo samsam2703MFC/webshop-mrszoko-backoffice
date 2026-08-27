@@ -2105,6 +2105,19 @@ jobs:
           # rsync tourne SANS --delete et l'assemblage a déjà oublié des
           # fichiers : deux pièces sur trois, et l'écran répond 200 avec des
           # pastilles de 24 px que personne ne peut viser au pouce.
+          # ── LA PHOTO DU HAUT DE PAGE ───────────────────────────────────────
+          # Trois pièces, encore une fois, et aucune ne dit rien toute seule :
+          # sans le type « image » le champ accepte un fichier et n'enregistre
+          # rien, sans la section « shop » dans config.php le réglage ne
+          # redescend jamais jusqu'à la vitrine, et sans la classe le fond
+          # reste le dégradé. Le rsync tourne sans --delete : un fichier oublié
+          # à l'assemblage laisse l'ancienne version en place, silencieusement.
+          echo "== zdjecie na stronie glownej =="
+          grep -q "'hero_image'" "$DIR_BO/api/settings.php" \
+            && grep -q "'shop' =>" "$DIR_BO/api/config.php" \
+            && grep -q 'hero--foto' "$DIR_BO/../shop/shop.css" \
+            && echo "  pole zdjecia + config + styl: obecne" \
+            || { echo "  ^ NOT OK : pole zdjecia na stronie glownej niekompletne"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in
