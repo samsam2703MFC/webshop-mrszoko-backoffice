@@ -23,12 +23,6 @@ require_once $API . '/brand.php';
 /** La table produits stocke des złotys, pas des grosze : conversion locale. */
 function zl($v): string { return number_format((float) $v, 2, ',', "\u{202F}") . "\u{202F}zł"; }
 
-// Le chemin enregistré en base est relatif à la boutique (« media/… ») :
-// depuis /backoffice/ il faut remonter d'un cran pour l'afficher.
-function img_src(string $url): string {
-    return str_starts_with($url, 'media/') ? '../shop/' . $url : $url;
-}
-
 // Jeton anti-CSRF, émis avant toute sortie (un en-tête ne s'ajoute plus après).
 $csrf = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
 if (!preg_match('/^[a-f0-9]{32}$/', $csrf)) {

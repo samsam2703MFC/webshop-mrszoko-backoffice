@@ -151,6 +151,16 @@ function wsm_console_mesure(PDO $pdo, array $me, string $ecran): void {
 }
 
 /** Le répertoire de l'API, quel que soit le nom du dossier déployé. */
+// Le chemin enregistré en base est relatif à la boutique (« media/… ») :
+// depuis /backoffice/ il faut remonter d'un cran pour l'afficher. Partagé,
+// parce que deux écrans l'utilisent — recopié, il aurait divergé le jour où
+// le répertoire des médias change.
+if (!function_exists('img_src')) {
+    function img_src(string $url): string {
+        return str_starts_with($url, 'media/') ? '../shop/' . $url : $url;
+    }
+}
+
 function console_api_dir(): string {
     return is_dir(__DIR__ . '/api') ? __DIR__ . '/api' : __DIR__ . '/php-api';
 }

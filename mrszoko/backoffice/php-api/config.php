@@ -46,6 +46,16 @@ $cfg = [
     // de notification envoyées à tpay. Vide : déduite de la requête en cours.
     'shop_url' => getenv('WSM_SHOP_URL') ?: '',
 
+    // ---- Vitrine : ce qui se règle depuis la console -----------------------
+    // VIDE PAR DÉFAUT, et ce n'est pas un détail : wsm_settings_apply() laisse
+    // la main au fichier de configuration dès qu'il a posé une valeur non
+    // vide. Une valeur en dur ici rendrait le champ de l'écran Ustawienia
+    // inopérant — il accepterait l'image, dirait « Zapisano », et rien ne
+    // changerait sur le site.
+    'shop' => [
+        'hero_image' => getenv('WSM_SHOP_HERO') ?: '',
+    ],
+
     // ---- tpay.com : encaissement ------------------------------------------
     // AUCUN défaut. Sans client_id/secret, aucune transaction n'est créée ;
     // sans security_code, aucune notification n'est acceptée (fail-closed).

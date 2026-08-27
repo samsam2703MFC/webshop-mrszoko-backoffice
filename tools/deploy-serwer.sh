@@ -205,6 +205,14 @@ grep -q 'fiszka = function' site/backoffice/produkty.php \
   && grep -q 'id="kategorie"' site/backoffice/produkty.php \
   || { echo "  fiche partagée ou gestion des catégories absente"; exit 1; }
 echo "  jedna fiszka (tworzenie + edycja) i zarzadzanie kategoriami : obecne"
+# LA PHOTO DU HERO. Les trois pieces partent ensemble : sans le type « image »
+# le champ n'enregistre rien, sans la classe le fond reste un degrade, et sans
+# la section « shop » dans config.php le reglage ne redescend jamais.
+grep -q "'hero_image'" site/backoffice/api/settings.php \
+  && grep -q "'shop' =>" site/backoffice/api/config.php \
+  && grep -q 'hero--foto' site/shop/shop.css \
+  || { echo "  champ photo du hero incomplet dans l'assemblage"; exit 1; }
+echo "  zdjecie na stronie glownej (pole + config + styl) : obecne"
 echo "  login, tokens, boutons de statut, reprise du compte : présents"
 
 echo "══ 4/6 · mise en place dans $DEPLOY_DIR ═══════════════════════════════"
