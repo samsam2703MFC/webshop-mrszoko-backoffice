@@ -1985,6 +1985,20 @@ jobs:
               '?') echo "  ^ ATTENTION : nie udało się sprawdzić martwego klucza";;
               *) echo "  ^ ATTENTION : story.pro.mail_subject nadal w bazie ($NMS) — edytowalny, bez efektu";;
             esac
+            # MÊME CONTRÔLE POUR L'ANCIEN DÉLAI D'EXPÉDITION. story.strip.1
+            # annonçait « Wysyłka w 48 h » au-dessus d'un bloc qui promet 24 h.
+            # Le bandeau lit maintenant le champ des promesses, donc plus
+            # personne ne lit celui-là : resté en base, il s'afficherait encore
+            # dans Treści, quelqu'un corrigerait un jour un délai que la page
+            # n'affiche plus, et le croirait corrigé. On regarde la BASE, pas
+            # l'exécution du script : « contenu synchronisé » ne prouve rien.
+            NST=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e \
+              "SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n WHERE k='story.strip.1'" 2>/dev/null || echo '?')
+            case "$NST" in
+              0) echo "  martwy klucz story.strip.1 usunięty — potwierdzone";;
+              '?') echo "  ^ ATTENTION : nie udało się sprawdzić story.strip.1";;
+              *) echo "  ^ ATTENTION : story.strip.1 nadal w bazie ($NST) — dwa terminy wysyłki mogą wrócić";;
+            esac
           fi
 
           if [ "$fail" = "0" ]; then echo "ALL SHOP CHECKS OK"; else echo "SHOP CHECK FAILED"; exit 1; fi
