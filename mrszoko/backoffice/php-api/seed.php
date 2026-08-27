@@ -619,7 +619,12 @@ function wsm_content_forces(): array {
             // resterait éditable dans Treści : quelqu'un le retoucherait un
             // jour, en soignerait la traduction, et rien ne changerait sur le
             // site. Un texte sans lecteur, on l'enlève.
-            'purge' => ['story.pro.mail_subject'],
+            // story.strip.1 disait « Wysyłka w 48 h » juste au-dessus d'un
+            // bloc qui promet 24 h. Le bandeau lit maintenant le MÊME champ
+            // que ce bloc, donc plus personne ne lit celui-ci : laissé en
+            // base, il resterait modifiable dans Treści, et quelqu'un
+            // corrigerait un jour un délai que la page n'affiche plus.
+            'purge' => ['story.pro.mail_subject', 'story.strip.1'],
         ],
     ];
 }

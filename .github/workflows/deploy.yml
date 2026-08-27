@@ -1943,9 +1943,17 @@ jobs:
           # suppose un client de messagerie configuré : au bureau il ouvre
           # Outlook chez les uns et rien du tout chez les autres, et le
           # prospect referme l'onglet sans qu'on le sache jamais.
-          case "$HOME_HTML" in
-            *'mailto:'*'#pro'*|*'#pro'*'mailto:'*)
-              echo "  ^ ATTENTION : blok B2B nadal proponuje mailto";;
+          # ON NE REGARDE QUE LA SECTION B2B, pas la page entière. Le motif
+          # précédent cherchait « mailto: » n'importe où avant ou après
+          # « #pro » : le pied de page porte l'adresse de contact, la barre du
+          # haut porte le lien « #pro », et l'avertissement tombait à CHAQUE
+          # déploiement sur une page parfaitement saine. Un contrôle qui crie
+          # au loup à tous les coups apprend à ignorer les contrôles.
+          PRO_HTML=$(printf '%s' "$HOME_HTML" | tr '\n' ' ' \
+                     | sed -e 's/.*id="pro"//' -e 's|</section>.*||')
+          case "$PRO_HTML" in
+            *'mailto:'*) echo "  ^ ATTENTION : blok B2B nadal proponuje mailto";;
+            *) echo "  blok B2B bez mailto — potwierdzone";;
           esac
           case "$HOME_HTML" in
             *'kontakt?temat=wspolpraca'*|*'kontakt&#63;temat=wspolpraca'*)
