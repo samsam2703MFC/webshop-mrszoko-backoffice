@@ -1999,6 +1999,18 @@ jobs:
               '?') echo "  ^ ATTENTION : nie udało się sprawdzić story.strip.1";;
               *) echo "  ^ ATTENTION : story.strip.1 nadal w bazie ($NST) — dwa terminy wysyłki mogą wrócić";;
             esac
+            # ET ON DIT LE DÉLAI À VOIX HAUTE. Le champ est unique depuis qu'on
+            # a retiré son doublon, mais « unique » ne veut pas dire « juste » :
+            # la synchronisation est un INSERT IGNORE, donc la valeur en ligne
+            # est celle de la base, pas celle du dépôt, et personne ne la
+            # relisait jamais. Une promesse de livraison fausse ne provoque
+            # aucune erreur — elle provoque des clients qui attendent.
+            TERM=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e \
+              "SELECT v FROM mrszoko.wsm_shop_i18n WHERE lang='pl' AND k='promise.1.t'" 2>/dev/null || echo '?')
+            case "$TERM" in
+              '?'|'') echo "  ^ ATTENTION : nie udało się odczytać terminu wysyłki";;
+              *) echo "  termin wysyłki na stronie: « $TERM » (jedno pole, dwa miejsca)";;
+            esac
           fi
 
           if [ "$fail" = "0" ]; then echo "ALL SHOP CHECKS OK"; else echo "SHOP CHECK FAILED"; exit 1; fi
