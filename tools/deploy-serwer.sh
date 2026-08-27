@@ -213,6 +213,16 @@ grep -q "'hero_image'" site/backoffice/api/settings.php \
   && grep -q 'hero--foto' site/shop/shop.css \
   || { echo "  champ photo du hero incomplet dans l'assemblage"; exit 1; }
 echo "  zdjecie na stronie glownej (pole + config + styl) : obecne"
+# LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
+# rayons de la maquette : il n'en restait qu'un allume, sur un champ
+# obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte
+# un nom de rayon et le jette en silence.
+grep -q 'function wsm_categorie_assure' site/backoffice/api/commerce.php \
+  && grep -q 'kat_nowa' site/backoffice/produkty.php \
+  && grep -q "commerce.php" site/backoffice/produkty.php \
+  || { echo "  nowa kategoria z fiszki produktu: niekompletna"; exit 1; }
+echo "  nowa kategoria z fiszki produktu : obecna"
+
 echo "  login, tokens, boutons de statut, reprise du compte : présents"
 
 echo "══ 4/6 · mise en place dans $DEPLOY_DIR ═══════════════════════════════"

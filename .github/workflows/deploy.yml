@@ -2126,6 +2126,17 @@ jobs:
             && grep -q 'hero--foto' "$DIR_BO/../shop/shop.css" \
             && echo "  pole zdjecia + config + styl: obecne" \
             || { echo "  ^ NOT OK : pole zdjecia na stronie glownej niekompletne"; fail=1; }
+          # ── LE RAYON QU'ON CRÉE EN RANGEANT UN PRODUIT ─────────────────────
+          # Le ménage a éteint cinq catégories de la maquette : il n'en restait
+          # qu'une allumée, sur un champ OBLIGATOIRE. La fiche produit porte
+          # donc « albo wpisz nową kategorię ». Deux pièces sur trois, et
+          # l'écran accepte un nom de rayon et le jette sans rien dire.
+          echo "== nowa kategoria z fiszki produktu =="
+          grep -q 'function wsm_categorie_assure' "$DIR_BO/api/commerce.php" \
+            && grep -q 'kat_nowa' "$DIR_BO/produkty.php" \
+            && grep -q 'commerce.php' "$DIR_BO/produkty.php" \
+            && echo "  reguła + pole + wczytanie: obecne" \
+            || { echo "  ^ NOT OK : nowa kategoria z fiszki niekompletna"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in
