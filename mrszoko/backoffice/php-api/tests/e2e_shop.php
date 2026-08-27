@@ -84,11 +84,27 @@ foreach (['pl', 'uk', 'en'] as $L) {
     [, $r] = http('GET', "$BASE/shop/catalog?lang=$L");
     $S = $r['strings'] ?? [];
     $missing = [];
-    foreach (['story.pro.title', 'story.pro.cta', 'story.strip.1', 'footer.email'] as $k) {
+    // story.strip.1 n'est plus dans la liste : le bandeau du haut lit
+    // désormais promise.1.t, le MÊME champ que le bloc des promesses, pour
+    // qu'un seul délai d'expédition existe. L'ancien libellé est purgé.
+    foreach (['story.pro.title', 'story.pro.cta', 'promise.1.t', 'footer.email'] as $k) {
         if (($S[$k] ?? '') === '') $missing[] = $k;
     }
     ok("treść strony marki dostępna w « $L »", !$missing, $missing);
 }
+// ── UN SEUL DÉLAI D'EXPÉDITION ──────────────────────────────────────────
+// La page annonçait « Wysyłka w 48 h » dans le bandeau du haut et « Wysyłka
+// w 24 h » trois centimètres plus bas. Deux champs pour un seul engagement
+// divergent toujours : il n'en reste qu'un, et l'autre est retiré de la base
+// pour que personne ne corrige un texte que plus rien n'affiche.
+[, $rD] = http('GET', "$BASE/shop/catalog?lang=pl");
+ok('le libellé orphelin du bandeau a disparu de la base',
+   !isset($rD['strings']['story.strip.1']), array_keys(array_filter(
+       $rD['strings'] ?? [], fn($k) => str_starts_with($k, 'story.strip.'), ARRAY_FILTER_USE_KEY)));
+$vitrine = (string) @file_get_contents(__DIR__ . '/../../../shop/index.php');
+ok('… et le bandeau lit le champ du bloc des promesses',
+   substr_count($vitrine, "\$S['promise.1.t']") >= 1 && !str_contains($vitrine, "story.strip.1"));
+
 [, $rPl] = http('GET', "$BASE/shop/catalog?lang=pl");
 [, $rEn] = http('GET', "$BASE/shop/catalog?lang=en");
 ok('treść strony marki jest przetłumaczona, nie skopiowana',
