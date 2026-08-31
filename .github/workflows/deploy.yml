@@ -2168,6 +2168,19 @@ jobs:
             && grep -q '\.termin' "$DIR_BO/console.css" \
             && echo "  kolumna + reguła + kolejka + styl: obecne" \
             || { echo "  ^ NOT OK : licznik terminu niekompletny"; fail=1; }
+          # ── AUCUN ÉCRAN N'ACCEPTE UN POST NU ───────────────────────────────
+          # Six écrans n'avaient aucun jeton — dont Ustawienia, où l'on colle
+          # un mot de passe SMTP, et Użytkownicy, où l'on crée des comptes et
+          # où l'on peut désormais en supprimer. Une page piégée ouverte dans
+          # un autre onglet suffisait : le navigateur joint le cookie de
+          # session tout seul, et l'audit note le geste au nom de la victime.
+          echo "== token CSRF konsoli =="
+          grep -q 'function console_csrf_ok' "$DIR_BO/console.php" \
+            && grep -q 'console_csrf_ok()' "$DIR_BO/uzytkownicy.php" \
+            && grep -q 'console_csrf_ok()' "$DIR_BO/ustawienia.php" \
+            && grep -q "POST\['usun'\]" "$DIR_BO/uzytkownicy.php" \
+            && echo "  token + usuwanie konta: obecne" \
+            || { echo "  ^ NOT OK : brak tokenu CSRF albo usuwania konta"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in

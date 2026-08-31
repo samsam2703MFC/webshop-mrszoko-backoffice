@@ -259,6 +259,16 @@ grep -q 'function wsm_order_termin' site/backoffice/api/invoice.php \
   && grep -q '\.termin' site/backoffice/console.css \
   || { echo "  licznik terminu wysylki: niekompletny"; exit 1; }
 echo "  licznik terminu wysylki (kolumna + regula + kolejka + styl) : obecny"
+# AUCUN EKRAN NIE PRZYJMUJE POST BEZ TOKENU. Sest ekranow nie mialo go
+# wcale, w tym Ustawienia i Uzytkownicy. Kontrola jest tutaj, bo dodanie
+# nowego ekranu bez tokenu nie rzuca zadnego bledu.
+grep -q 'function console_csrf_ok' site/backoffice/console.php \
+  && grep -q 'console_csrf_ok()' site/backoffice/uzytkownicy.php \
+  && grep -q 'console_csrf_ok()' site/backoffice/ustawienia.php \
+  && grep -q "POST\['usun'\]" site/backoffice/uzytkownicy.php \
+  || { echo "  token CSRF konsoli albo usuwanie konta: niekompletne"; exit 1; }
+echo "  token CSRF konsoli + usuwanie konta : obecne"
+
 
 
 

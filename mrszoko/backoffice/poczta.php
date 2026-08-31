@@ -27,6 +27,10 @@ $view  = ($_GET['widok'] ?? '') === 'szablony' ? 'szablony' : 'poczta';
 
 // ---- Actions (réservées à Centrala) ---------------------------------------
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    // Sans ce jeton, une page tierce fait poster ce formulaire par le
+    // navigateur de quelqu'un qui a sa session ouverte, et la console
+    // execute la demande comme si elle venait de lui.
+    if (!console_csrf_ok()) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może wysyłać wiadomości.'; $flashKind = 'err';
     } elseif (isset($_POST['wyslij'])) {
@@ -245,6 +249,7 @@ console_crumbs($detail
   <div class="panel">
     <h2>Szablon <?= h($edit['code']) ?> · <?= h(strtoupper((string) $edit['lang'])) ?></h2>
     <form method="post">
+      <?= console_csrf_field() ?>
       <input type="hidden" name="szablon" value="<?= (int) $edit['id'] ?>">
       <div class="grid2">
         <label class="field"><span>Nazwa robocza</span>
@@ -339,6 +344,7 @@ console_crumbs($detail
       </div>
       <?php elseif ($iaPrete && $isAdmin): ?>
       <form method="post" style="margin-top:12px">
+      <?= console_csrf_field() ?>
         <p class="muted small">
           Wiadomość wygląda na napisaną <b><?= h(wsm_lang_po($langDetectee)) ?></b><?php
           if ($confiance < 0.3): ?> <span class="tag">niepewne</span><?php endif; ?>.
@@ -370,6 +376,7 @@ console_crumbs($detail
     <p class="muted small">Nie rozpoznano żadnego produktu.</p>
     <?php else: ?>
     <form method="post">
+      <?= console_csrf_field() ?>
       <input type="hidden" name="zamow" value="<?= (int) $detail['id'] ?>">
       <div class="tiles">
         <?php foreach ($an['lines'] as $ln): $p = $ln['product']; ?>
@@ -442,6 +449,7 @@ console_crumbs($detail
     <?php endif; ?>
     <?php if ($isAdmin && $detail['direction'] === 'wyjscie' && $detail['status'] !== 'wyslana'): ?>
     <form method="post" class="actions">
+      <?= console_csrf_field() ?>
       <button class="primary" type="submit" name="wyslij" value="<?= (int) $detail['id'] ?>">Wyślij teraz</button>
     </form>
     <?php endif; ?>
@@ -477,6 +485,7 @@ console_crumbs($detail
     </form>
 
     <form method="post" style="margin-top:12px">
+      <?= console_csrf_field() ?>
       <input type="hidden" name="nowa" value="1">
       <input type="hidden" name="order_id" value="<?= $pickOrder ?>">
       <input type="hidden" name="tpl" value="<?= h($pickTpl) ?>">
@@ -523,6 +532,7 @@ console_crumbs($detail
       Gdy podłączymy skrzynkę IMAP (Ustawienia), wiadomości będą tu trafiać same — mechanizm jest ten sam.
     </p>
     <form method="post">
+      <?= console_csrf_field() ?>
       <input type="hidden" name="przychodzaca" value="1">
       <div class="grid2">
         <label class="field"><span>Od (adres)</span>
@@ -567,7 +577,8 @@ console_crumbs($detail
         <td data-l="Stan"><span class="tag <?= h($statusTag[$m['status']] ?? '') ?>"><?= h($statusLbl[$m['status']] ?? $m['status']) ?></span></td>
         <td data-l="">
           <?php if ($isAdmin && $m['status'] !== 'wyslana' && $m['direction'] === 'wyjscie'): ?>
-          <form method="post"><button type="submit" name="wyslij" value="<?= (int) $m['id'] ?>">Wyślij</button></form>
+          <form method="post">
+      <?= console_csrf_field() ?><button type="submit" name="wyslij" value="<?= (int) $m['id'] ?>">Wyślij</button></form>
           <?php endif; ?>
         </td>
       </tr>

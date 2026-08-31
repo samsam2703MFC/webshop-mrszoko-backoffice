@@ -31,6 +31,10 @@ require_once $API . '/ksef.php';   // wsm_ksef_enabled() : la tuile « KSeF goto
 $flash = ''; $flashKind = 'ok';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    // Sans ce jeton, une page tierce fait poster ce formulaire par le
+    // navigateur de quelqu'un qui a sa session ouverte, et la console
+    // execute la demande comme si elle venait de lui.
+    if (!console_csrf_ok()) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może zmieniać ustawienia.'; $flashKind = 'err';
     } elseif (isset($_POST['test_poczty'])) {
@@ -150,6 +154,7 @@ if ($orphelins): ?>
 <?php endif; ?>
 
 <form method="post" enctype="multipart/form-data">
+      <?= console_csrf_field() ?>
 <?php foreach ($groups as $g => [$title, $intro]):
   $fields = array_filter($view, fn($f) => $f['group'] === $g); ?>
   <div class="panel">
@@ -227,6 +232,7 @@ if ($orphelins): ?>
   <h2>Test poczty</h2>
   <p class="muted small">Wysyła jedną wiadomość na wskazany adres i zapisuje wynik w zakładce Poczta.</p>
   <form method="post" class="actions">
+      <?= console_csrf_field() ?>
     <?php // Le champ portait l'adresse de l'utilisateur et AUCUN nom : à
           // l'oreille, une zone de saisie sans intitulé au milieu d'un
           // formulaire de réglages. ?>

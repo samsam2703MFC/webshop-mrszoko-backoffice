@@ -35,6 +35,10 @@ $flash = ''; $kind = 'ok';
 const WSM_PZ_ROWS = 8;                 // lignes offertes à la saisie d'un bon
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    // Sans ce jeton, une page tierce fait poster ce formulaire par le
+    // navigateur de quelqu'un qui a sa session ouverte, et la console
+    // execute la demande comme si elle venait de lui.
+    if (!console_csrf_ok()) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może zmieniać magazyn.'; $kind = 'err';
     } elseif (isset($_POST['przyjmij'])) {
@@ -262,6 +266,7 @@ console_crumbs($doc
     faktycznie leży w magazynie. Puste wiersze są pomijane; jeśli któraś pozycja jest błędna,
     nie zapisuje się żadna.</p>
   <form method="post">
+      <?= console_csrf_field() ?>
     <input type="hidden" name="przyjmij" value="1">
     <div class="grid2">
       <label class="field"><span>Dostawca</span>
@@ -307,6 +312,7 @@ console_crumbs($doc
   <p class="why">Stłuczka, degustacja, inwentaryzacja, zwrot od klienta. Powód jest wymagany:
     korekta bez powodu to strata, której nikt później nie wyjaśni.</p>
   <form method="post">
+      <?= console_csrf_field() ?>
     <input type="hidden" name="koryguj" value="1">
     <div class="grid2">
       <label class="field"><span>Produkt</span>

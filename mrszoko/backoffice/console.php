@@ -165,6 +165,52 @@ function console_api_dir(): string {
     return is_dir(__DIR__ . '/api') ? __DIR__ . '/api' : __DIR__ . '/php-api';
 }
 
+/**
+ * LE JETON ANTI-CSRF DE LA CONSOLE, en un seul endroit.
+ *
+ * POURQUOI IL MONTE ICI. Sept écrans le fabriquaient chacun dans leur coin,
+ * six lignes identiques recopiées — et SIX AUTRES acceptaient des POST sans
+ * jeton du tout : Ustawienia, où l'on colle un mot de passe SMTP, Użytkownicy,
+ * où l'on crée des comptes et où l'on peut maintenant en supprimer, Treści,
+ * Poczta, Magazyn, Faktury.
+ *
+ * CE QUE ÇA COÛTAIT. Une page piégée, ouverte dans un onglet par quelqu'un qui
+ * a sa session de console ouverte dans un autre, poste vers l'écran des
+ * comptes. Le navigateur joint le cookie de session tout seul : la console
+ * exécute la demande comme si l'administrateur l'avait faite. Rien à l'écran
+ * ne le dit, et le journal d'audit note le geste au nom de la victime.
+ *
+ * Le jeton vit dans un cookie HttpOnly : une page tierce peut faire poster le
+ * navigateur, elle ne peut pas LIRE ce cookie pour recopier sa valeur dans le
+ * formulaire. C'est toute la protection.
+ */
+function console_csrf(): string {
+    $t = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
+    if (!preg_match('/^[a-f0-9]{32}$/', $t)) {
+        $t = bin2hex(random_bytes(16));
+        setcookie('ms_bo_csrf', $t, ['expires' => time() + 86400, 'path' => '/',
+            'httponly' => true, 'samesite' => 'Lax', 'secure' => wsm_is_https()]);
+        $_COOKIE['ms_bo_csrf'] = $t;                 // la même requête doit déjà le voir
+    }
+    return $t;
+}
+
+/** Le champ à poser dans chaque formulaire. */
+function console_csrf_field(): string {
+    return '<input type="hidden" name="_t" value="' . h(console_csrf()) . '">';
+}
+
+/**
+ * Le POST courant porte-t-il le bon jeton ?
+ *
+ * hash_equals, pas « === » : la comparaison ne doit pas révéler par sa durée
+ * combien de caractères sont justes.
+ */
+function console_csrf_ok(): bool {
+    $t = (string) ($_COOKIE['ms_bo_csrf'] ?? '');
+    return $t !== '' && hash_equals($t, (string) ($_POST['_t'] ?? ''));
+}
+
 function h(?string $s): string { return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 /** Grosze → « 129,90 zł » avec espaces insécables : un prix ne se coupe pas. */
