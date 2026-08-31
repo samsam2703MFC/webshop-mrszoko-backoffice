@@ -225,8 +225,6 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
     if (is_file($links)) { require_once $links; wsm_links_ensure($pdo); }
     $camp = __DIR__ . '/campaign.php';
     if (is_file($camp)) { require_once $camp; wsm_camp_ensure($pdo); }
-    $cykl = __DIR__ . '/cykl.php';
-    if (is_file($cykl)) { require_once $cykl; wsm_cykl_ensure($pdo); }
     // Les colonnes qui font AGIR un bon. Sans elles la boutique interrogerait
     // des colonnes absentes et rendrait 500 : la table wsm_vouchers existe en
     // production depuis le premier jour, et CREATE TABLE IF NOT EXISTS ne

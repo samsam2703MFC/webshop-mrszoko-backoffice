@@ -265,24 +265,6 @@ if ($method === 'POST') {
     // ---- Mise en place d'un abonnement depuis la confirmation ---------------
     //  Le jeton d'accès de la commande fait foi : sans lui, connaître un
     //  numéro de commande ne suffit pas à abonner quelqu'un d'autre.
-    if ($page === 'zamowienie' && isset($_POST['subskrybuj'])) {
-        $oSub = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
-        if ($oSub) {
-            require_once $WSM_API_DIR . '/cykl.php';
-            [$sidNew, $mSub] = wsm_cykl_create($pdo, (int) $oSub['id'], (string) ($_POST['rytm'] ?? ''), 'klient');
-            if ($sidNew > 0) {
-                $s = wsm_cykl_get($pdo, $sidNew);
-                $subMsg = str_replace('{data}', (string) $s['next_at'], $S['sub.done'] ?? $mSub);
-            } else {
-                $subMsg = $S['sub.already'] ?? $mSub;
-            }
-        }
-        // On retombe sur l'affichage de la confirmation, plus bas.
-    }
-
-    // ---- Réclamation ou rétractation depuis le suivi ------------------------
-    //  Le jeton d'accès de la commande fait foi : sans lui, connaître un
-    //  numéro ne suffit pas à ouvrir un dossier au nom de quelqu'un d'autre.
     if ($page === 'zamowienie' && isset($_POST['zgloszenie'])) {
         $oCl = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
         if ($oCl) {
@@ -1280,38 +1262,6 @@ if ($page === 'zamowienie') {
     </aside>
   </div>
 
-  <?php // ---- Reprendre la même chose, à un rythme ---------------------------
-        //  Proposé ICI et nulle part ailleurs : c'est le seul moment où le
-        //  client sait exactement ce qu'il reprendrait. Le texte dit en
-        //  toutes lettres que RIEN n'est prélevé — la boutique n'enregistre
-        //  aucune carte, et laisser croire le contraire ferait du premier
-        //  renouvellement un litige.
-        $subFile = $WSM_API_DIR . '/cykl.php';
-        if (is_file($subFile) && $o['items']):
-          require_once $subFile;
-          $dejaSub = $subMsg ?? ''; ?>
-  <section class="resub">
-    <h2><?= e($S['sub.title'] ?? '') ?></h2>
-    <p class="muted"><?= e($S['sub.lead'] ?? '') ?></p>
-    <?php if ($dejaSub !== ''): ?>
-      <?php notice('ok', $dejaSub); ?>
-    <?php else: ?>
-    <form method="post" action="<?= e(u('zamowienie/' . rawurlencode($o['code']), ['t' => $o['access_token']])) ?>">
-      <?= csrf_field() ?>
-      <label class="resub-pick">
-        <span><?= e($S['sub.rhythm'] ?? '') ?></span>
-        <select name="rytm">
-          <?php foreach (WSM_CYKL_RYTMY as $k => $r): ?>
-          <option value="<?= e($k) ?>"<?= $k === 'co_miesiac' ? ' selected' : '' ?>><?= e($r['label']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <button class="btn btn--brand" type="submit" name="subskrybuj" value="1"><?= e($S['sub.cta'] ?? '') ?></button>
-    </form>
-    <?php endif; ?>
-  </section>
-  <?php endif; ?>
-
   <?php // ---- Réclamation / rétractation ------------------------------------
         //  Le compteur de jours est AFFICHÉ, y compris quand il est dépassé :
         //  c'est ce chiffre qui fait agir, et le masquer ne l'annule pas.
@@ -1322,8 +1272,17 @@ if ($page === 'zamowienie') {
           require_once $clFile;
           $reste = wsm_claim_zwrot_reste($pdo, $o);
           $dejaCl = $claimMsg ?? ''; ?>
-  <section class="claim">
-    <h2><?= e($S['claim.title'] ?? '') ?></h2>
+  <?php // UN LIEN, PAS UN PAVÉ. Quatre-vingt-dix-neuf commandes sur cent se
+        // passent bien : leur page n'a pas à s'ouvrir sur un formulaire de
+        // réclamation déplié, qui suggère un problème avant qu'il existe.
+        //
+        // <details> est du HTML natif : il s'ouvre sans une ligne de
+        // JavaScript, il est lisible au clavier et par un lecteur d'écran, et
+        // il reste ouvert si le formulaire revient avec une erreur — d'où le
+        // « open » conditionnel : sinon le message d'erreur serait replié,
+        // donc invisible, et le client cliquerait « Wyślij » sans comprendre. ?>
+  <details class="claim"<?= ($dejaCl !== '' || isset($claimErr)) ? ' open' : '' ?>>
+    <summary><?= e($S['claim.title'] ?? '') ?></summary>
     <p class="muted"><?= e($S['claim.lead'] ?? '') ?></p>
     <p class="mono muted"><?= $reste['jours'] > 0
         ? e(str_replace('{n}', (string) $reste['jours'], $S['claim.left'] ?? ''))
@@ -1351,7 +1310,7 @@ if ($page === 'zamowienie') {
       <button class="btn btn--brand" type="submit" name="zgloszenie" value="1"><?= e($S['claim.cta'] ?? '') ?></button>
     </form>
     <?php endif; ?>
-  </section>
+  </details>
   <?php endif; ?>
 </main>
 <?php

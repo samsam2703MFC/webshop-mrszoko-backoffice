@@ -147,13 +147,6 @@ if (is_file($API . '/claims.php')) {
     }
 } else { saute('zgłoszenia', 'brak pliku claims.php'); }
 
-if (is_file($API . '/cykl.php')) {
-    require_once $API . '/cykl.php';
-    wsm_cykl_ensure($pdo);
-    $dues = wsm_cykl_dues($pdo);
-    if ($dues) gene(count($dues) . ' terminów subskrypcji wypada dziś', 'ekran Subskrypcje › Przygotuj zamówienia');
-    else bien('Żaden termin subskrypcji nie wypada dziś');
-} else { saute('subskrypcje', 'brak pliku cykl.php'); }
 
 // ---------------------------------------------------------------------------
 //  4. Le catalogue : ce qui empêche de vendre un article

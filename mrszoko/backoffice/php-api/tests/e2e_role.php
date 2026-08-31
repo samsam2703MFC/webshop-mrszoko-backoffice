@@ -102,7 +102,7 @@ foreach (['Sprzedaż', 'Magazyn', 'Księgowość', 'Podgląd'] as $r) {
 $ecrit = [];
 foreach (['pulpit.php', 'zamowienia.php', 'faktury.php', 'ksef.php', 'wysylka.php', 'magazyn.php',
           'produkty.php', 'klienci.php', 'poczta.php', 'rabaty.php', 'kraje.php', 'audyt.php',
-          'kampanie.php', 'zgloszenia.php', 'subskrypcje.php', 'allegro.php'] as $e) {
+          'kampanie.php', 'zgloszenia.php', 'allegro.php'] as $e) {
     if (wsm_droit_ecran($u('Podgląd'), $e) === 'w') $ecrit[] = $e;
 }
 ok('Podgląd n\'écrit NULLE PART', $ecrit === [], $ecrit);
