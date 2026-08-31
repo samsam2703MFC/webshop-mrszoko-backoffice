@@ -81,7 +81,7 @@ function wsm_roles_base(): array {
     // Les écrans « métier » de chaque rôle. Les impressions (…_druk.php) et
     // les étiquettes suivent l'écran qui les ouvre — la liste de ces
     // satellites, et la règle, sont dans roles.php (wsm_profil_satellites).
-    $vente  = ['zamowienia.php' => 'w', 'zamowienie_druk.php' => 'w', 'subskrypcje.php' => 'w',
+    $vente  = ['zamowienia.php' => 'w', 'zamowienie_druk.php' => 'w',
                'klienci.php' => 'w', 'kontrahenci.php' => 'w', 'poczta.php' => 'w',
                'przypomnienia.php' => 'w', 'kampanie.php' => 'w', 'zgloszenia.php' => 'w',
                'rabaty.php' => 'w', 'produkty.php' => 'r', 'faktury.php' => 'r', 'pulpit.php' => 'r'];

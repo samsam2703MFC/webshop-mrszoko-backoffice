@@ -624,7 +624,13 @@ function wsm_content_forces(): array {
             // que ce bloc, donc plus personne ne lit celui-ci : laissé en
             // base, il resterait modifiable dans Treści, et quelqu'un
             // corrigerait un jour un délai que la page n'affiche plus.
-            'purge' => ['story.pro.mail_subject', 'story.strip.1'],
+            // Les textes de l'abonnement n'ont plus d'ecran : le bloc a ete
+            // retire de la page de commande. Laisses en base, ils resteraient
+            // modifiables dans Tresci -- quelqu'un les soignerait un jour, et
+            // rien ne changerait nulle part.
+            'purge' => ['story.pro.mail_subject', 'story.strip.1',
+                        'sub.title', 'sub.lead', 'sub.rhythm', 'sub.cta',
+                        'sub.done', 'sub.already'],
         ],
     ];
 }
@@ -1375,56 +1381,8 @@ Mister Szoko
     //  Ce texte est le contrat. Rien n'est débité : la boutique n'enregistre
     //  aucune carte. Écrire « pobraliśmy » ferait du premier renouvellement
     //  un litige — et donnerait raison au client.
-    $t[] = ['subskrypcja', 'pl', 'Subskrypcja — gotowe do opłacenia',
-            'Twoje zamówienie {{numer}} czeka na opłacenie',
-"Dzień dobry {{imie}},
 
-nadszedł termin Twojej subskrypcji. Przygotowaliśmy zamówienie {{numer}}:
 
-{{pozycje}}
-
-Do zapłaty: {{kwota}}. Nic nie zostało pobrane — płacisz sam, kiedy zechcesz:
-{{link}}
-
-Dostawa: {{dostawa}}. Jeśli chcesz coś zmienić, przerwać lub zakończyć
-subskrypcję — odpisz na tę wiadomość, wystarczy jedno zdanie.
-
-Mister Szoko
-{{sklep}}", 'subskrypcja'];
-
-    $t[] = ['subskrypcja', 'en', 'Subscription — ready to pay',
-            'Your order {{numer}} is ready',
-"Hello {{imie}},
-
-your subscription is due. We have prepared order {{numer}}:
-
-{{pozycje}}
-
-Amount: {{kwota}}. Nothing has been charged — you pay yourself, whenever you
-like: {{link}}
-
-Delivery: {{dostawa}}. To change, pause or stop the subscription, just reply
-to this e-mail — one sentence is enough.
-
-Mister Szoko
-{{sklep}}", 'subskrypcja'];
-
-    $t[] = ['subskrypcja', 'uk', 'Підписка — готово до оплати',
-            'Ваше замовлення {{numer}} чекає на оплату',
-"Доброго дня, {{imie}}!
-
-Настав час вашої підписки. Ми підготували замовлення {{numer}}:
-
-{{pozycje}}
-
-До сплати: {{kwota}}. Нічого не списано — ви платите самі, коли забажаєте:
-{{link}}
-
-Доставка: {{dostawa}}. Щоб щось змінити, призупинити або завершити підписку,
-просто відповідайте на цей лист — достатньо одного речення.
-
-Mister Szoko
-{{sklep}}", 'subskrypcja'];
 
     // ---- Modèle libre, sans événement : la réponse écrite à la main --------
     $t[] = ['kontakt', 'pl', 'Odpowiedź do klienta (pusty)', 'W sprawie zamówienia {{numer}}',

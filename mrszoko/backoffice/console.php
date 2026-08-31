@@ -246,7 +246,6 @@ function console_sections(?array $me = null): array {
         // se plaint. Ni le document, ni le colis : ce sont d'autres gestes.
         'Sprzedaż' => [
             'zamowienia.php'  => 'Zamówienia',
-            'subskrypcje.php' => 'Subskrypcje',
             'zgloszenia.php'  => 'Zgłoszenia',
         ],
 

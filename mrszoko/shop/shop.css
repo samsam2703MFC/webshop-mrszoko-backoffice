@@ -517,3 +517,15 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
    formulaire a l'air d'en attendre huit. */
 .form--suivi { max-width: 620px; }
 .form--suivi .field small { display: block; margin-top: 4px; color: var(--text-muted); font-size: var(--text-xs); }
+
+/* La réclamation : un lien qu'on déplie, pas un pavé qui s'impose.
+   Quatre-vingt-dix-neuf commandes sur cent se passent bien — leur page n'a
+   pas à s'ouvrir sur un formulaire qui suggère un problème. */
+details.claim { margin-top: var(--space-6); border-top: 1px solid var(--border-subtle); padding-top: var(--space-5); }
+details.claim > summary { cursor: pointer; font-weight: 600; font-size: var(--text-base);
+                          list-style: none; display: flex; align-items: center; gap: 8px; }
+details.claim > summary::-webkit-details-marker { display: none; }
+details.claim > summary::before { content: '+'; font-weight: 400; color: var(--text-muted); }
+details.claim[open] > summary::before { content: '−'; }
+details.claim > summary:hover { color: var(--choco-700); }
+details.claim > *:not(summary) { margin-top: var(--space-3); }

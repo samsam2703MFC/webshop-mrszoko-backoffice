@@ -1377,40 +1377,18 @@ jobs:
             *bez_efektu=0) ;;
             *) echo "  ^ UWAGA : aktywny kod bez wartości — sklep go ODRZUCA, popraw go lub wycofaj w Rabatach";;
           esac
-          echo "== subskrypcje : nic nie jest pobierane =="
-          # La regle qui protege le plus : ce module ne PRELEVE pas. Aucune
-          # carte n est enregistree. Un texte qui promettrait un debit ferait
-          # du premier renouvellement un litige — et donnerait raison au
-          # client. On le verifie SUR LE MODELE DE COURRIER livre.
-          COUT=$(php -r '
-            require_once "'"$DIR_API"'/cykl.php";
-            $r = count(WSM_CYKL_RYTMY) === 4
-              && WSM_CYKL_RYTMY["co_miesiac"]["dni"] === 30
-              && wsm_cykl_rytm("cokolwiek")["dni"] === 30;
-            $p = WSM_CYKL_MAX_NIEOPLACONYCH === 3;
-            echo ($r ? "rytmy-ok" : "rytmy-ZLE"), " ",
-                 ($p ? "pauza-ok" : "pauza-ZLE");
-          ' 2>&1); [ $? -eq 0 ] || COUT="php-ZLE :: $COUT"
-          echo "  $COUT"
-          case "$COUT" in
-            *ZLE*|*Error*|*error*) echo "  ^ ATTENTION : reguły subskrypcji nie działają"; fail=1;;
-            *) ;;
-          esac
-          # Le modele est en base : on le lit par le client mysql, comme le
-          # reste de l etat. « pobraliśmy » est le mot qui ne doit PAS y etre.
-          QS="SELECT CONCAT('subskrypcji=', (SELECT COUNT(*) FROM mrszoko.wsm_subscriptions), ' aktywnych=', (SELECT COUNT(*) FROM mrszoko.wsm_subscriptions WHERE statut='aktywny'), ' wzor_pl=', (SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE code='subskrypcja' AND lang='pl'), ' obiecuje_pobranie=', (SELECT COUNT(*) FROM mrszoko.wsm_mail_templates WHERE code='subskrypcja' AND (body LIKE '%pobraliśmy%' OR body LIKE '%obciążyliśmy%')))"
-          if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
-            SV=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QS" 2>&1 || echo "sql-ZLE")
-          else
-            SV=$(mysql -N -e "$QS" 2>&1 || echo "sql-ZLE")
-          fi
-          echo "  $SV"
-          case "$SV" in
-            *ZLE*) echo "  ^ ATTENTION : nie udało się sprawdzić subskrypcji"; fail=1;;
-            *wzor_pl=0*) echo "  ^ ATTENTION : brak wzoru listu — subskrypcja byłaby niema"; fail=1;;
-            *obiecuje_pobranie=0) ;;
-            *) echo "  ^ ATTENTION : wzór listu obiecuje pobranie, a sklep NIE pobiera — popraw go w Poczcie"; fail=1;;
-          esac
+          # LES ABONNEMENTS ONT ETE RETIRES. Le module, l ecran, le bloc de la
+          # page de commande, le modele de courrier et les textes : plus rien
+          # ne les propose. Les tables restent en base — on ne detruit pas des
+          # donnees qui ont pu exister — mais plus aucun code ne les lit.
+          #
+          # Ce controle verifiait que le module ne PRELEVE jamais rien. Il n a
+          # plus d objet, et un controle qui teste un fichier absent tombe en
+          # erreur a chaque deploiement : on le retire avec le reste.
+          echo "== subskrypcje : wycofane =="
+          [ -f "$DIR_API/cykl.php" ] \
+            && { echo "  ^ NOT OK : cykl.php wrocil, a ekran juz go nie ma"; fail=1; } \
+            || echo "  modul wycofany — nic go nie proponuje"
           echo "== propozycje : etykieta nie klamie =="
           # « Souvent achete ensemble » sous deux produits que personne n a
           # jamais commandes ensemble est un mensonge. La regle se verifie ici
