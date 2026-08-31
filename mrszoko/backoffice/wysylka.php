@@ -35,6 +35,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!hash_equals($csrf, (string) ($_POST['_t'] ?? ''))) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może nadawać przesyłki.'; $kind = 'err';
+    } elseif (isset($_POST['sprawdz'])) {
+        // CE BOUTON MARCHE CANAL FERME, et c'est tout son interet : il sert
+        // justement a savoir POURQUOI il est ferme. Le ranger derriere le
+        // controle « InPost est-il configure ? » l'aurait rendu inaccessible
+        // exactement quand on en a besoin.
+        [$kInp, $mInp] = wsm_inpost_diag();
+        $flash = $mInp;
+        $kind  = $kInp === 'ok' ? 'ok' : ($kInp === 'uwaga' ? 'warn' : 'err');
+        wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Test połączenia InPost',
+                  mb_substr($mInp, 0, 120), 'Sieć');
+    } elseif (isset($_POST['odswiez']) && wsm_inpost_enabled()) {
+        // LA VIE DU COLIS APRES SON DEPART. Sans ca, une commande restait
+        // « Wysłane » pour toujours et la boutique etait le dernier endroit ou
+        // l'on apprenait qu'elle avait ete livree — le client, lui, le voyait
+        // sur le site du transporteur.
+        [$vus, $av] = wsm_inpost_sync($pdo);
+        $flash = 'Sprawdzono ' . $vus . ' przesyłek· zamówień oznaczonych jako dostarczone: ' . $av . '.';
+        $kind  = 'ok';
     } elseif (!wsm_inpost_enabled()) {
         // LE TRANSPORTEUR FERMÉ SE DIT AVANT D'ESSAYER, PAS APRÈS.
         // « Prêt » qualifiait la COMMANDE — téléphone, adresse, poids — et
@@ -130,12 +148,30 @@ if ($detail) {
   <?php if (!$configure): ?>
   <div class="panel" style="border-color: color-mix(in srgb, var(--warn, #9a6a00) 40%, transparent)">
     <h2>InPost nie jest skonfigurowany</h2>
-    <p class="hint" style="margin:0">
+    <p class="hint">
       Brakuje tokenu i identyfikatora organizacji — uzupełnij je w <a href="ustawienia.php">Integracjach</a>.
       Do tego czasu <b>ten ekran nadal działa jako lista rzeczy do zrobienia</b>: paczki nadajesz ręcznie,
       a widzisz tu dokładnie które i co im brakuje.
     </p>
+    <?php // LE BOUTON MARCHE MEME CANAL FERME : c'est justement ce qu'on veut
+          // savoir. Coller un jeton et n'avoir aucun retour, c'est l'apprendre
+          // le jour ou un client a paye et ou le colis n'existe pas. ?>
+    <form method="post" class="barre">
+      <?= console_csrf_field() ?>
+      <button type="submit" name="sprawdz" value="1">Sprawdź połączenie z ShipX</button>
+      <span class="hint" style="margin:0">Zapyta ShipX o Twoją organizację i powie, co dokładnie jest nie tak.</span>
+    </form>
   </div>
+  <?php else: ?>
+  <form method="post" class="barre">
+    <?= console_csrf_field() ?>
+    <button type="submit" name="sprawdz" value="1">Sprawdź połączenie</button>
+    <?php // Ce bouton finit le voyage : sans lui, une commande reste
+          // « Wysłane » pour toujours et la boutique est le dernier endroit ou
+          // l'on apprend qu'elle a ete livree. ?>
+    <button type="submit" name="odswiez" value="1">Odśwież statusy przesyłek</button>
+    <span class="hint" style="margin:0">Statusy pobierane z InPost: doręczona paczka zamyka zamówienie.</span>
+  </form>
   <?php endif; ?>
 
   <div class="kpis">

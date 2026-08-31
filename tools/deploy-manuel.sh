@@ -283,6 +283,15 @@ grep -q 'function wsm_mf_check' site/backoffice/api/mf.php \
   && grep -q "source = 'vies'" site/backoffice/api/vies.php \
   || { echo "  pobieranie danych z rejestru: niekompletne"; exit 1; }
 echo "  pobieranie danych z rejestru (MF + VIES + rozdzielone) : obecne"
+# LE CANAL INPOST, FINI. Le test de connexion doit repondre AVANT la
+# premiere vraie commande, et les statuts doivent revenir : sans eux une
+# commande reste « Wysłane » pour toujours.
+grep -q 'function wsm_inpost_diag' site/backoffice/api/inpost.php \
+  && grep -q 'function wsm_inpost_sync' site/backoffice/api/inpost.php \
+  && grep -q "POST\['sprawdz'\]" site/backoffice/wysylka.php \
+  || { echo "  kanal InPost: niekompletny"; exit 1; }
+echo "  kanal InPost (test polaczenia + statusy) : obecny"
+
 
 
 

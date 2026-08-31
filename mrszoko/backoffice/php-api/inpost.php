@@ -241,6 +241,137 @@ function wsm_inpost_blockers(array $order): array {
  * Sans jeton, la ligne reste `do_utworzenia` — c'est un état d'attente, pas
  * un échec : la commande est payée et le colis part à la main.
  */
+/**
+ * LE TRANSPORT SHIPX, REMPLACABLE.
+ *
+ * Sans lui, aucun test ne peut eprouver ce qui compte : un jeton perime, une
+ * organisation qui n'est pas la notre, un colis passe en « doreczona ». Ce sont
+ * exactement les cas qu'on ne peut pas provoquer a volonte — et exactement ceux
+ * qui arrivent un mardi matin.
+ *
+ * @return callable(string $methode, string $chemin, ?array $corps): array{0:int,1:mixed}
+ */
+function wsm_inpost_transport(?callable $set = null): callable {
+    static $fn = null;
+    if ($set !== null) { $fn = $set; }
+    return $fn ?? 'wsm_inpost_http';
+}
+
+/** @return array{0:int,1:mixed} [code HTTP, corps decode] */
+function wsm_inpost_http(string $methode, string $chemin, ?array $corps = null): array {
+    $c  = wsm_inpost_cfg();
+    $ch = curl_init(wsm_inpost_base() . $chemin);
+    $opt = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 25,
+        CURLOPT_CUSTOMREQUEST  => $methode,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Bearer ' . $c['token'],
+            'Content-Type: application/json', 'Accept: application/json',
+        ],
+    ];
+    if ($corps !== null) $opt[CURLOPT_POSTFIELDS] = json_encode($corps, JSON_UNESCAPED_UNICODE);
+    curl_setopt_array($ch, $opt);
+    $raw  = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$code, json_decode((string) $raw, true)];
+}
+
+/**
+ * « EST-CE QUE CA MARCHE ? », repondu AVANT la premiere vraie commande.
+ *
+ * C'est la piece qui manquait pour finir l'integration. Jusqu'ici, coller un
+ * jeton dans Ustawienia ne donnait aucun retour : on l'apprenait le jour ou un
+ * client avait paye, quand la creation du colis echouait — commande encaissee,
+ * colis inexistant, et personne devant l'ecran a ce moment-la.
+ *
+ * ON INTERROGE L'ORGANISATION, pas une route quelconque : c'est le seul appel
+ * qui eprouve LES DEUX reglages a la fois. Un jeton juste avec un mauvais
+ * numero d'organisation passe tous les tests de jeton et ne cree aucun colis.
+ *
+ * @return array{0:string,1:string} [etat 'ok'|'uwaga'|'zle', phrase polonaise]
+ */
+function wsm_inpost_diag(): array {
+    $c = wsm_inpost_cfg();
+    if ($c['token'] === '' && $c['organization_id'] === '') {
+        return ['zle', 'Brak tokenu i numeru organizacji — wpisz je w Ustawieniach.'];
+    }
+    if ($c['token'] === '')           return ['zle', 'Brak tokenu ShipX.'];
+    if ($c['organization_id'] === '') return ['zle', 'Brak numeru organizacji.'];
+
+    [$code, $res] = (wsm_inpost_transport())(
+        'GET', '/v1/organizations/' . rawurlencode($c['organization_id']), null);
+    $ou = $c['sandbox'] ? 'sandbox' : 'produkcja';
+
+    if ($code === 401 || $code === 403) {
+        return ['zle', 'Token odrzucony przez ShipX (' . $code . '). Sprawdź, czy nie wygasł '
+                     . 'i czy pochodzi ze środowiska „' . $ou . '".'];
+    }
+    if ($code === 404) {
+        // LE PIEGE LE PLUS COURANT : un jeton de production avec un numero
+        // d'organisation de sandbox, ou l'inverse. Les deux sont justes
+        // separement, et ensemble ils ne font rien.
+        return ['zle', 'ShipX nie zna organizacji ' . $c['organization_id'] . ' w środowisku „' . $ou
+                     . '". Token i numer organizacji muszą pochodzić z tego samego środowiska.'];
+    }
+    if ($code < 200 || $code >= 300) {
+        return ['uwaga', 'ShipX odpowiedział ' . $code . ' — spróbuj ponownie za chwilę.'];
+    }
+    $nom = trim((string) ($res['name'] ?? ''));
+    return ['ok', 'Połączenie działa: ' . ($nom !== '' ? $nom . ' ' : '')
+                . '(organizacja ' . $c['organization_id'] . ', środowisko „' . $ou . '").'];
+}
+
+/**
+ * LA VIE DU COLIS APRES SON DEPART, rapatriee depuis ShipX.
+ *
+ * Sans ca, une commande restait « Wysłane » pour toujours : rien ne la faisait
+ * passer a « Dostarczone », et rien ne signalait un retour. Le client, lui, le
+ * voit sur le site du transporteur — la boutique etait le dernier endroit ou
+ * l'information arrivait.
+ *
+ * ON NE FAIT AVANCER QUE CE QUI AVANCE. Un colis « doreczona » met la commande
+ * a « dostarczone » ; tout le reste met a jour l'etat de l'expedition et ne
+ * touche pas a la commande. Faire reculer une commande sur un statut mal
+ * interprete serait pire que ne rien savoir.
+ *
+ * @return array{0:int,1:int} [expeditions regardees, commandes avancees]
+ */
+function wsm_inpost_sync(PDO $pdo, int $limite = 50): array {
+    if (!wsm_inpost_enabled()) return [0, 0];
+    $st = $pdo->prepare("SELECT s.*, o.status AS order_status
+                           FROM wsm_shipments s
+                           JOIN wsm_orders o ON o.id = s.order_id
+                          WHERE s.shipment_id <> '' AND s.shipment_id IS NOT NULL
+                            AND o.status IN ('wyslane', 'w_realizacji')
+                          ORDER BY s.id DESC LIMIT " . max(1, min(200, $limite)));
+    $st->execute();
+    $vus = 0; $avances = 0;
+    $maj = $pdo->prepare("UPDATE wsm_shipments SET status = ? WHERE id = ?");
+
+    foreach ($st->fetchAll() as $sh) {
+        [$code, $res] = (wsm_inpost_transport())(
+            'GET', '/v1/shipments/' . rawurlencode((string) $sh['shipment_id']), null);
+        $vus++;
+        if ($code < 200 || $code >= 300 || !is_array($res)) continue;
+        $etat = strtolower(trim((string) ($res['status'] ?? '')));
+        if ($etat === '') continue;
+        if ($etat !== (string) $sh['status']) {
+            $maj->execute([$etat, (int) $sh['id']]);
+            wsm_order_event($pdo, (int) $sh['order_id'], 'wysylka_status', $etat, 'inpost');
+        }
+        // « delivered » est le vocabulaire de ShipX ; on garde les deux
+        // orthographes vues sur le terrain plutot que de parier sur une seule.
+        if (in_array($etat, ['delivered', 'doreczona', 'doręczona'], true)
+            && (string) $sh['order_status'] !== 'dostarczone') {
+            wsm_order_status_set($pdo, (int) $sh['order_id'], 'dostarczone', 'inpost');
+            $avances++;
+        }
+    }
+    return [$vus, $avances];
+}
+
 function wsm_inpost_create(PDO $pdo, array $order): array {
     $blockers = wsm_inpost_blockers($order);
     if ($blockers) {
