@@ -258,6 +258,15 @@ grep -q 'function wsm_golive_reset' site/backoffice/api/golive.php \
   && grep -q 'WSM_GOLIVE_MOT' site/backoffice/superadmin.php \
   || { echo "  zerowanie przed startem: niekompletne"; exit 1; }
 echo "  zerowanie przed startem (regula + panel + slowo) : obecne"
+# REMPLIR LA FACTURE DEPUIS LE REGISTRE. Deux registres, et il faut les
+# deux : VIES ne connait pas un NIP polonais qui ne fait pas d'intracom, et
+# repondrait « numer nieznany » a un client irreprochable.
+grep -q 'function wsm_mf_check' site/backoffice/api/mf.php \
+  && grep -q "name=\"pobierz_dane\"" site/shop/index.php \
+  && grep -q "source = 'vies'" site/backoffice/api/vies.php \
+  || { echo "  pobieranie danych z rejestru: niekompletne"; exit 1; }
+echo "  pobieranie danych z rejestru (MF + VIES + rozdzielone) : obecne"
+
 
 
 

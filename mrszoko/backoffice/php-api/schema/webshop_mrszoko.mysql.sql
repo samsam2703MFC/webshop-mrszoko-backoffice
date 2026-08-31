@@ -649,6 +649,7 @@ CREATE TABLE IF NOT EXISTS `wsm_vies_checks` (
   `name`         VARCHAR(250) NOT NULL DEFAULT '',
   `address`      VARCHAR(500) NOT NULL DEFAULT '',
   `consultation` VARCHAR(64)  NOT NULL DEFAULT '',
+  `source`       VARCHAR(8)   NOT NULL DEFAULT 'vies',
   `raw`          TEXT,
   `checked_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

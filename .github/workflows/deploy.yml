@@ -2192,6 +2192,22 @@ jobs:
             && grep -q 'WSM_GOLIVE_MOT' "$DIR_BO/superadmin.php" \
             && echo "  reguła + panel + słowo do przepisania: obecne" \
             || { echo "  ^ NOT OK : zerowanie przed startem niekompletne"; fail=1; }
+          # ── REMPLIR LA FACTURE DEPUIS LE REGISTRE ──────────────────────────
+          # Deux registres, et il faut les deux. VIES ne connaît que les
+          # numéros enregistrés pour l'intracommunautaire : une société
+          # polonaise qui vend en Pologne n'y figure pas, et on lui répondrait
+          # « numer nieznany » — vrai pour VIES, faux pour le client.
+          #
+          # Et la troisième condition n'est pas cosmétique : les deux registres
+          # partagent une table. Sans le filtre `source`, une réponse du
+          # ministère serait relue comme une réponse de VIES, et
+          # l'autoliquidation accordée sur une preuve qui n'en est pas une.
+          echo "== pobieranie danych z rejestru =="
+          grep -q 'function wsm_mf_check' "$DIR_BO/api/mf.php" \
+            && grep -q 'name="pobierz_dane"' "$DIR_BO/../shop/index.php" \
+            && grep -q "source = 'vies'" "$DIR_BO/api/vies.php" \
+            && echo "  MF + VIES + rozdzielone źródła: obecne" \
+            || { echo "  ^ NOT OK : pobieranie danych z rejestru niekompletne"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in

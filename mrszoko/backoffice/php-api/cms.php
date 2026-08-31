@@ -82,6 +82,7 @@ const WSM_CMS_SECTIONS = [
     // à quelqu'un qui vient corriger une phrase — et c'est exactement ce que
     // le test attrape : une section sans nom lisible.
     'track' => 'Wyszukiwanie zamówienia',
+    'reg' => 'Pobieranie danych z rejestru',
     'status' => 'Statusy zamówienia',
     'pay' => 'Statusy płatności',
     'ship' => 'Sposoby dostawy',

@@ -151,8 +151,14 @@ function wsm_vies_interpret(int $httpCode, $res): array {
 function wsm_vies_cached(PDO $pdo, string $vat, int $ttl): ?array {
     // Un « indisponible » n'est jamais mis en cache : ce serait figer une panne
     // et empêcher le contrôle de réussir plus tard.
+    // `source` : la table sert desormais aussi a la Biala lista du ministere.
+    // Sans ce filtre, une reponse du ministere serait relue comme une reponse
+    // de VIES, et l'autoliquidation serait accordee — ou refusee — sur une
+    // preuve qui n'en est pas une. Les lignes d'avant la colonne sont NULL,
+    // et elles viennent toutes de VIES : elles restent lisibles.
     $st = $pdo->prepare("SELECT * FROM wsm_vies_checks
                           WHERE vat_eu = ? AND status IN ('valid','invalid')
+                            AND (source IS NULL OR source = 'vies')
                           ORDER BY id DESC LIMIT 1");
     $st->execute([$vat]);
     $r = $st->fetch();
