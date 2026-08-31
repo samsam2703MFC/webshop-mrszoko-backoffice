@@ -1079,6 +1079,131 @@ function wsm_status_triggers(PDO $pdo): array {
  *
  * @return array{doc_status:string, doc_mail:bool, doc_ksef:bool, vies_recheck:bool}
  */
+// ═══ LE DÉLAI PROMIS, ET CE QU'IL RESTE ═════════════════════════════════════
+//
+// La vitrine promet « Wysyłka w 24 h ». Jusqu'ici cette phrase ne vivait que
+// dans un texte : rien dans la console ne disait quelle commande approchait de
+// l'échéance, ni laquelle l'avait dépassée. On tenait la promesse de mémoire,
+// commande par commande, et on la ratait sans le savoir.
+//
+// LE COMPTEUR DÉMARRE À LA PAYE, PAS À LA COMMANDE. Un panier « oczekuje na
+// płatność » ne peut pas partir : faire clignoter un retard sur une commande
+// qu'on n'a pas le droit d'expédier apprendrait, en une semaine, à ignorer le
+// voyant. Il s'arrête au DÉPART du colis, pas à la livraison : ce qu'on promet,
+// c'est d'emballer sous 24 h — ce qu'InPost fait ensuite ne dépend pas d'ici.
+const WSM_SHIP_DELAI_DEFAUT = 24;
+
+/**
+ * Le délai d'expédition promis, en heures.
+ *
+ * Réglable dans Ustawienia. Le défaut est lu ICI et non dans config.php : une
+ * valeur en dur dans le fichier de configuration rendrait le champ de l'écran
+ * inopérant à jamais — il accepterait la saisie, dirait « Zapisano », et rien
+ * ne changerait. C'est la panne qu'on a déjà payée sur ksef.env.
+ */
+function wsm_ship_delai_h(): int {
+    $v = trim((string) (wsm_config()['orders']['ship_h'] ?? ''));
+    // CE QUI N'EST PAS UN NOMBRE RETOMBE SUR LE DÉFAUT, pas sur zéro. Écrit
+    // « (int) $v », un « 24h » ou un « jeden dzień » tapé dans le champ aurait
+    // donné 0, borné à 1 heure — et TOUTES les commandes seraient passées en
+    // retard le lendemain, sans que rien n'ait l'air cassé.
+    $n = ($v === '' || !ctype_digit($v)) ? WSM_SHIP_DELAI_DEFAUT : (int) $v;
+    // Bornes : zéro rendrait tout en retard dès la seconde du paiement, et un
+    // délai d'un mois ne mesure plus rien.
+    return max(1, min(720, $n));
+}
+
+/**
+ * Où en est cette commande par rapport au délai promis.
+ *
+ * @param array $o      la commande — il lui faut paid_at et shipped_at
+ * @param int   $now    l'heure de la BASE (wsm_db_now), pas celle de PHP :
+ *                      les trois dates sont écrites par CURRENT_TIMESTAMP
+ * @return array{etat:string,terme:?int,ecart:int,delai_h:int}
+ *   etat : 'brak'      rien à compter (annulée)
+ *          'czeka'     pas encore payée — le compteur n'a pas démarré
+ *          'bieg'      en cours ; ecart = secondes restantes
+ *          'po_czasie' dépassé ; ecart = secondes de retard
+ *          'w_czasie'  partie dans les temps ; ecart = marge
+ *          'spoznione' partie en retard ; ecart = retard
+ *          'wyslane'   partie, date inconnue (commandes d'avant cette colonne)
+ */
+function wsm_order_termin(array $o, int $now, ?int $delaiH = null): array {
+    $delai = $delaiH ?? wsm_ship_delai_h();
+    $vide  = ['etat' => 'brak', 'terme' => null, 'ecart' => 0, 'delai_h' => $delai];
+
+    $st = (string) ($o['status'] ?? '');
+    if ($st === 'anulowane') return $vide;
+
+    $paid = trim((string) ($o['paid_at'] ?? ''));
+    $paye = $paid !== '' ? strtotime($paid) : false;
+    // Payée sans date : les commandes d'avant paid_at, et celles encaissées
+    // par une voie qui l'aurait oubliée. On repart de la date de commande
+    // plutôt que de ne rien afficher — c'est le pire estimé, jamais le
+    // meilleur, donc il ne fabrique pas de fausse tranquillité.
+    if ($paye === false && (string) ($o['payment_status'] ?? '') === 'oplacone') {
+        $paye = strtotime((string) ($o['created_at'] ?? '')) ?: false;
+    }
+    if ($paye === false) return ['etat' => 'czeka', 'terme' => null, 'ecart' => 0, 'delai_h' => $delai];
+
+    $terme = $paye + $delai * 3600;
+
+    $sh = trim((string) ($o['shipped_at'] ?? ''));
+    $parti = $sh !== '' ? strtotime($sh) : false;
+    if ($parti === false && in_array($st, ['wyslane', 'dostarczone'], true)) {
+        return ['etat' => 'wyslane', 'terme' => $terme, 'ecart' => 0, 'delai_h' => $delai];
+    }
+    if ($parti !== false) {
+        return $parti <= $terme
+            ? ['etat' => 'w_czasie',  'terme' => $terme, 'ecart' => $terme - $parti, 'delai_h' => $delai]
+            : ['etat' => 'spoznione', 'terme' => $terme, 'ecart' => $parti - $terme, 'delai_h' => $delai];
+    }
+    return $now <= $terme
+        ? ['etat' => 'bieg',      'terme' => $terme, 'ecart' => $terme - $now, 'delai_h' => $delai]
+        : ['etat' => 'po_czasie', 'terme' => $terme, 'ecart' => $now - $terme, 'delai_h' => $delai];
+}
+
+/**
+ * Une durée en polonais, courte, sans piège de déclinaison.
+ *
+ * « 2 godziny », « 5 godzin », « 22 godziny » : trois formes pour un mot, et
+ * une faute de grammaire dans un tableau qu'on regarde quarante fois par jour
+ * se remarque. L'abréviation « godz. » est correcte à tous les nombres.
+ */
+function wsm_duree_pl(int $sec): string {
+    $sec = max(0, $sec);
+    if ($sec < 3600)      return max(1, (int) round($sec / 60)) . ' min';
+    if ($sec < 48 * 3600) return (int) round($sec / 3600) . ' godz.';
+    return (int) round($sec / 86400) . ' dni';
+}
+
+/**
+ * Le voyant : une classe, trois caractères, et la phrase complète au survol.
+ *
+ * @return array{0:string,1:string,2:string} [classe, texte court, titre]
+ */
+function wsm_termin_etykieta(array $t): array {
+    $quand = $t['terme'] ? date('d.m H:i', $t['terme']) : '';
+    switch ($t['etat']) {
+        case 'czeka':
+            return ['czeka', '—', 'Odliczanie startuje przy zapłacie'];
+        case 'bieg':
+            return ['bieg', wsm_duree_pl($t['ecart']),
+                    'Wysyłka do ' . $quand . ' (' . $t['delai_h'] . ' godz. od zapłaty)'];
+        case 'po_czasie':
+            return ['po', '+' . wsm_duree_pl($t['ecart']),
+                    'Po terminie o ' . wsm_duree_pl($t['ecart']) . ' — termin był ' . $quand];
+        case 'w_czasie':
+            return ['ok', '✓', 'Wysłane w terminie, z zapasem ' . wsm_duree_pl($t['ecart'])];
+        case 'spoznione':
+            return ['po', '✓+' . wsm_duree_pl($t['ecart']),
+                    'Wysłane po terminie o ' . wsm_duree_pl($t['ecart'])];
+        case 'wyslane':
+            return ['ok', '✓', 'Wysłane — bez daty wysyłki, sprzed wprowadzenia licznika'];
+    }
+    return ['', '', ''];
+}
+
 function wsm_orders_cfg(): array {
     $c = wsm_config()['orders'] ?? [];
     $on = static function ($v): bool {

@@ -237,15 +237,37 @@ $KOLEJKI = [
     // se lit plus d'un coup d'œil.
     'przygotowanie' => ['Przygotowanie', ['nowe', 'oplacone']],
     'wysylka'       => ['Do wysłania',      ['w_realizacji']],
+    // LA FILE QUI RÉPOND À « QU'EST-CE QUI TRAÎNE ». Ce n'est pas un statut :
+    // c'est une date dépassée. Elle croise donc les trois états où un colis
+    // peut encore partir — payé, en préparation — avec l'échéance promise.
+    // Sans elle, trouver les retards demandait de lire 200 lignes une par une,
+    // c'est-à-dire de ne jamais les chercher.
+    'termin'        => ['Po terminie',      ['nowe', 'oplacone', 'w_realizacji']],
     'wyslane'       => ['Wysłane',          ['wyslane', 'dostarczone']],
     'wszystkie'     => ['Wszystkie',        []],
 ];
+// Le seuil : payée avant cette heure-là et pas encore partie = en retard. Il
+// se calcule sur l'horloge de la BASE, la même qui a écrit paid_at.
+$seuilTermin = date('Y-m-d H:i:s', wsm_db_now($pdo) - wsm_ship_delai_h() * 3600);
 $kolejka = (string) ($_GET['kolejka'] ?? 'wszystkie');
 if (!isset($KOLEJKI[$kolejka])) $kolejka = 'wszystkie';
 $hurtowa = $kolejka === 'wysylka';        // la seule où le lot a un sens
 
+// La condition « en retard », écrite UNE fois : le compteur de l'onglet et la
+// liste qu'il ouvre doivent porter sur exactement le même ensemble. Un onglet
+// qui annonce 7 et ouvre 5 lignes fait chercher les deux qui manquent.
+$ouTermin = " AND paid_at IS NOT NULL AND paid_at <> '' AND paid_at < ?"
+          . " AND (shipped_at IS NULL OR shipped_at = '')";
+
 $licznik = [];
 foreach ($KOLEJKI as $k => [$nazwa, $sts]) {
+    if ($k === 'termin') {
+        $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_orders
+                              WHERE status IN ('" . implode("','", $sts) . "')" . $ouTermin);
+        $st->execute([$seuilTermin]);
+        $licznik[$k] = (int) $st->fetchColumn();
+        continue;
+    }
     $licznik[$k] = $sts
         ? (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders WHERE status IN ('" . implode("','", $sts) . "')")->fetchColumn()
         : (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders")->fetchColumn();
@@ -277,9 +299,16 @@ if (!isset($WIDOKI[$widok])) $widok = 'lista';
 $TABL = ['przygotowanie', 'wysylka', 'wyslane'];
 if ($widok === 'tablica') $hurtowa = false;
 
+// LE RETARD SE FILTRE EN SQL, PAS APRÈS COUP. Filtrer les 200 dernières
+// commandes en PHP montrerait les retards RÉCENTS et cacherait les vieux —
+// exactement ceux qu'on cherche. Ce sont les plus anciens qui remontent en
+// premier ici, à l'inverse de tout le reste de l'écran : un retard de trois
+// jours passe avant un retard de deux heures.
 $orders = $widok === 'tablica'
     ? wsm_orders_list($pdo, 200, array_merge(...array_map(fn($k) => $KOLEJKI[$k][1], $TABL)))
-    : wsm_orders_list($pdo, 200, $KOLEJKI[$kolejka][1]);
+    : ($kolejka === 'termin'
+        ? wsm_orders_po_terminie($pdo, 200, $KOLEJKI['termin'][1], $seuilTermin)
+        : wsm_orders_list($pdo, 200, $KOLEJKI[$kolejka][1]));
 
 $kubelki = [];
 if ($widok === 'tablica') {
@@ -300,7 +329,14 @@ if ($widok === 'tablica') {
  * premier point ajouté au contrôle — et l'écran aurait annoncé « gotowe »
  * sur une commande que l'envoi refuse.
  */
-$dane = function (array $o) use ($pdo): array {
+// L'HEURE DE LA BASE, LUE UNE FOIS. paid_at et shipped_at sont écrits par
+// CURRENT_TIMESTAMP : c'est l'horloge du serveur de base qui les pose. Les
+// comparer à celle de PHP, c'est comparer deux pendules que rien n'oblige à
+// être d'accord — et un décalage d'une heure afficherait « po terminie » sur
+// des commandes payées il y a dix minutes. Une requête, pas deux cents.
+$teraz = wsm_db_now($pdo);
+
+$dane = function (array $o) use ($pdo, $teraz): array {
     $pf    = wsm_order_preflight($pdo, $o);
     $etapy = wsm_order_etapy($pdo, $o);
     // « wyjdzie z uwagą » ne dit rien : on garde le texte du PREMIER
@@ -313,9 +349,15 @@ $dane = function (array $o) use ($pdo): array {
         $uwagi++;
         if ($uwagaTxt === '') $uwagaTxt = (string) $lg['val'];
     }
+    // Le compte à rebours de la promesse « wysyłka w 24 h ». Calculé ici avec
+    // le reste : deux vues qui le calculeraient chacune de leur côté
+    // finiraient par ne pas dire la même heure du même colis.
+    $termin = wsm_order_termin($o, $teraz);
     return [
         'uwagaTxt' => $uwagaTxt,
         'pf'     => $pf,
+        'termin' => $termin,
+        'tEt'    => wsm_termin_etykieta($termin),
         'teraz'  => current(array_filter($etapy, fn($e) => $e['etat'] === 'teraz')) ?: null,
         'suiv'   => current(array_filter($etapy, fn($e) => $e['etat'] === 'nastepny')) ?: null,
         'autres' => array_values(array_filter($etapy,
@@ -634,6 +676,15 @@ console_crumbs($detail
   // au-dessus n'a plus qu'un seul bouton, toujours à la même place.
   $tiroir = function (array $o, array $d) use ($przycisk, $csrf, $isAdmin) { ?>
     <div class="szuf-in">
+      <?php // L'HEURE EXACTE, pas seulement « za 6 godz. ». On organise une
+            // journée avec des heures : « do 14:30 » se range dans un planning,
+            // « za six heures » demande un calcul mental à chaque lecture. ?>
+      <?php $t = $d['termin']; if ($t['terme']): ?>
+      <p class="termin-ligne t-<?= h($d['tEt'][0]) ?>">
+        <b><?= h($d['tEt'][2]) ?></b>
+        <span>Obiecany czas: <?= (int) $t['delai_h'] ?> godz. od zapłaty — zmienia się w Ustawieniach.</span>
+      </p>
+      <?php endif; ?>
       <ul class="przed-lista">
         <?php foreach ($d['pf']['lignes'] as $lg): ?>
         <li class="<?= h($lg['etat']) ?>">
@@ -703,6 +754,12 @@ console_crumbs($detail
             // lisait comme un bouton et n'en était pas un : on cliquait dessus,
             // il ne se passait rien, on cherchait la panne. ?>
       <td data-l="Stan"><span class="stan s-<?= h($o['status']) ?>"><i class="kropka"></i><?= h($statusLabel[$o['status']] ?? $o['status']) ?></span>
+        <?php // LE TEMPS QUI RESTE, DANS LA MÊME CASE QUE L'ÉTAT. Une neuvième
+              // colonne aurait coûté 80 px sur un écran déjà serré, pour une
+              // donnée qu'on lit avec l'état, pas à côté. ?>
+        <?php [$tKl, $tTxt, $tTyt] = $d['tEt']; if ($tTxt !== ''): ?>
+        <span class="termin t-<?= h($tKl) ?>" title="<?= h($tTyt) ?>"><?= h($tTxt) ?></span>
+        <?php endif; ?>
         <?php if (!empty($o['backorder'])): ?><span class="tag no">do potwierdzenia</span><?php endif; ?>
         <?php if (($o['discount_percent'] ?? 0) > 0): ?><span class="tag">−<?= (int) $o['discount_percent'] ?> %</span><?php endif; ?></td>
       <td data-l="Płatność"><span class="stan p-<?= h($payCls) ?>"><i class="kropka"></i><?= h($payLabel[$o['payment_status']] ?? $o['payment_status']) ?></span></td>
@@ -775,6 +832,12 @@ console_crumbs($detail
         <article id="z<?= (int) $o['id'] ?>" class="karta<?= $d['blok'] ? ' blok' : '' ?>">
           <div class="gora">
             <a class="code" href="<?= h($lien(['id' => (int) $o['id']])) ?>"><?= h($o['code']) ?></a>
+            <?php // Le temps restant EN HAUT DE LA CARTE, à côté du numéro : la
+                  // tablica sert à voir la charge, et une charge se lit dans le
+                  // temps qui reste avant qu'elle brûle. ?>
+            <?php [$tKl, $tTxt, $tTyt] = $d['tEt']; if ($tTxt !== ''): ?>
+            <span class="termin t-<?= h($tKl) ?>" title="<?= h($tTyt) ?>"><?= h($tTxt) ?></span>
+            <?php endif; ?>
             <span class="kw"><?= h(pln($o['total_gross'])) ?></span>
           </div>
           <p class="im"><?= h($o['client']) ?></p>

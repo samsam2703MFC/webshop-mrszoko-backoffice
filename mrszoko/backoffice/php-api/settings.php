@@ -91,6 +91,11 @@ function wsm_settings_fields(): array {
         // une base vide doit se comporter exactement comme avant, et un
         // réglage absent ne doit jamais éteindre une obligation légale.
         'orders.doc_status'   => ['zamowienia', 'Stan, który wystawia dokument', ['orders', 'doc_status'], 'WSM_ORDER_DOC_STATUS', 'select:wyslane|oplacone|dostarczone|nigdy', 'Domyślnie „wysłane". „nigdy" wyłącza automat — dokumenty wystawia się wtedy ręcznie.'],
+        // LE DÉLAI PROMIS, RÉGLABLE. La vitrine annonce « Wysyłka w 24 h ».
+        // Écrit en dur, ce chiffre aurait vécu à deux endroits — le texte de la
+        // vitrine et le compteur de la console — et ils auraient divergé le
+        // jour où l'un des deux change.
+        'orders.ship_h'       => ['zamowienia', 'Obiecany czas wysyłki (godz.)', ['orders', 'ship_h'], 'WSM_ORDER_SHIP_H', 'text', 'Liczony od zapłaty, od 1 do 720 godz. Domyślnie 24. Tyle samo powinno stać w Treściach, w obietnicy na stronie.'],
         'orders.doc_mail'     => ['zamowienia', 'Wysyłać dokument mailem', ['orders', 'doc_mail'], 'WSM_ORDER_DOC_MAIL', 'select:1|0', 'Wyłączenie nie kasuje dokumentu — tylko go nie wysyła.'],
         'orders.doc_ksef'     => ['zamowienia', 'Zgłaszać fakturę do KSeF', ['orders', 'doc_ksef'], 'WSM_ORDER_DOC_KSEF', 'select:1|0', 'Wyłączone: faktura czeka w kolejce KSeF i wysyła się ręcznie.'],
         'orders.vies_recheck' => ['zamowienia', 'Sprawdzać VIES przed wystawieniem', ['orders', 'vies_recheck'], 'WSM_ORDER_VIES_RECHECK', 'select:1|0', 'Wyłączenie zostawia status z chwili zamówienia — przy WDT to ryzyko podatkowe.'],

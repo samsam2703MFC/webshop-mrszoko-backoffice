@@ -158,6 +158,31 @@ function wsm_table_columns(PDO $pdo, string $table): array {
  *
  * @param array $cols  colonne => [déclaration MySQL, déclaration SQLite]
  */
+/**
+ * L'HEURE DE LA BASE, pas celle de PHP.
+ *
+ * created_at, paid_at et shipped_at sont écrits par CURRENT_TIMESTAMP : c'est
+ * l'horloge du serveur de base qui les pose, dans SON fuseau — UTC pour
+ * SQLite, celui de la session pour MySQL. Les comparer à time() de PHP, c'est
+ * comparer deux horloges qu'aucune règle n'oblige à être d'accord.
+ *
+ * Un décalage d'une heure ne casse rien visiblement : il affiche « po
+ * terminie » sur des commandes payées il y a dix minutes, ou laisse un retard
+ * de trois heures passer pour du temps restant. Personne ne cherche un bug
+ * dans une pendule.
+ *
+ * @return int horodatage Unix lu dans la base ; l'heure de PHP en dernier
+ *             recours, car un écran ne doit pas tomber pour une pendule.
+ */
+function wsm_db_now(PDO $pdo): int {
+    try {
+        $v = (string) $pdo->query('SELECT CURRENT_TIMESTAMP')->fetchColumn();
+        $t = strtotime($v);
+        if ($t !== false) return $t;
+    } catch (Throwable $e) { /* on retombe sur PHP */ }
+    return time();
+}
+
 function wsm_ensure_columns(PDO $pdo, string $table, array $cols): void {
     $have = wsm_table_columns($pdo, $table);
     if (!$have) return;                                   // table absente : le schéma la créera complète
@@ -322,6 +347,12 @@ function wsm_ensure_countries(PDO $pdo): void {
     // La commande retient le pays de livraison et le régime appliqué.
     wsm_ensure_columns($pdo, 'wsm_orders', [
         'reverse_charge' => ['TINYINT(1) NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
+        // QUAND LE COLIS EST PARTI. Sans cette date, on sait qu'une commande
+        // est « Wysłane » mais pas si elle l'a été dans le délai promis — et
+        // une promesse dont on ne mesure jamais la tenue n'est pas une
+        // promesse. Elle est posée une fois et jamais réécrite : c'est un
+        // fait, pas un état.
+        'shipped_at'     => ['DATETIME NULL DEFAULT NULL', 'TEXT DEFAULT NULL'],
     ]);
     try {
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_countries")->fetchColumn()) {

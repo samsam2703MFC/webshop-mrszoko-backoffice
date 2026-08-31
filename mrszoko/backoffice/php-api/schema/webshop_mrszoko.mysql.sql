@@ -510,6 +510,7 @@ CREATE TABLE IF NOT EXISTS `wsm_orders` (
   `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `paid_at`         DATETIME NULL DEFAULT NULL,
+  `shipped_at`      DATETIME NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_wsm_orders_code` (`code`),
   KEY `idx_wsm_orders_status` (`status`),

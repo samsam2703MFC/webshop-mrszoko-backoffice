@@ -1561,20 +1561,75 @@ function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bo
 }
 
 /** Liste pour le back-office. */
-function wsm_orders_list(PDO $pdo, int $limit = 200, array $statuts = []): array {
+/**
+ * Les commandes qui ont dépassé le délai promis et ne sont pas parties.
+ *
+ * POURQUOI UNE REQUÊTE À PART. Filtrer le retour de wsm_orders_list() en PHP
+ * paraît plus simple, et c'est faux : cette liste s'arrête aux 200 dernières
+ * commandes. On y verrait donc les retards RÉCENTS, et jamais les anciens —
+ * exactement ceux qu'on cherche quand on ouvre cette file.
+ *
+ * L'ORDRE EST INVERSÉ par rapport au reste de l'écran : le plus vieux retard
+ * d'abord. Ailleurs on veut les nouveautés ; ici on veut ce qui pourrit.
+ *
+ * La comparaison se fait sur des chaînes « Y-m-d H:i:s », identiques chez
+ * MySQL et chez SQLite, avec un seuil calculé sur l'horloge de la BASE — celle
+ * qui a écrit paid_at.
+ *
+ * @param string $seuil paid_at antérieur à cette date = hors délai
+ */
+function wsm_orders_po_terminie(PDO $pdo, int $limit, array $statuts, string $seuil): array {
+    $ok = array_values(array_intersect($statuts, WSM_ORDER_STATUSES));
+    if (!$ok) return [];
+    $st = $pdo->prepare("SELECT id FROM wsm_orders
+                          WHERE status IN ('" . implode("','", $ok) . "')
+                            AND paid_at IS NOT NULL AND paid_at <> '' AND paid_at < ?
+                            AND (shipped_at IS NULL OR shipped_at = '')
+                          ORDER BY paid_at ASC LIMIT " . max(1, min(1000, $limit)));
+    $st->execute([$seuil]);
+    $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    if (!$ids) return [];
+    // On repasse par wsm_orders_list pour l'hydratation : une deuxième
+    // construction de ligne divergerait de la première au premier champ ajouté,
+    // et c'est cette ligne-là que lisent les voyants.
+    return wsm_orders_list($pdo, count($ids), $ok, $ids);
+}
+
+function wsm_orders_list(PDO $pdo, int $limit = 200, array $statuts = [], array $ids = []): array {
     // Le filtre est une LISTE BLANCHE d'états connus, jamais du texte reçu :
     // cette valeur vient d'un paramètre d'URL.
     $ok = array_values(array_intersect($statuts, WSM_ORDER_STATUSES));
     $ou = '';
     if ($ok) $ou = " WHERE status IN ('" . implode("','", $ok) . "')";
-    $rows = $pdo->query("SELECT * FROM wsm_orders$ou ORDER BY id DESC LIMIT "
-                        . max(1, min(1000, $limit)))->fetchAll();
+    if ($ids) {
+        // DES IDENTIFIANTS PRÉCIS, DANS LEUR ORDRE. Appelée pour hydrater une
+        // sélection déjà faite (les retards, triés du plus vieux), elle doit
+        // rendre CES commandes-là et pas « les 200 dernières qui en font
+        // partie » : un retard de trois mois est justement celui qui tombe
+        // hors des 200 dernières.
+        $ints = array_values(array_filter(array_map('intval', $ids)));
+        if (!$ints) return [];
+        $rows = $pdo->query("SELECT * FROM wsm_orders WHERE id IN ("
+                            . implode(',', $ints) . ")")->fetchAll();
+        $par = [];
+        foreach ($rows as $r) $par[(int) $r['id']] = $r;
+        $rows = [];
+        foreach ($ints as $i) if (isset($par[$i])) $rows[] = $par[$i];
+    } else {
+        $rows = $pdo->query("SELECT * FROM wsm_orders$ou ORDER BY id DESC LIMIT "
+                            . max(1, min(1000, $limit)))->fetchAll();
+    }
     return array_map(function ($o) use ($pdo) {
         $st = $pdo->prepare("SELECT COUNT(*), COALESCE(SUM(qty),0) FROM wsm_order_items WHERE order_id = ?");
         $st->execute([(int) $o['id']]);
         [$lines, $units] = $st->fetch(PDO::FETCH_NUM);
         return [
             'id' => (int) $o['id'], 'code' => $o['code'], 'created_at' => $o['created_at'],
+            // Le compte à rebours se lit sur ces deux dates. Absentes de la
+            // liste, le voyant afficherait « brak wpłaty » sur toutes les
+            // commandes, y compris payées : exactement la panne décrite
+            // quelques lignes plus bas, avec un champ différent.
+            'paid_at' => $o['paid_at'] ?? null, 'shipped_at' => $o['shipped_at'] ?? null,
             'client' => trim($o['first_name'] . ' ' . $o['last_name']) ?: $o['company'],
             'email' => $o['email'], 'phone' => $o['phone'],
             'status' => $o['status'], 'payment_status' => $o['payment_status'],
@@ -1681,6 +1736,22 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
     }
 
     $pdo->prepare("UPDATE wsm_orders SET status = ? WHERE id = ?")->execute([$new, $id]);
+    // ─── LA DATE DE DÉPART, POSÉE UNE FOIS ────────────────────────────────
+    //
+    // C'est elle qui dit si le délai promis a été tenu. Sans elle, on sait
+    // qu'une commande est partie, jamais si elle est partie à temps — et une
+    // promesse dont on ne mesure pas la tenue n'en est pas une.
+    //
+    // `shipped_at IS NULL` dans la condition : une commande repassée par
+    // « Wysłane » — parce qu'on a corrigé un statut, parce qu'un transporteur
+    // a renvoyé son accusé deux fois — ne doit pas voir sa date de départ
+    // avancer. Un retard effacé par une seconde manipulation, c'est un
+    // indicateur qui s'auto-absout.
+    if ($new === 'wyslane') {
+        $pdo->prepare("UPDATE wsm_orders SET shipped_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND (shipped_at IS NULL OR shipped_at = '')")
+            ->execute([$id]);
+    }
     if ($paye) $out['note'] = 'zapłata odnotowana ręcznie';
     $out['ok'] = true;
     if ($avant === $new) return $out;              // rien de neuf : rien à émettre
