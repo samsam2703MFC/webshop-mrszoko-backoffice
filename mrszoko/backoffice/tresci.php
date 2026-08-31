@@ -69,6 +69,10 @@ function jez(string $cible): string { return '&amp;jezyk=' . rawurlencode($cible
 $flash = ''; $flashKind = 'ok';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    // Sans ce jeton, une page tierce fait poster ce formulaire par le
+    // navigateur de quelqu'un qui a sa session ouverte, et la console
+    // execute la demande comme si elle venait de lui.
+    if (!console_csrf_ok()) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może zmieniać treści strony.'; $flashKind = 'err';
     } elseif (isset($_POST['przywroc'])) {
@@ -323,6 +327,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
         <td data-l="">
           <?php if ($c !== WSM_CMS_BASE_LANG && $isAdmin): ?>
           <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <?= console_csrf_field() ?>
             <input type="hidden" name="publikuj" value="<?= h($c) ?>">
             <?php if (!$l['published']): ?>
               <input type="hidden" name="wlacz" value="1">
@@ -367,6 +372,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
       <?php foreach ($registre as $c => $l): if ($c === WSM_CMS_BASE_LANG) continue;
         $cv = $couv[$c]; if ($cv['pct'] >= 100.0) continue; ?>
       <form method="post">
+      <?= console_csrf_field() ?>
         <button class="btn sm" name="tlumacz" value="<?= h($c) ?>">
           <?= h($l['name']) ?> — uzupełnij <?= (int) ($cv['total'] - $cv['done']) ?></button>
       </form>
@@ -410,6 +416,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
         <td data-l="">
           <?php if ($isAdmin): ?>
           <form method="post" style="display:inline">
+      <?= console_csrf_field() ?>
             <button class="btn sm ghost" name="cofnij_zmiane" value="<?= (int) $h['id'] ?>">Cofnij</button>
           </form>
           <?php endif; ?>
@@ -446,6 +453,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
     tutaj ustawia się kolejność, widoczność, płynność (0–5) i ceny orientacyjne.
     Karta odznaczona znika ze strony, ale nic nie traci.</p>
   <form method="post">
+      <?= console_csrf_field() ?>
     <input type="hidden" name="kafelki" value="1">
     <div class="tablewrap">
     <table class="rwd">
@@ -540,6 +548,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
   <h2><?= h(wsm_cms_section_label($open)) ?>
     <span class="tag"><?= count($visible[$open]) ?> <?= count($visible[$open]) === 1 ? 'tekst' : 'tekstów' ?></span></h2>
   <form method="post">
+      <?= console_csrf_field() ?>
     <?php foreach ($visible[$open] as $k): $by = $content[$k]; $multi = wsm_cms_multiline($by); ?>
     <div class="row">
       <div class="kk">
@@ -577,6 +586,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Treści' => null,
   <p class="muted small">Wraca do tekstu dostarczonego z wdrożeniem — po jednym kluczu,
     we wszystkich językach. Przydaje się, gdy poprawka okazała się gorsza od oryginału.</p>
   <form method="post" class="actions">
+      <?= console_csrf_field() ?>
     <select name="przywroc" style="max-width:340px">
       <?php foreach ($visible[$open] as $k): if (!isset($source[$k])) continue; ?>
       <option value="<?= h($k) ?>"><?= h($k) ?></option>

@@ -44,7 +44,18 @@ function admins_restants(PDO $pdo, int $exceptId = 0): int {
     return (int) $st->fetchColumn();
 }
 
+// L'ECRAN LE PLUS SENSIBLE DE LA MAISON N'AVAIT PAS DE JETON. On y cree des
+// comptes, on y pose des mots de passe, et on peut desormais y supprimer
+// quelqu'un — le tout sur un simple POST. Une page piegee ouverte dans un
+// autre onglet suffisait : le navigateur joint le cookie de session tout seul,
+// et le journal d'audit aurait note le geste au nom de la victime.
+$csrf = console_csrf();
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    if (!console_csrf_ok()) {
+        http_response_code(400);
+        exit('Bad request.');
+    }
     if (!$isAdmin) {
         $flash = 'Twoja rola nie pozwala zmieniać kont.'; $kind = 'err';
     } else {
@@ -120,6 +131,64 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $flash = 'Ustawiono nowe hasło dla ' . $u['email'] . '.';
             } catch (InvalidArgumentException $e) {
                 $flash = $e->getMessage(); $kind = 'err';
+            }
+        } elseif (isset($_POST['przelacz'])) {
+            // DESACTIVER D'UN BOUTON. C'etait deja possible — une case a cocher
+            // au milieu du formulaire d'edition, qu'il fallait ensuite
+            // enregistrer. Personne ne l'a trouvee. Le geste le plus courant
+            // d'un ecran de comptes merite son propre bouton, avec les MEMES
+            // garde-fous : ils sont ici, pas dans le formulaire.
+            $act = (int) $u['act'] === 1 ? 0 : 1;
+            if ($id === $meId && $act === 0) {
+                $flash = 'Nie możesz wyłączyć własnego konta.'; $kind = 'err';
+            } elseif ($act === 0
+                      && in_array((string) $u['role'], [WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN, 'Centrala'], true)
+                      && admins_restants($pdo, $id) === 0) {
+                $flash = 'To ostatnie konto z pełnym dostępem — po tej zmianie nikt nie wszedłby do konsoli.';
+                $kind = 'err';
+            } elseif (!wsm_peut_donner_role($me, (string) $u['role'])) {
+                // On ne touche pas a un compte dont on ne pourrait pas donner
+                // le role : sinon un Administrator eteindrait le Superadmin.
+                $flash = 'Nie możesz zmieniać konta o roli ' . $u['role'] . '.'; $kind = 'err';
+            } else {
+                $pdo->prepare("UPDATE wsm_users SET act = ? WHERE id = ?")->execute([$act, $id]);
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), $act ? 'Włączenie konta' : 'Wyłączenie konta',
+                          (string) $u['email'], 'Sieć');
+                $flash = $act ? 'Konto ' . $u['email'] . ' włączone.'
+                              : 'Konto ' . $u['email'] . ' wyłączone — nie zaloguje się, ale zostaje na liście.';
+            }
+        } elseif (isset($_POST['usun'])) {
+            // ─── SUPPRIMER, ET SEULEMENT QUAND C'EST SANS RISQUE ──────────
+            //
+            // Desactiver suffit presque toujours : le compte ne se connecte
+            // plus, et son nom reste lisible partout ou le journal d'audit le
+            // cite. Supprimer sert au vrai cas — une adresse tapee de travers,
+            // un compte cree par erreur, un prestataire parti pour de bon.
+            //
+            // MEME GARDE-FOUS QUE LA DESACTIVATION, plus un : on exige que
+            // l'adresse soit RETAPEE. Un bouton « Usuń » a cote d'un bouton
+            // « Zapisz » se clique par erreur ; une adresse ne se retape pas
+            // par erreur.
+            $conf = strtolower(trim((string) ($_POST['potwierdz'] ?? '')));
+            if ($id === $meId) {
+                $flash = 'Nie możesz usunąć własnego konta.'; $kind = 'err';
+            } elseif (!wsm_peut_donner_role($me, (string) $u['role'])) {
+                $flash = 'Nie możesz usunąć konta o roli ' . $u['role'] . '.'; $kind = 'err';
+            } elseif (in_array((string) $u['role'], [WSM_ROLE_ADMIN, WSM_ROLE_SUPERADMIN, 'Centrala'], true)
+                      && admins_restants($pdo, $id) === 0) {
+                $flash = 'To ostatnie konto z pełnym dostępem — po usunięciu nikt nie wszedłby do konsoli.';
+                $kind = 'err';
+            } elseif ($conf !== strtolower((string) $u['email'])) {
+                $flash = 'Wpisz adres konta, żeby potwierdzić usunięcie.'; $kind = 'err';
+            } else {
+                // LE JOURNAL D'ABORD. Ecrit apres la suppression, il pourrait
+                // manquer si celle-ci echoue a mi-chemin — et un compte
+                // disparu sans trace est exactement ce qu'un audit doit
+                // empecher.
+                wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Usunięcie konta',
+                          (string) $u['email'] . ' · ' . (string) $u['role'], 'Sieć');
+                $pdo->prepare("DELETE FROM wsm_users WHERE id = ?")->execute([$id]);
+                $flash = 'Konto ' . $u['email'] . ' usunięte. Ślad został w dzienniku audytu.';
             }
         } elseif (isset($_POST['odblokuj'])) {
             $pdo->prepare("UPDATE wsm_users SET failed_attempts = 0, locked_until = NULL WHERE id = ?")->execute([$id]);
@@ -207,6 +276,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Użytkownicy' => null]);
       <?php endif; ?>
 
       <form method="post">
+        <?= console_csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
         <div class="grid2">
           <label class="field"><span>Imię i nazwisko</span>
@@ -238,14 +308,50 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Użytkownicy' => null]);
           <?php if ($locked && $isAdmin): ?>
           <button type="submit" name="odblokuj" value="1">Odblokuj</button>
           <?php endif; ?>
+          <?php // LE GESTE LE PLUS COURANT A SON PROPRE BOUTON. Il existait
+                // deja — une case a cocher au milieu du formulaire, qu'il
+                // fallait ensuite enregistrer — et personne ne l'a trouvee.
+                // Il ne remplace pas la case : les deux ecrivent la meme
+                // colonne, avec les memes garde-fous. ?>
+          <?php if ($isAdmin && (int) $u['id'] !== (int) ($me['id'] ?? 0)): ?>
+          <button type="submit" name="przelacz" value="1"><?= (int) $u['act'] ? 'Wyłącz konto' : 'Włącz konto' ?></button>
+          <?php endif; ?>
         </div>
       </form>
+
+      <?php // ─── SUPPRIMER : dernier recours, et il se merite ────────────────
+            //
+            // Desactiver suffit presque toujours — le compte ne se connecte
+            // plus, et son nom reste lisible partout ou le journal le cite.
+            // Supprimer sert au vrai cas : une adresse tapee de travers, un
+            // compte cree par erreur, un prestataire parti pour de bon.
+            //
+            // L'ADRESSE SE RETAPE. Un bouton « Usuń » a cote d'un bouton
+            // « Zapisz » se clique par erreur ; une adresse, non. Le champ est
+            // la garde, pas une fenetre de confirmation — qu'on apprend a
+            // valider sans lire. ?>
+      <?php if ($isAdmin && (int) $u['id'] !== (int) ($me['id'] ?? 0)): ?>
+      <details class="usun-konto">
+        <summary>Usuń konto</summary>
+        <p class="why">Wyłączenie wystarcza w większości przypadków: konto się nie zaloguje,
+          a jego nazwa zostaje czytelna wszędzie tam, gdzie wymienia ją dziennik audytu.
+          Usunięcie jest nieodwracalne. Sam fakt usunięcia zostaje w dzienniku.</p>
+        <form method="post" class="actions">
+        <?= console_csrf_field() ?>
+          <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
+          <input type="text" name="potwierdz" autocomplete="off" spellcheck="false"
+                 placeholder="<?= h((string) $u['email']) ?>" aria-label="Wpisz adres, żeby potwierdzić" required>
+          <button class="niebezpieczny" type="submit" name="usun" value="1">Usuń bezpowrotnie</button>
+        </form>
+      </details>
+      <?php endif; ?>
 
       <?php if ($isAdmin): ?>
       <h3>Nowe hasło</h3>
       <p class="why">Hasła nie da się odczytać — można je tylko ustawić na nowo.
         Minimum <?= WSM_PASSWORD_MIN ?> znaków. W dzienniku audytu zapisuje się sam fakt zmiany.</p>
       <form method="post" class="actions">
+        <?= console_csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
         <input type="password" name="password" autocomplete="new-password" placeholder="nowe hasło" required>
         <button type="submit" name="haslo" value="1">Ustaw hasło</button>
@@ -262,6 +368,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Użytkownicy' => null]);
   <p class="why">Konto powstaje od razu z hasłem — konto bez hasła istnieje, ale nie może się
     zalogować, więc nikomu nie służy.</p>
   <form method="post">
+        <?= console_csrf_field() ?>
     <input type="hidden" name="nowy" value="1">
     <div class="grid2">
       <label class="field"><span>E-mail</span>

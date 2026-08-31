@@ -25,6 +25,10 @@ require_once $API . '/mail.php';
 $flash = ''; $kind = 'ok';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    // Sans ce jeton, une page tierce fait poster ce formulaire par le
+    // navigateur de quelqu'un qui a sa session ouverte, et la console
+    // execute la demande comme si elle venait de lui.
+    if (!console_csrf_ok()) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może wystawiać dokumenty.'; $kind = 'err';
     } elseif (isset($_POST['wystaw'])) {
@@ -199,16 +203,20 @@ console_crumbs($detail
   <div class="actions">
     <a class="code" href="faktury.php?id=<?= (int) $i['id'] ?>&amp;druk=1" target="_blank" rel="noopener">Otwórz do druku / PDF ↗</a>
     <?php if ($isAdmin): ?>
-    <form method="post"><button type="submit" name="wyslij" value="<?= (int) $i['id'] ?>">Wyślij mailem</button></form>
+    <form method="post">
+      <?= console_csrf_field() ?><button type="submit" name="wyslij" value="<?= (int) $i['id'] ?>">Wyślij mailem</button></form>
     <?php if ($i['kind'] !== 'proforma'): ?>
-    <form method="post"><button type="submit" name="proforma" value="<?= (int) $i['id'] ?>">Wystaw proformę</button></form>
+    <form method="post">
+      <?= console_csrf_field() ?><button type="submit" name="proforma" value="<?= (int) $i['id'] ?>">Wystaw proformę</button></form>
     <?php endif; ?>
     <?php if (!$i['paid'] && $i['kind'] !== 'paragon'): ?>
     <form method="post">
+      <?= console_csrf_field() ?>
       <input type="hidden" name="dokument" value="<?= (int) $i['id'] ?>">
       <button type="submit" name="monit" value="zadanie_zaplaty">Prośba o płatność</button>
     </form>
     <form method="post">
+      <?= console_csrf_field() ?>
       <input type="hidden" name="dokument" value="<?= (int) $i['id'] ?>">
       <button type="submit" name="monit" value="przypomnienie">Wyślij przypomnienie</button>
     </form>
@@ -225,6 +233,7 @@ console_crumbs($detail
   <p class="muted small">Faktury nie zmienia się — wystawia się korektę, która wskazuje oryginał.
     Podaj kwotę brutto <b>po korekcie</b> i przyczynę.</p>
   <form method="post" class="grid2">
+      <?= console_csrf_field() ?>
     <input type="hidden" name="koryguj" value="<?= (int) $i['id'] ?>">
     <label class="field"><span>Kwota brutto po korekcie (zł)</span>
       <input type="text" name="total_gross" inputmode="decimal" value="<?= h(number_format($i['total_gross'] / 100, 2, ',', '')) ?>"></label>
@@ -255,8 +264,10 @@ console_crumbs($detail
       <td data-l="">
         <?php if ($isAdmin): ?>
         <div class="actions">
-          <form method="post"><button class="primary" type="submit" name="wystaw" value="<?= (int) $o['id'] ?>">Wystaw</button></form>
-          <form method="post"><button type="submit" name="proforma_zam" value="<?= (int) $o['id'] ?>">Proforma</button></form>
+          <form method="post">
+      <?= console_csrf_field() ?><button class="primary" type="submit" name="wystaw" value="<?= (int) $o['id'] ?>">Wystaw</button></form>
+          <form method="post">
+      <?= console_csrf_field() ?><button type="submit" name="proforma_zam" value="<?= (int) $o['id'] ?>">Proforma</button></form>
         </div>
         <?php endif; ?>
       </td>
@@ -289,6 +300,7 @@ console_crumbs($detail
       <td data-l="">
         <?php if ($isAdmin): ?>
         <form method="post">
+      <?= console_csrf_field() ?>
           <input type="hidden" name="dokument" value="<?= (int) $i2['id'] ?>">
           <button type="submit" name="monit" value="przypomnienie">Przypomnij</button>
         </form>
