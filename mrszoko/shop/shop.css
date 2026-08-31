@@ -529,3 +529,12 @@ details.claim > summary::before { content: '+'; font-weight: 400; color: var(--t
 details.claim[open] > summary::before { content: '−'; }
 details.claim > summary:hover { color: var(--choco-700); }
 details.claim > *:not(summary) { margin-top: var(--space-3); }
+
+/* Le bouton « remplir depuis le registre » : présent, mais jamais confondu
+   avec « payer ». Un bouton secondaire dans un formulaire qui en a un seul
+   d'important doit se voir comme un outil, pas comme une issue. */
+.reg-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: var(--space-3) 0; }
+.reg-ligne small { color: var(--text-muted); font-size: var(--text-xs); line-height: 1.5; flex: 1 1 240px; }
+.btn--ghost { background: transparent; color: var(--choco-700);
+              border: 1px solid var(--border-default); }
+.btn--ghost:hover { background: var(--cream-100); }

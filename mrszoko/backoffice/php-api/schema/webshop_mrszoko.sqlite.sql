@@ -487,6 +487,7 @@ CREATE TABLE IF NOT EXISTS wsm_vies_checks (
   name         TEXT NOT NULL DEFAULT '',
   address      TEXT NOT NULL DEFAULT '',
   consultation TEXT NOT NULL DEFAULT '',
+  source       TEXT NOT NULL DEFAULT 'vies',
   raw          TEXT,
   checked_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

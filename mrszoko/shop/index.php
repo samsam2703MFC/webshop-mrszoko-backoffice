@@ -282,8 +282,66 @@ if ($method === 'POST') {
         // On retombe sur l'affichage du suivi, plus bas.
     }
 
+    // ---- Remplir la facture depuis le registre ------------------------------
+    //
+    // POURQUOI DEUX REGISTRES. On nous a demande de remplir les champs « depuis
+    // VIES ». VIES ne peut pas le faire pour un NIP polonais : il ne connait
+    // que les numeros enregistres pour le commerce intracommunautaire, donc une
+    // societe qui vend uniquement en Pologne n'y figure pas. On lui aurait
+    // repondu « numer nieznany » — vrai pour VIES, FAUX pour le client, dont le
+    // NIP est parfaitement valide.
+    //
+    //   · un numero de TVA UE  → VIES
+    //   · un NIP polonais      → Biala lista du ministere
+    //
+    // SANS JAVASCRIPT : le bouton poste le formulaire, le serveur remplit ce
+    // qu'il sait, et la page revient avec les cases pleines. Rien a charger,
+    // rien qui echoue en silence sur un telephone qui bloque les scripts.
+    if ($page === 'kasa' && isset($_POST['pobierz_dane'])) {
+        $formValues = $_POST;
+        $vatUE = trim((string) ($_POST['vat_eu'] ?? ''));
+        $nipPl = trim((string) ($_POST['nip'] ?? ''));
+        $trouve = null; $regInfo = ''; $regKind = 'warn';
+
+        if ($vatUE !== '') {
+            require_once $WSM_API_DIR . '/vies.php';
+            $r = wsm_vies_check($pdo, $vatUE);
+            if (($r['status'] ?? '') === 'valid') { $trouve = $r; $regInfo = $S['reg.ok_vies'] ?? ''; $regKind = 'ok'; }
+            elseif (($r['status'] ?? '') === 'invalid') $regInfo = $S['reg.nieznany'] ?? '';
+            else $regInfo = $S['reg.niedostepny'] ?? '';
+        } elseif ($nipPl !== '') {
+            require_once $WSM_API_DIR . '/mf.php';
+            $r = wsm_mf_check($pdo, $nipPl);
+            if (($r['status'] ?? '') === 'valid') { $trouve = $r; $regInfo = $S['reg.ok_mf'] ?? ''; $regKind = 'ok'; }
+            elseif (($r['status'] ?? '') === 'invalid') $regInfo = $S['reg.nieznany'] ?? '';
+            else $regInfo = $S['reg.niedostepny'] ?? '';
+        } else {
+            $regInfo = $S['reg.podaj'] ?? '';
+        }
+
+        if ($trouve) {
+            // ON NE REMPLIT QUE CE QUI EST VIDE. Ecraser ce que quelqu'un vient
+            // de taper, c'est lui reprendre son travail sans le prevenir — et
+            // le registre n'a pas toujours raison : une societe demenagee met
+            // des semaines a y apparaitre a sa nouvelle adresse.
+            if (trim((string) ($formValues['company'] ?? '')) === '' && ($trouve['name'] ?? '') !== '') {
+                $formValues['company'] = (string) $trouve['name'];
+            }
+            require_once $WSM_API_DIR . '/mf.php';
+            $ad = wsm_mf_adresse((string) ($trouve['address'] ?? ''));
+            foreach (['street' => 'bill_street', 'building' => 'bill_building',
+                      'postcode' => 'bill_postcode', 'city' => 'bill_city'] as $k => $champ) {
+                if ($ad[$k] !== '' && trim((string) ($formValues[$champ] ?? '')) === '') {
+                    $formValues[$champ] = $ad[$k];
+                }
+            }
+            $formValues['invoice'] = '1';           // on vient de demander une facture
+        }
+        // on retombe sur l'affichage de la caisse, plus bas
+    }
+
     // ---- Passage de commande ----------------------------------------------
-    if ($page === 'kasa') {
+    if ($page === 'kasa' && !isset($_POST['pobierz_dane'])) {
         $body = $_POST;
         $body['items'] = cart_items($cart);
         $body['lang']  = $lang;
@@ -1052,6 +1110,20 @@ if ($page === 'kasa') {
             <?php $field('nip', $S['checkout.nip'] ?? '', ['required' => false, 'inputmode' => 'numeric', 'placeholder' => '5252248481']); ?>
           </div>
           <?php $field('vat_eu', $S['checkout.vat_eu'] ?? '', ['required' => false, 'placeholder' => 'PL5252248481']); ?>
+
+          <?php // ─── REMPLIR DEPUIS LE REGISTRE ────────────────────────────
+                // Une adresse recopiee a la main sur une facture, c'est une
+                // correction de facture la semaine suivante. Le bouton poste
+                // le formulaire ; le serveur lit le registre et renvoie la
+                // page remplie. Aucun JavaScript : sur le telephone qui bloque
+                // les scripts, il marche exactement pareil. ?>
+          <p class="reg-ligne">
+            <button class="btn btn--ghost" type="submit" name="pobierz_dane" value="1"
+                    formnovalidate><?= e($S['reg.cta'] ?? 'Pobierz dane z rejestru') ?></button>
+            <small><?= e($S['reg.hint'] ?? '') ?></small>
+          </p>
+          <?php if (isset($regInfo) && $regInfo !== '') notice($regKind ?? 'warn', $regInfo); ?>
+
           <p class="mono muted"><?= e($S['checkout.bill_address'] ?? '') ?></p>
           <div class="row">
             <?php $field('bill_street', $S['checkout.street'] ?? '', ['required' => false]); ?>

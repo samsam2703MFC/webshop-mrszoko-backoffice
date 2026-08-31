@@ -352,6 +352,14 @@ function wsm_ensure_countries(PDO $pdo): void {
         // fait, pas un état.
         'shipped_at'     => ['DATETIME NULL DEFAULT NULL', 'TEXT DEFAULT NULL'],
     ]);
+    // DEUX REGISTRES, UNE TABLE, ET JAMAIS LE MEME SENS. wsm_vies_checks garde
+    // maintenant aussi les reponses de la Biala lista du ministere. Sans cette
+    // colonne, une reponse du ministere serait relue comme une reponse de
+    // VIES — et l'autoliquidation serait accordee, ou refusee, sur une preuve
+    // qui n'en est pas une.
+    wsm_ensure_columns($pdo, 'wsm_vies_checks', [
+        'source' => ["VARCHAR(8) NOT NULL DEFAULT 'vies'", "TEXT NOT NULL DEFAULT 'vies'"],
+    ]);
     try {
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_countries")->fetchColumn()) {
             require_once __DIR__ . '/seed.php';

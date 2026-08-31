@@ -427,7 +427,14 @@
       "track.submit": "Pokaż zamówienie",
       "track.notfound": "Nie znaleźliśmy zamówienia o tym numerze dla tego adresu. Sprawdź jedno i drugie.",
       "track.limit": "Za dużo prób z tego miejsca. Spróbuj ponownie za godzinę.",
-      "track.help": "Link do zamówienia jest też w mailu z potwierdzeniem. Jeśli go nie masz, napisz do nas:"
+      "track.help": "Link do zamówienia jest też w mailu z potwierdzeniem. Jeśli go nie masz, napisz do nas:",
+      "reg.cta": "Pobierz dane z rejestru",
+      "reg.hint": "Wpisz NIP albo numer VAT UE — uzupełnimy nazwę i adres. Puste pola, których nie ruszamy.",
+      "reg.ok_mf": "Dane pobrane z Białej listy podatników VAT. Sprawdź je — rejestr bywa o kilka tygodni z tyłu.",
+      "reg.ok_vies": "Dane pobrane z VIES. Sprawdź je przed wysłaniem zamówienia.",
+      "reg.nieznany": "Nie znaleźliśmy tego numeru w rejestrze. Sprawdź go albo wpisz dane ręcznie.",
+      "reg.niedostepny": "Rejestr chwilowo nie odpowiada. Wpisz dane ręcznie — to nie blokuje zamówienia.",
+      "reg.podaj": "Najpierw wpisz NIP albo numer VAT UE."
     },
     "uk": {
       "meta.title": "Mister Szoko, крамниця шоколаду",
@@ -655,7 +662,14 @@
       "track.submit": "Показати замовлення",
       "track.notfound": "Ми не знайшли замовлення з таким номером для цієї адреси. Перевірте обидва поля.",
       "track.limit": "Забагато спроб звідси. Спробуйте за годину.",
-      "track.help": "Посилання на замовлення є також у листі з підтвердженням. Якщо його немає, напишіть нам:"
+      "track.help": "Посилання на замовлення є також у листі з підтвердженням. Якщо його немає, напишіть нам:",
+      "reg.cta": "Отримати дані з реєстру",
+      "reg.hint": "Введіть NIP або номер VAT UE — заповнимо назву та адресу. Заповнені поля не чіпаємо.",
+      "reg.ok_mf": "Дані з польського реєстру платників ПДВ. Перевірте їх — реєстр буває із запізненням.",
+      "reg.ok_vies": "Дані з VIES. Перевірте їх перед відправленням замовлення.",
+      "reg.nieznany": "Не знайшли цього номера в реєстрі. Перевірте його або введіть дані вручну.",
+      "reg.niedostepny": "Реєстр зараз не відповідає. Введіть дані вручну — це не блокує замовлення.",
+      "reg.podaj": "Спершу введіть NIP або номер VAT UE."
     },
     "en": {
       "meta.title": "Mister Szoko, chocolate shop",
@@ -883,7 +897,14 @@
       "track.submit": "Show my order",
       "track.notfound": "We found no order with that number for that address. Please check both.",
       "track.limit": "Too many attempts from here. Try again in an hour.",
-      "track.help": "The link to your order is also in the confirmation e-mail. If you no longer have it, write to us:"
+      "track.help": "The link to your order is also in the confirmation e-mail. If you no longer have it, write to us:",
+      "reg.cta": "Fetch from the register",
+      "reg.hint": "Enter a Polish NIP or an EU VAT number and we will fill in the name and address. Fields you have already filled are left alone.",
+      "reg.ok_mf": "Fetched from the Polish VAT register. Please check it — the register can be a few weeks behind.",
+      "reg.ok_vies": "Fetched from VIES. Please check it before placing the order.",
+      "reg.nieznany": "We could not find that number in the register. Check it, or fill the fields in yourself.",
+      "reg.niedostepny": "The register is not answering right now. Fill the fields in yourself — this does not block your order.",
+      "reg.podaj": "Enter a NIP or an EU VAT number first."
     }
   }
 }
