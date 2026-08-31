@@ -2208,6 +2208,18 @@ jobs:
             && grep -q "source = 'vies'" "$DIR_BO/api/vies.php" \
             && echo "  MF + VIES + rozdzielone źródła: obecne" \
             || { echo "  ^ NOT OK : pobieranie danych z rejestru niekompletne"; fail=1; }
+          # ── LE CANAL INPOST, FINI ──────────────────────────────────────────
+          # Deux pièces manquaient, et ce sont celles qu'on ne voit pas tant
+          # qu'on n'a pas de vrai client : savoir si le jeton marche AVANT la
+          # première commande payée, et rapatrier les statuts — sans eux, une
+          # commande reste « Wysłane » pour toujours et la boutique est le
+          # dernier endroit où l'on apprend qu'elle a été livrée.
+          echo "== kanal InPost =="
+          grep -q 'function wsm_inpost_diag' "$DIR_BO/api/inpost.php" \
+            && grep -q 'function wsm_inpost_sync' "$DIR_BO/api/inpost.php" \
+            && grep -q "POST\['sprawdz'\]" "$DIR_BO/wysylka.php" \
+            && echo "  test połączenia + statusy przesyłek: obecne" \
+            || { echo "  ^ NOT OK : kanał InPost niekompletny"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in
