@@ -397,7 +397,8 @@ CREATE TABLE IF NOT EXISTS wsm_orders (
   note            TEXT,
   created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  paid_at         TEXT DEFAULT NULL
+  paid_at         TEXT DEFAULT NULL,
+  shipped_at      TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS wsm_order_items (

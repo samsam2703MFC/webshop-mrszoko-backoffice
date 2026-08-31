@@ -2176,6 +2176,20 @@ jobs:
             && [ "$(grep -c 'moje-zamowienie' "$DIR_BO/../shop/layout.php")" -ge 2 ] \
             && echo "  reguła + strona + jeton + dwa linki: obecne" \
             || { echo "  ^ NOT OK : wyszukiwanie zamówienia niekompletne"; fail=1; }
+          # ── LE COMPTE À REBOURS DE LA PROMESSE ─────────────────────────────
+          # La vitrine promet « Wysyłka w 24 h ». Quatre pièces font que la
+          # console le mesure : la colonne qui date le départ, la règle qui
+          # compte, la file des retards, le voyant. Sans shipped_at, l'écran
+          # dit « wysłane » sans jamais pouvoir dire « à temps » — et une
+          # promesse dont on ne mesure pas la tenue n'en est pas une.
+          echo "== licznik terminu wysylki =="
+          grep -q 'function wsm_order_termin' "$DIR_BO/api/invoice.php" \
+            && grep -q 'function wsm_orders_po_terminie' "$DIR_BO/api/shop.php" \
+            && grep -q "'shipped_at'" "$DIR_BO/api/db.php" \
+            && grep -q 'Po terminie' "$DIR_BO/zamowienia.php" \
+            && grep -q '\.termin' "$DIR_BO/console.css" \
+            && echo "  kolumna + reguła + kolejka + styl: obecne" \
+            || { echo "  ^ NOT OK : licznik terminu niekompletny"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in

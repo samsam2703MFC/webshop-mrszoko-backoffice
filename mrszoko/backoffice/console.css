@@ -688,3 +688,31 @@ table.zam2 .kasa2 .kw, .tablica .kol > header .ile, .karta .gora .kw {
 /* Renommer une catégorie : le champ et son bouton sur une ligne. */
 .kat-in { display: flex; gap: 8px; align-items: center; margin: 0; }
 .kat-in input { flex: 1 1 auto; min-width: 0; }
+
+/* ─── LE TEMPS QUI RESTE ────────────────────────────────────────────────────
+   Le compteur de la promesse « wysyłka w 24 h ». Il vit dans la case de
+   l'état, en dessous, et sur la carte de la tablica, en haut à côté du numéro.
+
+   TROIS COULEURS, PAS CINQ. Vert « il reste du temps », ambre « ça se
+   rapproche », rouge « c'est dépassé » : au-delà, on relit la légende à
+   chaque coup d'œil, et un voyant qu'on relit ne sert plus à rien. */
+.termin { display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 999px;
+          font-size: 12px; font-weight: 600; line-height: 1.5;
+          font-variant-numeric: tabular-nums; white-space: nowrap; }
+.termin.t-czeka { color: var(--text-muted); background: transparent; padding-left: 0; }
+.termin.t-bieg  { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.termin.t-po    { color: var(--danger);  background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.termin.t-ok    { color: var(--text-muted); background: color-mix(in srgb, var(--success) 9%, transparent); }
+
+/* Sur la carte de la tablica, il se range entre le numéro et le montant. */
+.karta .gora .termin { margin-top: 0; }
+
+/* Dans le tiroir : la phrase complète, avec l'heure exacte. Le badge dit
+   « za 6 godz. », ceci dit « do 14:30 » — on range une journée avec des
+   heures, pas avec des durées à recalculer de tête. */
+.termin-ligne { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius-md);
+                background: var(--surface-sunken); font-size: 13px; line-height: 1.5; }
+.termin-ligne b { display: block; font-weight: 600; }
+.termin-ligne span { color: var(--text-muted); }
+.termin-ligne.t-po { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.termin-ligne.t-po b { color: var(--danger); }

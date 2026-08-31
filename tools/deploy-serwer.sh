@@ -231,6 +231,18 @@ grep -q 'function wsm_suivi_cherche' site/backoffice/api/shop.php \
   && [ "$(grep -c "moje-zamowienie" site/shop/layout.php)" -ge 2 ] \
   || { echo "  wyszukiwanie zamowienia: niekompletne"; exit 1; }
 echo "  wyszukiwanie zamowienia (regula + strona + dwa linki) : obecne"
+# LE COMPTE A REBOURS DE LA PROMESSE « wysylka w 24 h ». Quatre pieces :
+# la colonne qui date le depart, la regle qui compte, le voyant, et la file
+# des retards. Sans shipped_at la console dit « wyslane » sans jamais dire
+# « a temps » ; sans le style, le voyant est un texte gris de plus.
+grep -q 'function wsm_order_termin' site/backoffice/api/invoice.php \
+  && grep -q 'function wsm_orders_po_terminie' site/backoffice/api/shop.php \
+  && grep -q "'shipped_at'" site/backoffice/api/db.php \
+  && grep -q 'Po terminie' site/backoffice/zamowienia.php \
+  && grep -q '\.termin' site/backoffice/console.css \
+  || { echo "  licznik terminu wysylki: niekompletny"; exit 1; }
+echo "  licznik terminu wysylki (kolumna + regula + kolejka + styl) : obecny"
+
 
 
 echo "  login, tokens, boutons de statut, reprise du compte : présents"
