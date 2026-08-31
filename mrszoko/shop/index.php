@@ -1145,6 +1145,79 @@ if ($page === 'kasa') {
     exit;
 }
 
+// ------------------------------------------------- RETROUVER SA COMMANDE ----
+//
+// Le lien signé du mail de confirmation reste la voie normale. Celle-ci existe
+// pour le jour où ce mail a disparu — et pour le client qui cherche « gdzie
+// moje zamówienie » avant de penser à fouiller sa boîte.
+//
+// ON N'AFFICHE RIEN ICI. Le couple numéro + e-mail reconnu REDIRIGE vers la
+// page de commande existante, avec son jeton. Une deuxième page qui afficherait
+// une commande, c'est un deuxième endroit à tenir juste — et le premier qui
+// oubliera d'y masquer une donnée.
+if ($page === 'moje-zamowienie') {
+    $tErr = ''; $tKod = ''; $tMail = '';
+    if ($method === 'POST') {
+        $tKod  = (string) ($_POST['kod'] ?? '');
+        $tMail = (string) ($_POST['email'] ?? '');
+        $ip    = wsm_ip_appelant();
+        if (wsm_suivi_trop($pdo, $ip)) {
+            $tErr = (string) ($S['track.limit'] ?? '');
+        } else {
+            $trouve = wsm_suivi_cherche($pdo, $tKod, $tMail);
+            if ($trouve) {
+                redirect(u('zamowienie/' . rawurlencode($trouve['code']), ['t' => $trouve['token']]));
+            }
+            // UN SEUL MESSAGE POUR LES DEUX ÉCHECS. Dire « ce numéro n'existe
+            // pas » d'un côté et « mauvaise adresse » de l'autre, c'est offrir
+            // un détecteur de numéros valides : on essaie des numéros jusqu'à
+            // changer de message, puis on s'attaque à l'adresse.
+            wsm_suivi_echec($pdo, $ip, $tKod);
+            $tErr = (string) ($S['track.notfound'] ?? '');
+        }
+    }
+    layout_head($S, $lang, $langs, $S['track.title'] ?? '', $S['track.lead'] ?? '', 'moje-zamowienie');
+    layout_header($S, $lang, $langs, $cartCount);
+    ?>
+<main class="wrap block">
+  <h1><?= e($S['track.title'] ?? '') ?></h1>
+  <p class="lead"><?= e($S['track.lead'] ?? '') ?></p>
+
+  <?php if ($tErr !== ''): ?>
+  <p class="notice notice--error" role="alert"><?= e($tErr) ?></p>
+  <?php endif; ?>
+
+  <form method="post" class="checkout-form form--suivi">
+    <?php // SANS CE JETON, le formulaire ne part pas : la boutique refuse tout
+          // POST sans lui, avec un « Bad request » nu et une page blanche. La
+          // page s'affichait parfaitement et le bouton ne faisait rien. ?>
+    <?= csrf_field() ?>
+    <div class="row">
+      <p class="field">
+        <label for="t-kod"><?= e($S['track.code'] ?? '') ?></label>
+        <input id="t-kod" name="kod" type="text" maxlength="40" required
+               autocomplete="off" spellcheck="false"
+               value="<?= e($tKod) ?>" placeholder="MS-000000-0000">
+        <small><?= e($S['track.code_hint'] ?? '') ?></small>
+      </p>
+      <p class="field">
+        <label for="t-mail"><?= e($S['track.email'] ?? '') ?></label>
+        <input id="t-mail" name="email" type="email" maxlength="190" required
+               autocomplete="email" value="<?= e($tMail) ?>">
+        <small><?= e($S['track.email_hint'] ?? '') ?></small>
+      </p>
+    </div>
+    <p><button class="btn btn--accent" type="submit"><?= e($S['track.submit'] ?? '') ?></button></p>
+  </form>
+
+  <p class="muted small"><?= e($S['track.help'] ?? '') ?>
+    <a href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? 'Kontakt') ?></a>.</p>
+</main>
+<?php
+    layout_footer($S);
+    exit;
+}
+
 // ------------------------------------------------------------- CONFIRMATION -
 if ($page === 'zamowienie') {
     $o = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
