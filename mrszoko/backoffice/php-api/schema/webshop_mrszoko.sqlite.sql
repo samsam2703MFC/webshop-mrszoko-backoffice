@@ -491,6 +491,22 @@ CREATE TABLE IF NOT EXISTS wsm_vies_checks (
 );
 CREATE INDEX IF NOT EXISTS idx_wsm_vies_vat ON wsm_vies_checks (vat_eu, id);
 
+-- --- Recherche de commande sans compte ---------------------------------------
+-- Un plafond, et rien d'autre. Le numéro de commande s'écrit MS-AAMMJJ-0001 :
+-- une date et un compteur, donc devinable. C'est le COUPLE numéro + e-mail qui
+-- ouvre la page, et cette table empêche d'en essayer mille.
+--
+-- Elle ne va PAS dans wsm_audit : ce journal-là ne montre que les 150 derniers
+-- gestes de la console, et une rafale de tentatives publiques en chasserait
+-- « qui a changé ce prix » — la seule question à laquelle il sert à répondre.
+CREATE TABLE IF NOT EXISTS wsm_order_lookups (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip         TEXT NOT NULL DEFAULT '',
+  code       TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_lookups_ip ON wsm_order_lookups (ip, created_at);
+
 -- --- Pays servis (miroir SQLite) --------------------------------------------
 CREATE TABLE IF NOT EXISTS wsm_countries (
   code       TEXT PRIMARY KEY,

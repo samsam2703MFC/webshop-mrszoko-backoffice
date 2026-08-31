@@ -511,3 +511,9 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
     linear-gradient(90deg, rgba(43,26,18,.92) 0%, rgba(43,26,18,.72) 45%, rgba(43,26,18,.45) 100%),
     var(--hero-foto);
   background-size: cover; background-position: center; }
+
+/* Retrouver sa commande : deux champs, et rien d'autre à regarder.
+   Sans largeur maximale, deux champs s'étirent sur toute la page et le
+   formulaire a l'air d'en attendre huit. */
+.form--suivi { max-width: 620px; }
+.form--suivi .field small { display: block; margin-top: 4px; color: var(--text-muted); font-size: var(--text-xs); }

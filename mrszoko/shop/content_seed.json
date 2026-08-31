@@ -422,7 +422,18 @@
       "checkout.point_map": "Wybierz paczkomat na mapie",
       "checkout.point_map_fail": "Mapa nie chce się załadować. Wpisz kod paczkomatu ręcznie, pole powyżej.",
       "checkout.point_map_help": "Mapa nie działa albo pisze „Brak dostępu”? Wpisz kod paczkomatu w polu powyżej, zamówienie przyjmiemy tak samo.",
-      "catalog.all": "Wszystkie"
+      "catalog.all": "Wszystkie",
+      "nav.order": "Moje zamówienie",
+      "track.title": "Moje zamówienie",
+      "track.lead": "Wpisz numer zamówienia i adres e-mail podany przy zakupie. Pokażemy status, zawartość i przesyłkę.",
+      "track.code": "Numer zamówienia",
+      "track.code_hint": "Jest w potwierdzeniu, w formacie MS-000000-0000.",
+      "track.email": "Adres e-mail",
+      "track.email_hint": "Ten sam, który podałeś składając zamówienie.",
+      "track.submit": "Pokaż zamówienie",
+      "track.notfound": "Nie znaleźliśmy zamówienia o tym numerze dla tego adresu. Sprawdź jedno i drugie.",
+      "track.limit": "Za dużo prób z tego miejsca. Spróbuj ponownie za godzinę.",
+      "track.help": "Link do zamówienia jest też w mailu z potwierdzeniem. Jeśli go nie masz, napisz do nas:"
     },
     "uk": {
       "meta.title": "Mister Szoko, крамниця шоколаду",
@@ -645,7 +656,18 @@
       "checkout.point_map": "Обрати Paczkomat на карті",
       "checkout.point_map_fail": "Карта не завантажується. Введіть код Paczkomat вручну, поле вище.",
       "checkout.point_map_help": "Карта не працює або пише «Немає доступу»? Введіть код Paczkomat у полі вище, замовлення приймемо так само.",
-      "catalog.all": "Усі"
+      "catalog.all": "Усі",
+      "nav.order": "Моє замовлення",
+      "track.title": "Моє замовлення",
+      "track.lead": "Введіть номер замовлення та e-mail, вказаний під час покупки. Покажемо статус, вміст і відправлення.",
+      "track.code": "Номер замовлення",
+      "track.code_hint": "Він у підтвердженні, у форматі MS-000000-0000.",
+      "track.email": "Адреса e-mail",
+      "track.email_hint": "Та сама, яку ви вказали під час замовлення.",
+      "track.submit": "Показати замовлення",
+      "track.notfound": "Ми не знайшли замовлення з таким номером для цієї адреси. Перевірте обидва поля.",
+      "track.limit": "Забагато спроб звідси. Спробуйте за годину.",
+      "track.help": "Посилання на замовлення є також у листі з підтвердженням. Якщо його немає, напишіть нам:"
     },
     "en": {
       "meta.title": "Mister Szoko, chocolate shop",
@@ -868,7 +890,18 @@
       "checkout.point_map": "Pick a locker on the map",
       "checkout.point_map_fail": "The map will not load. Type the locker code by hand, the field above.",
       "checkout.point_map_help": "Map not working, or showing “No access”? Type the locker code in the field above, we will take the order just the same.",
-      "catalog.all": "All"
+      "catalog.all": "All",
+      "nav.order": "My order",
+      "track.title": "My order",
+      "track.lead": "Enter your order number and the e-mail address you used. We will show the status, the contents and the shipment.",
+      "track.code": "Order number",
+      "track.code_hint": "It is in your confirmation, in the form MS-000000-0000.",
+      "track.email": "E-mail address",
+      "track.email_hint": "The same one you gave when ordering.",
+      "track.submit": "Show my order",
+      "track.notfound": "We found no order with that number for that address. Please check both.",
+      "track.limit": "Too many attempts from here. Try again in an hour.",
+      "track.help": "The link to your order is also in the confirmation e-mail. If you no longer have it, write to us:"
     }
   }
 }

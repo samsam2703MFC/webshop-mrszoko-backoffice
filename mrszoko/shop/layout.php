@@ -95,6 +95,11 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
       <?php // La page existe depuis longtemps et n'était atteignable que par le
             // pied de page : un client qui a une question ne fait pas défiler
             // toute la boutique pour la poser. ?>
+      <?php // Le suivi de commande, à côté de Kontakt et AVANT lui dans
+            // l'intention : neuf visiteurs sur dix qui cliquent « Kontakt »
+            // écrivent pour demander où en est leur colis. Ils ont maintenant
+            // la réponse sans écrire, et personne ici n'a à la taper. ?>
+      <a class="navlink" href="<?= e(u('moje-zamowienie')) ?>"><?= e($S['nav.order'] ?? 'Moje zamówienie') ?></a>
       <a class="navlink" href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? 'Kontakt') ?></a>
     </nav>
     <div class="head-right">
@@ -137,6 +142,12 @@ function layout_footer(array $S): void {
       <?php if (($S['footer.email'] ?? '') !== ''): ?>
       <a href="mailto:<?= e($S['footer.email']) ?>"><?= e($S['footer.email']) ?></a>
       <?php endif; ?>
+      <?php // AUSSI DANS LE PIED DE PAGE, et ce n'est pas une redite : la
+            // barre du haut disparaît entièrement sous 900 px (.head-nav
+            // display:none). Or on regarde où en est son colis DEPUIS SON
+            // TÉLÉPHONE. Sans cette ligne, le suivi n'existerait que sur
+            // l'écran où on en a le moins besoin. ?>
+      <a href="<?= e(u('moje-zamowienie')) ?>"><?= e($S['nav.order'] ?? '') ?></a>
       <a href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? '') ?></a>
       <a href="<?= e(shop_base() . '/../backoffice/') ?>"><?= e($S['footer.console'] ?? '') ?></a>
     </nav>

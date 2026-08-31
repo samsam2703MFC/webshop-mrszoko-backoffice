@@ -1365,6 +1365,111 @@ function wsm_order_by_code(PDO $pdo, string $code, string $token): ?array {
     return wsm_order_hydrate($pdo, $o);
 }
 
+// ─── RETROUVER SA COMMANDE SANS COMPTE ──────────────────────────────────────
+//
+// LE LIEN SIGNÉ EXISTE DÉJÀ, et il est solide : 128 bits de jeton dans
+// /zamowienie/<kod>?t=<jeton>. Mais il vit dans un mail, et un mail se perd, se
+// range tout seul, part en indésirables. Le client qui veut juste savoir où est
+// son colis écrit alors à la boutique, et quelqu'un ici répond à la main.
+//
+// LE NUMÉRO SEUL NE PROTÈGE RIEN. Il s'écrit MS-AAMMJJ-0001 : une date et un
+// compteur. Qui connaît le jour d'une commande la trouve en quelques centaines
+// d'essais. C'est le COUPLE numéro + adresse e-mail qui ouvre, et le plafond
+// ci-dessous qui interdit d'essayer mille couples.
+//
+// PAS DE COMPTE CLIENT, et c'est volontaire : des comptes, ce sont des mots de
+// passe à réinitialiser, des données à exporter et à effacer sur demande, et
+// une surface à tenir pour toujours. Pour une boutique où l'on commande en
+// invité, le couple numéro + e-mail donne le même service.
+const WSM_SUIVI_MAX_ESSAIS = 8;        // par heure et par adresse IP
+const WSM_SUIVI_GARDE_H    = 24;       // au-delà, les tentatives sont oubliées
+
+/**
+ * L'adresse de l'appelant, sans faire confiance aux en-têtes falsifiables.
+ *
+ * REMOTE_ADDR est posé par le serveur ; X-Forwarded-For vient du client et ne
+ * vaut que derrière un proxy dont on est sûr. Un plafond contournable ne
+ * plafonne rien.
+ */
+function wsm_ip_appelant(): string {
+    $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';
+}
+
+/**
+ * Le numéro tel qu'on le retrouve, pas tel qu'il a été tapé.
+ *
+ * Il est recopié à la main depuis un mail ou une page : minuscules, espaces
+ * parasites, et surtout le tiret cadratin qu'un traitement de texte substitue
+ * tout seul au trait d'union. Refuser un numéro juste pour ça, c'est renvoyer
+ * le client vers le formulaire de contact qu'on essaie précisément de lui
+ * épargner.
+ */
+function wsm_suivi_code(string $s): string {
+    $s = strtoupper(trim($s));
+    // Les espaces deviennent des traits d'union, ils ne DISPARAISSENT pas :
+    // « MS 260827 0001 » est ce qu'on obtient en recopiant depuis un téléphone,
+    // et l'effacer donnerait « MS2608270001 », qui ne correspond à rien.
+    $s = str_replace(["\u{2013}", "\u{2014}", "\u{2212}", ' ', "\t"], ['-', '-', '-', '-', '-'], $s);
+    $s = (string) preg_replace('/[^A-Z0-9-]/', '', $s);
+    $s = trim((string) preg_replace('/-+/', '-', $s), '-');
+    return substr($s, 0, 40);
+}
+
+/**
+ * La commande qui porte CE numéro ET CET e-mail, ou rien.
+ *
+ * @return array{code:string,token:string}|null
+ */
+function wsm_suivi_cherche(PDO $pdo, string $code, string $email): ?array {
+    $code = wsm_suivi_code($code);
+    $mail = strtolower(trim($email));
+    if ($code === '' || $mail === '') return null;
+    // LOWER() des deux côtés : une adresse se saisit comme elle se prononce,
+    // et « Jan.Kowalski@ » doit ouvrir la commande de « jan.kowalski@ ».
+    $st = $pdo->prepare("SELECT code, access_token FROM wsm_orders
+                          WHERE code = ? AND LOWER(email) = ? LIMIT 1");
+    $st->execute([$code, $mail]);
+    $r = $st->fetch();
+    return $r ? ['code' => (string) $r['code'], 'token' => (string) $r['access_token']] : null;
+}
+
+/** Trop de tentatives infructueuses depuis cette adresse dans la dernière heure ? */
+function wsm_suivi_trop(PDO $pdo, string $ip): bool {
+    if ($ip === '') return false;
+    try {
+        $st = $pdo->prepare("SELECT COUNT(*) FROM wsm_order_lookups
+                              WHERE ip = ? AND created_at >= ?");
+        $st->execute([$ip, date('Y-m-d H:i:s', time() - 3600)]);
+        return (int) $st->fetchColumn() >= WSM_SUIVI_MAX_ESSAIS;
+    } catch (Throwable $e) {
+        // Table absente : on ne bloque pas la boutique pour un compteur. Le
+        // couple numéro + e-mail reste exigé, il n'y a pas d'ouverture.
+        return false;
+    }
+}
+
+/**
+ * Note une tentative ratée, et oublie les vieilles.
+ *
+ * L'HORODATAGE EST CALCULÉ EN PHP, pas laissé au défaut de la base. MySQL écrit
+ * CURRENT_TIMESTAMP dans le fuseau de la session, SQLite en UTC : si les deux
+ * bouts ne parlent pas du même fuseau, la fenêtre d'une heure glisse, le compte
+ * revient à zéro, et le plafond ne plafonne plus — sans la moindre erreur nulle
+ * part.
+ */
+function wsm_suivi_echec(PDO $pdo, string $ip, string $code): void {
+    if ($ip === '') return;
+    try {
+        $st = $pdo->prepare("INSERT INTO wsm_order_lookups (ip, code, created_at) VALUES (?,?,?)");
+        $st->execute([$ip, wsm_suivi_code($code), date('Y-m-d H:i:s')]);
+        // On ne garde pas un journal de tentatives : ce qui a plus d'un jour ne
+        // sert plus à rien et reste une adresse IP conservée sans raison.
+        $pdo->prepare("DELETE FROM wsm_order_lookups WHERE created_at < ?")
+            ->execute([date('Y-m-d H:i:s', time() - WSM_SUIVI_GARDE_H * 3600)]);
+    } catch (Throwable $e) { /* le compteur n'est pas la boutique */ }
+}
+
 function wsm_order_hydrate(PDO $pdo, array $o): array {
     $id = (int) $o['id'];
     $st = $pdo->prepare("SELECT * FROM wsm_order_items WHERE order_id = ? ORDER BY id");

@@ -78,6 +78,10 @@ const WSM_CMS_SECTIONS = [
     'cart' => 'Koszyk',
     'checkout' => 'Zamawianie',
     'order' => 'Potwierdzenie zamówienia',
+    // Sans cette ligne, l'écran Treści afficherait un groupe intitulé « track »
+    // à quelqu'un qui vient corriger une phrase — et c'est exactement ce que
+    // le test attrape : une section sans nom lisible.
+    'track' => 'Wyszukiwanie zamówienia',
     'status' => 'Statusy zamówienia',
     'pay' => 'Statusy płatności',
     'ship' => 'Sposoby dostawy',

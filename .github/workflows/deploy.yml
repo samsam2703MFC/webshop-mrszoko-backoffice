@@ -2163,6 +2163,19 @@ jobs:
             && grep -q 'commerce.php' "$DIR_BO/produkty.php" \
             && echo "  reguła + pole + wczytanie: obecne" \
             || { echo "  ^ NOT OK : nowa kategoria z fiszki niekompletna"; fail=1; }
+          # ── RETROUVER SA COMMANDE SANS COMPTE ──────────────────────────────
+          # Quatre pièces, et il en faut quatre. Sans le jeton CSRF la boutique
+          # refuse le POST avec un « Bad request » nu : la page s'affiche
+          # parfaitement et le bouton ne fait rien. Sans les DEUX liens, le
+          # suivi n'existe pas sur téléphone — la barre du haut disparaît sous
+          # 900 px, et c'est là qu'on regarde où en est son colis.
+          echo "== wyszukiwanie zamowienia =="
+          grep -q 'function wsm_suivi_cherche' "$DIR_BO/api/shop.php" \
+            && grep -q "page === 'moje-zamowienie'" "$DIR_BO/../shop/index.php" \
+            && grep -q 'csrf_field()' "$DIR_BO/../shop/index.php" \
+            && [ "$(grep -c 'moje-zamowienie' "$DIR_BO/../shop/layout.php")" -ge 2 ] \
+            && echo "  reguła + strona + jeton + dwa linki: obecne" \
+            || { echo "  ^ NOT OK : wyszukiwanie zamówienia niekompletne"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in

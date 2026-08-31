@@ -222,6 +222,16 @@ grep -q 'function wsm_categorie_assure' site/backoffice/api/commerce.php \
   && grep -q "commerce.php" site/backoffice/produkty.php \
   || { echo "  nowa kategoria z fiszki produktu: niekompletna"; exit 1; }
 echo "  nowa kategoria z fiszki produktu : obecna"
+# RETROUVER SA COMMANDE SANS COMPTE. Quatre pieces, et deux sur quatre
+# donnent une page qui s'affiche et un bouton qui ne fait rien : sans le
+# jeton CSRF la boutique refuse le POST, sans le lien personne n'y arrive.
+grep -q 'function wsm_suivi_cherche' site/backoffice/api/shop.php \
+  && grep -q "page === 'moje-zamowienie'" site/shop/index.php \
+  && grep -q 'csrf_field()' site/shop/index.php \
+  && [ "$(grep -c "moje-zamowienie" site/shop/layout.php)" -ge 2 ] \
+  || { echo "  wyszukiwanie zamowienia: niekompletne"; exit 1; }
+echo "  wyszukiwanie zamowienia (regula + strona + dwa linki) : obecne"
+
 
 echo "  login, tokens, boutons de statut, reprise du compte : présents"
 

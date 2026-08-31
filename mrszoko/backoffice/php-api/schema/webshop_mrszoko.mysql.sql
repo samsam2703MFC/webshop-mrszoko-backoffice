@@ -621,6 +621,23 @@ CREATE TABLE IF NOT EXISTS `wsm_shop_i18n` (
 -- Un contrôle par ligne, JAMAIS écrasé : c'est l'historique qui prouve, en cas
 -- de contrôle fiscal, qu'on a vérifié tel numéro à telle date. Le numéro de
 -- consultation délivré par VIES est la pièce opposable.
+-- --- Recherche de commande sans compte ---------------------------------------
+-- Un plafond, et rien d'autre. Le numéro de commande s'écrit MS-AAMMJJ-0001 :
+-- une date et un compteur, donc devinable. C'est le COUPLE numéro + e-mail qui
+-- ouvre la page, et cette table empêche d'en essayer mille.
+--
+-- Elle ne va PAS dans `wsm_audit` : ce journal-là ne montre que les 150
+-- derniers gestes de la console, et une rafale de tentatives publiques en
+-- chasserait « qui a changé ce prix » — sa seule raison d'être.
+CREATE TABLE IF NOT EXISTS `wsm_order_lookups` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ip`         VARCHAR(45)  NOT NULL DEFAULT '',
+  `code`       VARCHAR(40)  NOT NULL DEFAULT '',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_lookups_ip` (`ip`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `wsm_vies_checks` (
   `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `vat_eu`       VARCHAR(20)  NOT NULL,
