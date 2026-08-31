@@ -1386,9 +1386,33 @@ jobs:
           # plus d objet, et un controle qui teste un fichier absent tombe en
           # erreur a chaque deploiement : on le retire avec le reste.
           echo "== subskrypcje : wycofane =="
-          [ -f "$DIR_API/cykl.php" ] \
-            && { echo "  ^ NOT OK : cykl.php wrocil, a ekran juz go nie ma"; fail=1; } \
-            || echo "  modul wycofany — nic go nie proponuje"
+          # CE CONTROLE A CASSE CINQ DEPLOIEMENTS DE SUITE, et la lecon est
+          # ecrite partout ailleurs dans ce fichier : LE RSYNC TOURNE SANS
+          # --delete. Un fichier retire du depot RESTE sur le serveur pour
+          # toujours. Exiger la disparition de cykl.php etait donc exiger
+          # quelque chose que le deploiement ne fait pas — un controle qui ne
+          # pouvait jamais passer, sur du code par ailleurs parfaitement livre.
+          #
+          # Ce qui compte n'est pas qu'un fichier ait disparu du disque : c'est
+          # que PLUS RIEN NE LE PROPOSE. Et ces deux fichiers-la, eux, sont
+          # bien reecrits a chaque envoi.
+          # $DIR_BO N'EXISTE PAS DANS CETTE ETAPE — elle ne declare que
+          # $DIR_API. L'employer aurait donne un chemin vide, un grep en
+          # erreur, et la branche « tout va bien » : un controle qui ne
+          # controle plus rien, et qui ne le dit pas. On part donc du chemin
+          # reellement declare, et on VERIFIE QUE LE FICHIER EXISTE avant de
+          # conclure quoi que ce soit de son contenu.
+          for F in "$DIR_API/../console.php:subskrypcje.php:ekran wrocil do menu" \
+                   "$DIR_API/../../shop/index.php:subskrybuj:strona zamowienia znow proponuje subskrypcje"; do
+            CHEMIN="${F%%:*}"; RESTE="${F#*:}"; MOTIF="${RESTE%%:*}"; PLAINTE="${RESTE#*:}"
+            if [ ! -f "$CHEMIN" ]; then
+              echo "  ^ NOT OK : brak pliku $CHEMIN — nie da sie sprawdzic"; fail=1
+            elif grep -q "$MOTIF" "$CHEMIN"; then
+              echo "  ^ NOT OK : $PLAINTE"; fail=1
+            else
+              echo "  $(basename "$CHEMIN") : nic nie proponuje"
+            fi
+          done
           echo "== propozycje : etykieta nie klamie =="
           # « Souvent achete ensemble » sous deux produits que personne n a
           # jamais commandes ensemble est un mensonge. La regle se verifie ici
@@ -2572,7 +2596,8 @@ jobs:
           DIR='$DIR'
           for f in back_office_ws_franchisor.dc.html api-config.js support.js \
                    bo_server.js menu_api.js menu_seed.js .nojekyll \
-                   _ds vendor img api mrszoko; do
+                   _ds vendor img api mrszoko \
+                   backoffice/subskrypcje.php backoffice/api/cykl.php; do
             if [ -e "\$DIR/\$f" ]; then rm -rf "\${DIR:?}/\$f" && echo "supprimé : \$DIR/\$f"; fi
           done
           echo "reste à la racine :"; ls -1 "\$DIR"
