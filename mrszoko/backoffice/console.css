@@ -716,3 +716,21 @@ table.zam2 .kasa2 .kw, .tablica .kol > header .ile, .karta .gora .kw {
 .termin-ligne span { color: var(--text-muted); }
 .termin-ligne.t-po { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .termin-ligne.t-po b { color: var(--danger); }
+
+/* ─── LES GESTES QU'ON NE RATTRAPE PAS ──────────────────────────────────────
+   Supprimer un compte, remettre la boutique à zéro. Ils ne se cachent pas —
+   un geste caché se cherche, et on finit par le trouver au mauvais moment —
+   mais ils ne ressemblent à aucun autre bouton de la console. */
+.panel.danger { border-color: color-mix(in srgb, var(--danger) 35%, var(--border-subtle)); }
+.panel.danger > h2 { color: var(--danger); }
+
+button.niebezpieczny {
+  background: var(--danger); color: var(--white); border-color: var(--danger);
+  min-height: 44px;                 /* même plancher tactile que le reste */
+}
+button.niebezpieczny:hover { filter: brightness(1.08); }
+
+/* Le repli « Usuń konto » : présent, discret, et jamais ouvert par défaut. */
+details.usun-konto { margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 12px; }
+details.usun-konto > summary { cursor: pointer; color: var(--danger); font-weight: 600; font-size: 14px; }
+details.usun-konto[open] > summary { margin-bottom: 8px; }
