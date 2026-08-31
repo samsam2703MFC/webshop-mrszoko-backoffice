@@ -2181,6 +2181,17 @@ jobs:
             && grep -q "POST\['usun'\]" "$DIR_BO/uzytkownicy.php" \
             && echo "  token + usuwanie konta: obecne" \
             || { echo "  ^ NOT OK : brak tokenu CSRF albo usuwania konta"; fail=1; }
+          # ── LE MÉNAGE D'AVANT L'OUVERTURE ──────────────────────────────────
+          # Trois pièces, et la troisième est la seule qui protège : sans le
+          # mot à retaper, un clic vide sept mille lignes de la boutique. Une
+          # fenêtre « êtes-vous sûr ? » n'aurait pas suffi — on apprend à
+          # cliquer « oui » sans lire.
+          echo "== zerowanie przed startem =="
+          grep -q 'function wsm_golive_reset' "$DIR_BO/api/golive.php" \
+            && grep -q 'id="zerowanie"' "$DIR_BO/superadmin.php" \
+            && grep -q 'WSM_GOLIVE_MOT' "$DIR_BO/superadmin.php" \
+            && echo "  reguła + panel + słowo do przepisania: obecne" \
+            || { echo "  ^ NOT OK : zerowanie przed startem niekompletne"; fail=1; }
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in

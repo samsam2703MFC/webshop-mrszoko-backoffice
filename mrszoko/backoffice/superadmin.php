@@ -230,6 +230,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $flash = $diff ? 'Zapisano: ' . implode(' · ', $diff) : 'Nic się nie zmieniło.';
         $kind  = 'ok';
 
+    } elseif (isset($_POST['zeruj'])) {
+        // ─── LE MENAGE D'AVANT L'OUVERTURE ────────────────────────────────
+        //
+        // Irreversible, donc traite comme tel : reserve au Superadmin, derriere
+        // le code du jour, avec un mot a retaper. Une fenetre « etes-vous
+        // sur ? » apprend a cliquer « oui » sans lire ; un mot a taper, non.
+        require_once $API . '/golive.php';
+        if (trim((string) ($_POST['potwierdz'] ?? '')) !== WSM_GOLIVE_MOT) {
+            $flash = 'Wpisz ' . WSM_GOLIVE_MOT . ', żeby potwierdzić.'; $kind = 'err';
+        } else {
+            [$okZ, $msgZ] = wsm_golive_reset($pdo, $actor);
+            $flash = $okZ ? 'Wyczyszczono: ' . $msgZ : $msgZ;
+            $kind  = $okZ ? 'ok' : 'err';
+        }
+
     } elseif (isset($_POST['wystaw'])) {
         [$p, $err] = wsm_platform_issue($pdo, (string) $_POST['wystaw'], $actor);
         if ($p) {
@@ -1107,5 +1122,58 @@ $trig = wsm_status_triggers($pdo);
     </tbody>
   </table>
 </div>
+
+<?php require_once $API . '/golive.php'; $gl = wsm_golive_compte($pdo);
+      $glTotal = array_sum($gl); ?>
+<div class="panel danger" style="margin-top:20px" id="zerowanie">
+  <h2>Zerowanie przed startem</h2>
+  <p class="why">
+    Sklep w budowie zbiera setki zamówień testowych, ich dokumenty, ruchy magazynowe
+    i listy. W dniu otwarcia te liczby nie są bezużyteczne — one <b>kłamią</b>: pulpit
+    pokazuje obrót, którego nie było, faktury zaczynają się od FV/240 zamiast FV/1,
+    a magazyn podaje stany z wrześniowej próby.
+  </p>
+  <p class="why">
+    <b>Zostaje nietknięte wszystko, co opisuje sklep</b> — produkty, kategorie, marki,
+    ceny, ustawienia, konta, treści, wzory listów, kraje, sposoby dostawy, kody rabatowe.
+    <b>Znika wszystko, co opisuje działalność</b> — zamówienia, płatności, wysyłki,
+    dokumenty, reklamacje, ruchy magazynowe, listy.
+  </p>
+  <p class="why">
+    <b>Stany magazynowe schodzą do zera</b>, nie są zachowywane. Stan to wynik ruchów:
+    kasując ruchy i zostawiając liczby, zostawilibyśmy wartość, której już nic nie
+    tłumaczy. Zaczynasz od pustego magazynu i liczysz naprawdę — to jedyna uczciwa
+    inwentaryzacja.
+  </p>
+
+  <?php // LE DECOMPTE AVANT LE GESTE. « To skasuje 552 zamówienia i 239 faktur »
+        // fait reflechir ; « czy na pewno? » fait kliknąć. ?>
+  <table class="rwd dense" style="max-width:520px;margin:14px 0">
+    <thead><tr><th>Co zniknie</th><th class="num">Wierszy</th></tr></thead>
+    <tbody>
+    <?php // « stock niezerowy » n'est pas une table qu'on vide : c'est le
+          // nombre de produits dont la quantite retombe a zero. Range sous le
+          // meme titre sans un mot, il se lisait comme « 46 lignes effacees ».
+          $etiq = ['stock_niezerowy' => 'produkty — stan wróci do zera']; ?>
+    <?php foreach ($gl as $t => $n): if (!$n) continue; ?>
+    <tr><td data-l="Co"><?= h($etiq[$t] ?? str_replace(['wsm_', '_'], ['', ' '], (string) $t)) ?></td>
+        <td data-l="Wierszy" class="num"><?= (int) $n ?></td></tr>
+    <?php endforeach; ?>
+    <?php if (!$glTotal): ?><tr><td class="muted" colspan="2">Nie ma czego czyścić — baza jest już pusta.</td></tr><?php endif; ?>
+    </tbody>
+  </table>
+
+  <?php if ($glTotal): ?>
+  <form method="post" class="actions">
+    <?= console_csrf_field() ?>
+    <input type="text" name="potwierdz" autocomplete="off" spellcheck="false"
+           placeholder="<?= h(WSM_GOLIVE_MOT) ?>" aria-label="Wpisz <?= h(WSM_GOLIVE_MOT) ?>, żeby potwierdzić" required>
+    <button class="niebezpieczny" type="submit" name="zeruj" value="1">Wyczyść i zacznij od zera</button>
+  </form>
+  <p class="why" style="margin-top:10px">Operacja jest <b>nieodwracalna</b> i zapisuje się w dzienniku audytu.
+    Wykonuje się w jednej transakcji: albo wszystko, albo nic.</p>
+  <?php endif; ?>
+</div>
+
 
 <?php console_foot(); ?>

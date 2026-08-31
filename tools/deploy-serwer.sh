@@ -251,6 +251,14 @@ grep -q 'function console_csrf_ok' site/backoffice/console.php \
   && grep -q "POST\['usun'\]" site/backoffice/uzytkownicy.php \
   || { echo "  token CSRF konsoli albo usuwanie konta: niekompletne"; exit 1; }
 echo "  token CSRF konsoli + usuwanie konta : obecne"
+# LE MENAGE D'AVANT L'OUVERTURE. Trois pieces : la regle, le panneau, le
+# mot a retaper. Sans le mot, un clic vide la boutique.
+grep -q 'function wsm_golive_reset' site/backoffice/api/golive.php \
+  && grep -q 'id="zerowanie"' site/backoffice/superadmin.php \
+  && grep -q 'WSM_GOLIVE_MOT' site/backoffice/superadmin.php \
+  || { echo "  zerowanie przed startem: niekompletne"; exit 1; }
+echo "  zerowanie przed startem (regula + panel + slowo) : obecne"
+
 
 
 
