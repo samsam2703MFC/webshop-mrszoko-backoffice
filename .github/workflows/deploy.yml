@@ -1926,6 +1926,44 @@ jobs:
             && { echo "  ^ FUITE : sitemap wymienia stronę prywatną"; fail=1; } \
             || echo "  sitemap nie wymienia stron prywatnych"
 
+          echo "== regulamin i polityka : STRONY, nie pliki =="
+          # LE CONTROLE D'ASSEMBLAGE PROUVE QUE LE FICHIER EST ARRIVE. Il ne
+          # prouve pas que la page s'affiche — et c'est exactement ce que fera
+          # l'examinateur de l'operateur de paiement : ouvrir les deux adresses.
+          # On les ouvre donc ici, sur le serveur, comme un visiteur.
+          for U in regulamin prywatnosc; do
+            H=$(curl -skL "$SH/$U")
+            C=$(curl -skL -o /dev/null -w "%{http_code}" "$SH/$U")
+            if [ "$C" != "200" ]; then
+              echo "  ^ ZLE : /$U odpowiada $C"; fail=1; continue
+            fi
+            # Le document doit NOMMER le vendeur : c'est la premiere chose que
+            # regarde un operateur, et un regulamin anonyme ne vaut rien.
+            case "$H" in
+              *'sp. z o.o.'*) ;;
+              *) echo "  ^ ZLE : /$U nie wymienia sprzedawcy"; fail=1;;
+            esac
+            # UNE ACCOLADE RESTEE DANS LA PAGE est un engagement que le document
+            # ne prend pas — et personne ne relit un reglement une fois publie.
+            case "$H" in
+              *'{wysylka_h}'*|*'{sprzedawca}'*|*'{dostawa}'*|*'{email}'*|*'{adres}'*)
+                echo "  ^ ZLE : /$U pokazuje niewypelniony nawias"; fail=1;;
+              *) echo "  /$U : 200, ze sprzedawca, bez nawiasow";;
+            esac
+          done
+          # ET LA CASE DE LA CAISSE POINTE SUR LES DEUX. C'est le point exact
+          # releve par l'operateur : elle demandait d'accepter un document
+          # inexistant.
+          KASA=$(curl -skL "$SH/kasa")
+          case "$KASA" in
+            *'/regulamin'*) ;;
+            *) echo "  ^ ZLE : kasa nie linkuje regulaminu"; fail=1;;
+          esac
+          case "$KASA" in
+            *'/prywatnosc'*) echo "  kasa linkuje oba dokumenty";;
+            *) echo "  ^ ZLE : kasa nie linkuje polityki"; fail=1;;
+          esac
+
           echo "== wejście B2B ze strony głównej =="
           # LE TEXTE A-T-IL VRAIMENT CHANGÉ ? La synchronisation est un INSERT
           # IGNORE : elle protège ce qui a été écrit en console, et elle avale
