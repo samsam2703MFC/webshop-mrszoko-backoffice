@@ -41,12 +41,36 @@ function wsm_request_origin(): string {
     return ($https ? 'https://' : 'http://') . (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
 }
 
-/** URL publique de l'API — sert à composer l'URL de notification tpay. */
+/**
+ * URL publique de l'API — c'est elle qui compose l'adresse de notification
+ * envoyée à tpay à CHAQUE transaction.
+ *
+ * ELLE ÉTAIT FAUSSE LÀ OÙ ELLE COMPTE. L'ancienne version coupait le chemin au
+ * premier « /shop/ » et s'arrêtait là. Depuis l'API — /mrszoko/backoffice/api/
+ * shop/catalog — elle tombait juste par accident. Mais la CAISSE, elle, vit
+ * sous /mrszoko/shop/kasa : la coupure rendait « /mrszoko », et l'adresse
+ * envoyée à tpay devenait /mrszoko/shop/tpay/notify — la boutique, qui ne
+ * connaît pas cette route.
+ *
+ * CE QUE ÇA AURAIT COÛTÉ, et rien ne l'aurait signalé : le client paie, tpay
+ * appelle cette adresse, reçoit une page 404, et réessaie. La commande reste
+ * « oczekuje na płatność » sur de l'argent déjà encaissé. Aucune erreur dans
+ * la console, aucune dans la boutique — juste un client qui a payé et une
+ * commande que personne n'expédie.
+ *
+ * Jamais vu parce que tpay n'a jamais été branché. C'est le premier vrai
+ * paiement qui l'aurait révélé.
+ *
+ * On repart donc de wsm_shop_base_url(), qui sait déjà retrouver la racine du
+ * déploiement depuis N'IMPORTE QUELLE surface — et qui respecte l'adresse
+ * publique configurée en console.
+ */
 function wsm_api_base_url(): string {
-    $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?? '/';
-    $cut  = strpos($path, '/shop/');
-    $base = $cut !== false ? substr($path, 0, $cut) : rtrim($path, '/');
-    return wsm_request_origin() . $base;
+    $base = wsm_shop_base_url();
+    // wsm_shop_base_url() rend « …/shop ». L'adresse publique saisie en console
+    // peut ne pas le porter : on retire le suffixe s'il est là, jamais plus.
+    $racine = preg_replace('#/shop/?$#', '', $base) ?? $base;
+    return rtrim($racine, '/') . '/backoffice/api';
 }
 
 /**
@@ -75,6 +99,13 @@ function wsm_shop_base_url(): string {
             break;
         }
     }
+    // LA RACINE D'UN DÉPLOIEMENT N'EST JAMAIS UN FICHIER .php. Quand aucune
+    // surface connue n'apparaît dans le chemin — console servie à la racine
+    // d'un domaine, serveur de développement — le nom du script restait collé
+    // à l'adresse : « /ustawienia.php/shop ». Une adresse qu'on affiche pour
+    // être recopiée dans le panneau d'un opérateur de paiement n'a pas le
+    // droit d'être approximative.
+    $path = preg_replace('#/[^/]+\.php$#', '', rtrim($path, '/')) ?? $path;
     return wsm_request_origin() . rtrim($path, '/') . '/shop';
 }
 

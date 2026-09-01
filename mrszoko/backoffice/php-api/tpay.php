@@ -67,12 +67,94 @@ function wsm_tpay_http(string $method, string $path, array $body = [], string $b
     return [$code, json_decode((string) $raw, true)];
 }
 
+/**
+ * LE TRANSPORT, REMPLACABLE — comme pour InPost, VIES et le registre MF.
+ *
+ * Sans lui, aucun test ne peut eprouver ce qui compte vraiment : un secret
+ * copie a moitie, des identifiants de sandbox employes en production. Ce sont
+ * les deux pannes qui arrivent, et aucune ne se provoque a volonte.
+ */
+function wsm_tpay_transport(?callable $set = null): callable {
+    static $fn = null;
+    if ($set !== null) { $fn = $set; }
+    return $fn ?? 'wsm_tpay_http';
+}
+
 function wsm_tpay_token(): ?string {
     $c = wsm_tpay_cfg();
-    [$code, $res] = wsm_tpay_http('POST', '/oauth/auth', [
+    [$code, $res] = (wsm_tpay_transport())('POST', '/oauth/auth', [
         'client_id' => $c['client_id'], 'client_secret' => $c['client_secret'],
-    ]);
+    ], '');
     return ($code === 200 && !empty($res['access_token'])) ? (string) $res['access_token'] : null;
+}
+
+/**
+ * « EST-CE QUE L'ENCAISSEMENT MARCHE ? », repondu AVANT le premier client.
+ *
+ * C'est la piece qui manquait pour brancher le paiement. Coller un client_id
+ * et un secret dans Ustawienia ne donnait aucun retour : on l'apprenait le jour
+ * ou quelqu'un cliquait « Zamawiam i płacę » et tombait sur une commande qui
+ * n'ouvre aucune transaction. Le panier est perdu, et personne n'est devant
+ * l'ecran a ce moment-la.
+ *
+ * DEUX CANAUX, DEUX PANNES DIFFERENTES, et il faut les distinguer :
+ *
+ *  · client_id + client_secret ouvrent la transaction. Faux : le client ne
+ *    peut pas payer, et il le voit tout de suite.
+ *  · le code de securite valide la NOTIFICATION. Absent : le client paie
+ *    normalement, tpay confirme, et la boutique refuse la confirmation. La
+ *    commande reste « oczekuje na płatność » sur de l'argent encaisse — la
+ *    panne la plus chere, parce qu'elle est invisible des deux cotes.
+ *
+ * @return array{0:string,1:string} [etat 'ok'|'uwaga'|'zle', phrase polonaise]
+ */
+function wsm_tpay_diag(): array {
+    $c = wsm_tpay_cfg();
+    $ou = $c['sandbox'] ? 'sandbox' : 'produkcja';
+
+    $brak = [];
+    if ($c['client_id'] === '')     $brak[] = 'Client ID';
+    if ($c['client_secret'] === '') $brak[] = 'Client secret';
+    if ($brak) {
+        return ['zle', 'Brak: ' . implode(' i ', $brak) . '. Bez tego klient nie zapłaci.'];
+    }
+
+    [$code, $res] = (wsm_tpay_transport())('POST', '/oauth/auth', [
+        'client_id' => $c['client_id'], 'client_secret' => $c['client_secret'],
+    ], '');
+
+    if ($code === 401 || $code === 400) {
+        // LE PIEGE LE PLUS COURANT : des identifiants de sandbox employes en
+        // production, ou l'inverse. Chacun est juste chez lui, et ensemble ils
+        // n'ouvrent rien.
+        return ['zle', 'tpay odrzucił dane (' . $code . '). Sprawdź, czy Client ID i secret '
+                     . 'pochodzą ze środowiska „' . $ou . '" — to najczęstsza pomyłka.'];
+    }
+    if ($code < 200 || $code >= 300 || empty($res['access_token'])) {
+        return ['uwaga', 'tpay odpowiedział ' . $code . ' — spróbuj ponownie za chwilę.'];
+    }
+
+    // Le canal d'encaissement est ouvert. Reste celui des notifications, et
+    // son absence ne se voit nulle part ailleurs.
+    if ($c['security_code'] === '') {
+        return ['uwaga', 'Połączenie działa (środowisko „' . $ou . '"), ale BRAKUJE kodu bezpieczeństwa. '
+                       . 'Klient zapłaci, a sklep odrzuci potwierdzenie od tpay — zamówienie zostanie '
+                       . 'jako nieopłacone mimo pobranych pieniędzy.'];
+    }
+    return ['ok', 'Połączenie działa, środowisko „' . $ou . '", kod bezpieczeństwa ustawiony.'
+                . ($c['sandbox'] ? ' To sandbox: prawdziwe pieniądze NIE są pobierane.' : '')];
+}
+
+/**
+ * L'adresse que tpay doit appeler pour confirmer un paiement.
+ *
+ * Elle se COLLE dans le panneau tpay, et elle ne se devine pas : c'est celle
+ * que la caisse envoie a chaque transaction. L'afficher ici evite qu'elle soit
+ * recopiee de travers — une notification qui frappe a la mauvaise porte laisse
+ * la commande impayee sur de l'argent encaisse.
+ */
+function wsm_tpay_notify_url(): string {
+    return wsm_api_base_url() . '/shop/tpay/notify';
 }
 
 /**
