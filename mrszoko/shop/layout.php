@@ -148,6 +148,12 @@ function layout_footer(array $S): void {
             // TÉLÉPHONE. Sans cette ligne, le suivi n'existerait que sur
             // l'écran où on en a le moins besoin. ?>
       <a href="<?= e(u('moje-zamowienie')) ?>"><?= e($S['nav.order'] ?? '') ?></a>
+      <?php // « W ŁATWO DOSTĘPNYM MIEJSCU », mot pour mot ce que demande
+            // l'opérateur de paiement — et ce que demande la loi avant lui. Le
+            // pied de page est le seul endroit présent sur TOUTES les pages,
+            // y compris sur téléphone où la barre du haut disparaît. ?>
+      <a href="<?= e(u('regulamin')) ?>"><?= e($S['legal.terms'] ?? '') ?></a>
+      <a href="<?= e(u('prywatnosc')) ?>"><?= e($S['legal.privacy'] ?? '') ?></a>
       <a href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? '') ?></a>
       <a href="<?= e(shop_base() . '/../backoffice/') ?>"><?= e($S['footer.console'] ?? '') ?></a>
     </nav>
