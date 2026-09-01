@@ -2298,6 +2298,35 @@ jobs:
             && grep -q 'checkout.terms_l2' "$DIR_BO/../shop/index.php" \
             && echo "  dwie strony + stopka + kasa: obecne" \
             || { echo "  ^ NOT OK : regulamin albo polityka niekompletne"; fail=1; }
+          # ── LE CANAL TPAY, ET SURTOUT SON ADRESSE DE NOTIFICATION ──────────
+          # L'adresse envoyee a tpay a chaque transaction DOIT designer l'API.
+          # Elle designait la boutique — qui ne connait pas cette route : le
+          # client payait, tpay recevait un 404, et la commande restait
+          # « oczekuje na płatność » sur de l'argent encaisse. Jamais vu, parce
+          # que tpay n'avait jamais ete branche.
+          echo "== kanal tpay =="
+          grep -q 'function wsm_tpay_diag' "$DIR_BO/api/tpay.php" \
+            && grep -q "POST\['test_polaczenia'\]" "$DIR_BO/ustawienia.php" \
+            && echo "  test polaczenia: obecny" \
+            || { echo "  ^ NOT OK : brak testu polaczenia tpay"; fail=1; }
+          # L'ADRESSE SE CALCULE, ON LA VERIFIE. Depuis la caisse, depuis la
+          # console : la meme, et elle doit contenir /backoffice/api.
+          TN=$(php -r '
+            require_once "'"$DIR_BO"'/api/db.php";
+            require_once "'"$DIR_BO"'/api/shop.php";
+            $_SERVER["HTTP_HOST"] = "example.com";
+            $vues = [];
+            foreach (["/mrszoko/shop/kasa", "/mrszoko/backoffice/ustawienia.php"] as $u) {
+              $_SERVER["REQUEST_URI"] = $u;
+              $vues[] = wsm_api_base_url() . "/shop/tpay/notify";
+            }
+            echo count(array_unique($vues)) === 1
+              && str_contains($vues[0], "/backoffice/api/shop/tpay/notify") ? "adres-ok" : "adres-ZLE :: " . implode(" | ", $vues);
+          ' 2>&1); [ $? -eq 0 ] || TN="php-ZLE :: $TN"
+          echo "  $TN"
+          case "$TN" in
+            *ZLE*|*Error*|*error*) echo "  ^ NOT OK : adres powiadomien tpay nie wskazuje API"; fail=1;;
+          esac
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in

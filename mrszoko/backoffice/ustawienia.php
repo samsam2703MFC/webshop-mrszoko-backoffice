@@ -37,6 +37,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!console_csrf_ok()) { http_response_code(400); exit('Bad request.'); }
     if (!$isAdmin) {
         $flash = 'Tylko rola Centrala może zmieniać ustawienia.'; $flashKind = 'err';
+    } elseif (isset($_POST['test_polaczenia'])) {
+        // ON N'ENREGISTRE RIEN ICI. Le bouton teste ce qui est DEJA en base :
+        // tester ce qui vient d'etre tape sans l'enregistrer dirait « ca
+        // marche » sur des identifiants que la boutique n'a pas — et l'inverse
+        // est pire encore. On enregistre d'abord, on teste ensuite.
+        $quoi = (string) $_POST['test_polaczenia'];
+        $fn = ['tpay' => 'wsm_tpay_diag', 'inpost' => 'wsm_inpost_diag'][$quoi] ?? '';
+        if ($fn === '' || !function_exists($fn)) {
+            $flash = 'Nie ma takiego testu.'; $flashKind = 'err';
+        } else {
+            [$etat, $phrase] = $fn();
+            $flash = $phrase;
+            $flashKind = $etat === 'ok' ? 'ok' : ($etat === 'uwaga' ? 'warn' : 'err');
+            wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Test połączenia ' . $quoi,
+                      mb_substr($phrase, 0, 120), 'Sieć');
+        }
     } elseif (isset($_POST['test_poczty'])) {
         $to = trim((string) ($_POST['test_email'] ?? ''));
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
@@ -179,6 +195,28 @@ if ($orphelins): ?>
       </p>
       <?php endif;
     endif; ?>
+
+    <?php // ─── « EST-CE QUE ÇA MARCHE ? », POSÉ LÀ OÙ L'ON COLLE ────────────
+          //
+          // Coller un identifiant et n'avoir aucun retour, c'est l'apprendre le
+          // jour où un client a payé — ou pire, le jour où il n'a PAS pu payer
+          // et où personne n'était devant l'écran. Le bouton vit à côté du
+          // champ, pas sur un autre écran : c'est ici qu'on vient, et c'est ici
+          // qu'on se demande si c'est bon.
+          //
+          // Il marche CANAL FERMÉ, volontairement : c'est précisément quand
+          // rien ne fonctionne qu'on a besoin de savoir pourquoi.
+          $diag = ['tpay' => 'wsm_tpay_diag', 'inpost' => 'wsm_inpost_diag'];
+          if (isset($diag[$g]) && function_exists($diag[$g])): ?>
+      <p class="actions" style="margin:0 0 14px">
+        <button type="submit" name="test_polaczenia" value="<?= h($g) ?>" formnovalidate>Sprawdź połączenie</button>
+        <?php if ($g === 'tpay' && function_exists('wsm_tpay_notify_url')): ?>
+        <span class="muted small">Adres powiadomień do wklejenia w panelu tpay:
+          <code><?= h(wsm_tpay_notify_url()) ?></code></span>
+        <?php endif; ?>
+      </p>
+      <?php endif; ?>
+
     <div class="grid2">
     <?php foreach ($fields as $key => $f): ?>
       <label class="field">

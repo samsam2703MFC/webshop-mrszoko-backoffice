@@ -300,6 +300,15 @@ grep -q "page === 'regulamin'" site/shop/index.php \
   && grep -q 'checkout.terms_l2' site/shop/index.php \
   || { echo "  regulamin i polityka: niekompletne"; exit 1; }
 echo "  regulamin i polityka (dwie strony + stopka + kasa) : obecne"
+# LE CANAL TPAY. Deux voies, deux pannes differentes : les identifiants
+# ouvrent la transaction, le code de securite valide la NOTIFICATION. Sans
+# le second, le client paie et la commande reste impayee.
+grep -q 'function wsm_tpay_diag' site/backoffice/api/tpay.php \
+  && grep -q 'function wsm_tpay_notify_url' site/backoffice/api/tpay.php \
+  && grep -q "POST\['test_polaczenia'\]" site/backoffice/ustawienia.php \
+  || { echo "  kanal tpay: niekompletny"; exit 1; }
+echo "  kanal tpay (test + adres powiadomien) : obecny"
+
 
 
 
