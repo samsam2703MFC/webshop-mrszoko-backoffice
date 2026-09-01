@@ -83,6 +83,10 @@ const WSM_CMS_SECTIONS = [
     // le test attrape : une section sans nom lisible.
     'track' => 'Wyszukiwanie zamówienia',
     'reg' => 'Pobieranie danych z rejestru',
+    // Les deux documents que tpay exige, et que la loi exige avant tpay.
+    'legal' => 'Strony prawne — nagłówki',
+    'terms' => 'Regulamin sklepu',
+    'privacy' => 'Polityka prywatności',
     'status' => 'Statusy zamówienia',
     'pay' => 'Statusy płatności',
     'ship' => 'Sposoby dostawy',

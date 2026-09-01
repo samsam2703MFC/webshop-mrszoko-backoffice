@@ -628,9 +628,14 @@ function wsm_content_forces(): array {
             // retire de la page de commande. Laisses en base, ils resteraient
             // modifiables dans Tresci -- quelqu'un les soignerait un jour, et
             // rien ne changerait nulle part.
+            // checkout.terms disait « Akceptuję regulamin i politykę
+            // prywatności » en un seul bloc, sans lien. La phrase est
+            // maintenant en trois morceaux pour porter DEUX liens et les
+            // formes flechies. L'ancienne cle resterait modifiable dans
+            // Tresci, sur une phrase que plus rien n'affiche.
             'purge' => ['story.pro.mail_subject', 'story.strip.1',
                         'sub.title', 'sub.lead', 'sub.rhythm', 'sub.cta',
-                        'sub.done', 'sub.already'],
+                        'sub.done', 'sub.already', 'checkout.terms'],
         ],
     ];
 }

@@ -1145,7 +1145,25 @@ if ($page === 'kasa') {
         <p class="field<?= isset($errors['consent_terms']) ? ' has-error' : '' ?>">
           <label class="check">
             <input type="checkbox" name="consent_terms" value="1"<?= !empty($v['consent_terms']) ? ' checked' : '' ?>>
-            <span><?= e($S['checkout.terms'] ?? '') ?></span>
+            <?php // LA CASE POINTE ENFIN SUR QUELQUE CHOSE. Elle disait
+                  // « Akceptuję regulamin i politykę prywatności » sans qu'aucun
+                  // des deux documents n'existe : on faisait accepter le vide,
+                  // et c'est ce que l'opérateur de paiement a relevé.
+                  //
+                  // target="_blank" : le panier est rempli, le formulaire aussi.
+                  // Ouvrir le règlement dans le MÊME onglet ferait perdre la
+                  // saisie à qui veut simplement lire ce qu'il accepte — donc
+                  // apprendrait à cocher sans lire. ?>
+            <?php // LES LIBELLES DE LA PHRASE NE SONT PAS CEUX DES PAGES. Le
+                  // titre d'une page est au nominatif ; dans une phrase le
+                  // polonais le decline. Reutiliser le titre donnait
+                  // « zapoznałem się z Polityka prywatności » — une faute que
+                  // tout client polonais voit, sur la ligne meme ou on lui
+                  // demande sa confiance. ?>
+            <span><?= e($S['checkout.terms_a'] ?? '') ?>
+              <a href="<?= e(u('regulamin')) ?>" target="_blank" rel="noopener"><?= e($S['checkout.terms_l1'] ?? '') ?></a>
+              <?= e($S['checkout.terms_b'] ?? '') ?>
+              <a href="<?= e(u('prywatnosc')) ?>" target="_blank" rel="noopener"><?= e($S['checkout.terms_l2'] ?? '') ?></a>.</span>
           </label>
           <?php if (isset($errors['consent_terms'])) echo '<small class="err">' . e($errors['consent_terms']) . '</small>'; ?>
         </p>
@@ -1193,6 +1211,63 @@ if ($page === 'kasa') {
     </aside>
   </div>
   <?php endif; ?>
+</main>
+<?php
+    layout_footer($S);
+    exit;
+}
+
+// ------------------------------------------------------ PAGES JURIDIQUES ----
+//
+// Regulamin et Polityka Prywatności. Deux pages, une seule mécanique : le texte
+// vient de la base (donc corrigeable en console), les chiffres viennent de la
+// configuration réelle (donc jamais en contradiction avec la caisse).
+//
+// LE CORPS EST EN POLONAIS, QUELLE QUE SOIT LA LANGUE DU VISITEUR, et c'est un
+// choix, pas un oubli : un règlement traduit approximativement est un règlement
+// dont on ne sait plus lequel fait foi. Le titre et l'avertissement, eux,
+// parlent la langue du visiteur — et l'avertissement DIT que la version
+// polonaise est celle qui engage.
+if ($page === 'regulamin' || $page === 'prywatnosc') {
+    $prefixe = $page === 'regulamin' ? 'terms' : 'privacy';
+    $titre   = (string) ($S[$page === 'regulamin' ? 'legal.terms' : 'legal.privacy'] ?? '');
+    $pl      = $lang === 'pl' ? $S : wsm_shop_strings($pdo, 'pl');
+    $vals    = legal_valeurs($pdo, $pl);
+    $sections = legal_sections($pl, $prefixe, $vals);
+    $quand   = (string) ($pl[$prefixe . '.updated'] ?? '');
+
+    layout_head($S, $lang, $langs, $titre, '', $page);
+    layout_header($S, $lang, $langs, $cartCount);
+    ?>
+<main class="wrap block legal">
+  <h1><?= e($titre) ?></h1>
+  <?php if ($quand !== ''): ?>
+  <p class="mono muted"><?= e(str_replace('{data}', $quand, (string) ($S['legal.updated'] ?? ''))) ?></p>
+  <?php endif; ?>
+  <?php if (($S['legal.pl_only'] ?? '') !== ''): ?>
+    <?php notice('warn', (string) $S['legal.pl_only']); ?>
+  <?php endif; ?>
+
+  <?php if (!$sections): ?>
+  <p class="muted">Dokument nie został jeszcze uzupełniony.</p>
+  <?php endif; ?>
+
+  <?php // La numérotation est POSÉE ICI, pas tapée dans le texte : on peut
+        // insérer une section sans renuméroter les onze suivantes à la main. ?>
+  <ol class="legal-spis">
+    <?php foreach ($sections as $i => [$t, ]): ?>
+    <li><a href="#p<?= $i + 1 ?>"><?= e($t) ?></a></li>
+    <?php endforeach; ?>
+  </ol>
+
+  <?php foreach ($sections as $i => [$t, $b]): ?>
+  <section class="legal-sec" id="p<?= $i + 1 ?>">
+    <h2><span class="nr"><?= $i + 1 ?>.</span> <?= e($t) ?></h2>
+    <?= $b ?>
+  </section>
+  <?php endforeach; ?>
+
+  <p class="mono muted"><?= e($S['legal.print'] ?? '') ?></p>
 </main>
 <?php
     layout_footer($S);

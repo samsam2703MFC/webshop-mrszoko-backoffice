@@ -274,6 +274,16 @@ grep -q 'function wsm_inpost_diag' site/backoffice/api/inpost.php \
   && grep -q "POST\['sprawdz'\]" site/backoffice/wysylka.php \
   || { echo "  kanal InPost: niekompletny"; exit 1; }
 echo "  kanal InPost (test polaczenia + statusy) : obecny"
+# LES DEUX DOCUMENTS QUE L'OPERATEUR DE PAIEMENT EXIGE. Quatre pieces : les
+# deux pages, le lien du pied de page (present partout, telephone compris) et
+# la case de la caisse qui pointe enfin sur quelque chose.
+grep -q "page === 'regulamin'" site/shop/index.php \
+  && grep -q "page === 'prywatnosc'" site/shop/index.php \
+  && grep -q "u('regulamin')" site/shop/layout.php \
+  && grep -q 'checkout.terms_l2' site/shop/index.php \
+  || { echo "  regulamin i polityka: niekompletne"; exit 1; }
+echo "  regulamin i polityka (dwie strony + stopka + kasa) : obecne"
+
 
 
 

@@ -538,3 +538,27 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .btn--ghost { background: transparent; color: var(--choco-700);
               border: 1px solid var(--border-default); }
 .btn--ghost:hover { background: var(--cream-100); }
+
+/* ─── LES PAGES JURIDIQUES ───────────────────────────────────────────────────
+   Un règlement se LIT, parfois sous la contrainte d'un litige. Colonne étroite,
+   interligne large, numérotation visible : ce sont les seules choses qui
+   rendent un texte de loi consultable au lieu d'imposant. */
+.legal { max-width: 760px; }
+.legal h1 { margin-bottom: var(--space-2); }
+.legal-spis { margin: var(--space-6) 0 var(--space-8); padding-left: 1.4em;
+              color: var(--text-muted); line-height: 1.9; font-size: var(--text-sm); }
+.legal-spis a { color: var(--choco-700); text-decoration: none; }
+.legal-spis a:hover { text-decoration: underline; }
+.legal-sec { margin-bottom: var(--space-7); scroll-margin-top: 90px; }
+.legal-sec h2 { font-size: var(--text-lg); margin-bottom: var(--space-3); }
+.legal-sec h2 .nr { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.legal-sec p, .legal-sec li { line-height: 1.75; }
+.legal-sec p { margin: 0 0 var(--space-3); }
+.legal-sec ul { margin: 0 0 var(--space-3); padding-left: 1.3em; }
+.legal-sec li { margin-bottom: 6px; }
+.legal-sec strong { font-weight: 600; }
+
+/* La case de la caisse porte maintenant deux liens : ils doivent se voir
+   comme des liens, sinon personne ne les ouvre — et c'est justement ce que
+   l'opérateur de paiement veut éviter. */
+.check a { color: var(--choco-700); text-decoration: underline; }

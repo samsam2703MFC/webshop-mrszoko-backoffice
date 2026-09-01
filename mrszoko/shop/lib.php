@@ -266,3 +266,115 @@ function brand_mark(?array $b, string $class = 'brand-mark'): string {
     }
     return '<span class="' . e($class) . ' ' . e($class) . '--text">' . e($name) . '</span>';
 }
+
+// ═══ LES DEUX DOCUMENTS QUE LA LOI EXIGE ═══════════════════════════════════
+//
+// Regulamin et Polityka Prywatności. L'opérateur de paiement a refusé
+// d'activer le compte tant qu'ils n'étaient pas publiés — et il avait raison
+// deux fois : la case à cocher de la caisse disait « Akceptuję regulamin » en
+// ne pointant sur rien du tout. On faisait accepter un document inexistant.
+//
+// LE TEXTE VIT DANS LA BASE, comme le reste de la vitrine : il se corrige dans
+// Treści sans passer par moi, et un texte juridique se corrige. Mais LES
+// CHIFFRES viennent de la CONFIGURATION RÉELLE, jamais du texte : un règlement
+// qui promet 48 h pendant que la caisse annonce 24 h ne se contente pas d'être
+// faux, il est opposable. Les accolades ci-dessous sont remplies au rendu par
+// ce que la boutique fait vraiment.
+
+/** Les valeurs qui remplacent les accolades. Une seule source : la boutique. */
+function legal_valeurs(PDO $pdo, array $S): array {
+    $api = dirname(__DIR__) . '/backoffice/php-api';
+    if (!is_dir($api)) $api = dirname(__DIR__) . '/backoffice/api';
+    if (!function_exists('wsm_ship_delai_h') && is_file($api . '/invoice.php')) {
+        require_once $api . '/invoice.php';
+    }
+    $h = function_exists('wsm_ship_delai_h') ? wsm_ship_delai_h() : 24;
+
+    // Le tableau des livraisons, écrit depuis la table : ajoutez un
+    // transporteur demain, le règlement le nommera sans qu'on y touche.
+    $lignes = [];
+    try {
+        $st = $pdo->query("SELECT id, price_net, vat_rate, free_from FROM wsm_shipping_methods
+                            WHERE active = 1 ORDER BY sort_order, id");
+        foreach ($st as $m) {
+            $nom = (string) ($S['ship.' . $m['id'] . '.label'] ?? $m['id']);
+            $brut = (int) round((int) $m['price_net'] * (1 + (float) $m['vat_rate']));
+            $l = '- **' . $nom . '** — ' . number_format($brut / 100, 2, ',', ' ') . ' zł';
+            if ((int) $m['free_from'] > 0) {
+                $l .= ', bezpłatnie od ' . number_format((int) $m['free_from'] / 100, 2, ',', ' ') . ' zł';
+            }
+            $lignes[] = $l;
+        }
+    } catch (Throwable $e) { /* table absente : le document reste lisible */ }
+
+    return [
+        '{sklep}'      => (string) ($S['brand'] ?? 'Mister Szoko'),
+        '{sprzedawca}' => (string) ($S['seller.name'] ?? ''),
+        '{adres}'      => (string) ($S['seller.address'] ?? ''),
+        '{ids}'        => (string) ($S['seller.ids'] ?? ''),
+        '{email}'      => (string) ($S['footer.email'] ?? ''),
+        // seo_origin() vit dans seo.php, que lib.php NE CHARGE PAS : l'appeler
+        // nu faisait tomber en « undefined function » tout appelant qui n'avait
+        // pas charge les deux. La vitrine les charge tous les deux, donc ca ne
+        // se voyait pas — jusqu'au premier autre appelant.
+        '{adres_www}'  => (function_exists('seo_origin') && seo_origin() !== '')
+                            ? seo_origin() . shop_base() . '/' : shop_base() . '/',
+        '{wysylka_h}'  => (string) $h,
+        '{zwrot_dni}'  => '14',
+        '{dostawa}'    => $lignes ? implode("\n", $lignes) : '- (brak aktywnych sposobów dostawy)',
+    ];
+}
+
+/**
+ * Le corps d'une section, rendu SANS jamais laisser passer de HTML.
+ *
+ * Le texte vient d'un champ éditable en console. Y accepter du HTML ferait de
+ * l'écran Treści une porte d'entrée pour du script sur la vitrine — la faille
+ * la plus banale qui soit. On échappe TOUT, puis on rend une grammaire
+ * minuscule et sûre : un paragraphe par ligne vide, une liste par lignes qui
+ * commencent par « - », et **gras**.
+ */
+function legal_corps(string $txt, array $vals): string {
+    $txt = strtr($txt, $vals);
+    $out = '';
+    foreach (preg_split('/\n\s*\n/', trim($txt)) ?: [] as $bloc) {
+        $bloc = trim($bloc);
+        if ($bloc === '') continue;
+        $lignes = preg_split('/\n/', $bloc) ?: [];
+        $liste = true;
+        foreach ($lignes as $l) if (!str_starts_with(trim($l), '- ')) { $liste = false; break; }
+        if ($liste) {
+            $out .= '<ul>';
+            foreach ($lignes as $l) $out .= '<li>' . legal_gras(substr(trim($l), 2)) . '</li>';
+            $out .= '</ul>';
+        } else {
+            $out .= '<p>' . legal_gras(implode(' ', array_map('trim', $lignes))) . '</p>';
+        }
+    }
+    return $out;
+}
+
+/** **gras** — sur du texte DÉJÀ échappé, donc sans risque d'injection. */
+function legal_gras(string $s): string {
+    $s = e($s);
+    return (string) preg_replace('/\*\*(.+?)\*\*/u', '<strong>$1</strong>', $s);
+}
+
+/**
+ * Les sections d'un document, dans l'ordre, telles qu'elles existent en base.
+ *
+ * On s'arrête à la première manquante plutôt que de deviner un nombre : une
+ * section retirée en console ne doit pas couper le document en deux.
+ *
+ * @return list<array{0:string,1:string}> [titre, corps rendu]
+ */
+function legal_sections(array $pl, string $prefixe, array $vals): array {
+    $out = [];
+    for ($i = 1; $i <= 40; $i++) {
+        $t = trim((string) ($pl["$prefixe.s$i.t"] ?? ''));
+        $b = trim((string) ($pl["$prefixe.s$i.b"] ?? ''));
+        if ($t === '' && $b === '') break;
+        $out[] = [$t, legal_corps($b, $vals)];
+    }
+    return $out;
+}
