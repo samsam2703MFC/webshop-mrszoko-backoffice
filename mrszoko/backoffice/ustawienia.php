@@ -232,16 +232,20 @@ if ($orphelins): ?>
             <option value="<?= h($o) ?>"<?= (string) $f['show'] === $o ? ' selected' : '' ?>><?= h($o) ?></option>
             <?php endforeach; ?>
           </select>
-        <?php elseif ($f['type'] === 'image'): ?>
-          <?php $img = (string) ($f['show'] ?? ''); $aImg = $img !== '' && $img !== 'xxxx'; ?>
+        <?php elseif ($f['type'] === 'image' || $f['type'] === 'ikona'):
+          // Une icône se montre sur damier : c'est le seul moyen de VOIR que la
+          // transparence a survécu, avant de la découvrir sur la vitrine.
+          $ikona = $f['type'] === 'ikona';
+          $img = (string) ($f['show'] ?? ''); $aImg = $img !== '' && $img !== 'xxxx'; ?>
           <?php if ($aImg): ?>
-            <img src="<?= h(img_src($img)) ?>" alt="" class="ust-foto">
+            <img src="<?= h(img_src($img)) ?>" alt="" class="<?= $ikona ? 'ust-ikona' : 'ust-foto' ?>">
           <?php endif; ?>
-          <input type="file" name="<?= h($f['form']) ?>" accept="image/jpeg,image/png,image/webp">
+          <input type="file" name="<?= h($f['form']) ?>" accept="<?= $ikona ? 'image/png,image/webp' : 'image/jpeg,image/png,image/webp' ?>">
           <?php if ($aImg): ?>
-          <label class="chk"><input type="checkbox" name="<?= h($f['form']) ?>__usun" value="1"><span>Usuń zdjęcie przy zapisie</span></label>
+          <label class="chk"><input type="checkbox" name="<?= h($f['form']) ?>__usun" value="1"><span>Usuń <?= $ikona ? 'ikonę' : 'zdjęcie' ?> przy zapisie</span></label>
           <?php endif; ?>
-          <small><?= $aImg ? 'Wybierz plik, żeby podmienić. Puste pole = bez zmian.' : 'JPEG · PNG · WebP, maks. 8 MB.' ?></small>
+          <small><?= $aImg ? 'Wybierz plik, żeby podmienić. Puste pole = bez zmian.'
+                           : ($ikona ? 'PNG · WebP z przezroczystym tłem, maks. 8 MB.' : 'JPEG · PNG · WebP, maks. 8 MB.') ?></small>
         <?php elseif ($f['type'] === 'pem'): ?>
           <textarea name="<?= h($f['form']) ?>" rows="4" class="pem" spellcheck="false"
                     placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----"></textarea>

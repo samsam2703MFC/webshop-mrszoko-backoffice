@@ -333,6 +333,7 @@ function console_sections(?array $me = null): array {
             'produkty.php' => 'Produkty',
             'rabaty.php'   => 'Rabaty',
             'tresci.php'   => 'Treści',
+            'wyglad.php'   => 'Wygląd',
             'allegro.php'  => 'Allegro',
         ],
 

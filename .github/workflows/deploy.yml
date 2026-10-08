@@ -643,13 +643,25 @@ jobs:
           [ "${N_PRICE:-0}" -ge 5 ] || { echo "  ^ NOT OK : les prix ne sont pas dans le HTML initial"; fail=1; }
           # Page unique : le contenu éditorial de la landing doit y être, rendu
           # par le serveur comme le reste — sinon la fusion n'a pas eu lieu.
+          # « id="pro" » peut manquer À DESSEIN : l'écran Wygląd cache le bloc
+          # B2B, et la page le dit alors en commentaire. Caché n'est pas perdu.
           for anchor in 'id="katalog"' 'id="pro"' 'hero-strip'; do
             if printf '%s' "$HOME_HTML" | grep -q "$anchor"; then
               echo "  section $anchor : présente"
+            elif [ "$anchor" = 'id="pro"' ] && printf '%s' "$HOME_HTML" | grep -q 'sekcja pro: ukryta'; then
+              echo "  section $anchor : cachée depuis Wygląd — voulu"
             else
               echo "  ^ NOT OK : section $anchor absente de la page unique"; fail=1
             fi
           done
+          # Le thème de Wygląd est imprimé dans <head>, même au défaut : un
+          # <style id="motyw"> absent veut dire que la vitrine ne lit plus
+          # theme.php — et l'écran de la console tournerait à vide.
+          if printf '%s' "$HOME_HTML" | grep -q 'id="motyw"'; then
+            echo "  motyw (Wygląd) : wpięty w stronę"
+          else
+            echo "  ^ NOT OK : strona nie czyta motywu z Wygladu"; fail=1
+          fi
           # Fiche produit : on suit un vrai lien du catalogue.
           SLUG=$(printf '%s' "$HOME_HTML" | grep -o 'href="[^"]*/shop/p/[^"]*"' | head -1 | sed 's/.*\/p\///;s/"$//')
           if [ -n "$SLUG" ]; then run "$SH/p/$SLUG" 4000; else echo "  ^ NOT OK : aucun lien produit"; fail=1; fi
@@ -1977,6 +1989,7 @@ jobs:
             *'Strefa pro'*|*'40 kg'*)
               echo "  ^ ZLE : stary blok « Strefa pro » nadal na stronie — treść nie doszła"; fail=1;;
             *'id="pro"'*) echo "  blok B2B jest na stronie — potwierdzone";;
+            *'sekcja pro: ukryta'*) echo "  blok B2B ukryty w Wyglądzie — świadomie";;
             *) echo "  ^ ATTENTION : brak bloku B2B na stronie głównej"; fail=1;;
           esac
           # Le bouton mène au FORMULAIRE, sujet déjà posé. Un « mailto: »
@@ -1998,6 +2011,7 @@ jobs:
           case "$HOME_HTML" in
             *'kontakt?temat=wspolpraca'*|*'kontakt&#63;temat=wspolpraca'*)
               echo "  przycisk prowadzi do formularza z tematem — potwierdzone";;
+            *'sekcja pro: ukryta'*) echo "  (blok B2B ukryty w Wyglądzie — przycisk nie do sprawdzenia)";;
             *) echo "  ^ ZLE : przycisk B2B nie prowadzi do formularza z tematem"; fail=1;;
           esac
           # Et le formulaire présélectionne CE sujet. Sans cette ligne le
@@ -2171,6 +2185,22 @@ jobs:
             && grep -q 'wsm_usage_skad' "$DIR_BO/api/usage.php" \
             && echo "  referer filtrowany przez usage.php: tak" \
             || { echo "  ^ ATTENTION : referer trafia gdzie indziej"; fail=1; }
+          if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
+          REMOTE
+
+      # L'étape précédente avait dépassé ce qu'un script d'étape peut peser
+      # (21 000 caractères) : GitHub l'acceptait encore, de justesse, et
+      # tools/check-workflow.sh refusait de laisser pousser. Scindée en deux :
+      # avant, « les écrans répondent » ; ici, « ce que les écrans portent ».
+      - name: Verify console features (what the screens carry)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+          fail=0
           # ── LE STATUT EST UN BOUTON ────────────────────────────────────────
           # Zamówienia est l'écran le plus ouvert de la maison, et changer un
           # statut y est devenu le geste d'un doigt. Trois pièces doivent être
@@ -2192,6 +2222,46 @@ jobs:
             && grep -q 'hero--foto' "$DIR_BO/../shop/shop.css" \
             && echo "  pole zdjecia + config + styl: obecne" \
             || { echo "  ^ NOT OK : pole zdjecia na stronie glownej niekompletne"; fail=1; }
+          # ── LES ICÔNES DES PROMESSES ──────────────────────────────────────
+          # Même mécanique que la photo, mêmes pièces, plus la vitrine qui
+          # doit LIRE le réglage : un fichier déposé que la page n'affiche pas
+          # est déposé pour rien, et personne ne le voit.
+          echo "== ikony obietnic =="
+          grep -q "'promise_icon_1'" "$DIR_BO/api/settings.php" \
+            && grep -q "'promise_icon_3'" "$DIR_BO/api/config.php" \
+            && grep -q 'promise-ikona' "$DIR_BO/../shop/index.php" \
+            && grep -q 'promise-ikona' "$DIR_BO/../shop/shop.css" \
+            && grep -q 'ust-ikona' "$DIR_BO/console.css" \
+            && echo "  pola + config + witryna + styl: obecne" \
+            || { echo "  ^ NOT OK : ikony obietnic niekompletne"; fail=1; }
+          # ── LE WYGLĄD ─────────────────────────────────────────────────────
+          # L'écran, le moteur, la vitrine qui l'imprime, le rail — et les
+          # polices au choix : on vérifie les BINAIRES, pas la déclaration.
+          # Une famille déclarée dans tokens.css dont les fichiers manquent
+          # donne un sélecteur qui « marche » et une boutique en Georgia.
+          echo "== wyglad sklepu =="
+          [ -f "$DIR_BO/wyglad.php" ] && [ -f "$DIR_BO/api/theme.php" ] \
+            && grep -q 'theme_head()' "$DIR_BO/../shop/layout.php" \
+            && grep -q 'wsm_theme_head' "$DIR_BO/../shop/lib.php" \
+            && grep -q "'wyglad.php'" "$DIR_BO/console.php" \
+            && echo "  ekran + theme.php + witryna + szyna: obecne" \
+            || { echo "  ^ NOT OK : wyglad sklepu niekompletny"; fail=1; }
+          for fam in nunito jost lora playfair-display; do
+            ls "$DIR_BO/../shop/fonts/$fam-normal-"*"-latin-ext.woff2" >/dev/null 2>&1 \
+              && echo "  czcionka $fam: pliki na serwerze" \
+              || { echo "  ^ NOT OK : brak plikow czcionki $fam — wybor w Wygladzie bylby pusty"; fail=1; }
+          done
+          grep -q "font-family: 'Lora'" "$DIR_BO/../shop/tokens.css" \
+            && echo "  tokens.css deklaruje rodziny do wyboru" \
+            || { echo "  ^ NOT OK : tokens.css bez rodzin do wyboru"; fail=1; }
+          # ── KILOGRAMY W KLIENTACH ─────────────────────────────────────────
+          # Le seuil d'un compte professionnel se compte en kg : la liste et
+          # la fiche doivent les porter, et par produit.
+          echo "== kilogramy i produkty w Klientach =="
+          grep -q 'wsm_crm_achats' "$DIR_BO/api/crm.php" \
+            && grep -q 'Kupione kilogramy' "$DIR_BO/klienci.php" \
+            && echo "  crm.php + klienci.php: obecne" \
+            || { echo "  ^ NOT OK : kilogramy w Klientach niekompletne"; fail=1; }
           # ── LE RAYON QU'ON CRÉE EN RANGEANT UN PRODUIT ─────────────────────
           # Le ménage a éteint cinq catégories de la maquette : il n'en restait
           # qu'une allumée, sur un champ OBLIGATOIRE. La fiche produit porte
@@ -2404,7 +2474,7 @@ jobs:
             && { echo "  ^ ZLE : wróciły rozmiary poniżej 12 px"; fail=1; } \
             || echo "  skala: nic poniżej 12 px — potwierdzone"
 
-          if [ "$fail" = "0" ]; then echo "ALL CONSOLE SCREENS OK"; else echo "CONSOLE SCREENS FAILED"; exit 1; fi
+          if [ "$fail" = "0" ]; then echo "ALL CONSOLE FEATURES OK"; else echo "CONSOLE FEATURES FAILED"; exit 1; fi
           REMOTE
 
 

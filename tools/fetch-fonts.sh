@@ -18,7 +18,10 @@ DS="mrszoko/design-system"
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 # Les trois familles que typography.css utilise réellement. DM Serif Display a
 # été retirée de la marque : ne pas la remettre sans changer typography.css.
-URL="https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,300..800;1,400&family=DM+Mono:wght@400;500&display=swap"
+# LES FAMILLES AU CHOIX dans Wygląd (theme.php) suivent : sans italique, pour
+# ne pas tripler le poids du dépôt. Seule la famille choisie est téléchargée
+# par le navigateur — un @font-face non utilisé ne coûte rien au visiteur.
+URL="https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,300..800;1,400&family=DM+Mono:wght@400;500&family=Nunito:wght@300..800&family=Jost:wght@300..700&family=Lora:wght@400..700&family=Playfair+Display:wght@400..800&display=swap"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 echo "== feuille Google Fonts (UA moderne → woff2)"

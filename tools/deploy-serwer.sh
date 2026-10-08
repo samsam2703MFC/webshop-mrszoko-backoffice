@@ -213,6 +213,30 @@ grep -q "'hero_image'" site/backoffice/api/settings.php \
   && grep -q 'hero--foto' site/shop/shop.css \
   || { echo "  champ photo du hero incomplet dans l'assemblage"; exit 1; }
 echo "  zdjecie na stronie glownej (pole + config + styl) : obecne"
+# LES ICONES DES PROMESSES : memes trois pieces que la photo, plus la vitrine
+# qui doit LIRE le reglage — un fichier depose que la page n'affiche pas est
+# depose pour rien, et personne ne le voit.
+grep -q "'promise_icon_1'" site/backoffice/api/settings.php \
+  && grep -q "'promise_icon_3'" site/backoffice/api/config.php \
+  && grep -q 'promise-ikona' site/shop/index.php \
+  && grep -q 'promise-ikona' site/shop/shop.css \
+  || { echo "  ikony obietnic incompletes dans l'assemblage"; exit 1; }
+echo "  ikony obietnic (pola + config + witryna + styl) : obecne"
+# LE WYGLAD : l'ecran, le moteur, la vitrine qui l'imprime, et les polices au
+# choix — on verifie les BINAIRES, pas la declaration : une famille declaree
+# sans fichiers donne un selecteur qui marche et une boutique en Georgia.
+[ -f site/backoffice/wyglad.php ] && [ -f site/backoffice/api/theme.php ] \
+  && grep -q 'theme_head()' site/shop/layout.php \
+  && grep -q 'wsm_theme_head' site/shop/lib.php \
+  && grep -q "font-family: 'Lora'" site/shop/tokens.css \
+  && ls site/shop/fonts/lora-normal-*-latin-ext.woff2 site/shop/fonts/nunito-normal-*-latin-ext.woff2 \
+        site/shop/fonts/jost-normal-*-latin-ext.woff2 site/shop/fonts/playfair-display-normal-*-latin-ext.woff2 >/dev/null 2>&1 \
+  || { echo "  ecran Wyglad ou polices au choix incomplets dans l'assemblage"; exit 1; }
+echo "  wyglad sklepu (ekran + theme.php + witryna + czcionki) : obecne"
+grep -q 'wsm_crm_achats' site/backoffice/api/crm.php \
+  && grep -q 'Kupione kilogramy' site/backoffice/klienci.php \
+  || { echo "  kilogramy w Klientach incomplets dans l'assemblage"; exit 1; }
+echo "  kilogramy i produkty w Klientach : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte

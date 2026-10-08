@@ -34,7 +34,7 @@ function layout_head(array $S, string $lang, array $langs, string $title = '',
 <link rel="icon" type="image/png" href="<?= e(u('assets/logo.png')) ?>">
 <link rel="stylesheet" href="<?= e(asset('tokens.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset('shop.css')) ?>">
-<?php
+<?= theme_head() ?><?php
 // Robots, canonique, grappe hreflang ABSOLUE et partage social. Les hreflang
 // émis ici auparavant étaient relatifs : Google les ignore en bloc, sans un
 // mot dans la Search Console. Ils n'ont donc jamais rien fait.

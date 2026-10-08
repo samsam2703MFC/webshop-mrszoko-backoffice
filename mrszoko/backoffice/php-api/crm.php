@@ -81,7 +81,7 @@ function wsm_crm_list(PDO $pdo): array {
         if (!isset($out[$k])) {
             $out[$k] = [
                 'email' => (string) $o['email'], 'name' => '', 'company' => '',
-                'orders' => 0, 'paid_orders' => 0, 'revenue' => 0, 'unpaid' => 0,
+                'orders' => 0, 'paid_orders' => 0, 'revenue' => 0, 'unpaid' => 0, 'weight_g' => 0,
                 'first_at' => '', 'last_at' => '', 'lang' => '', 'nip' => '',
                 'client_id' => 0, 'photo' => '',
             ];
@@ -113,6 +113,24 @@ function wsm_crm_list(PDO $pdo): array {
         unset($c);
     }
 
+    // LES KILOS. Le seuil d'un compte professionnel se compte en kg, pas en
+    // zlotys : 2 000 zł de pralines et 2 000 zł de tablettes n'ont pas la
+    // même place sur l'écran des contrats. Le poids d'une ligne est celui
+    // écrit à la commande ; une ligne ancienne qui n'en porte pas retombe sur
+    // la fiche produit × quantité, comme le calcul du compte professionnel.
+    try {
+        $sqlG = "SELECT LOWER(o.email) AS em,
+                        SUM(CASE WHEN i.weight_g > 0 THEN i.weight_g ELSE i.qty * COALESCE(p.weight_g, 0) END) AS g
+                   FROM wsm_order_items i
+                   JOIN wsm_orders o ON o.id = i.order_id
+              LEFT JOIN wsm_products p ON p.id = i.product_id
+                  WHERE o.email <> '' AND o.status <> 'anulowane' AND o.payment_status = 'oplacone'
+               GROUP BY LOWER(o.email)";
+        foreach ($pdo->query($sqlG)->fetchAll() ?: [] as $g) {
+            if (isset($out[(string) $g['em']])) $out[(string) $g['em']]['weight_g'] = (int) $g['g'];
+        }
+    } catch (Throwable $e) { /* table absente : la colonne reste à zéro */ }
+
     // Le raccord avec les fiches B2B saisies à la main : même adresse, même
     // personne. Sans ce raccord, un contact professionnel apparaîtrait deux
     // fois — une fois avec ses achats, une fois avec son numéro de TVA.
@@ -123,7 +141,7 @@ function wsm_crm_list(PDO $pdo): array {
             if (!isset($out[$k])) {
                 $out[$k] = [
                     'email' => (string) $cl['email'], 'name' => '', 'company' => '',
-                    'orders' => 0, 'paid_orders' => 0, 'revenue' => 0, 'unpaid' => 0,
+                    'orders' => 0, 'paid_orders' => 0, 'revenue' => 0, 'unpaid' => 0, 'weight_g' => 0,
                     'first_at' => '', 'last_at' => '', 'lang' => '', 'nip' => '',
                     'client_id' => 0, 'photo' => '',
                 ];
@@ -219,18 +237,71 @@ function wsm_crm_client(PDO $pdo, string $email): ?array {
     $moi['notes'] = wsm_crm_notes($pdo, $email);
 
     // Ce qu'il achète vraiment : sans ça, « bon client » ne dit pas quoi lui
-    // proposer. On compte les quantités, pas les lignes — dix fois un kilo
-    // n'est pas la même chose qu'une fois dix kilos.
-    $st4 = $pdo->prepare("SELECT i.name, SUM(i.qty) AS q, SUM(i.line_gross) AS v
-                            FROM wsm_order_items i
-                            JOIN wsm_orders o ON o.id = i.order_id
-                           WHERE LOWER(o.email) = ? AND o.status <> 'anulowane'
-                             AND o.payment_status = 'oplacone'
-                           GROUP BY i.name ORDER BY v DESC LIMIT 8");
-    $st4->execute([$email]);
-    $moi['top'] = $st4->fetchAll() ?: [];
+    // proposer. Quantités, kilos et valeur, produit par produit.
+    $moi['top'] = wsm_crm_achats($pdo, $email);
 
     return $moi;
+}
+
+/**
+ * Ce qu'une adresse a acheté, produit par produit : pièces, kilos, valeur.
+ *
+ * On compte les QUANTITÉS, pas les lignes — dix fois un kilo n'est pas la
+ * même chose qu'une fois dix kilos. Et les KILOS, parce que l'équipe parle
+ * en kilos : « ten kontrahent bierze 100 kg miesięcznie », jamais « 340
+ * sztuk ». Seules les commandes payées comptent, comme partout sur l'écran.
+ *
+ * Regroupé par IDENTIFIANT de produit, pas par nom : un produit renommé en
+ * console coupait son historique en deux lignes, et la meilleure vente de la
+ * maison passait pour deux ventes moyennes. Le nom affiché est celui de la
+ * commande la plus récente — la même règle que pour le nom du client. Une
+ * ligne sans identifiant (import ancien) se regroupe par nom, faute de mieux.
+ *
+ * Rien n'est tronqué : un contractant qui prend trente références veut voir
+ * les trente, c'est précisément pour lui que la liste existe.
+ *
+ * @return array<int, array{product_id:string,name:string,q:int,v:int,g:int}>
+ *         triés par valeur décroissante
+ */
+function wsm_crm_achats(PDO $pdo, string $email): array {
+    $email = strtolower(trim($email));
+    if ($email === '') return [];
+    try {
+        $st = $pdo->prepare("SELECT i.product_id, i.name, i.qty, i.line_gross, i.weight_g, p.weight_g AS unit_g
+                               FROM wsm_order_items i
+                               JOIN wsm_orders o ON o.id = i.order_id
+                          LEFT JOIN wsm_products p ON p.id = i.product_id
+                              WHERE LOWER(o.email) = ? AND o.status <> 'anulowane'
+                                AND o.payment_status = 'oplacone'
+                           ORDER BY o.id DESC, i.id DESC");
+        $st->execute([$email]);
+        $lignes = $st->fetchAll() ?: [];
+    } catch (Throwable $e) { return []; }
+
+    $out = [];
+    foreach ($lignes as $l) {
+        $pid = trim((string) ($l['product_id'] ?? ''));
+        $k = $pid !== '' ? 'p:' . $pid : 'n:' . mb_strtolower(trim((string) $l['name']));
+        if (!isset($out[$k])) {
+            $out[$k] = ['product_id' => $pid, 'name' => (string) $l['name'], 'q' => 0, 'v' => 0, 'g' => 0];
+        }
+        $out[$k]['q'] += (int) $l['qty'];
+        $out[$k]['v'] += (int) $l['line_gross'];
+        $out[$k]['g'] += wsm_crm_ligne_g($l);
+    }
+    usort($out, fn($a, $b) => $b['v'] <=> $a['v']);
+    return array_values($out);
+}
+
+/**
+ * Le poids d'une ligne de commande, en grammes : celui écrit à la commande
+ * (le poids de la ligne, quantité comprise), sinon la fiche produit × la
+ * quantité — c'est ce que fait déjà le calcul du compte professionnel.
+ */
+function wsm_crm_ligne_g(array $l): int {
+    $g = (int) ($l['weight_g'] ?? 0);
+    if ($g > 0) return $g;
+    return (int) ($l['qty'] ?? 0) * (int) ($l['unit_g'] ?? 0);
 }
 
 // ---------------------------------------------------------------------------
