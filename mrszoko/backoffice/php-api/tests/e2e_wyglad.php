@@ -47,14 +47,24 @@ $avant = $st->fetchAll() ?: [];
 wsm_theme_reset($pdo);
 
 // ---- 1. Au défaut ------------------------------------------------------------------------
-echo "-- domyślnie: nic do wysłania, ale znacznik jest --\n";
+echo "-- domyślnie: para czcionek sklepu, nic więcej; znacznik jest --\n";
 $t = wsm_theme_get($pdo, true);
 ok('tout est au défaut', wsm_theme_is_default($t));
-ok('la feuille est vide — le design system fait foi', wsm_theme_css($t) === '', wsm_theme_css($t));
-ok('mais la balise est imprimée, pour qu\'un contrôle la trouve',
+ok('le défaut de la boutique est Lora pour le texte, Playfair Display pour les titres',
+   $t['font_body'] === 'lora' && $t['font_head'] === 'playfair', [$t['font_body'], $t['font_head']]);
+ok('au défaut, la feuille porte cette paire — et RIEN d\'autre',
+   wsm_theme_css($t) === ":root{--font-sans:'Lora', Georgia, serif;--font-display:'Playfair Display', Georgia, serif;}",
+   wsm_theme_css($t));
+ok('la balise est imprimée, pour qu\'un contrôle la trouve',
    str_contains(wsm_theme_head($pdo), '<style id="motyw">'));
-ok('la police par défaut est celle de typography.css',
-   $t['font_body'] === 'mulish' && str_contains($lire('mrszoko/design-system/tokens/typography.css'), "'Mulish'"));
+ok('la BASE du design system reste Mulish — la console ne change pas d\'habit',
+   WSM_THEME_FONT_BAZA === 'mulish' && str_contains($lire('mrszoko/design-system/tokens/typography.css'), "'Mulish'"));
+wsm_theme_save($pdo, ['font_body' => 'mulish', 'font_head' => 'same'], 'test');
+ok('revenir à Mulish vide la feuille : la base fait alors foi, aucun octet pour rien',
+   wsm_theme_css(wsm_theme_get($pdo, true)) === '', wsm_theme_css(wsm_theme_get($pdo, true)));
+ok('… et la balise le dit', str_contains(wsm_theme_head($pdo), '/* wygląd domyślny */'));
+wsm_theme_reset($pdo);
+$t = wsm_theme_get($pdo, true);
 $colors = $lire('mrszoko/design-system/tokens/colors.css');
 ok('les couleurs par défaut sont CELLES de colors.css — un thème vide est la boutique d\'aujourd\'hui',
    str_contains($colors, $t['brand']) && str_contains($colors, $t['accent']) && str_contains($colors, $t['bg']),
@@ -63,12 +73,12 @@ ok('les couleurs par défaut sont CELLES de colors.css — un thème vide est la
 // ---- 2. Refus ----------------------------------------------------------------------------
 echo "\n-- zapis: poprawne wchodzi, nieczytelne odpada i jest nazwane --\n";
 $r = [];
-$zm = wsm_theme_save($pdo, ['accent' => '#1F5F8B', 'font_body' => 'lora', 'radius' => 'ostre',
+$zm = wsm_theme_save($pdo, ['accent' => '#1F5F8B', 'font_body' => 'nunito', 'font_head' => 'same', 'radius' => 'ostre',
                             'hero_align' => 'srodek', 'show_pro' => '0'], 'test', $r);
-ok('cinq réglages enregistrés d\'un coup', count($zm) === 5 && $r === [], [$zm, $r]);
+ok('six réglages enregistrés d\'un coup', count($zm) === 6 && $r === [], [$zm, $r]);
 $t = wsm_theme_get($pdo, true);
-ok('relus tels quels', $t['accent'] === '#1F5F8B' && $t['font_body'] === 'lora' && $t['radius'] === 'ostre'
-   && $t['hero_align'] === 'srodek' && $t['show_pro'] === '0', $t);
+ok('relus tels quels', $t['accent'] === '#1F5F8B' && $t['font_body'] === 'nunito' && $t['font_head'] === 'same'
+   && $t['radius'] === 'ostre' && $t['hero_align'] === 'srodek' && $t['show_pro'] === '0', $t);
 $rB = []; wsm_theme_save($pdo, ['brand' => '#FFFFFF'], 'test', $rB);
 ok('une marque blanche est refusée — elle porte du texte clair', isset($rB['brand']), $rB);
 ok('… et le refus est dit en polonais, à l\'écran', str_contains((string) ($rB['brand'] ?? ''), 'ciemny'), $rB['brand'] ?? null);
@@ -102,15 +112,16 @@ ok('… et ses nuances se calculent dans le navigateur',
    && str_contains($css, '--caramel-400:color-mix(in srgb, #1F5F8B 78%, white)'));
 ok('la marque, inchangée, n\'est pas touchée', !str_contains($css, '--choco-700'));
 ok('le papier, inchangé, non plus', !str_contains($css, '--cream-50'));
-ok('la police change le corps ET les titres', str_contains($css, "--font-sans:'Lora', Georgia, serif;")
-   && str_contains($css, "--font-display:'Lora', Georgia, serif;"));
+ok('« taka sama jak tekst » : la police change le corps ET les titres',
+   str_contains($css, "--font-sans:'Nunito', system-ui, sans-serif;")
+   && str_contains($css, "--font-display:'Nunito', system-ui, sans-serif;"));
 ok('coins « ostre » : les boutons aussi', str_contains($css, '--radius-pill:6px') && str_contains($css, '--radius-lg:8px'));
 ok('hero centré : une règle, pas un jeton', str_contains($css, '.hero-in{text-align:center}'));
 ok('rien d\'autre que des jetons et des règles — jamais de balise', !str_contains($css, '<') && !str_contains($css, '>'));
 wsm_theme_save($pdo, ['font_head' => 'playfair'], 'test');
 $css = wsm_theme_css(wsm_theme_get($pdo, true));
 ok('une famille de titres distincte, le corps reste', str_contains($css, "--font-display:'Playfair Display'")
-   && str_contains($css, "--font-sans:'Lora'"));
+   && str_contains($css, "--font-sans:'Nunito'"));
 wsm_theme_save($pdo, ['brand' => '#2A1A3E', 'bg' => '#F2F7F2', 'radius' => 'okragle'], 'test');
 $css = wsm_theme_css(wsm_theme_get($pdo, true));
 ok('la marque redéfinit toute la gamme de bruns, du plus sombre au plus clair',
@@ -147,8 +158,9 @@ echo "\n-- przywrócenie --\n";
 $n = wsm_theme_reset($pdo);
 ok('les lignes disparaissent', $n >= 5, $n);
 $t = wsm_theme_get($pdo, true);
-ok('retour au design system', wsm_theme_is_default($t));
-ok('la feuille est vide à nouveau', wsm_theme_css($t) === '');
+ok('retour au défaut de la boutique', wsm_theme_is_default($t));
+ok('la feuille ne porte plus que la paire de polices', str_contains(wsm_theme_css($t), "--font-sans:'Lora'")
+   && str_contains(wsm_theme_css($t), "--font-display:'Playfair Display'") && !str_contains(wsm_theme_css($t), '--caramel'));
 ok('un second reset ne casse rien', wsm_theme_reset($pdo) === 0);
 
 // ---- 6. Vitrine et console ----------------------------------------------------------------
@@ -176,7 +188,8 @@ if ($home === false || $home === '') {
     echo "  (pominięte: brak serwera sklepu pod $base)\n";
 } else {
     echo "\n-- strona główna nosi styl --\n";
-    ok('au défaut, la balise est là et vide', str_contains($home, '<style id="motyw">/* wygląd domyślny */</style>'));
+    ok('au défaut, la page porte Lora et Playfair Display',
+       str_contains($home, "--font-sans:'Lora'") && str_contains($home, "--font-display:'Playfair Display'"));
     ok('… et le bloc B2B est sur la page', str_contains($home, 'id="pro"'));
     wsm_theme_save($pdo, ['accent' => '#1F5F8B', 'show_pro' => '0', 'show_promises' => '0'], 'test');
     $h1 = (string) @file_get_contents($base . '/?t=' . time(), false, $ctx);
@@ -187,7 +200,7 @@ if ($home === false || $home === '') {
     wsm_theme_reset($pdo);
     $h0 = (string) @file_get_contents($base . '/?t=' . (time() + 1), false, $ctx);
     ok('après Przywróć, tout revient', str_contains($h0, 'id="pro"') && str_contains($h0, 'class="promise"')
-       && str_contains($h0, '/* wygląd domyślny */'));
+       && str_contains($h0, "--font-sans:'Lora'") && !str_contains($h0, '--caramel-500:#1F5F8B'));
 }
 
 // ---- Remise en place ----------------------------------------------------------------------
