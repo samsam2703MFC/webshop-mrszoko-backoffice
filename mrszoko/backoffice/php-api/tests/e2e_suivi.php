@@ -152,12 +152,19 @@ ok('la route existe', str_contains($vitrine, "\$page === 'moje-zamowienie'"));
 ok('… et le formulaire porte le jeton CSRF', str_contains($vitrine, 'csrf_field()'));
 ok('… et un couple juste REDIRIGE vers la page signée',
    str_contains($vitrine, "redirect(u('zamowienie/' . rawurlencode(\$trouve['code'])"));
-ok('le lien est dans la barre du haut', str_contains($layout, "u('moje-zamowienie')"));
+// Les liens viennent d'Układ strony (layout.php) : la barre et le pied de
+// page lisent la même fonction, et « zamowienie » est dans les deux listes
+// d'origine. L'adresse elle-même vit dans liens_uklad() (lib.php).
+require_once dirname(__DIR__) . '/layout.php';
+$libShop = (string) @file_get_contents(dirname(__DIR__, 3) . '/shop/lib.php');
+ok('le lien est dans la barre du haut', isset(wsm_layout_nav_builtins()['zamowienie'])
+   && str_contains($layout, "liens_uklad(wsm_pdo(), \$S, \$lang, 'nav')"));
 // La barre du haut disparaît sous 900 px, et on suit son colis DEPUIS SON
 // TÉLÉPHONE : sans le lien du pied de page, le suivi n'existerait que sur
 // l'écran où on en a le moins besoin.
 ok('… et aussi dans le pied de page, seul visible sur téléphone',
-   substr_count($layout, "u('moje-zamowienie')") >= 2);
+   isset(wsm_layout_footer_builtins()['zamowienie']) && str_contains($layout, "liens_uklad(wsm_pdo(), \$S, \$lang, 'footer')")
+   && str_contains($libShop, "case 'zamowienie': \$out[] = ['href' => u('moje-zamowienie')"));
 
 echo "\n" . str_repeat('-', 60) . "\n";
 echo "  $pass passed, $fail failed\n";

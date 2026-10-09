@@ -107,8 +107,16 @@ ok('la route /regulamin existe',  str_contains($idx, "\$page === 'regulamin'"));
 ok('la route /prywatnosc existe', str_contains($idx, "\$page === 'prywatnosc'"));
 // « W ŁATWO DOSTĘPNYM MIEJSCU » : le pied de page est le seul endroit présent
 // sur toutes les pages, y compris sur téléphone où la barre du haut disparaît.
+// Le pied de page vient d'Układ strony (layout.php) : les deux documents y
+// sont des entrées FIXES — pas d'interrupteur pour les cacher — et leurs
+// adresses vivent dans liens_uklad() (lib.php).
+require_once dirname(__DIR__) . '/layout.php';
+$libShop = (string) @file_get_contents($shop . '/lib.php');
 ok('les deux sont dans le pied de page',
-   str_contains($lay, "u('regulamin')") && str_contains($lay, "u('prywatnosc')"));
+   str_contains($lay, "liens_uklad(wsm_pdo(), \$S, \$lang, 'footer')")
+   && str_contains($libShop, "u('regulamin')") && str_contains($libShop, "u('prywatnosc')"));
+ok('… et personne ne peut les en retirer depuis Układ',
+   !empty(wsm_layout_footer_builtins()['regulamin']['fixed']) && !empty(wsm_layout_footer_builtins()['prywatnosc']['fixed']));
 // LA CASE POINTAIT SUR RIEN : c'est exactement ce qu'a relevé l'opérateur.
 ok('la case de la caisse porte les deux liens',
    str_contains($idx, "u('regulamin')") && str_contains($idx, "u('prywatnosc')"));

@@ -598,3 +598,14 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .blok-txt .lead { color: var(--text-muted); margin-bottom: var(--space-3); }
 .blok-txt .btn { margin-top: var(--space-3); }
 @media (max-width: 720px) { .blok--foto .blok-in { grid-template-columns: minmax(0, 1fr); } }
+/* Les styles cochés dans Strony : fond sombre (couleur de marque, texte
+   crème), photo à droite, sans carte. Des classes, jamais du style inline. */
+.blok--ciemny .blok-in { background: var(--choco-800); border-color: var(--choco-700); color: var(--cream-100); }
+.blok--ciemny .blok-txt h2, .blok--ciemny .prose h2, .blok--ciemny .prose h3 { color: var(--cream-50); }
+.blok--ciemny .blok-txt .lead { color: var(--cream-200); }
+.blok--ciemny .prose a { color: var(--caramel-400); }
+.blok--foto.blok--foto_prawo .blok-in { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.blok--foto_prawo .blok-img { order: 2; }
+.blok--szeroki .blok-in { background: transparent; border: 0; box-shadow: none; padding: 0; border-radius: 0; }
+.blok--szeroki.blok--ciemny .blok-in { background: var(--choco-800); padding: var(--space-6); border-radius: var(--radius-xl); }
+@media (max-width: 720px) { .blok--foto_prawo .blok-img { order: 0; } }

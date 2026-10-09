@@ -264,6 +264,13 @@ echo "  kilogramy i produkty w Klientach : obecne"
   && grep -q 'wsm_page_i18n' site/backoffice/api/schema/webshop_mrszoko.mysql.sql \
   || { echo "  CMS (strony, bloki, media) incomplet dans l'assemblage"; exit 1; }
 echo "  CMS: strony, bloki, media : obecne"
+# L'ORDRE DES CHOSES (Uklad strony) et le logo deposable.
+[ -f site/backoffice/api/layout.php ] && [ -f site/backoffice/uklad.php ] \
+  && grep -q "'uklad.php'" site/backoffice/console.php \
+  && grep -q 'wsm_layout_home' site/shop/index.php && grep -q 'liens_uklad' site/shop/layout.php \
+  && grep -q 'logo_src()' site/shop/layout.php && grep -q "'logo_image'" site/backoffice/api/settings.php \
+  || { echo "  Uklad strony ou logo incomplets dans l'assemblage"; exit 1; }
+echo "  uklad strony + logo : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte

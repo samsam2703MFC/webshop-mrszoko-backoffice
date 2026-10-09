@@ -406,6 +406,21 @@ if ($page === '') {
     seo_org($S, $lang, WSM_SHOP_DEFAULT_LANG);
     ?>
 <main>
+<?php // L'ACCUEIL SE LIT DANS L'ORDRE D'UKŁAD STRONY (layout.php) : chaque entrée
+      // est une section intégrée ou un bloc écrit dans Strony. Une section
+      // cachée laisse un commentaire à sa place — un contrôle qui ne la trouve
+      // pas doit pouvoir distinguer « voulu » de « cassé ». Sans layout.php
+      // (assemblage incomplet), l'ordre d'origine, tout visible.
+      $uklad = function_exists('wsm_layout_home') ? wsm_layout_home($pdo) : [];
+      if (!$uklad) $uklad = array_map(fn($k) => ['k' => $k, 'type' => 'builtin', 'id' => 0, 'on' => 1],
+                                      ['hero', 'pasek', 'obietnice', 'katalog', 'pro']);
+      $pasekOn = true;
+      foreach ($uklad as $it) if ($it['k'] === 'pasek') $pasekOn = (bool) $it['on'];
+      foreach ($uklad as $it): $typ = (string) $it['k'];
+          if ($typ === 'pasek') continue;                                      // rendu dans le hero
+          if ($it['type'] === 'blok') { if ($it['on']) blok_html($pdo, $lang, (int) $it['id']); continue; }
+          if (!$it['on']) { echo '  ' . wsm_layout_marker($typ) . "\n"; continue; } ?>
+  <?php if ($typ === 'hero'): ?>
   <?php // LA PHOTO DU HERO, si elle est posée dans Ustawienia.
         //
         // Le voile n'est pas décoratif : le titre est blanc, et une photo
@@ -423,7 +438,8 @@ if ($page === '') {
       <p class="lead"><?= e($S['home.lead'] ?? '') ?></p>
       <a class="btn btn--accent" href="#katalog"><?= e($S['home.cta'] ?? '') ?></a>
     </div>
-    <?php if (isset($S['promise.1.t']  /* MÊME champ que le bloc des promesses : deux textes pour un seul engagement divergent toujours */)): ?>
+    <?php // Le pasek suit Układ strony ; caché, il laisse son marqueur ici.
+          if ($pasekOn && isset($S['promise.1.t']  /* MÊME champ que le bloc des promesses : deux textes pour un seul engagement divergent toujours */)): ?>
     <div class="hero-strip">
       <div class="wrap hero-strip-in mono">
         <span><?= e($S['promise.1.t']  /* MÊME champ que le bloc des promesses : deux textes pour un seul engagement divergent toujours */) ?></span>
@@ -431,13 +447,9 @@ if ($page === '') {
         <span><?= e($S['story.strip.3'] ?? '') ?></span>
       </div>
     </div>
-    <?php endif; ?>
+    <?php elseif (!$pasekOn): echo '    ' . wsm_layout_marker('pasek') . "\n"; endif; ?>
   </section>
-
-  <?php // Les trois promesses se cachent depuis Wygląd. Cachées, la page le
-        // DIT en commentaire : un contrôle qui ne les trouve pas doit pouvoir
-        // distinguer « voulu » de « cassé ».
-        if (theme_values()['show_promises'] !== '0'): ?>
+  <?php elseif ($typ === 'obietnice'): ?>
   <section class="wrap promises">
     <?php // L'ICÔNE D'UNE PROMESSE, si elle est déposée dans Ustawienia → Sklep.
           // Même règle que la photo du hero : absente, le bloc reste du texte.
@@ -456,11 +468,7 @@ if ($page === '') {
     </div>
     <?php endfor; ?>
   </section>
-  <?php else: ?>
-  <!-- obietnice: ukryte w Wyglądzie -->
-  <?php endif; ?>
-  <?php bloki_html($pdo, $lang, 'po_obietnicach'); ?>
-
+  <?php elseif ($typ === 'katalog'): ?>
   <section class="wrap block" id="katalog">
     <div class="section-head">
       <h2><?= e($S['catalog.title'] ?? '') ?></h2>
@@ -517,14 +525,7 @@ if ($page === '') {
     </div>
     <?php endif; ?>
   </section>
-
-  <?php bloki_html($pdo, $lang, 'po_katalogu'); ?>
-  <?php // ---- Panneau pro : compte B2B ------------------------------------- ?>
-  <?php // Le bloc se cache depuis Wygląd — le compte firmowe, lui, reste :
-        // on cache une réclame, pas un service. Et la page le dit.
-        $proWidoczny = theme_values()['show_pro'] !== '0';
-        if (!$proWidoczny) echo "  <!-- sekcja pro: ukryta w Wyglądzie -->\n"; ?>
-  <?php if ($proWidoczny && isset($S['story.pro.title'])): ?>
+  <?php elseif ($typ === 'pro' && isset($S['story.pro.title'])): ?>
   <section class="wrap block" id="pro" style="padding-top:0">
     <div class="pro">
       <div class="pro-in">
@@ -558,7 +559,7 @@ if ($page === '') {
     </div>
   </section>
   <?php endif; ?>
-  <?php bloki_html($pdo, $lang, 'przed_stopka'); ?>
+<?php endforeach; ?>
 </main>
 <?php
     layout_footer($S);

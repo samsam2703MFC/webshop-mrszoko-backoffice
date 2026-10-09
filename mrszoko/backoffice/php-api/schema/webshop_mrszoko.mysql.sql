@@ -1243,6 +1243,7 @@ CREATE TABLE IF NOT EXISTS `wsm_pages` (
   `in_footer`  TINYINT(1) NOT NULL DEFAULT 0,
   `sort_order` INT NOT NULL DEFAULT 100,
   `image_url`  VARCHAR(255) NOT NULL DEFAULT '',
+  `styl`       VARCHAR(60)  NOT NULL DEFAULT '',
   `created_at` DATETIME NOT NULL,
   `updated_at` DATETIME NOT NULL,
   `updated_by` VARCHAR(120) NOT NULL DEFAULT '',

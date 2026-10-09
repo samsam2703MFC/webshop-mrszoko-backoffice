@@ -24,6 +24,9 @@ require_once $WSM_API_DIR . '/shop.php';
 // fichier manque à l'assemblage, la boutique vit sans pages — et le contrôle
 // de déploiement le dit — au lieu de tomber entière.
 if (is_file($WSM_API_DIR . '/pages.php')) require_once $WSM_API_DIR . '/pages.php';
+// L'ordre des sections, du menu et du pied de page (Układ strony). Même
+// règle : absent, la boutique garde son ordre d'origine, tout visible.
+if (is_file($WSM_API_DIR . '/layout.php')) require_once $WSM_API_DIR . '/layout.php';
 require_once $WSM_API_DIR . '/tpay.php';
 
 const WSM_CART_COOKIE = 'ms_cart';
@@ -252,7 +255,60 @@ function theme_values(): array {
     $f = (string) $WSM_API_DIR . '/theme.php';
     if (!function_exists('wsm_theme_get') && is_file($f)) require_once $f;
     if (function_exists('wsm_theme_get')) return $t = wsm_theme_get(wsm_pdo());
-    return $t = ['show_promises' => '1', 'show_pro' => '1', 'hero_align' => 'lewo'];
+    return $t = ['hero_align' => 'lewo'];
+}
+
+/**
+ * Le logo : celui déposé dans Ustawienia → Sklep, sinon celui du dépôt.
+ * « xxxx », le masque d'un réglage vidé, n'est pas une adresse.
+ */
+function logo_src(): string {
+    $l = trim((string) (wsm_config()['shop']['logo_image'] ?? ''));
+    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return u('assets/logo.png');
+    return media_src($l);
+}
+
+/**
+ * Les liens d'une surface (barre du haut ou pied de page), dans l'ordre
+ * d'Układ strony : [['href', 'label'], …]. layout.php dit QUOI et dans quel
+ * ordre ; ici on met les adresses et les libellés de la langue courante.
+ * Sans layout.php : l'ordre d'origine, tout visible.
+ */
+function liens_uklad(PDO $pdo, array $S, string $lang, string $which): array {
+    $def = $which === 'nav'
+        ? ['sklep', 'b2b', 'zamowienie', 'kontakt']
+        : ['email', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', 'konsola'];
+    $items = function_exists('wsm_layout_liens')
+        ? wsm_layout_liens($pdo, $which)
+        : array_map(fn($k) => ['k' => $k, 'type' => 'builtin', 'id' => 0, 'slug' => ''], $def);
+    if (function_exists('wsm_page_liens')) {
+        // Les pages cochées pour cette surface, quand layout.php manque.
+        if (!function_exists('wsm_layout_liens')) {
+            foreach (wsm_page_liens($pdo, $lang, $which) as $pg) $items[] = ['k' => 'strona:' . $pg['slug'], 'type' => 'strona', 'id' => 0, 'slug' => $pg['slug'], 'title' => $pg['title']];
+        }
+    }
+    $out = [];
+    foreach ($items as $it) {
+        if ($it['type'] === 'strona') {
+            $t = $it['title'] ?? (function_exists('wsm_page_textes') ? wsm_page_textes($pdo, (int) $it['id'], $lang)['title'] : '');
+            if ($t === '') continue;
+            $out[] = ['href' => u($it['slug']), 'label' => $t];
+            continue;
+        }
+        switch ($it['k']) {
+            case 'sklep':      $out[] = ['href' => u() . '#katalog', 'label' => (string) ($S['nav.shop'] ?? '')]; break;
+            case 'b2b':        $out[] = ['href' => u() . '#pro', 'label' => (string) ($S['story.pro.eyebrow'] ?? '')]; break;
+            case 'zamowienie': $out[] = ['href' => u('moje-zamowienie'), 'label' => (string) ($S['nav.order'] ?? 'Moje zamówienie')]; break;
+            case 'kontakt':    $out[] = ['href' => u('kontakt'), 'label' => (string) ($S['nav.contact'] ?? 'Kontakt')]; break;
+            case 'regulamin':  $out[] = ['href' => u('regulamin'), 'label' => (string) ($S['legal.terms'] ?? '')]; break;
+            case 'prywatnosc': $out[] = ['href' => u('prywatnosc'), 'label' => (string) ($S['legal.privacy'] ?? '')]; break;
+            case 'konsola':    $out[] = ['href' => shop_base() . '/../backoffice/', 'label' => (string) ($S['footer.console'] ?? '')]; break;
+            case 'email':
+                if (($S['footer.email'] ?? '') !== '') $out[] = ['href' => 'mailto:' . $S['footer.email'], 'label' => (string) $S['footer.email']];
+                break;
+        }
+    }
+    return array_values(array_filter($out, fn($l) => $l['label'] !== ''));
 }
 
 /**
@@ -265,16 +321,21 @@ function page_href(string $url): string {
 }
 
 /**
- * Les blocs écrits dans Strony pour un emplacement de l'accueil. Rien à
- * afficher = rien d'imprimé : la page ne change pas quand l'équipe n'a
- * encore rien écrit.
+ * UN bloc écrit dans Strony, à la place qu'Układ lui donne. Non publié ou
+ * vide = rien d'imprimé : la page ne change pas quand l'équipe n'a encore
+ * rien écrit. Les styles cochés (ciemny, foto_prawo, szeroki) sont des
+ * classes, stylées dans shop.css.
  */
-function bloki_html(PDO $pdo, string $lang, string $placement): void {
-    if (!function_exists('wsm_page_bloki')) return;
-    foreach (wsm_page_bloki($pdo, $lang, $placement) as $b) {
+function blok_html(PDO $pdo, string $lang, int $id): void {
+    if (!function_exists('wsm_page_blok')) return;
+    $b = wsm_page_blok($pdo, $id, $lang);
+    if (!$b) return;
+    {
         $img = (string) ($b['image_url'] ?? '');
+        $kl = 'wrap block blok' . ($img !== '' ? ' blok--foto' : '');
+        foreach ((array) ($b['styl'] ?? []) as $t) $kl .= ' blok--' . preg_replace('/[^a-z_]/', '', (string) $t);
         ?>
-  <section class="wrap block blok<?= $img !== '' ? ' blok--foto' : '' ?>" id="blok-<?= (int) $b['id'] ?>">
+  <section class="<?= e($kl) ?>" id="blok-<?= (int) $b['id'] ?>">
     <div class="blok-in">
       <?php if ($img !== ''): ?><img class="blok-img" src="<?= e(media_src($img)) ?>" alt="" loading="lazy" decoding="async"><?php endif; ?>
       <div class="blok-txt">

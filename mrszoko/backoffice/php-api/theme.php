@@ -82,10 +82,8 @@ function wsm_theme_fields(): array {
         'hero_align' => ['Nagłówek strony głównej', 'select', 'lewo',
                          ['lewo' => 'Tekst po lewej (obecnie)', 'srodek' => 'Tekst na środku'],
                          'Układ tytułu i hasła nad katalogiem.'],
-        'show_promises' => ['Trzy obietnice pod nagłówkiem', 'select', '1', ['1' => 'Pokaż', '0' => 'Ukryj'],
-                         'Wysyłka 24h, paczkomat / kurier, pakowanie termiczne — teksty w Treściach, ikony w Integracjach → Sklep.'],
-        'show_pro'   => ['Sekcja dla firm (B2B)', 'select', '1', ['1' => 'Pokaż', '0' => 'Ukryj'],
-                         'Blok „konto firmowe” na stronie głównej. Ukryty nie wyłącza kont firmowych — tylko ich reklamę.'],
+        // « Pokaż / ukryj » les sections ? Dans Układ strony (layout.php),
+        // avec l'ordre : une seule vérité par section, pas deux écrans.
     ];
 }
 

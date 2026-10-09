@@ -59,6 +59,7 @@ $cfg = [
         'promise_icon_1' => getenv('WSM_SHOP_ICON_1') ?: '',
         'promise_icon_2' => getenv('WSM_SHOP_ICON_2') ?: '',
         'promise_icon_3' => getenv('WSM_SHOP_ICON_3') ?: '',
+        'logo_image'     => getenv('WSM_SHOP_LOGO') ?: '',
     ],
 
     // ---- tpay.com : encaissement ------------------------------------------

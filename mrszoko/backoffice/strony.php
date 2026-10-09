@@ -26,6 +26,7 @@ require_once $API . '/pages.php';
 require_once $API . '/media.php';
 require_once $API . '/delivery.php';   // wsm_audit
 require_once $API . '/shop.php';       // wsm_shop_available_langs : les langues PUBLIÉES
+require_once $API . '/layout.php';     // la position d'un bloc dans l'accueil
 
 // Les langues du formulaire : celles que la boutique publie, plus celles
 // où cette page a déjà un texte. Le registre en connaît huit ; en proposer
@@ -164,7 +165,8 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Strony i bloki' => $formulaire ? 'str
 <?php if (!$formulaire): ?>
 <p class="why">
   <b>Strona</b> ma własny adres (np. <code>/o-nas</code>) i może wejść do górnego menu lub stopki.
-  <b>Blok</b> nie ma adresu: wstawia się na stronę główną, w jednym z trzech miejsc — zdjęcie, tekst, przycisk.
+  <b>Blok</b> nie ma adresu: wstawia się na stronę główną — zdjęcie, tekst, przycisk. Jego miejsce
+  (i kolejność sekcji) ustawia się w <a href="uklad.php">Układzie strony</a>.
   Oba piszą się tak samo, w trzech językach; tam, gdzie brakuje tłumaczenia, sklep pokazuje polski.
   Szkic nie jest widoczny w sklepie, dopóki go nie opublikujesz.
 </p>
@@ -214,14 +216,21 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Strony i bloki' => $formulaire ? 'str
   <p class="why">Jeszcze żadnego. Blok to np. „Nowość sezonu” ze zdjęciem i przyciskiem do produktu, albo „Odwiedź nas we Wrocławiu”.</p>
   <?php else: ?>
   <table class="rwd">
-    <thead><tr><th>Tytuł</th><th>Miejsce</th><th>Stan</th><th class="num">Kolejność</th><th>Języki</th><th></th></tr></thead>
+    <thead><tr><th>Tytuł</th><th>Pozycja na stronie głównej</th><th>Stan</th><th>Styl</th><th>Języki</th><th></th></tr></thead>
     <tbody>
+    <?php $pozycja = []; $home = wsm_layout_get($pdo, 'home');
+          foreach ($home as $i => $it) if ($it['type'] === 'blok') $pozycja[$it['id']] = $i + 1;
+          $poprzednik = function (int $id) use ($home): string {
+              $prev = '';
+              foreach ($home as $it) { if ($it['type'] === 'blok' && $it['id'] === $id) return $prev; $prev = $it['label']; }
+              return $prev;
+          }; ?>
     <?php foreach ($bloki as $p): $pub = (int) $p['published'] === 1; ?>
       <tr>
         <td data-l="Tytuł"><a href="strony.php?id=<?= (int) $p['id'] ?>"><b><?= h($p['title'] !== '' ? $p['title'] : '(bez tytułu)') ?></b></a></td>
-        <td data-l="Miejsce"><?= h(WSM_PAGE_PLACEMENTS[(string) $p['placement']] ?? (string) $p['placement']) ?></td>
+        <td data-l="Pozycja"><?php if (isset($pozycja[(int) $p['id']])): ?>po: <?= h($poprzednik((int) $p['id'])) ?> <a class="code" href="uklad.php">zmień</a><?php else: ?><span class="muted">—</span><?php endif; ?></td>
         <td data-l="Stan"><span class="bdg <?= $pub ? 'pub' : 'szkic' ?>"><?= $pub ? 'widoczny' : 'szkic' ?></span></td>
-        <td data-l="Kolejność" class="num"><?= (int) $p['sort_order'] ?></td>
+        <td data-l="Styl"><span class="code"><?= h(str_replace(',', ' ', (string) ($p['styl'] ?? ''))) ?: '—' ?></span></td>
         <td data-l="Języki"><span class="code"><?= h(implode(' ', $p['langs'])) ?></span></td>
         <td>
           <?php if ($isAdmin): ?>
@@ -269,15 +278,13 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Strony i bloki' => $formulaire ? 'str
           <input type="text" name="slug" value="<?= h($slugAktualny) ?>" placeholder="np. o-nas — puste: z polskiego tytułu"<?= $isAdmin ? '' : ' disabled' ?>>
           <small>Tylko strona. Małe litery, cyfry, myślniki. Strona będzie pod <code>/sklep/<?= h($slugAktualny !== '' ? $slugAktualny : '…') ?></code>.</small>
         </label>
-        <label class="field"><span>Miejsce bloku<?php if (isset($errs['placement'])): ?> <em class="tag err">wybierz</em><?php endif; ?></span>
-          <select name="placement"<?= $isAdmin ? '' : ' disabled' ?>>
-            <option value="">— tylko blok —</option>
-            <?php foreach (WSM_PAGE_PLACEMENTS as $k => $lbl): ?>
-            <option value="<?= h($k) ?>"<?= $val('placement') === $k ? ' selected' : '' ?>><?= h($lbl) ?></option>
-            <?php endforeach; ?>
-          </select>
-          <small>Tylko blok. Gdzie na stronie głównej ma się pojawić.</small>
-        </label>
+        <div class="field"><span>Styl bloku</span>
+          <?php $stylAkt = isset($_POST['zapisz']) ? (array) ($_POST['styl'] ?? []) : explode(',', (string) ($edit['styl'] ?? '')); ?>
+          <?php foreach (WSM_PAGE_STYLE as $k => $lbl): ?>
+          <label class="chk"><input type="checkbox" name="styl[]" value="<?= h($k) ?>"<?= in_array($k, $stylAkt, true) ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>><span><?= h($lbl) ?></span></label>
+          <?php endforeach; ?>
+          <small>Tylko blok. Miejsce bloku na stronie głównej: <a href="uklad.php">Układ strony</a>.</small>
+        </div>
       </div>
       <div class="grid2" style="margin-top:6px">
         <label class="chk"><input type="checkbox" name="published" value="1"<?= $pub ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>><span><b>Opublikowane</b> — widoczne w sklepie</span></label>

@@ -95,8 +95,11 @@ $e = [];
 $cta = wsm_page_save($pdo, null, ['kind' => 'strona', 'slug' => "zly-$sfx", 't' => ['pl' => ['title' => 'Zły', 'cta_label' => 'x', 'cta_url' => 'javascript:alert(1)']]], 'test', $e);
 ok('un bouton javascript: est refusé', $cta === null && isset($e['cta_url']), $e);
 $e = [];
-$blokSans = wsm_page_save($pdo, null, ['kind' => 'blok', 'placement' => 'nigdzie', 't' => ['pl' => ['title' => 'B']]], 'test', $e);
-ok('un bloc sans emplacement connu est refusé', $blokSans === null && isset($e['placement']), $e);
+$blokStyl = wsm_page_save($pdo, null, ['kind' => 'blok', 'styl' => ['foto_prawo', 'nieznany', 'ciemny'], 'published' => 1, 't' => ['pl' => ['title' => "Styl $sfx"]]], 'test', $e);
+$ids[] = $blokStyl;
+ok('un bloc se crée sans emplacement — sa place se règle dans Układ', $blokStyl !== null, $e);
+ok('ses styles sont filtrés sur la liste connue, dans l\'ordre posté',
+   (wsm_page_blok($pdo, (int) $blokStyl, 'pl')['styl'] ?? null) === ['foto_prawo', 'ciemny'], wsm_page_blok($pdo, (int) $blokStyl, 'pl')['styl'] ?? null);
 
 // ---- 3. Repli sur le polonais --------------------------------------------------------
 echo "\n-- polski jest siatką: brakujące tłumaczenie spada na polski, pole po polu --\n";
@@ -125,21 +128,23 @@ ok('ni dans le plan du site', !in_array("szkic-$sfx", wsm_page_sitemap($pdo), tr
 ok('un menu en anglais porte le titre anglais', in_array("About us $sfx", array_column(wsm_page_liens($pdo, 'en', 'nav'), 'title'), true));
 
 $e = [];
-$idC = wsm_page_save($pdo, null, ['kind' => 'blok', 'placement' => 'po_katalogu', 'published' => 1, 'sort_order' => 1,
+$idC = wsm_page_save($pdo, null, ['kind' => 'blok', 'published' => 1, 'sort_order' => 1,
     't' => ['pl' => ['title' => "Nowość $sfx", 'body' => 'Spróbuj **nowej** tabliczki.', 'cta_label' => 'Zobacz', 'cta_url' => '#katalog']]], 'test', $e);
 $ids[] = $idC;
 $pC = $idC !== null ? wsm_page_get($pdo, (int) $idC) : [];
 ok('un bloc se crée sans adresse (NULL, pas une chaîne vide — UNIQUE tolère plusieurs NULL)',
    $idC !== null && array_key_exists('slug', $pC) && $pC['slug'] === null, $e ?: ($pC['slug'] ?? 'absent'));
 $e = [];
-$idD = wsm_page_save($pdo, null, ['kind' => 'blok', 'placement' => 'po_katalogu', 'published' => 1, 'sort_order' => 1,
+$idD = wsm_page_save($pdo, null, ['kind' => 'blok', 'published' => 1, 'sort_order' => 1,
     't' => ['pl' => ['title' => "Drugi blok $sfx"]]], 'test', $e);
 $ids[] = $idD;
 ok('un second bloc sans adresse ne heurte pas l\'unicité', $idD !== null, $e);
-$bl = wsm_page_bloki($pdo, 'pl', 'po_katalogu');
-ok('les blocs de l\'emplacement se listent, publiés seulement', count(array_filter($bl, fn($b) => in_array((int) $b['id'], [(int) $idC, (int) $idD], true))) === 2);
-ok('rien à un emplacement vide', wsm_page_bloki($pdo, 'pl', 'przed_stopka') === [] || !array_filter(wsm_page_bloki($pdo, 'pl', 'przed_stopka'), fn($b) => (int) $b['id'] === (int) $idC));
-ok('un emplacement inconnu ne rend rien', wsm_page_bloki($pdo, 'pl', 'nigdzie') === []);
+$bC = wsm_page_blok($pdo, (int) $idC, 'pl');
+ok('un bloc publié se lit seul, textes et styles compris', $bC !== null && $bC['title'] === "Nowość $sfx" && $bC['styl'] === [] && $bC['cta_url'] === '#katalog');
+$pdo->prepare("UPDATE wsm_pages SET published = 0 WHERE id = ?")->execute([$idD]);
+ok('un bloc dépublié ne se lit pas', wsm_page_blok($pdo, (int) $idD, 'pl') === null);
+ok('une page n\'est pas un bloc', wsm_page_blok($pdo, (int) $idA, 'pl') === null);
+ok('un identifiant inconnu non plus', wsm_page_blok($pdo, 999999, 'pl') === null);
 
 // Modification : l'adresse change, l'ancienne ne répond plus.
 $e = [];
@@ -166,10 +171,10 @@ ok('la liste porte le titre polonais et les langues remplies', ($moi[0]['title']
 echo "\n-- witryna i konsola --\n";
 $vit = $lire('mrszoko/shop/index.php');
 ok('la vitrine route les pages avant le 404', preg_match('/wsm_page_find\(\$pdo, \$page, \$lang\).*http_response_code\(404\)/s', $vit) === 1);
-ok('… et pose les blocs aux trois emplacements', substr_count($vit, 'bloki_html($pdo, $lang,') === 3);
+ok('… et pose chaque bloc à la place qu\'Układ lui donne', str_contains($vit, 'wsm_layout_home($pdo)') && str_contains($vit, 'blok_html($pdo, $lang, (int) $it[\'id\'])'));
 ok('… et liste les pages dans le plan du site', str_contains($vit, 'wsm_page_sitemap($pdo)'));
 $lay = $lire('mrszoko/shop/layout.php');
-ok('le menu et le pied de page lisent les pages', substr_count($lay, 'wsm_page_liens(') === 2);
+ok('le menu et le pied de page lisent les pages par Układ', substr_count($lay, 'liens_uklad(wsm_pdo(), $S, $lang,') === 2);
 ok('lib.php charge pages.php sans tomber s\'il manque', str_contains($lire('mrszoko/shop/lib.php'), "is_file(\$WSM_API_DIR . '/pages.php')"));
 ok('strony.php et media.php existent', is_file("$racine/mrszoko/backoffice/strony.php") && is_file("$racine/mrszoko/backoffice/media.php"));
 ok('… dans le rail, à côté de Treści et Wygląd', preg_match("/'wyglad\.php'.*'strony\.php'.*'media\.php'/s", $lire('mrszoko/backoffice/console.php')) === 1);
