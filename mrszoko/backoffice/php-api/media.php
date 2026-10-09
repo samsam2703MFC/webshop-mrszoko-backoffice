@@ -115,7 +115,10 @@ function wsm_media_store(array $file, bool $alpha = false): array {
     if (!$written) return [null, 'zapis nie powiódł się'];
     @chmod($path, 0644);
 
-    return [wsm_media_url($name), null];
+    // Le nom lisible, tiré du nom du fichier envoyé — jamais son chemin.
+    $url = wsm_media_url($name);
+    wsm_media_title_register($url, (string) ($file['name'] ?? ''));
+    return [$url, null];
 }
 
 /**
@@ -126,7 +129,10 @@ function wsm_media_store(array $file, bool $alpha = false): array {
 function wsm_media_delete(string $url): bool {
     if (!preg_match('#^media/([a-f0-9]{24}\.(webp|jpg|png))$#', $url, $m)) return false;
     $path = wsm_media_dir() . '/' . $m[1];
-    return is_file($path) && @unlink($path);
+    if (!is_file($path) || !@unlink($path)) return false;
+    // Le nom part avec le fichier — sans jamais faire échouer la suppression.
+    if (function_exists('wsm_pdo')) { try { wsm_media_title_set(wsm_pdo(), $url, ''); } catch (Throwable $e) {} }
+    return true;
 }
 
 /** Une URL d'image acceptable en base : notre média, ou une adresse https. */
@@ -146,18 +152,104 @@ function wsm_media_valid_url(string $url): bool {
 //  supprime que ce qui ne sert nulle part.
 // ---------------------------------------------------------------------------
 
-/** Les fichiers du dossier média, les nôtres seulement, les plus récents d'abord. */
-function wsm_media_list(): array {
+// ---------------------------------------------------------------------------
+//  LES NOMS. Un fichier s'appelle « 7d8fbbb829e6c2d6….webp » : stable, sûr,
+//  et illisible. L'ADRESSE ne change jamais — tout ce qui cite le fichier
+//  (produits, pages, sections, réglages) continue de marcher. Le NOM, lui,
+//  est pour les gens : pris du nom du fichier à l'envoi, modifiable dans
+//  Media, montré partout où l'on choisit une photo. Rangé à part, dans
+//  wsm_media : un nom absent n'empêche rien, et un fichier sans nom se
+//  présente par le début de son adresse.
+// ---------------------------------------------------------------------------
+
+function wsm_media_ensure(PDO $pdo): void {
+    static $done = [];
+    $k = spl_object_id($pdo);
+    if (isset($done[$k])) return;
+    if (!wsm_table_exists($pdo, 'wsm_media')) wsm_apply_schema($pdo);
+    $done[$k] = true;
+}
+
+/** Un nom tel qu'on le range : une ligne, sans caractère de contrôle, 120 signes. */
+function wsm_media_title_clean(string $t): string {
+    $t = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $t) ?? '';
+    $t = trim(preg_replace('/\s+/u', ' ', $t) ?? '');
+    return mb_substr($t, 0, 120);
+}
+
+/** Un nom lisible tiré du nom du fichier envoyé : sans chemin, sans extension, sans tirets bas. */
+function wsm_media_title_from_filename(string $filename): string {
+    $t = (string) pathinfo(trim($filename), PATHINFO_FILENAME);
+    return wsm_media_title_clean(preg_replace('/[_\-]+/u', ' ', $t) ?? '');
+}
+
+/** Notre média seulement : jamais un chemin, jamais une adresse distante. */
+function wsm_media_own_url(string $url): bool {
+    return (bool) preg_match('#^media/[a-f0-9]{24}\.(webp|jpg|png)$#', $url);
+}
+
+/** url → nom, pour toute la médiathèque ; vide si la table manque. */
+function wsm_media_titles(PDO $pdo): array {
+    $out = [];
+    try {
+        wsm_media_ensure($pdo);
+        foreach ($pdo->query("SELECT url, title FROM wsm_media")->fetchAll() ?: [] as $r) $out[(string) $r['url']] = (string) $r['title'];
+    } catch (Throwable $e) {}
+    return $out;
+}
+
+/** Nomme (ou renomme) un média. Un nom vide efface le nom ; le fichier reste. */
+function wsm_media_title_set(PDO $pdo, string $url, string $title, string $actor = ''): bool {
+    if (!wsm_media_own_url($url)) return false;
+    wsm_media_ensure($pdo);
+    $title = wsm_media_title_clean($title);
+    if ($title === '') { $pdo->prepare("DELETE FROM wsm_media WHERE url = ?")->execute([$url]); return true; }
+    // UPDATE puis INSERT : MySQL compte 0 ligne pour une mise à jour identique,
+    // d'où l'INSERT sous try — la clé primaire tranche.
+    $up = $pdo->prepare("UPDATE wsm_media SET title = ?, updated_by = ? WHERE url = ?");
+    $up->execute([$title, mb_substr($actor, 0, 120), $url]);
+    if ($up->rowCount() === 0) {
+        try {
+            $pdo->prepare("INSERT INTO wsm_media (url, title, created_at, updated_by) VALUES (?,?,?,?)")
+                ->execute([$url, $title, date('Y-m-d H:i:s'), mb_substr($actor, 0, 120)]);
+        } catch (Throwable $e) { /* la ligne existait, identique */ }
+    }
+    return true;
+}
+
+/** Ce qu'on montre : le nom, sinon le début de l'adresse (« plik 7d8fbbb8 »). */
+function wsm_media_label(string $url, string $title): string {
+    if ($title !== '') return $title;
+    return preg_match('#^media/([a-f0-9]{8})#', $url, $m) ? 'plik ' . $m[1] : $url;
+}
+
+/** Enregistre le nom à l'envoi — sans jamais bloquer l'envoi (table absente, base en panne). */
+function wsm_media_title_register(string $url, string $origName): void {
+    $t = wsm_media_title_from_filename($origName);
+    if ($t === '' || !function_exists('wsm_pdo')) return;
+    try { wsm_media_title_set(wsm_pdo(), $url, $t); } catch (Throwable $e) {}
+}
+
+/**
+ * Les fichiers du dossier média, les nôtres seulement, les plus récents
+ * d'abord. Avec une base : chacun porte son nom ('title', '' s'il n'en a pas)
+ * et son étiquette ('label' : le nom, sinon le début de l'adresse).
+ */
+function wsm_media_list(?PDO $pdo = null): array {
     $dir = wsm_media_dir();
     if (!is_dir($dir)) return [];
+    $titles = $pdo ? wsm_media_titles($pdo) : [];
     $out = [];
     foreach (scandir($dir) ?: [] as $f) {
         if (!preg_match('/^[a-f0-9]{24}\.(webp|jpg|png)$/', $f)) continue;
         $path = $dir . '/' . $f;
         $info = @getimagesize($path);
+        $url  = wsm_media_url($f);
         $out[] = [
-            'url'   => wsm_media_url($f),
+            'url'   => $url,
             'name'  => $f,
+            'title' => $titles[$url] ?? '',
+            'label' => wsm_media_label($url, $titles[$url] ?? ''),
             'bytes' => (int) @filesize($path),
             'mtime' => (int) @filemtime($path),
             'w'     => (int) ($info[0] ?? 0),

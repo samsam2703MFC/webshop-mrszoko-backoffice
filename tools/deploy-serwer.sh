@@ -266,6 +266,14 @@ echo "  uklad strony + logo : obecne"
   && grep -q 'wsm_section_i18n' site/backoffice/api/db.php \
   || { echo "  Kreator strony (sekcje) incomplet dans l'assemblage"; exit 1; }
 echo "  kreator strony (sekcje) : obecne"
+# LES NOMS DES FICHIERS de la mediatheque : l'API, le champ a l'envoi, la
+# table creee au premier appel, le schema.
+grep -q 'function wsm_media_titles(PDO' site/backoffice/api/media.php \
+  && grep -q 'name="nazwa"' site/backoffice/media.php \
+  && grep -q "'wsm_media'" site/backoffice/api/db.php \
+  && grep -q 'wsm_media' site/backoffice/api/schema/webshop_mrszoko.mysql.sql \
+  || { echo "  nazwy plikow w mediotece incompletes dans l'assemblage"; exit 1; }
+echo "  nazwy plikow w mediotece : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte

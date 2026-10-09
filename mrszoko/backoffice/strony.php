@@ -138,7 +138,7 @@ $coche = function (string $k, bool $defaut = false) use ($edit, $refuse): bool {
 $liste = wsm_page_list($pdo);
 $strony = array_values(array_filter($liste, fn($p) => $p['kind'] === 'strona'));
 $bloki  = array_values(array_filter($liste, fn($p) => $p['kind'] === 'blok'));
-$media  = wsm_media_list();
+$media  = wsm_media_list($pdo);
 $sklep  = '../shop/';
 
 $css = <<<CSS
@@ -153,7 +153,8 @@ $css = <<<CSS
   .gram { font-size: 13px; color: var(--text-muted); } .gram code { font-size: 12px; }
   .media-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 8px; }
   .media-pick figure { margin: 0; text-align: center; } .media-pick img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--cream-200); }
-  .media-pick figcaption { font-family: var(--font-mono); font-size: 10px; word-break: break-all; margin-top: 4px; }
+  .media-pick figcaption { font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; margin-top: 4px; }
+  .media-pick figcaption .code { font-size: 10px; word-break: break-all; }
   .str-foto { display: block; max-width: 100%; max-height: 180px; border-radius: 10px; margin-bottom: 8px; }
   .bdg.pub { background: #e3f1e3; color: #2f5d2f; } .bdg.szkic { background: var(--surface-sunken); color: var(--text-muted); }
   .inline-form { display: inline; }
@@ -372,7 +373,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Strony i bloki' => $formulaire ? 'str
       <?php else: ?>
       <div class="media-pick">
         <?php foreach (array_slice($media, 0, 24) as $m): ?>
-        <figure><img src="<?= h(img_src($m['url'])) ?>" alt="" loading="lazy"><figcaption><?= h($m['url']) ?></figcaption></figure>
+        <figure><img src="<?= h(img_src($m['url'])) ?>" alt="" loading="lazy"><figcaption><b><?= h($m['label']) ?></b><br><span class="code"><?= h($m['url']) ?></span></figcaption></figure>
         <?php endforeach; ?>
       </div>
       <?php endif; ?>

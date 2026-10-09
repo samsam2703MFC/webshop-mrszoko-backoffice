@@ -1010,3 +1010,12 @@ CREATE TABLE IF NOT EXISTS wsm_section_i18n (
   items      TEXT,
   PRIMARY KEY (section_id, lang)
 );
+
+-- Les noms des fichiers de la médiathèque : l'adresse (media/<hash>.webp) est
+-- stable et citée partout, le nom est pour les gens — modifiable dans Media.
+CREATE TABLE IF NOT EXISTS wsm_media (
+  url        TEXT PRIMARY KEY,
+  title      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_by TEXT NOT NULL DEFAULT ''
+);

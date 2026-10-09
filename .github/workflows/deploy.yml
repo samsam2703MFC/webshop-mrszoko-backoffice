@@ -867,14 +867,14 @@ jobs:
             # web après le déploiement (db.php les assure) : si elles manquent
             # ici, l'écran Strony s'ouvre et la première page enregistrée
             # tombe en 500 — sans rien dire à personne.
-            QP="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_pages','wsm_page_i18n','wsm_sections','wsm_section_i18n')"
+            QP="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_pages','wsm_page_i18n','wsm_sections','wsm_section_i18n','wsm_media')"
             if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
               NP=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QP" 2>/dev/null || echo 0)
             else
               NP=$(mysql -N -e "$QP" 2>/dev/null || echo 0)
             fi
-            echo "  tabele CMS (wsm_pages, wsm_page_i18n, wsm_sections, wsm_section_i18n) : $NP/4"
-            if [ "${NP:-0}" -lt 4 ]; then echo "  ^ NOT OK : brak tabel CMS — pierwsza zapisana strona lub sekcja skonczy sie bledem 500"; fail=1; fi
+            echo "  tabele CMS (wsm_pages, wsm_page_i18n, wsm_sections, wsm_section_i18n, wsm_media) : $NP/5"
+            if [ "${NP:-0}" -lt 5 ]; then echo "  ^ NOT OK : brak tabel CMS — pierwsza zapisana strona, sekcja lub nazwa pliku skonczy sie bledem 500"; fail=1; fi
             QK="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name='wsm_countries'"
             if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
               NK=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QK" 2>/dev/null || echo 0)
@@ -2546,7 +2546,11 @@ jobs:
             && grep -q '\.ogloszenie' "$DIR_BO/../shop/shop.css" \
             && grep -q 'wsm_page_i18n' "$DIR_BO/api/schema/webshop_mrszoko.mysql.sql" \
             && grep -q 'wsm_section_i18n' "$DIR_BO/api/schema/webshop_mrszoko.mysql.sql" \
-            && echo "  api + ekrany (strony, media, uklad, budowa) + szyna + witryna + logo + styl + schemat: obecne" \
+            && grep -q 'function wsm_media_titles(PDO' "$DIR_BO/api/media.php" \
+            && grep -q 'name="nazwa"' "$DIR_BO/media.php" \
+            && grep -q "'wsm_media'" "$DIR_BO/api/db.php" \
+            && grep -q 'wsm_media' "$DIR_BO/api/schema/webshop_mrszoko.mysql.sql" \
+            && echo "  api + ekrany (strony, media, uklad, budowa) + szyna + witryna + logo + styl + schemat + nazwy mediow: obecne" \
             || { echo "  ^ NOT OK : CMS niekompletny"; fail=1; }
           # L'ORDRE EST LU, pas seulement livré : la barre du haut et le pied de
           # page sortent d'Układ. Sans menu, la fonction est tombée en silence.
