@@ -650,7 +650,7 @@ jobs:
             if printf '%s' "$HOME_HTML" | grep -q "$anchor"; then
               echo "  section $anchor : présente"
             elif { [ "$anchor" = 'id="pro"' ] && printf '%s' "$HOME_HTML" | grep -q 'sekcja pro: ukryta'; } \
-                 || { [ "$anchor" = 'hero-strip' ] && printf '%s' "$HOME_HTML" | grep -q 'pasek: ukryty'; }; then
+                 || { [ "$anchor" = 'hero-strip' ] && printf '%s' "$HOME_HTML" | grep -q 'pasek: ukryty\|hero: ukryte'; }; then
               echo "  section $anchor : cachée depuis Układ strony — voulu"
             else
               echo "  ^ NOT OK : section $anchor absente de la page unique"; fail=1
@@ -867,14 +867,14 @@ jobs:
             # web après le déploiement (db.php les assure) : si elles manquent
             # ici, l'écran Strony s'ouvre et la première page enregistrée
             # tombe en 500 — sans rien dire à personne.
-            QP="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_pages','wsm_page_i18n')"
+            QP="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_pages','wsm_page_i18n','wsm_sections','wsm_section_i18n')"
             if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
               NP=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QP" 2>/dev/null || echo 0)
             else
               NP=$(mysql -N -e "$QP" 2>/dev/null || echo 0)
             fi
-            echo "  tabele CMS (wsm_pages, wsm_page_i18n) : $NP/2"
-            if [ "${NP:-0}" -lt 2 ]; then echo "  ^ NOT OK : brak tabel CMS — pierwsza zapisana strona skonczy sie bledem 500"; fail=1; fi
+            echo "  tabele CMS (wsm_pages, wsm_page_i18n, wsm_sections, wsm_section_i18n) : $NP/4"
+            if [ "${NP:-0}" -lt 4 ]; then echo "  ^ NOT OK : brak tabel CMS — pierwsza zapisana strona lub sekcja skonczy sie bledem 500"; fail=1; fi
             QK="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name='wsm_countries'"
             if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
               NK=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QK" 2>/dev/null || echo 0)
@@ -2526,18 +2526,27 @@ jobs:
           # écran qui s'ouvre et une vitrine qui ignore ce qu'on y écrit.
           [ -f "$DIR_BO/api/pages.php" ] && [ -f "$DIR_BO/strony.php" ] && [ -f "$DIR_BO/media.php" ] \
             && [ -f "$DIR_BO/api/layout.php" ] && [ -f "$DIR_BO/uklad.php" ] \
+            && [ -f "$DIR_BO/api/sections.php" ] && [ -f "$DIR_BO/budowa.php" ] \
             && grep -q "'strony.php'" "$DIR_BO/console.php" && grep -q "'media.php'" "$DIR_BO/console.php" \
-            && grep -q "'uklad.php'" "$DIR_BO/console.php" \
+            && grep -q "'uklad.php'" "$DIR_BO/console.php" && grep -q "'budowa.php'" "$DIR_BO/console.php" \
             && grep -q 'wsm_page_find' "$DIR_BO/../shop/index.php" \
             && grep -q 'wsm_layout_home' "$DIR_BO/../shop/index.php" \
             && grep -q 'blok_html' "$DIR_BO/../shop/index.php" \
+            && grep -q 'sekcja_id_html($pdo, $lang' "$DIR_BO/../shop/index.php" \
+            && grep -q 'sekcje_html($pdo, $lang' "$DIR_BO/../shop/index.php" \
+            && grep -q 'sekcje_html(wsm_pdo(), $lang' "$DIR_BO/../shop/layout.php" \
+            && grep -q 'function sekcja_html' "$DIR_BO/../shop/lib.php" \
             && grep -q 'liens_uklad' "$DIR_BO/../shop/layout.php" \
             && grep -q 'logo_src()' "$DIR_BO/../shop/layout.php" \
             && grep -q "'logo_image'" "$DIR_BO/api/settings.php" \
             && grep -q 'wsm_pages' "$DIR_BO/api/db.php" \
+            && grep -q 'wsm_section_i18n' "$DIR_BO/api/db.php" \
             && grep -q '\.blok-in' "$DIR_BO/../shop/shop.css" \
+            && grep -q '\.sek--hero' "$DIR_BO/../shop/shop.css" \
+            && grep -q '\.ogloszenie' "$DIR_BO/../shop/shop.css" \
             && grep -q 'wsm_page_i18n' "$DIR_BO/api/schema/webshop_mrszoko.mysql.sql" \
-            && echo "  api + ekrany (strony, media, uklad) + szyna + witryna + logo + styl + schemat: obecne" \
+            && grep -q 'wsm_section_i18n' "$DIR_BO/api/schema/webshop_mrszoko.mysql.sql" \
+            && echo "  api + ekrany (strony, media, uklad, budowa) + szyna + witryna + logo + styl + schemat: obecne" \
             || { echo "  ^ NOT OK : CMS niekompletny"; fail=1; }
           # L'ORDRE EST LU, pas seulement livré : la barre du haut et le pied de
           # page sortent d'Układ. Sans menu, la fonction est tombée en silence.

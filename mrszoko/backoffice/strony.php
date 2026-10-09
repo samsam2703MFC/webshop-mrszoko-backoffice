@@ -118,17 +118,20 @@ if ($editId && !$edit) { $flash = $flash ?: 'Takiej strony nie ma.'; $kind = 'er
 $formulaire = $edit !== null || $nowa !== '';
 $kindForm = $edit ? (string) $edit['kind'] : ($nowa ?: 'strona');
 
-// Les valeurs du formulaire : ce qui vient d'être posté (en cas de refus) gagne sur la base.
-$val = function (string $k, $defaut = '') use ($edit) {
-    if (isset($_POST['zapisz']) && array_key_exists($k, $_POST)) return (string) $_POST[$k];
+// Les valeurs du formulaire : ce qui vient d'être posté gagne sur la base EN CAS
+// DE REFUS seulement ; après un enregistrement réussi, c'est la base qui parle
+// (l'adresse fabriquée depuis le titre, par exemple, doit se voir tout de suite).
+$refuse = isset($_POST['zapisz']) && $errs;
+$val = function (string $k, $defaut = '') use ($edit, $refuse) {
+    if ($refuse && array_key_exists($k, $_POST)) return (string) $_POST[$k];
     return $edit ? (string) ($edit[$k] ?? $defaut) : (string) $defaut;
 };
-$txt = function (string $lang, string $f) use ($edit) {
-    if (isset($_POST['zapisz'])) return (string) ($_POST['t'][$lang][$f] ?? '');
+$txt = function (string $lang, string $f) use ($edit, $refuse) {
+    if ($refuse) return (string) ($_POST['t'][$lang][$f] ?? '');
     return (string) ($edit['i18n'][$lang][$f] ?? '');
 };
-$coche = function (string $k, bool $defaut = false) use ($edit): bool {
-    if (isset($_POST['zapisz'])) return !empty($_POST[$k]);
+$coche = function (string $k, bool $defaut = false) use ($edit, $refuse): bool {
+    if ($refuse) return !empty($_POST[$k]);
     return $edit ? !empty($edit[$k]) : $defaut;
 };
 
@@ -175,6 +178,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Strony i bloki' => $formulaire ? 'str
   <a class="btn" href="strony.php?nowa=strona">+ Nowa strona</a>
   <a class="btn" href="strony.php?nowa=blok">+ Nowy blok</a>
   <?php endif; ?>
+  <a class="btn ghost" href="budowa.php">Kreator strony (sekcje)</a>
   <a class="btn ghost" href="media.php">Media (zdjęcia do treści)</a>
 </p>
 
@@ -254,6 +258,9 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Strony i bloki' => $formulaire ? 'str
   <?php if ($edit && (int) $edit['published'] === 1): ?>
   <a class="btn ghost" href="<?= h($kindForm === 'blok' ? $sklep . '#blok-' . (int) $edit['id'] : $sklep . (string) $edit['slug']) ?>" target="_blank" rel="noopener">Zobacz w sklepie ↗</a>
   <?php endif; ?>
+  <?php if ($edit && $kindForm === 'strona'): ?>
+  <a class="btn ghost" href="budowa.php?cel=<?= (int) $edit['id'] ?>">Sekcje tej strony (Kreator)</a>
+  <?php endif; ?>
 </p>
 
 <form method="post" enctype="multipart/form-data" class="str-grid">
@@ -279,7 +286,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Strony i bloki' => $formulaire ? 'str
           <small>Tylko strona. Małe litery, cyfry, myślniki. Strona będzie pod <code>/sklep/<?= h($slugAktualny !== '' ? $slugAktualny : '…') ?></code>.</small>
         </label>
         <div class="field"><span>Styl bloku</span>
-          <?php $stylAkt = isset($_POST['zapisz']) ? (array) ($_POST['styl'] ?? []) : explode(',', (string) ($edit['styl'] ?? '')); ?>
+          <?php $stylAkt = $refuse ? (array) ($_POST['styl'] ?? []) : explode(',', (string) ($edit['styl'] ?? '')); ?>
           <?php foreach (WSM_PAGE_STYLE as $k => $lbl): ?>
           <label class="chk"><input type="checkbox" name="styl[]" value="<?= h($k) ?>"<?= in_array($k, $stylAkt, true) ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>><span><?= h($lbl) ?></span></label>
           <?php endforeach; ?>

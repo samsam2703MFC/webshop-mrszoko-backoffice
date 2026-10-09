@@ -271,6 +271,18 @@ echo "  CMS: strony, bloki, media : obecne"
   && grep -q 'logo_src()' site/shop/layout.php && grep -q "'logo_image'" site/backoffice/api/settings.php \
   || { echo "  Uklad strony ou logo incomplets dans l'assemblage"; exit 1; }
 echo "  uklad strony + logo : obecne"
+# LE KREATOR : la boutique composee en sections. L'API, l'ecran, le rail, la
+# vitrine qui rend (accueil, pages, pasek au-dessus du nagłowek), le style,
+# le schema, db.php qui cree les tables au premier appel.
+[ -f site/backoffice/api/sections.php ] && [ -f site/backoffice/budowa.php ] \
+  && grep -q "'budowa.php'" site/backoffice/console.php \
+  && grep -q 'sekcja_id_html($pdo, $lang' site/shop/index.php && grep -q 'sekcje_html($pdo, $lang' site/shop/index.php \
+  && grep -q 'sekcje_html(wsm_pdo(), $lang' site/shop/layout.php && grep -q 'function sekcja_html' site/shop/lib.php \
+  && grep -q '\.sek--hero' site/shop/shop.css && grep -q '\.ogloszenie' site/shop/shop.css \
+  && grep -q 'wsm_section_i18n' site/backoffice/api/schema/webshop_mrszoko.mysql.sql \
+  && grep -q 'wsm_section_i18n' site/backoffice/api/db.php \
+  || { echo "  Kreator strony (sekcje) incomplet dans l'assemblage"; exit 1; }
+echo "  kreator strony (sekcje) : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte

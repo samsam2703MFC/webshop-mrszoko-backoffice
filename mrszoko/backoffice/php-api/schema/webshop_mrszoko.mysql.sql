@@ -1262,3 +1262,37 @@ CREATE TABLE IF NOT EXISTS `wsm_page_i18n` (
   `cta_url`   VARCHAR(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`page_id`, `lang`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Le Kreator (sections.php) : des sections typees, composees depuis la
+--  console, pour l'accueil (page_id = 0), une page (page_id > 0) ou tout le
+--  site (page_id = -1, la barre d'annonce). Textes a part, une ligne par
+--  langue, avec repli sur le polonais a la lecture ; items en JSON.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_sections` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `page_id`    INT NOT NULL DEFAULT 0,
+  `type`       VARCHAR(20) NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 100,
+  `published`  TINYINT(1) NOT NULL DEFAULT 0,
+  `styl`       VARCHAR(80) NOT NULL DEFAULT '',
+  `image_url`  VARCHAR(255) NOT NULL DEFAULT '',
+  `settings`   VARCHAR(255) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  `updated_by` VARCHAR(120) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `ix_wsm_sections_page` (`page_id`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_section_i18n` (
+  `section_id` INT UNSIGNED NOT NULL,
+  `lang`       VARCHAR(5) NOT NULL,
+  `title`      VARCHAR(200) NOT NULL DEFAULT '',
+  `lead`       TEXT,
+  `body`       MEDIUMTEXT,
+  `cta_label`  VARCHAR(120) NOT NULL DEFAULT '',
+  `cta_url`    VARCHAR(255) NOT NULL DEFAULT '',
+  `items`      MEDIUMTEXT,
+  PRIMARY KEY (`section_id`, `lang`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

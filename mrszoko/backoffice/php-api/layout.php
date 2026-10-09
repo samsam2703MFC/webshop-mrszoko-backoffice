@@ -36,7 +36,10 @@ const WSM_LAYOUT_LISTES = ['home', 'nav', 'footer'];
 /** Les sections intégrées de l'accueil, dans l'ordre d'origine. */
 function wsm_layout_home_builtins(): array {
     return [
-        'hero'      => ['label' => 'Nagłówek — zdjęcie, tytuł, przycisk', 'fixed' => true,  'pin' => 'first'],
+        // Le hero intégré peut se cacher depuis que le Kreator sait en poser
+        // un autre (section « Nagłówek ze zdjęciem ») — mais s'il est là, il
+        // reste premier.
+        'hero'      => ['label' => 'Nagłówek — zdjęcie, tytuł, przycisk', 'fixed' => false, 'pin' => 'first'],
         'pasek'     => ['label' => 'Pasek pod nagłówkiem — trzy hasła',    'fixed' => false, 'pin' => 'hero'],
         'obietnice' => ['label' => 'Trzy obietnice z ikonami',             'fixed' => false],
         'katalog'   => ['label' => 'Katalog produktów',                    'fixed' => true],
@@ -95,7 +98,7 @@ function wsm_layout_raw(PDO $pdo, string $which): ?array {
         // « b2b » porte un chiffre : une clé est une lettre puis des lettres,
         // chiffres ou tirets bas — pas seulement des lettres. Le premier jet
         // laissait tomber b2b à chaque lecture, et le menu se réordonnait seul.
-        if (!preg_match('/^([a-z][a-z0-9_]*|blok:\d+|strona:\d+)$/', $k)) continue;
+        if (!preg_match('/^([a-z][a-z0-9_]*|blok:\d+|strona:\d+|sekcja:\d+)$/', $k)) continue;
         $out[$k] = ['k' => $k, 'on' => !empty($it['on']) ? 1 : 0];
     }
     return array_values($out);
@@ -122,6 +125,19 @@ function wsm_layout_reset(PDO $pdo, string $which): void {
     $pdo->prepare("DELETE FROM wsm_settings WHERE cle = ?")->execute([WSM_LAYOUT_PREFIX . $which]);
 }
 
+/** Les sections du Kreator posées sur l'accueil : id → ligne (type, title, published, sort_order). */
+function wsm_layout_sections(PDO $pdo): array {
+    if (!function_exists('wsm_section_list')) {
+        $f = __DIR__ . '/sections.php';
+        if (!is_file($f)) return [];
+        require_once $f;
+    }
+    try { $rows = wsm_section_list($pdo, WSM_SECTION_HOME); } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $r) $out[(int) $r['id']] = $r;
+    return $out;
+}
+
 /** Les pages écrites dans Strony : id → [slug, title (pl), published, in_nav, in_footer, kind, placement]. */
 function wsm_layout_pages(PDO $pdo): array {
     if (!function_exists('wsm_page_list')) {
@@ -144,6 +160,7 @@ function wsm_layout_get(PDO $pdo, string $which): array {
     if (!in_array($which, WSM_LAYOUT_LISTES, true)) return [];
     $builtins = wsm_layout_builtins($which);
     $pages = wsm_layout_pages($pdo);
+    $sekcje = $which === 'home' ? wsm_layout_sections($pdo) : [];
     $raw = wsm_layout_raw($pdo, $which) ?? [];
 
     // 1. Ce que la préférence connaît encore, dans son ordre.
@@ -152,6 +169,10 @@ function wsm_layout_get(PDO $pdo, string $which): array {
         $k = $it['k'];
         if (isset($builtins[$k])) {
             $liste[$k] = wsm_layout_item($which, $k, $builtins[$k], $it['on'], null);
+        } elseif (preg_match('/^sekcja:(\d+)$/', $k, $m)) {
+            $s = $sekcje[(int) $m[1]] ?? null;
+            if (!$s || $which !== 'home') continue;                              // supprimée depuis
+            $liste[$k] = wsm_layout_item_sekcja($k, $s);
         } elseif (preg_match('/^(blok|strona):(\d+)$/', $k, $m)) {
             $p = $pages[(int) $m[2]] ?? null;
             if (!$p) continue;                                                   // supprimée depuis
@@ -170,7 +191,22 @@ function wsm_layout_get(PDO $pdo, string $which): array {
         for ($j = $i - 1; $j >= 0; $j--) if (isset($liste[$ordre[$j]])) { $apres = $ordre[$j]; break; }
         $liste = wsm_layout_inserer($liste, $k, $item, $apres);
     }
-    // 3. Les blocs et pages que la préférence ne connaît pas encore.
+    // 3. Les sections du Kreator que la préférence ne connaît pas encore :
+    //    après le dernier élément du Kreator déjà placé, sinon avant le B2B —
+    //    dans l'ordre où elles ont été créées (sort_order).
+    if ($which === 'home') {
+        uasort($sekcje, fn($a, $b) => [(int) $a['sort_order'], (int) $a['id']] <=> [(int) $b['sort_order'], (int) $b['id']]);
+        foreach ($sekcje as $id => $s) {
+            $k = 'sekcja:' . $id;
+            if (isset($liste[$k])) continue;
+            $cles = array_keys($liste);
+            $apres = null;
+            foreach (array_reverse($cles) as $c) if (str_starts_with($c, 'sekcja:') || str_starts_with($c, 'blok:')) { $apres = $c; break; }
+            if ($apres === null) { $pos = array_search('katalog', $cles, true); $apres = $pos !== false ? $cles[$pos] : array_key_last($liste); }
+            $liste = wsm_layout_inserer($liste, $k, wsm_layout_item_sekcja($k, $s), $apres);
+        }
+    }
+    // 3bis. Les blocs et pages que la préférence ne connaît pas encore.
     foreach ($pages as $id => $p) {
         if ($which === 'home') {
             if ($p['kind'] !== 'blok') continue;
@@ -215,6 +251,18 @@ function wsm_layout_get(PDO $pdo, string $which): array {
         $liste = array_merge(array_filter(['hero' => $hero, 'pasek' => $pasek]), $liste);
     }
     return array_values($liste);
+}
+
+/** Une entrée « sekcja » du Kreator, pour la liste de l'accueil. */
+function wsm_layout_item_sekcja(string $k, array $s): array {
+    $typ = function_exists('wsm_section_types') ? (wsm_section_types()[(string) $s['type']]['label'] ?? (string) $s['type']) : (string) $s['type'];
+    $titre = (string) ($s['title'] ?? '');
+    return [
+        'k' => $k, 'type' => 'sekcja', 'id' => (int) $s['id'],
+        'on' => (int) ($s['published'] ?? 0) ? 1 : 0, 'published' => (int) ($s['published'] ?? 0),
+        'label' => 'Sekcja — ' . $typ . ($titre !== '' ? ': ' . $titre : ''),
+        'fixed' => false, 'pin' => null,
+    ];
 }
 
 /** Une entrée de liste, normalisée. */
@@ -278,6 +326,11 @@ function wsm_layout_toggle(PDO $pdo, string $which, string $k, string $actor = '
         if ($it['fixed']) return false;
         if ($it['type'] === 'builtin') {
             $it['on'] = $it['on'] ? 0 : 1;
+            wsm_layout_write($pdo, $which, $liste, $actor);
+            return true;
+        }
+        if ($it['type'] === 'sekcja') {
+            if (function_exists('wsm_section_toggle')) wsm_section_toggle($pdo, $it['id'], $actor);
             wsm_layout_write($pdo, $which, $liste, $actor);
             return true;
         }

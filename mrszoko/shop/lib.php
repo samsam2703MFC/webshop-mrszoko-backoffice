@@ -27,6 +27,9 @@ if (is_file($WSM_API_DIR . '/pages.php')) require_once $WSM_API_DIR . '/pages.ph
 // L'ordre des sections, du menu et du pied de page (Układ strony). Même
 // règle : absent, la boutique garde son ordre d'origine, tout visible.
 if (is_file($WSM_API_DIR . '/layout.php')) require_once $WSM_API_DIR . '/layout.php';
+// Les sections du Kreator (sections.php). Même règle : absent, la boutique
+// vit sans sections — et le contrôle de déploiement le dit.
+if (is_file($WSM_API_DIR . '/sections.php')) require_once $WSM_API_DIR . '/sections.php';
 require_once $WSM_API_DIR . '/tpay.php';
 
 const WSM_CART_COOKIE = 'ms_cart';
@@ -350,6 +353,178 @@ function blok_html(PDO $pdo, string $lang, int $id): void {
   </section>
         <?php
     }
+}
+
+/**
+ * UNE SECTION DU KREATOR, rendue. $v vient de wsm_section_view() : textes
+ * repliés, items décodés, images validées. Chaque type a son gabarit ; les
+ * styles cochés deviennent des classes « sek--… », stylées dans shop.css.
+ * Tout texte passe par e() ou par la grammaire de pages.php — jamais brut.
+ *
+ * $opt['h1'] : le nagłówek natif est caché, le premier nagłówek du Kreator
+ * porte le h1 de la page. $opt['home_anchors'] : la section n'est pas sur
+ * l'accueil, un bouton « #katalog » renvoie donc à l'accueil — l'ancre
+ * n'existe pas ailleurs.
+ */
+function sekcja_html(array $v, array $opt = []): void {
+    static $h1Done = false;
+    $typ = (string) $v['type'];
+    $kl = 'sek sek--' . preg_replace('/[^a-z_]/', '', $typ);
+    foreach ((array) ($v['styl'] ?? []) as $t) $kl .= ' sek--' . preg_replace('/[^a-z_]/', '', (string) $t);
+    foreach ((array) ($v['ustawienia'] ?? []) as $k => $val) $kl .= ' sek--' . preg_replace('/[^a-z_0-9]/', '', (string) $k) . '-' . preg_replace('/[^a-z_0-9]/', '', (string) $val);
+    $id = 'sek-' . (int) $v['id'];
+    $img = (string) ($v['image_url'] ?? '');
+    $u = fn(string $x) => u($x);
+    $cta = $v['cta_label'] !== '' && $v['cta_url'] !== '';
+    $href = fn(string $url) => str_starts_with($url, '#') && !empty($opt['home_anchors']) ? u('') . $url : page_href($url);
+    switch ($typ) {
+        case 'hero':
+            $h1 = !empty($opt['h1']) && !$h1Done; if ($h1) $h1Done = true; $tag = $h1 ? 'h1' : 'h2';
+            ?>
+  <section class="hero<?= $img !== '' ? ' hero--foto' : '' ?> <?= e($kl) ?>" id="<?= e($id) ?>"<?= $img !== '' ? ' style="--hero-foto:url(' . e(media_src($img)) . ')"' : '' ?>>
+    <div class="wrap hero-in">
+      <?php if ($v['title'] !== ''): ?><<?= $tag ?> class="sek-h1"><?= e($v['title']) ?></<?= $tag ?>><?php endif; ?>
+      <?php if ($v['lead'] !== ''): ?><p class="lead"><?= e($v['lead']) ?></p><?php endif; ?>
+      <?php if ($cta): ?><a class="btn btn--accent" href="<?= e($href($v['cta_url'])) ?>"><?= e($v['cta_label']) ?></a><?php endif; ?>
+    </div>
+  </section>
+            <?php
+            break;
+        case 'tekst':
+            ?>
+  <section class="wrap block <?= e($kl) ?>" id="<?= e($id) ?>">
+    <?php if ($v['title'] !== ''): ?><h2><?= e($v['title']) ?></h2><?php endif; ?>
+    <div class="prose<?= ($v['ustawienia']['kolumny'] ?? '1') === '2' ? ' prose--2kol' : '' ?>"><?= wsm_page_render($v['body'], $u) ?></div>
+  </section>
+            <?php
+            break;
+        case 'tekst_foto':
+            ?>
+  <section class="wrap block blok<?= $img !== '' ? ' blok--foto' : '' ?><?php foreach ((array) $v['styl'] as $t) echo ' blok--' . e((string) $t); ?> <?= e($kl) ?>" id="<?= e($id) ?>">
+    <div class="blok-in">
+      <?php if ($img !== ''): ?><img class="blok-img" src="<?= e(media_src($img)) ?>" alt="" loading="lazy" decoding="async"><?php endif; ?>
+      <div class="blok-txt">
+        <?php if ($v['title'] !== ''): ?><h2><?= e($v['title']) ?></h2><?php endif; ?>
+        <?php if ($v['lead'] !== ''): ?><p class="lead"><?= e($v['lead']) ?></p><?php endif; ?>
+        <?php if ($v['body'] !== ''): ?><div class="prose"><?= wsm_page_render($v['body'], $u) ?></div><?php endif; ?>
+        <?php if ($cta): ?><a class="btn btn--accent" href="<?= e($href($v['cta_url'])) ?>"><?= e($v['cta_label']) ?></a><?php endif; ?>
+      </div>
+    </div>
+  </section>
+            <?php
+            break;
+        case 'foto':
+            if ($img === '') return;
+            ?>
+  <section class="wrap block <?= e($kl) ?>" id="<?= e($id) ?>">
+    <figure class="page-fig sek-foto"><img src="<?= e(media_src($img)) ?>" alt="<?= e($v['lead']) ?>" loading="lazy" decoding="async">
+      <?php if ($v['lead'] !== ''): ?><figcaption><?= e($v['lead']) ?></figcaption><?php endif; ?></figure>
+  </section>
+            <?php
+            break;
+        case 'galeria':
+            $imgs = array_values(array_filter($v['items'], fn($it) => $it['img'] !== ''));
+            if (!$imgs) return;
+            ?>
+  <section class="wrap block <?= e($kl) ?>" id="<?= e($id) ?>">
+    <?php if ($v['title'] !== ''): ?><h2><?= e($v['title']) ?></h2><?php endif; ?>
+    <div class="galeria galeria--<?= (int) ($v['ustawienia']['kolumny'] ?? 3) ?>">
+      <?php foreach ($imgs as $it): ?>
+      <figure><img src="<?= e(media_src($it['img'])) ?>" alt="<?= e($it['t']) ?>" loading="lazy" decoding="async">
+        <?php if ($it['t'] !== ''): ?><figcaption><?= e($it['t']) ?></figcaption><?php endif; ?></figure>
+      <?php endforeach; ?>
+    </div>
+  </section>
+            <?php
+            break;
+        case 'kafelki':
+            if (!$v['items']) return;
+            ?>
+  <section class="wrap block <?= e($kl) ?>" id="<?= e($id) ?>">
+    <?php if ($v['title'] !== '' || $v['lead'] !== ''): ?>
+    <div class="section-head"><?php if ($v['title'] !== ''): ?><h2><?= e($v['title']) ?></h2><?php endif; ?>
+      <?php if ($v['lead'] !== ''): ?><p class="sub"><?= e($v['lead']) ?></p><?php endif; ?></div>
+    <?php endif; ?>
+    <div class="promises kafelki kafelki--<?= (int) ($v['ustawienia']['kolumny'] ?? 3) ?>">
+      <?php foreach ($v['items'] as $it): ?>
+      <div class="promise<?= $it['img'] !== '' ? ' promise--ikona' : '' ?>">
+        <?php if ($it['img'] !== ''): ?><img class="promise-ikona" src="<?= e(media_src($it['img'])) ?>" alt="" width="56" height="56" loading="lazy" decoding="async"><?php endif; ?>
+        <?php if ($it['t'] !== ''): ?><h3><?= e($it['t']) ?></h3><?php endif; ?>
+        <?php if ($it['d'] !== ''): ?><p><?= e($it['d']) ?></p><?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </section>
+            <?php
+            break;
+        case 'baner':
+            ?>
+  <section class="wrap block <?= e($kl) ?>" id="<?= e($id) ?>" style="padding-top:0">
+    <div class="pro">
+      <div class="pro-in">
+        <div>
+          <?php if ($v['title'] !== ''): ?><h2><?= e($v['title']) ?></h2><?php endif; ?>
+          <?php if ($v['lead'] !== ''): ?><p><?= e($v['lead']) ?></p><?php endif; ?>
+        </div>
+        <?php if ($cta): ?><a class="btn btn--accent btn--lg" href="<?= e($href($v['cta_url'])) ?>"><?= e($v['cta_label']) ?></a><?php endif; ?>
+      </div>
+    </div>
+  </section>
+            <?php
+            break;
+        case 'faq':
+            if (!$v['items']) return;
+            ?>
+  <section class="wrap block <?= e($kl) ?>" id="<?= e($id) ?>">
+    <?php if ($v['title'] !== ''): ?><h2><?= e($v['title']) ?></h2><?php endif; ?>
+    <?php if ($v['lead'] !== ''): ?><p class="sub"><?= e($v['lead']) ?></p><?php endif; ?>
+    <div class="faq">
+      <?php foreach ($v['items'] as $it): if ($it['t'] === '') continue; ?>
+      <details class="faq-q"><summary><?= e($it['t']) ?></summary><div class="prose"><?= wsm_page_render($it['d'], $u) ?></div></details>
+      <?php endforeach; ?>
+    </div>
+  </section>
+            <?php
+            break;
+        case 'cytat':
+            ?>
+  <section class="wrap block <?= e($kl) ?>" id="<?= e($id) ?>">
+    <blockquote class="cytat">
+      <?php if ($img !== ''): ?><img class="cytat-foto" src="<?= e(media_src($img)) ?>" alt="" width="72" height="72" loading="lazy" decoding="async"><?php endif; ?>
+      <p>„<?= e($v['body']) ?>”</p>
+      <?php if ($v['lead'] !== ''): ?><footer>— <?= e($v['lead']) ?></footer><?php endif; ?>
+    </blockquote>
+  </section>
+            <?php
+            break;
+        case 'odstep':
+            ?>
+  <div class="wrap <?= e($kl) ?>" id="<?= e($id) ?>"><?= in_array('linia', (array) $v['styl'], true) ? '<hr>' : '' ?></div>
+            <?php
+            break;
+        case 'ogloszenie':
+            if ($v['body'] === '') return;
+            ?>
+<div class="ogloszenie <?= e($kl) ?>" id="<?= e($id) ?>"><div class="wrap ogloszenie-in"><span><?= wsm_page_inline($v['body'], $u) ?></span>
+  <?php if ($cta): ?><a href="<?= e($href($v['cta_url'])) ?>"><?= e($v['cta_label']) ?> →</a><?php endif; ?></div></div>
+            <?php
+            break;
+    }
+}
+
+/** Une section de l'accueil par identifiant (depuis la liste d'Układ). */
+function sekcja_id_html(PDO $pdo, string $lang, int $id, array $opt = []): void {
+    if (!function_exists('wsm_section_get')) return;
+    $s = wsm_section_get($pdo, $id);
+    if (!$s || !(int) $s['published'] || (int) $s['page_id'] !== WSM_SECTION_HOME) return;
+    $v = wsm_section_view($pdo, $s, $lang);
+    if ($v) sekcja_html($v, $opt);
+}
+
+/** Les sections publiées d'une cible, rendues dans l'ordre (hors accueil : les ancres visent l'accueil). */
+function sekcje_html(PDO $pdo, string $lang, int $pageId): void {
+    if (!function_exists('wsm_section_views')) return;
+    foreach (wsm_section_views($pdo, $pageId, $lang) as $v) sekcja_html($v, ['home_anchors' => $pageId !== WSM_SECTION_HOME]);
 }
 
 /** Ce que <head> imprime après shop.css : les jetons redéfinis, ou rien. */

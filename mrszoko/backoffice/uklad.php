@@ -82,8 +82,9 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Układ strony' => null]);
 
 <p class="why">
   Tu ustawia się <b>kolejność</b> sekcji strony głównej oraz linków w górnym menu i w stopce — i to, co widać, a co nie.
-  Teksty są w <a href="tresci.php">Treściach</a>, kolory i czcionki w <a href="wyglad.php">Wyglądzie</a>,
-  nowe strony i bloki w <a href="strony.php">Stronach</a>. Każda zmiana jest widoczna od razu i odwracalna.
+  Nowe sekcje (zdjęcia, galerie, kafelki, pytania, banery…) dodaje się w <a href="budowa.php">Kreatorze strony</a>;
+  teksty są w <a href="tresci.php">Treściach</a>, kolory i czcionki w <a href="wyglad.php">Wyglądzie</a>,
+  nowe strony w <a href="strony.php">Stronach</a>. Każda zmiana jest widoczna od razu i odwracalna.
   <?php if (!$isAdmin): ?><em>Twoja rola tylko ogląda — zmienia Centrala.</em><?php endif; ?>
 </p>
 
@@ -99,7 +100,8 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Układ strony' => null]);
         <td data-l="#" class="num"><?= $i + 1 ?></td>
         <td data-l="Element">
           <?= h($it['label']) ?>
-          <?php if ($it['type'] !== 'builtin'): ?> <a class="code" href="strony.php?id=<?= (int) $it['id'] ?>">edytuj</a><?php endif; ?>
+          <?php if ($it['type'] === 'sekcja'): ?> <a class="code" href="budowa.php?cel=home&amp;id=<?= (int) $it['id'] ?>">edytuj</a>
+          <?php elseif ($it['type'] !== 'builtin'): ?> <a class="code" href="strony.php?id=<?= (int) $it['id'] ?>">edytuj</a><?php endif; ?>
           <?php if ($it['k'] === 'pasek'): ?><br><small class="muted">w nagłówku — nie przesuwa się osobno</small><?php endif; ?>
         </td>
         <td data-l="Stan">
@@ -121,7 +123,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Układ strony' => null]);
             <button class="btn sm ghost" name="przelacz" value="<?= h($it['k']) ?>"><?= $it['on'] ? 'Ukryj' : 'Pokaż' ?></button>
           </form>
           <?php elseif ($it['type'] !== 'builtin' && !$it['published']): ?>
-          <small class="muted">opublikuj w Stronach</small>
+          <small class="muted">opublikuj w <?= $it['type'] === 'sekcja' ? 'Kreatorze' : 'Stronach' ?></small>
           <?php endif; ?>
         </td>
       </tr>

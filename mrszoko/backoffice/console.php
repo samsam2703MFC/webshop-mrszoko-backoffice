@@ -335,6 +335,7 @@ function console_sections(?array $me = null): array {
             'tresci.php'   => 'Treści',
             'wyglad.php'   => 'Wygląd',
             'uklad.php'    => 'Układ strony',
+            'budowa.php'   => 'Kreator strony',
             'strony.php'   => 'Strony i bloki',
             'media.php'    => 'Media',
             'allegro.php'  => 'Allegro',

@@ -59,7 +59,12 @@ ok('le catalogue ne se cache pas', !wsm_layout_toggle($pdo, 'home', 'katalog') &
 ok('le règlement et la politique non plus', !wsm_layout_toggle($pdo, 'footer', 'regulamin') && !wsm_layout_toggle($pdo, 'footer', 'prywatnosc'));
 ok('ni le suivi de commande — le pied de page est le seul endroit présent sur téléphone', !wsm_layout_toggle($pdo, 'footer', 'zamowienie'));
 ok('… et l\'écran peut le dire : ils sont marqués fixes',
-   wsm_layout_get($pdo, 'footer')[2]['fixed'] && wsm_layout_get($pdo, 'home')[3]['fixed'] && wsm_layout_get($pdo, 'home')[0]['fixed']);
+   wsm_layout_get($pdo, 'footer')[2]['fixed'] && wsm_layout_get($pdo, 'home')[3]['fixed']);
+// Le hero natif, lui, se cache depuis que le Kreator sait en composer un autre
+// (une photo, un titre, un bouton) — il reste épinglé en tête, mais pas fixe.
+ok('le hero natif n\'est pas fixe : le Kreator peut le remplacer', !wsm_layout_get($pdo, 'home')[0]['fixed'] && wsm_layout_get($pdo, 'home')[0]['pin'] === 'first');
+ok('… il se cache', wsm_layout_toggle($pdo, 'home', 'hero') && wsm_layout_get($pdo, 'home')[0]['on'] === 0);
+ok('… et se remontre', wsm_layout_toggle($pdo, 'home', 'hero') && wsm_layout_get($pdo, 'home')[0]['on'] === 1);
 ok('le B2B, lui, se cache', wsm_layout_toggle($pdo, 'home', 'pro') && wsm_layout_get($pdo, 'home')[4]['on'] === 0);
 ok('… et se remontre', wsm_layout_toggle($pdo, 'home', 'pro') && wsm_layout_get($pdo, 'home')[4]['on'] === 1);
 ok('une clé inconnue ne bouge rien', !wsm_layout_toggle($pdo, 'home', 'nieznane') && !wsm_layout_move($pdo, 'home', 'nieznane', 'up'));

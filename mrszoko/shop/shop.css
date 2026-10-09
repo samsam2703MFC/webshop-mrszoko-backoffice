@@ -609,3 +609,46 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .blok--szeroki .blok-in { background: transparent; border: 0; box-shadow: none; padding: 0; border-radius: 0; }
 .blok--szeroki.blok--ciemny .blok-in { background: var(--choco-800); padding: var(--space-6); border-radius: var(--radius-xl); }
 @media (max-width: 720px) { .blok--foto_prawo .blok-img { order: 0; } }
+
+/* ---- Sekcje z Kreatora ------------------------------------------------------- */
+/* Un gabarit par type, des classes pour les styles cochés. Rien n'est stylé
+   inline : ce que l'équipe compose passe par les mêmes jetons que le reste. */
+.sek--hero .sek-h1 { color: var(--cream-50); font-size: clamp(2rem, 5vw, var(--text-4xl)); line-height: var(--leading-tight);
+                     max-width: 18ch; margin-bottom: var(--space-4); }
+.sek--hero.sek--wysokosc-wysoki .hero-in { padding-top: var(--space-12, 6rem); padding-bottom: var(--space-12, 6rem); }
+.sek--hero.sek--srodek .hero-in { text-align: center; }
+.sek--hero.sek--srodek .sek-h1, .sek--hero.sek--srodek .lead { margin-left: auto; margin-right: auto; }
+.sek--tekst.sek--waski { max-width: 760px; }
+.sek--tekst h2 { margin-bottom: var(--space-4); }
+@media (min-width: 720px) { .prose--2kol { columns: 2; column-gap: var(--space-7); } .prose--2kol p { break-inside: avoid; } }
+.sek--foto .sek-foto img { width: 100%; height: auto; }
+.galeria { display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.galeria figure { margin: 0; }
+.galeria img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-md); display: block; }
+.galeria figcaption { color: var(--text-muted); font-size: var(--text-sm); margin-top: var(--space-2); }
+@media (min-width: 720px) { .galeria--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .galeria--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.kafelki { margin-top: 0; }
+.kafelki h3 { font-size: var(--text-lg); margin-bottom: var(--space-1); }
+.kafelki--4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.kafelki--2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.sek--baner.sek--akcent .pro { background: var(--accent); color: var(--text-on-accent); }
+.sek--baner.sek--akcent .pro .btn--accent { background: var(--choco-800); color: var(--cream-50); }
+.faq { max-width: 760px; }
+.faq-q { border-top: 1px solid var(--border-subtle); padding: var(--space-3) 0; }
+.faq-q:last-child { border-bottom: 1px solid var(--border-subtle); }
+.faq-q summary { cursor: pointer; font-family: var(--font-display); font-size: var(--text-lg); color: var(--text-strong); }
+.faq-q .prose { padding-top: var(--space-3); }
+.cytat { margin: 0; max-width: 760px; padding: var(--space-6); border-radius: var(--radius-xl); background: var(--surface-card);
+         border: 1px solid var(--border-subtle); }
+.cytat p { font-family: var(--font-display); font-size: var(--text-xl); line-height: var(--leading-snug); margin: 0 0 var(--space-3); }
+.cytat footer { color: var(--text-muted); }
+.cytat-foto { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; margin-bottom: var(--space-4); display: block; }
+.sek--cytat.sek--ciemny .cytat { background: var(--choco-800); border-color: var(--choco-700); color: var(--cream-100); }
+.sek--cytat.sek--ciemny .cytat p { color: var(--cream-50); } .sek--cytat.sek--ciemny .cytat footer { color: var(--cream-200); }
+.sek--odstep { height: var(--space-6); } .sek--odstep.sek--rozmiar-duzy { height: var(--space-10); }
+.sek--odstep hr { border: 0; border-top: 1px solid var(--border-subtle); margin: 0; }
+.ogloszenie { background: var(--choco-800); color: var(--cream-100); font-size: var(--text-sm); }
+.ogloszenie.sek--akcent { background: var(--accent); color: var(--text-on-accent); }
+.ogloszenie-in { display: flex; gap: var(--space-4); justify-content: center; align-items: center; padding: var(--space-2) 0; flex-wrap: wrap; text-align: center; }
+.ogloszenie a { color: inherit; font-weight: 600; text-decoration: underline; }
+.ogloszenie strong { color: inherit; }
