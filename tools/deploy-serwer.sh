@@ -269,7 +269,8 @@ echo "  nowa kategoria z fiszki produktu : obecna"
 grep -q 'function wsm_suivi_cherche' site/backoffice/api/shop.php \
   && grep -q "page === 'moje-zamowienie'" site/shop/index.php \
   && grep -q 'csrf_field()' site/shop/index.php \
-  && [ "$(grep -c "moje-zamowienie" site/shop/layout.php)" -ge 2 ] \
+  && grep -q "u('moje-zamowienie')" site/shop/lib.php \
+  && grep -q "'zamowienie' => \['label' => 'Moje zamówienie[^']*', 'fixed' => true\]" site/backoffice/api/layout.php \
   || { echo "  wyszukiwanie zamowienia: niekompletne"; exit 1; }
 echo "  wyszukiwanie zamowienia (regula + strona + dwa linki) : obecne"
 # LE COMPTE A REBOURS DE LA PROMESSE « wysylka w 24 h ». Quatre pieces :
@@ -320,7 +321,8 @@ echo "  kanal InPost (test polaczenia + statusy) : obecny"
 # la case de la caisse qui pointe enfin sur quelque chose.
 grep -q "page === 'regulamin'" site/shop/index.php \
   && grep -q "page === 'prywatnosc'" site/shop/index.php \
-  && grep -q "u('regulamin')" site/shop/layout.php \
+  && grep -q "u('regulamin')" site/shop/lib.php && grep -q "u('prywatnosc')" site/shop/lib.php \
+  && grep -q "'regulamin'  => \['label' => '[^']*', 'fixed' => true\]" site/backoffice/api/layout.php \
   && grep -q 'checkout.terms_l2' site/shop/index.php \
   || { echo "  regulamin i polityka: niekompletne"; exit 1; }
 echo "  regulamin i polityka (dwie strony + stopka + kasa) : obecne"

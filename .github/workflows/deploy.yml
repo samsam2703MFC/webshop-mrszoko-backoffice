@@ -2298,13 +2298,19 @@ jobs:
           # parfaitement et le bouton ne fait rien. Sans les DEUX liens, le
           # suivi n'existe pas sur téléphone — la barre du haut disparaît sous
           # 900 px, et c'est là qu'on regarde où en est son colis.
+          # Les liens viennent d'Układ strony depuis octobre 2026 : on lit la
+          # PAGE SERVIE, pas layout.php. Le pied de page est fixe (layout.php,
+          # l'API) ; la barre du haut est au choix de l'équipe.
           echo "== wyszukiwanie zamowienia =="
+          SHOP_HOME=$(curl -skL "http://localhost/mrszoko/shop/")
+          NZAM=$(printf '%s' "$SHOP_HOME" | grep -o 'href="[^"]*moje-zamowienie"' | wc -l)
           grep -q 'function wsm_suivi_cherche' "$DIR_BO/api/shop.php" \
             && grep -q "page === 'moje-zamowienie'" "$DIR_BO/../shop/index.php" \
             && grep -q 'csrf_field()' "$DIR_BO/../shop/index.php" \
-            && [ "$(grep -c 'moje-zamowienie' "$DIR_BO/../shop/layout.php")" -ge 2 ] \
-            && echo "  reguła + strona + jeton + dwa linki: obecne" \
-            || { echo "  ^ NOT OK : wyszukiwanie zamówienia niekompletne"; fail=1; }
+            && grep -q "'zamowienie' => \['label' => 'Moje zamówienie[^']*', 'fixed' => true\]" "$DIR_BO/api/layout.php" \
+            && [ "${NZAM:-0}" -ge 1 ] \
+            && echo "  reguła + strona + jeton + link w stopce (stały): obecne — linkow na stronie: $NZAM" \
+            || { echo "  ^ NOT OK : wyszukiwanie zamówienia niekompletne (linkow na stronie: ${NZAM:-0})"; fail=1; }
           # ── LE COMPTE À REBOURS DE LA PROMESSE ─────────────────────────────
           # La vitrine promet « Wysyłka w 24 h ». Quatre pièces font que la
           # console le mesure : la colonne qui date le départ, la règle qui
@@ -2381,11 +2387,15 @@ jobs:
           # endroit present sur TOUTES les pages, telephone compris, ou la
           # barre du haut disparait.
           echo "== regulamin i polityka prywatnosci =="
+          SHOP_HOME=${SHOP_HOME:-$(curl -skL "http://localhost/mrszoko/shop/")}
           grep -q "page === 'regulamin'" "$DIR_BO/../shop/index.php" \
             && grep -q "page === 'prywatnosc'" "$DIR_BO/../shop/index.php" \
-            && grep -q "u('regulamin')" "$DIR_BO/../shop/layout.php" \
+            && grep -q "u('regulamin')" "$DIR_BO/../shop/lib.php" \
+            && grep -q "'regulamin'  => \['label' => '[^']*', 'fixed' => true\]" "$DIR_BO/api/layout.php" \
+            && printf '%s' "$SHOP_HOME" | grep -q 'href="[^"]*regulamin"' \
+            && printf '%s' "$SHOP_HOME" | grep -q 'href="[^"]*prywatnosc"' \
             && grep -q 'checkout.terms_l2' "$DIR_BO/../shop/index.php" \
-            && echo "  dwie strony + stopka + kasa: obecne" \
+            && echo "  dwie strony + stopka (stala, na stronie) + kasa: obecne" \
             || { echo "  ^ NOT OK : regulamin albo polityka niekompletne"; fail=1; }
           # ── LE CANAL TPAY, ET SURTOUT SON ADRESSE DE NOTIFICATION ──────────
           # L'adresse envoyee a tpay a chaque transaction DOIT designer l'API.
