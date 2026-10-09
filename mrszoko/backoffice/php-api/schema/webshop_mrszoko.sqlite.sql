@@ -960,6 +960,7 @@ CREATE TABLE IF NOT EXISTS wsm_pages (
   in_footer   INTEGER NOT NULL DEFAULT 0,
   sort_order  INTEGER NOT NULL DEFAULT 100,
   image_url   TEXT NOT NULL DEFAULT '',
+  styl        TEXT NOT NULL DEFAULT '',
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   updated_by  TEXT NOT NULL DEFAULT '',

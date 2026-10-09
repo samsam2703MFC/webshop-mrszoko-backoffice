@@ -157,9 +157,10 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Wygląd sklepu' => null]);
     </div>
 
     <div class="panel" style="margin-top:20px">
-      <h2>Kształt i układ</h2>
+      <h2>Kształt i nagłówek</h2>
+      <p class="why">Kolejność sekcji, pokazywanie i ukrywanie bloków, menu i stopka: <a href="uklad.php">Układ strony</a>.</p>
       <div class="grid2">
-        <?php foreach (['radius', 'hero_align', 'show_promises', 'show_pro'] as $k): $f = $pola[$k]; ?>
+        <?php foreach (['radius', 'hero_align'] as $k): $f = $pola[$k]; ?>
         <label class="field">
           <span><?= h($f[0]) ?></span>
           <select name="<?= h($k) ?>"<?= $isAdmin ? '' : ' disabled' ?>>

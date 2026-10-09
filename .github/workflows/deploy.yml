@@ -643,13 +643,15 @@ jobs:
           [ "${N_PRICE:-0}" -ge 5 ] || { echo "  ^ NOT OK : les prix ne sont pas dans le HTML initial"; fail=1; }
           # Page unique : le contenu éditorial de la landing doit y être, rendu
           # par le serveur comme le reste — sinon la fusion n'a pas eu lieu.
-          # « id="pro" » peut manquer À DESSEIN : l'écran Wygląd cache le bloc
-          # B2B, et la page le dit alors en commentaire. Caché n'est pas perdu.
+          # « id="pro" » et « hero-strip » peuvent manquer À DESSEIN : l'écran
+          # Układ strony les cache, et la page le dit alors en commentaire.
+          # Caché n'est pas perdu. Le catalogue, lui, ne se cache pas.
           for anchor in 'id="katalog"' 'id="pro"' 'hero-strip'; do
             if printf '%s' "$HOME_HTML" | grep -q "$anchor"; then
               echo "  section $anchor : présente"
-            elif [ "$anchor" = 'id="pro"' ] && printf '%s' "$HOME_HTML" | grep -q 'sekcja pro: ukryta'; then
-              echo "  section $anchor : cachée depuis Wygląd — voulu"
+            elif { [ "$anchor" = 'id="pro"' ] && printf '%s' "$HOME_HTML" | grep -q 'sekcja pro: ukryta'; } \
+                 || { [ "$anchor" = 'hero-strip' ] && printf '%s' "$HOME_HTML" | grep -q 'pasek: ukryty'; }; then
+              echo "  section $anchor : cachée depuis Układ strony — voulu"
             else
               echo "  ^ NOT OK : section $anchor absente de la page unique"; fail=1
             fi
@@ -2513,15 +2515,31 @@ jobs:
           # tourne sans --delete : une pièce oubliée à l'assemblage laisse un
           # écran qui s'ouvre et une vitrine qui ignore ce qu'on y écrit.
           [ -f "$DIR_BO/api/pages.php" ] && [ -f "$DIR_BO/strony.php" ] && [ -f "$DIR_BO/media.php" ] \
+            && [ -f "$DIR_BO/api/layout.php" ] && [ -f "$DIR_BO/uklad.php" ] \
             && grep -q "'strony.php'" "$DIR_BO/console.php" && grep -q "'media.php'" "$DIR_BO/console.php" \
+            && grep -q "'uklad.php'" "$DIR_BO/console.php" \
             && grep -q 'wsm_page_find' "$DIR_BO/../shop/index.php" \
-            && grep -q 'bloki_html' "$DIR_BO/../shop/index.php" \
-            && grep -q 'wsm_page_liens' "$DIR_BO/../shop/layout.php" \
+            && grep -q 'wsm_layout_home' "$DIR_BO/../shop/index.php" \
+            && grep -q 'blok_html' "$DIR_BO/../shop/index.php" \
+            && grep -q 'liens_uklad' "$DIR_BO/../shop/layout.php" \
+            && grep -q 'logo_src()' "$DIR_BO/../shop/layout.php" \
+            && grep -q "'logo_image'" "$DIR_BO/api/settings.php" \
             && grep -q 'wsm_pages' "$DIR_BO/api/db.php" \
             && grep -q '\.blok-in' "$DIR_BO/../shop/shop.css" \
             && grep -q 'wsm_page_i18n' "$DIR_BO/api/schema/webshop_mrszoko.mysql.sql" \
-            && echo "  api + ekrany + szyna + witryna + styl + schemat: obecne" \
+            && echo "  api + ekrany (strony, media, uklad) + szyna + witryna + logo + styl + schemat: obecne" \
             || { echo "  ^ NOT OK : CMS niekompletny"; fail=1; }
+          # L'ORDRE EST LU, pas seulement livré : la barre du haut et le pied de
+          # page sortent d'Układ. Sans menu, la fonction est tombée en silence.
+          HH=$(curl -skL "$SH/")
+          NNAV=$(printf '%s' "$HH" | grep -o 'class="navlink"' | wc -l)
+          NFOOT=$(printf '%s' "$HH" | tr '\n' ' ' | sed 's/.*class="foot-links[^>]*>//;s|</nav>.*||' | grep -o '<a ' | wc -l)
+          [ "${NNAV:-0}" -ge 1 ] && [ "${NFOOT:-0}" -ge 3 ] \
+            && echo "  menu z Ukladu: $NNAV linkow u gory, $NFOOT w stopce" \
+            || { echo "  ^ NOT OK : menu lub stopka puste — Uklad nie dziala (gora $NNAV, stopka $NFOOT)"; fail=1; }
+          printf '%s' "$HH" | grep -q 'href="[^"]*regulamin"' && printf '%s' "$HH" | grep -q 'href="[^"]*prywatnosc"' \
+            && echo "  regulamin i polityka w stopce: obecne" \
+            || { echo "  ^ NOT OK : stopka bez regulaminu lub polityki — wymagane prawem"; fail=1; }
           # L'EFFET, pas le script : une adresse inventée doit répondre 404 —
           # ni 200 (la route avalerait tout), ni 500 (pages.php cassé ou
           # table absente). C'est la ligne qui dit que la route VIT.

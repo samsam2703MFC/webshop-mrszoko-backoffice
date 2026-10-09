@@ -31,7 +31,7 @@ function layout_head(array $S, string $lang, array $langs, string $title = '',
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?></title>
 <meta name="description" content="<?= e($desc) ?>">
-<link rel="icon" type="image/png" href="<?= e(u('assets/logo.png')) ?>">
+<link rel="icon" href="<?= e(logo_src()) ?>">
 <link rel="stylesheet" href="<?= e(asset('tokens.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset('shop.css')) ?>">
 <?= theme_head() ?><?php
@@ -87,23 +87,15 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
 <header class="site-head">
   <div class="wrap head-in">
     <a class="head-logo" href="<?= e(u()) ?>" aria-label="<?= e($S['a11y.home'] ?? '') ?>">
-      <img src="<?= e(u('assets/logo.png')) ?>" alt="<?= e($S['brand'] ?? 'Mister Szoko') ?>" width="150" height="44">
+      <img src="<?= e(logo_src()) ?>" alt="<?= e($S['brand'] ?? 'Mister Szoko') ?>" width="150" height="44">
     </a>
     <nav class="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
-      <a class="navlink" href="<?= e(u()) ?>#katalog"><?= e($S['nav.shop'] ?? '') ?></a>
-      <a class="navlink" href="<?= e(u()) ?>#pro"><?= e($S['story.pro.eyebrow'] ?? '') ?></a>
-      <?php // La page existe depuis longtemps et n'était atteignable que par le
-            // pied de page : un client qui a une question ne fait pas défiler
-            // toute la boutique pour la poser. ?>
-      <?php // Le suivi de commande, à côté de Kontakt et AVANT lui dans
-            // l'intention : neuf visiteurs sur dix qui cliquent « Kontakt »
-            // écrivent pour demander où en est leur colis. Ils ont maintenant
-            // la réponse sans écrire, et personne ici n'a à la taper. ?>
-      <a class="navlink" href="<?= e(u('moje-zamowienie')) ?>"><?= e($S['nav.order'] ?? 'Moje zamówienie') ?></a>
-      <a class="navlink" href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? 'Kontakt') ?></a>
-      <?php // Les pages écrites dans Strony et cochées « w górnym menu ».
-            foreach (function_exists('wsm_page_liens') ? wsm_page_liens(wsm_pdo(), $lang, 'nav') : [] as $pg): ?>
-      <a class="navlink" href="<?= e(u($pg['slug'])) ?>"><?= e($pg['title']) ?></a>
+      <?php // L'ORDRE ET LA PRÉSENCE DES LIENS VIENNENT D'UKŁAD STRONY : Sklep,
+            // B2B, Moje zamówienie, Kontakt et les pages cochées « w menu ».
+            // Le suivi de commande avant Kontakt par défaut : neuf visiteurs
+            // sur dix qui cliquent « Kontakt » demandent où en est leur colis.
+            foreach (liens_uklad(wsm_pdo(), $S, $lang, 'nav') as $l): ?>
+      <a class="navlink" href="<?= e($l['href']) ?>"><?= e($l['label']) ?></a>
       <?php endforeach; ?>
     </nav>
     <div class="head-right">
@@ -129,7 +121,7 @@ function layout_footer(array $S, string $lang = ''): void {
 <footer class="site-foot">
   <div class="wrap foot-in">
     <div>
-      <img class="foot-logo" src="<?= e(u('assets/logo.png')) ?>" alt="<?= e($S['brand'] ?? '') ?>" width="120" height="36" loading="lazy">
+      <img class="foot-logo" src="<?= e(logo_src()) ?>" alt="<?= e($S['brand'] ?? '') ?>" width="120" height="36" loading="lazy">
       <p class="mono"><?= e($S['footer.tagline'] ?? '') ?></p>
       <?php // Vente à distance en Pologne : raison sociale, adresse du siège et
             // numéros d'immatriculation doivent figurer sur le site. ?>
@@ -144,27 +136,16 @@ function layout_footer(array $S, string $lang = ''): void {
       <p class="mono"><?= e(date('Y')) ?> · <?= e($S['brand'] ?? '') ?> · <?= e($S['footer.rights'] ?? '') ?></p>
     </div>
     <nav class="foot-links mono" aria-label="<?= e($S['footer.contact'] ?? '') ?>">
-      <?php if (($S['footer.email'] ?? '') !== ''): ?>
-      <a href="mailto:<?= e($S['footer.email']) ?>"><?= e($S['footer.email']) ?></a>
-      <?php endif; ?>
-      <?php // AUSSI DANS LE PIED DE PAGE, et ce n'est pas une redite : la
-            // barre du haut disparaît entièrement sous 900 px (.head-nav
-            // display:none). Or on regarde où en est son colis DEPUIS SON
-            // TÉLÉPHONE. Sans cette ligne, le suivi n'existerait que sur
-            // l'écran où on en a le moins besoin. ?>
-      <a href="<?= e(u('moje-zamowienie')) ?>"><?= e($S['nav.order'] ?? '') ?></a>
-      <?php // « W ŁATWO DOSTĘPNYM MIEJSCU », mot pour mot ce que demande
-            // l'opérateur de paiement — et ce que demande la loi avant lui. Le
-            // pied de page est le seul endroit présent sur TOUTES les pages,
-            // y compris sur téléphone où la barre du haut disparaît. ?>
-      <a href="<?= e(u('regulamin')) ?>"><?= e($S['legal.terms'] ?? '') ?></a>
-      <a href="<?= e(u('prywatnosc')) ?>"><?= e($S['legal.privacy'] ?? '') ?></a>
-      <a href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? '') ?></a>
-      <?php // Les pages écrites dans Strony et cochées « w stopce ».
-            foreach (function_exists('wsm_page_liens') ? wsm_page_liens(wsm_pdo(), $lang, 'footer') : [] as $pg): ?>
-      <a href="<?= e(u($pg['slug'])) ?>"><?= e($pg['title']) ?></a>
+      <?php // L'ORDRE VIENT D'UKŁAD STRONY, mais deux liens n'y ont pas
+            // d'interrupteur : le règlement et la politique de confidentialité.
+            // « W ŁATWO DOSTĘPNYM MIEJSCU », mot pour mot ce que demande
+            // l'opérateur de paiement — et la loi avant lui. Le pied de page
+            // est le seul endroit présent sur TOUTES les pages, y compris sur
+            // téléphone où la barre du haut disparaît — d'où aussi le suivi
+            // de commande ici, et pas seulement en haut.
+            foreach (liens_uklad(wsm_pdo(), $S, $lang, 'footer') as $l): ?>
+      <a href="<?= e($l['href']) ?>"><?= e($l['label']) ?></a>
       <?php endforeach; ?>
-      <a href="<?= e(shop_base() . '/../backoffice/') ?>"><?= e($S['footer.console'] ?? '') ?></a>
     </nav>
   </div>
 </footer>

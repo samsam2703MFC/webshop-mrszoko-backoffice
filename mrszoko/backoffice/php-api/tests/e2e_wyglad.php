@@ -33,6 +33,8 @@ require_once dirname(__DIR__) . '/delivery.php';
 require_once dirname(__DIR__) . '/auth.php';
 require_once dirname(__DIR__) . '/settings.php';
 require_once dirname(__DIR__) . '/theme.php';
+require_once dirname(__DIR__) . '/pages.php';
+require_once dirname(__DIR__) . '/layout.php';
 $pdo = wsm_bootstrap();
 
 echo "webshop_mrszoko — end-to-end wygląd sklepu\n\n";
@@ -74,11 +76,12 @@ ok('les couleurs par défaut sont CELLES de colors.css — un thème vide est la
 echo "\n-- zapis: poprawne wchodzi, nieczytelne odpada i jest nazwane --\n";
 $r = [];
 $zm = wsm_theme_save($pdo, ['accent' => '#1F5F8B', 'font_body' => 'nunito', 'font_head' => 'same', 'radius' => 'ostre',
-                            'hero_align' => 'srodek', 'show_pro' => '0'], 'test', $r);
-ok('six réglages enregistrés d\'un coup', count($zm) === 6 && $r === [], [$zm, $r]);
+                            'hero_align' => 'srodek'], 'test', $r);
+ok('cinq réglages enregistrés d\'un coup', count($zm) === 5 && $r === [], [$zm, $r]);
 $t = wsm_theme_get($pdo, true);
 ok('relus tels quels', $t['accent'] === '#1F5F8B' && $t['font_body'] === 'nunito' && $t['font_head'] === 'same'
-   && $t['radius'] === 'ostre' && $t['hero_align'] === 'srodek' && $t['show_pro'] === '0', $t);
+   && $t['radius'] === 'ostre' && $t['hero_align'] === 'srodek', $t);
+ok('les interrupteurs de section ne sont plus ici — ils vivent dans Układ strony', !isset(wsm_theme_fields()['show_pro']) && !isset(wsm_theme_fields()['show_promises']));
 $rB = []; wsm_theme_save($pdo, ['brand' => '#FFFFFF'], 'test', $rB);
 ok('une marque blanche est refusée — elle porte du texte clair', isset($rB['brand']), $rB);
 ok('… et le refus est dit en polonais, à l\'écran', str_contains((string) ($rB['brand'] ?? ''), 'ciemny'), $rB['brand'] ?? null);
@@ -92,8 +95,6 @@ $rR = []; wsm_theme_save($pdo, ['accent' => 'red'], 'test', $rR);
 ok('« red » n\'est pas une couleur #RRGGBB', isset($rR['accent']), $rR);
 $rF = []; wsm_theme_save($pdo, ['font_body' => 'comic'], 'test', $rF);
 ok('une police inconnue est refusée', isset($rF['font_body']), $rF);
-$rS = []; wsm_theme_save($pdo, ['show_pro' => 'maybe'], 'test', $rS);
-ok('un interrupteur ne prend que Pokaż/Ukryj', isset($rS['show_pro']), $rS);
 $rN = []; wsm_theme_save($pdo, ['nonexistent' => '1'], 'test', $rN);
 ok('une clé inconnue est ignorée, pas enregistrée', $rN === [] && !$pdo->query("SELECT COUNT(*) FROM wsm_settings WHERE cle = 'theme.nonexistent'")->fetchColumn());
 $t = wsm_theme_get($pdo, true);
@@ -168,10 +169,10 @@ echo "\n-- witryna i konsola --\n";
 ok('layout.php imprime le thème après shop.css',
    preg_match('/shop\.css.*theme_head\(\)/s', $lire('mrszoko/shop/layout.php')) === 1);
 $lib = $lire('mrszoko/shop/lib.php');
-ok('lib.php charge theme.php sans tomber s\'il manque', str_contains($lib, "is_file(\$f)) require_once \$f") && str_contains($lib, "'show_pro' => '1'"));
+ok('lib.php charge theme.php sans tomber s\'il manque', str_contains($lib, "is_file(\$f)) require_once \$f") && str_contains($lib, "'hero_align' => 'lewo'"));
 $vit = $lire('mrszoko/shop/index.php');
-ok('index.php respecte les deux interrupteurs', str_contains($vit, "['show_promises']") && str_contains($vit, "['show_pro']"));
-ok('… et DIT quand un bloc est caché', str_contains($vit, 'sekcja pro: ukryta') && str_contains($vit, 'obietnice: ukryte'));
+ok('index.php lit l\'ordre et la visibilité dans Układ', str_contains($vit, 'wsm_layout_home($pdo)'));
+ok('… et DIT quand une section est cachée', str_contains($vit, 'wsm_layout_marker($typ)'));
 ok('wyglad.php existe', is_file("$racine/mrszoko/backoffice/wyglad.php"));
 ok('… dans le rail, à côté de Treści', preg_match("/'tresci\.php'.*'wyglad\.php'/s", $lire('mrszoko/backoffice/console.php')) === 1);
 $wyg = $lire('mrszoko/backoffice/wyglad.php');
@@ -191,13 +192,18 @@ if ($home === false || $home === '') {
     ok('au défaut, la page porte Lora et Playfair Display',
        str_contains($home, "--font-sans:'Lora'") && str_contains($home, "--font-display:'Playfair Display'"));
     ok('… et le bloc B2B est sur la page', str_contains($home, 'id="pro"'));
-    wsm_theme_save($pdo, ['accent' => '#1F5F8B', 'show_pro' => '0', 'show_promises' => '0'], 'test');
+    wsm_theme_save($pdo, ['accent' => '#1F5F8B'], 'test');
+    $ukladAvant = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'layout.home'")->fetchColumn();
+    wsm_layout_reset($pdo, 'home');
+    wsm_layout_toggle($pdo, 'home', 'pro'); wsm_layout_toggle($pdo, 'home', 'obietnice');
     $h1 = (string) @file_get_contents($base . '/?t=' . time(), false, $ctx);
     ok('la page servie porte l\'accent', str_contains($h1, '--caramel-500:#1F5F8B'));
     ok('le bloc B2B est caché — et la page le dit', !str_contains($h1, 'id="pro"') && str_contains($h1, 'sekcja pro: ukryta'));
     ok('les promesses aussi', !str_contains($h1, 'class="promise"') && str_contains($h1, 'obietnice: ukryte'));
     ok('le catalogue, lui, est toujours là', str_contains($h1, 'id="katalog"'));
     wsm_theme_reset($pdo);
+    wsm_layout_reset($pdo, 'home');
+    if ($ukladAvant) $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES ('layout.home', ?, 0, ?, 'test')")->execute([$ukladAvant, date('Y-m-d H:i:s')]);
     $h0 = (string) @file_get_contents($base . '/?t=' . (time() + 1), false, $ctx);
     ok('après Przywróć, tout revient', str_contains($h0, 'id="pro"') && str_contains($h0, 'class="promise"')
        && str_contains($h0, "--font-sans:'Lora'") && !str_contains($h0, '--caramel-500:#1F5F8B'));

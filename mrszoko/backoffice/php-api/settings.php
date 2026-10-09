@@ -145,6 +145,11 @@ function wsm_settings_fields(): array {
                              'Druga obietnica (Treści → promise.2). Ten sam format co wyżej.'],
         'promise_icon_3' => ['sklep', 'Ikona obietnicy 3', ['shop', 'promise_icon_3'], 'WSM_SHOP_ICON_3', 'ikona',
                              'Trzecia obietnica (Treści → promise.3). Ten sam format co wyżej.'],
+        // LE LOGO. Il était un fichier du dépôt (assets/logo.png) : le changer
+        // voulait dire ouvrir le code. Déposé ici, il prend la barre du haut,
+        // le pied de page et l'icône d'onglet. Vide = le logo du dépôt.
+        'logo_image'     => ['sklep', 'Logo sklepu', ['shop', 'logo_image'], 'WSM_SHOP_LOGO', 'ikona',
+                             'Górna belka, stopka i ikona karty. PNG lub WebP z przezroczystym tłem, szerokość ok. 300–600 px. Puste = logo z repozytorium.'],
 
         'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z tpay.'],
 

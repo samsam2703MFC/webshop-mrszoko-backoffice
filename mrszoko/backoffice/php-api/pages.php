@@ -35,11 +35,22 @@ const WSM_PAGE_BODY_MAX  = 20000;
 
 const WSM_PAGE_KINDS = ['strona', 'blok'];
 
-/** Où un bloc s'insère dans l'accueil : clé → étiquette lue par l'équipe. */
+/**
+ * Où un bloc s'insère dans l'accueil — PREMIÈRE version de Strony. L'ordre
+ * se règle désormais dans Układ strony (layout.php) ; la colonne ne sert
+ * plus qu'à placer un bloc ancien la première fois qu'Układ le découvre.
+ */
 const WSM_PAGE_PLACEMENTS = [
     'po_obietnicach' => 'Pod obietnicami, nad katalogiem',
     'po_katalogu'    => 'Pod katalogiem, nad blokiem B2B',
     'przed_stopka'   => 'Na dole, nad stopką',
+];
+
+/** Les styles d'un bloc : des jetons, cochés dans Strony, stylés dans shop.css. */
+const WSM_PAGE_STYLE = [
+    'ciemny'     => 'Ciemne tło (kolor marki, jasny tekst)',
+    'foto_prawo' => 'Zdjęcie po prawej stronie tekstu',
+    'szeroki'    => 'Bez karty — na całą szerokość',
 ];
 
 /** Les routes de la boutique et les dossiers servis : aucune page ne peut les prendre. */
@@ -55,7 +66,20 @@ function wsm_pages_ensure(PDO $pdo): void {
     $k = spl_object_id($pdo);
     if (isset($done[$k])) return;
     if (!wsm_table_exists($pdo, 'wsm_pages') || !wsm_table_exists($pdo, 'wsm_page_i18n')) wsm_apply_schema($pdo);
+    // Le style d'un bloc est arrivé après la table : une base qui l'a créée
+    // sans lui le reçoit ici, sans migration à jouer à la main.
+    if (function_exists('wsm_ensure_columns')) {
+        wsm_ensure_columns($pdo, 'wsm_pages', ['styl' => ["VARCHAR(60) NOT NULL DEFAULT ''", "TEXT NOT NULL DEFAULT ''"]]);
+    }
     $done[$k] = true;
+}
+
+/** Les jetons de style d'un bloc, filtrés sur la liste connue. */
+function wsm_page_styl(string|array $v): array {
+    $tok = is_array($v) ? $v : explode(',', $v);
+    $out = [];
+    foreach ($tok as $t) { $t = trim((string) $t); if (isset(WSM_PAGE_STYLE[$t])) $out[$t] = $t; }
+    return array_values($out);
 }
 
 /**
@@ -193,20 +217,17 @@ function wsm_page_liens(PDO $pdo, string $lang, string $ou = 'nav'): array {
     return $out;
 }
 
-/** Les blocs publiés d'un emplacement de l'accueil, dans l'ordre, textes repliés. */
-function wsm_page_bloki(PDO $pdo, string $lang, string $placement): array {
+/** UN bloc publié, textes repliés, pour la vitrine — null s'il n'est pas à montrer. */
+function wsm_page_blok(PDO $pdo, int $id, string $lang): ?array {
     wsm_pages_ensure($pdo);
-    if (!isset(WSM_PAGE_PLACEMENTS[$placement])) return [];
-    $st = $pdo->prepare("SELECT * FROM wsm_pages WHERE kind = 'blok' AND published = 1 AND placement = ?
-                          ORDER BY sort_order, id");
-    $st->execute([$placement]);
-    $out = [];
-    foreach ($st->fetchAll() ?: [] as $b) {
-        $t = wsm_page_textes($pdo, (int) $b['id'], $lang);
-        if ($t['title'] === '' && $t['body'] === '' && (string) $b['image_url'] === '') continue;
-        $out[] = array_merge($b, $t);
-    }
-    return $out;
+    $st = $pdo->prepare("SELECT * FROM wsm_pages WHERE id = ? AND kind = 'blok' AND published = 1");
+    $st->execute([$id]);
+    $b = $st->fetch();
+    if (!$b) return null;
+    $t = wsm_page_textes($pdo, (int) $b['id'], $lang);
+    if ($t['title'] === '' && $t['body'] === '' && (string) $b['image_url'] === '') return null;
+    $b['styl'] = wsm_page_styl((string) ($b['styl'] ?? ''));
+    return array_merge($b, $t);
 }
 
 /** Les adresses des pages publiées, pour le plan du site. */
@@ -261,11 +282,11 @@ function wsm_page_save(PDO $pdo, ?int $id, array $in, string $actor = '', array 
             if ($st->fetchColumn()) $errs['slug'] = 'Adres „' . $slug . '” jest już zajęty przez inną stronę';
         }
     }
-    $placement = '';
-    if ($kind === 'blok') {
-        $placement = (string) ($in['placement'] ?? '');
-        if (!isset(WSM_PAGE_PLACEMENTS[$placement])) $errs['placement'] = 'Wybierz miejsce bloku na stronie głównej';
-    }
+    // L'emplacement n'est plus demandé : l'ordre vit dans Układ strony. On
+    // garde ce qui est posté s'il est connu, pour les blocs d'avant.
+    $placement = (string) ($in['placement'] ?? '');
+    if (!isset(WSM_PAGE_PLACEMENTS[$placement])) $placement = '';
+    $styl = $kind === 'blok' ? implode(',', wsm_page_styl((array) ($in['styl'] ?? []))) : '';
     $img = trim((string) ($in['image_url'] ?? ''));
     if (function_exists('wsm_media_valid_url') && !wsm_media_valid_url($img)) $errs['image_url'] = 'Nieprawidłowy adres obrazu';
 
@@ -281,6 +302,7 @@ function wsm_page_save(PDO $pdo, ?int $id, array $in, string $actor = '', array 
         'in_footer'  => $kind === 'strona' && !empty($in['in_footer']) ? 1 : 0,
         'sort_order' => max(0, min(9999, (int) ($in['sort_order'] ?? 100))),
         'image_url'  => $img,
+        'styl'       => $styl,
         'updated_at' => $now,
         'updated_by' => mb_substr($actor, 0, 120),
     ];
