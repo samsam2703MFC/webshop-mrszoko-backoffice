@@ -57,6 +57,7 @@ ok('et le pied de page', $cles('footer') === ['email', 'zamowienie', 'regulamin'
 ok('tout est visible', !array_filter(wsm_layout_get($pdo, 'home'), fn($it) => !$it['on']));
 ok('le catalogue ne se cache pas', !wsm_layout_toggle($pdo, 'home', 'katalog') && wsm_layout_get($pdo, 'home')[3]['on'] === 1);
 ok('le règlement et la politique non plus', !wsm_layout_toggle($pdo, 'footer', 'regulamin') && !wsm_layout_toggle($pdo, 'footer', 'prywatnosc'));
+ok('ni le suivi de commande — le pied de page est le seul endroit présent sur téléphone', !wsm_layout_toggle($pdo, 'footer', 'zamowienie'));
 ok('… et l\'écran peut le dire : ils sont marqués fixes',
    wsm_layout_get($pdo, 'footer')[2]['fixed'] && wsm_layout_get($pdo, 'home')[3]['fixed'] && wsm_layout_get($pdo, 'home')[0]['fixed']);
 ok('le B2B, lui, se cache', wsm_layout_toggle($pdo, 'home', 'pro') && wsm_layout_get($pdo, 'home')[4]['on'] === 0);

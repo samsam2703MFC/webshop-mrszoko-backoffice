@@ -58,7 +58,10 @@ function wsm_layout_nav_builtins(): array {
 function wsm_layout_footer_builtins(): array {
     return [
         'email'      => ['label' => 'Adres e-mail (z Treści: footer.email)'],
-        'zamowienie' => ['label' => 'Moje zamówienie'],
+        // Le pied de page est le seul endroit présent sur TOUTES les pages,
+        // téléphone compris : le suivi de commande y reste, sinon il
+        // n'existerait que sur l'écran où on en a le moins besoin.
+        'zamowienie' => ['label' => 'Moje zamówienie — zawsze w stopce (telefon)', 'fixed' => true],
         'regulamin'  => ['label' => 'Regulamin sklepu — wymagany prawem', 'fixed' => true],
         'prywatnosc' => ['label' => 'Polityka prywatności — wymagana prawem', 'fixed' => true],
         'kontakt'    => ['label' => 'Kontakt'],
