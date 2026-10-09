@@ -237,6 +237,16 @@ grep -q 'wsm_crm_achats' site/backoffice/api/crm.php \
   && grep -q 'Kupione kilogramy' site/backoffice/klienci.php \
   || { echo "  kilogramy w Klientach incomplets dans l'assemblage"; exit 1; }
 echo "  kilogramy i produkty w Klientach : obecne"
+# LE CMS : pages, blocs, mediatheque — l'API, les ecrans, le rail, la vitrine,
+# le schema. Une piece oubliee donne un ecran qui s'ouvre et une vitrine qui
+# ignore ce qu'on y ecrit.
+[ -f site/backoffice/api/pages.php ] && [ -f site/backoffice/strony.php ] && [ -f site/backoffice/media.php ] \
+  && grep -q "'strony.php'" site/backoffice/console.php \
+  && grep -q 'wsm_page_find' site/shop/index.php && grep -q 'wsm_page_liens' site/shop/layout.php \
+  && grep -q '\.blok-in' site/shop/shop.css \
+  && grep -q 'wsm_page_i18n' site/backoffice/api/schema/webshop_mrszoko.mysql.sql \
+  || { echo "  CMS (strony, bloki, media) incomplet dans l'assemblage"; exit 1; }
+echo "  CMS: strony, bloki, media : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte

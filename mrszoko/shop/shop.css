@@ -567,3 +567,34 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
    comme des liens, sinon personne ne les ouvre — et c'est justement ce que
    l'opérateur de paiement veut éviter. */
 .check a { color: var(--choco-700); text-decoration: underline; }
+
+/* ---- Strony i bloki pisane w konsoli (Strony) ------------------------------ */
+/* La page : une colonne de lecture, comme le règlement. La grammaire du corps
+   (pages.php) ne produit que h2/h3, p, ul, strong, a, img, hr : tout est stylé
+   ici, rien ne dépend de ce que l'équipe tape. */
+.page { max-width: 760px; }
+.page h1 { margin-bottom: var(--space-2); }
+.page .lead { color: var(--text-muted); font-size: var(--text-lg); margin-bottom: var(--space-5); }
+/* À sa taille naturelle, jamais agrandie : une photo de 1600 px remplit la
+   colonne, un pictogramme de 200 px reste un pictogramme. */
+.page-hero { display: block; max-width: 100%; height: auto; border-radius: var(--radius-lg); margin: 0 0 var(--space-6); }
+.prose p, .prose li { line-height: 1.75; }
+.prose p { margin: 0 0 var(--space-3); }
+.prose ul { margin: 0 0 var(--space-3); padding-left: 1.3em; }
+.prose h2 { font-size: var(--text-xl); margin: var(--space-6) 0 var(--space-3); }
+.prose h3 { font-size: var(--text-lg); margin: var(--space-5) 0 var(--space-2); }
+.prose hr { border: 0; border-top: 1px solid var(--border-subtle); margin: var(--space-6) 0; }
+.prose a { color: var(--choco-700); text-decoration: underline; }
+.page-fig { margin: var(--space-5) 0; }
+.page-fig img, .page-img { max-width: 100%; height: auto; border-radius: var(--radius-md); display: block; }
+.page-fig figcaption { color: var(--text-muted); font-size: var(--text-sm); margin-top: var(--space-2); }
+/* Le bloc de l'accueil : une carte, photo à gauche quand il y en a une. */
+.blok { padding-top: 0; }
+.blok-in { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+           padding: var(--space-6); display: grid; gap: var(--space-5); align-items: center; box-shadow: var(--shadow-sm); }
+.blok--foto .blok-in { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.blok-img { width: 100%; height: 100%; max-height: 360px; object-fit: cover; border-radius: var(--radius-lg); }
+.blok-txt h2 { margin-bottom: var(--space-2); }
+.blok-txt .lead { color: var(--text-muted); margin-bottom: var(--space-3); }
+.blok-txt .btn { margin-top: var(--space-3); }
+@media (max-width: 720px) { .blok--foto .blok-in { grid-template-columns: minmax(0, 1fr); } }

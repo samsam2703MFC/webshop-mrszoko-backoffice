@@ -218,7 +218,8 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
               'wsm_voucher_uses', 'wsm_subscriptions', 'wsm_subscription_items',
               'wsm_claims', 'wsm_links', 'wsm_campaigns',
               'wsm_page_views', 'wsm_page_paths', 'wsm_order_lookups',
-              'wsm_role_profiles', 'wsm_role_screens'] as $t) {
+              'wsm_role_profiles', 'wsm_role_screens',
+              'wsm_pages', 'wsm_page_i18n'] as $t) {
         if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
     }
     $links = __DIR__ . '/links.php';

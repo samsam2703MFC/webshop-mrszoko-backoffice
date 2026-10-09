@@ -143,6 +143,10 @@ if ($page === 'sitemap.xml') {
         if (($prod['slug'] ?? '') === '') continue;
         $urls[] = ['path' => '/p/' . $prod['slug'], 'priority' => '0.8'];
     }
+    // Les pages publiées depuis Strony : indexables, donc listées.
+    if (function_exists('wsm_page_sitemap')) {
+        foreach (wsm_page_sitemap($pdo) as $sl) $urls[] = ['path' => '/' . $sl, 'priority' => '0.6'];
+    }
     echo seo_sitemap($urls, $langs, WSM_SHOP_DEFAULT_LANG);
     exit;
 }
@@ -455,6 +459,7 @@ if ($page === '') {
   <?php else: ?>
   <!-- obietnice: ukryte w Wyglądzie -->
   <?php endif; ?>
+  <?php bloki_html($pdo, $lang, 'po_obietnicach'); ?>
 
   <section class="wrap block" id="katalog">
     <div class="section-head">
@@ -513,6 +518,7 @@ if ($page === '') {
     <?php endif; ?>
   </section>
 
+  <?php bloki_html($pdo, $lang, 'po_katalogu'); ?>
   <?php // ---- Panneau pro : compte B2B ------------------------------------- ?>
   <?php // Le bloc se cache depuis Wygląd — le compte firmowe, lui, reste :
         // on cache une réclame, pas un service. Et la page le dit.
@@ -552,6 +558,7 @@ if ($page === '') {
     </div>
   </section>
   <?php endif; ?>
+  <?php bloki_html($pdo, $lang, 'przed_stopka'); ?>
 </main>
 <?php
     layout_footer($S);
@@ -1484,6 +1491,36 @@ if ($page === 'zamowienie') {
 <?php
     layout_footer($S);
     exit;
+}
+
+// ------------------------------------------------------- STRONY Z KONSOLI -
+// Une page écrite dans Strony : une adresse à UN segment, hors routes
+// réservées (pages.php les connaît). Inconnue ou non publiée → le 404
+// ci-dessous, comme pour n'importe quelle adresse inventée : un brouillon
+// n'existe pas pour le public.
+if (count($seg) === 1 && $page !== '' && function_exists('wsm_page_find')) {
+    $pg = wsm_page_find($pdo, $page, $lang);
+    if ($pg) {
+        $img = (string) $pg['image_url'];
+        $og  = $img === '' ? '' : (str_starts_with($img, 'https://') ? $img : seo_origin() . media_src($img));
+        layout_head($S, $lang, $langs, $pg['title'], $pg['meta_desc'] !== '' ? $pg['meta_desc'] : $pg['lead'], $page, $og);
+        layout_header($S, $lang, $langs, $cartCount);
+        ?>
+<main class="wrap block page">
+  <article>
+    <h1><?= e($pg['title']) ?></h1>
+    <?php if ($pg['lead'] !== ''): ?><p class="lead"><?= e($pg['lead']) ?></p><?php endif; ?>
+    <?php if ($img !== ''): ?><img class="page-hero" src="<?= e(media_src($img)) ?>" alt="" decoding="async"><?php endif; ?>
+    <div class="prose"><?= wsm_page_render($pg['body'], fn(string $x) => u($x)) ?></div>
+    <?php if ($pg['cta_label'] !== '' && $pg['cta_url'] !== ''): ?>
+    <p><a class="btn btn--accent" href="<?= e(page_href($pg['cta_url'])) ?>"><?= e($pg['cta_label']) ?></a></p>
+    <?php endif; ?>
+  </article>
+</main>
+<?php
+        layout_footer($S, $lang);
+        exit;
+    }
 }
 
 // ----------------------------------------------------------------- 404 ------

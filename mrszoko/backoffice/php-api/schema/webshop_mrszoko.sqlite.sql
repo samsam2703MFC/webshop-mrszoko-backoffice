@@ -942,3 +942,38 @@ CREATE TABLE IF NOT EXISTS wsm_role_screens (
   droit TEXT NOT NULL DEFAULT 'r',
   PRIMARY KEY (rola, ekran)
 );
+
+-- ---------------------------------------------------------------------------
+--  Pages et blocs écrits depuis la console (pages.php). Une « strona » a une
+--  adresse ; un « blok » s'insère dans l'accueil. Les textes vivent à part,
+--  une ligne par langue, avec repli sur le polonais à la lecture.
+--  Le slug est NULL pour un bloc : UNIQUE accepte plusieurs NULL, pas
+--  plusieurs chaînes vides.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_pages (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug        TEXT,
+  kind        TEXT NOT NULL DEFAULT 'strona',
+  placement   TEXT NOT NULL DEFAULT '',
+  published   INTEGER NOT NULL DEFAULT 0,
+  in_nav      INTEGER NOT NULL DEFAULT 0,
+  in_footer   INTEGER NOT NULL DEFAULT 0,
+  sort_order  INTEGER NOT NULL DEFAULT 100,
+  image_url   TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  updated_by  TEXT NOT NULL DEFAULT '',
+  UNIQUE (slug)
+);
+
+CREATE TABLE IF NOT EXISTS wsm_page_i18n (
+  page_id    INTEGER NOT NULL,
+  lang       TEXT NOT NULL,
+  title      TEXT NOT NULL DEFAULT '',
+  lead       TEXT,
+  body       TEXT,
+  meta_desc  TEXT NOT NULL DEFAULT '',
+  cta_label  TEXT NOT NULL DEFAULT '',
+  cta_url    TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (page_id, lang)
+);

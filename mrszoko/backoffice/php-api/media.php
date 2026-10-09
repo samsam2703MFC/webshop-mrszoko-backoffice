@@ -137,3 +137,89 @@ function wsm_media_valid_url(string $url): bool {
     // le navigateur la bloquerait : https uniquement.
     return (bool) filter_var($url, FILTER_VALIDATE_URL) && str_starts_with($url, 'https://');
 }
+
+// ---------------------------------------------------------------------------
+//  LA MÉDIATHÈQUE. Les fichiers sont déposés depuis quatre écrans (produits,
+//  marques, réglages, pages) et personne ne les voyait ensemble : un dossier
+//  qui grossit, des fichiers orphelins, et aucun moyen de savoir lequel sert
+//  encore. La liste dit, pour chaque fichier, OÙ il est utilisé — et on ne
+//  supprime que ce qui ne sert nulle part.
+// ---------------------------------------------------------------------------
+
+/** Les fichiers du dossier média, les nôtres seulement, les plus récents d'abord. */
+function wsm_media_list(): array {
+    $dir = wsm_media_dir();
+    if (!is_dir($dir)) return [];
+    $out = [];
+    foreach (scandir($dir) ?: [] as $f) {
+        if (!preg_match('/^[a-f0-9]{24}\.(webp|jpg|png)$/', $f)) continue;
+        $path = $dir . '/' . $f;
+        $info = @getimagesize($path);
+        $out[] = [
+            'url'   => wsm_media_url($f),
+            'name'  => $f,
+            'bytes' => (int) @filesize($path),
+            'mtime' => (int) @filemtime($path),
+            'w'     => (int) ($info[0] ?? 0),
+            'h'     => (int) ($info[1] ?? 0),
+        ];
+    }
+    usort($out, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
+    return $out;
+}
+
+/**
+ * Où chaque média sert : url → liste d'usages lisibles (« produkt: Tabliczka
+ * 70% », « ustawienie: zdjęcie na stronie głównej »…). Un fichier absent de
+ * la table ne sert nulle part. Chaque source est lue à part : une table
+ * manquante sur une base ancienne ne cache pas les autres usages.
+ */
+function wsm_media_usages(PDO $pdo): array {
+    $u = [];
+    $add = function (string $url, string $quoi) use (&$u): void {
+        $url = trim($url);
+        if ($url === '') return;
+        $u[$url][] = $quoi;
+    };
+    try {
+        foreach ($pdo->query("SELECT image_url, name FROM wsm_products WHERE image_url <> ''")->fetchAll() ?: [] as $r) {
+            $add((string) $r['image_url'], 'produkt: ' . (string) $r['name']);
+        }
+    } catch (Throwable $e) {}
+    try {
+        foreach ($pdo->query("SELECT logo_url, name FROM wsm_brands WHERE logo_url <> ''")->fetchAll() ?: [] as $r) {
+            $add((string) $r['logo_url'], 'marka: ' . (string) $r['name']);
+        }
+    } catch (Throwable $e) {}
+    try {
+        $noms = ['hero_image' => 'zdjęcie na stronie głównej', 'promise_icon_1' => 'ikona obietnicy 1',
+                 'promise_icon_2' => 'ikona obietnicy 2', 'promise_icon_3' => 'ikona obietnicy 3'];
+        foreach ($pdo->query("SELECT cle, val FROM wsm_settings WHERE cle IN ('hero_image','promise_icon_1','promise_icon_2','promise_icon_3')")->fetchAll() ?: [] as $r) {
+            $add((string) $r['val'], 'ustawienie: ' . ($noms[(string) $r['cle']] ?? (string) $r['cle']));
+        }
+    } catch (Throwable $e) {}
+    try {
+        foreach ($pdo->query("SELECT photo_url, email FROM wsm_clients WHERE photo_url <> ''")->fetchAll() ?: [] as $r) {
+            $add((string) $r['photo_url'], 'klient: ' . (string) $r['email']);
+        }
+    } catch (Throwable $e) {}
+    try {
+        $titres = [];
+        foreach ($pdo->query("SELECT page_id, title FROM wsm_page_i18n WHERE lang = 'pl'")->fetchAll() ?: [] as $r) {
+            $titres[(int) $r['page_id']] = (string) $r['title'];
+        }
+        foreach ($pdo->query("SELECT id, kind, image_url FROM wsm_pages")->fetchAll() ?: [] as $r) {
+            $etiq = ((string) $r['kind'] === 'blok' ? 'blok: ' : 'strona: ') . ($titres[(int) $r['id']] ?? ('#' . (int) $r['id']));
+            $add((string) $r['image_url'], $etiq);
+        }
+        foreach ($pdo->query("SELECT page_id, body FROM wsm_page_i18n WHERE body LIKE '%media/%'")->fetchAll() ?: [] as $r) {
+            preg_match_all('#media/[a-f0-9]{24}\.(?:webp|jpg|png)#', (string) $r['body'], $m);
+            foreach (array_unique($m[0] ?? []) as $url) {
+                $add($url, 'w treści: ' . ($titres[(int) $r['page_id']] ?? ('#' . (int) $r['page_id'])));
+            }
+        }
+    } catch (Throwable $e) {}
+    foreach ($u as &$liste) $liste = array_values(array_unique($liste));
+    unset($liste);
+    return $u;
+}
