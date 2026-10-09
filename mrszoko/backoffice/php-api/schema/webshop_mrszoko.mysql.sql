@@ -1296,3 +1296,13 @@ CREATE TABLE IF NOT EXISTS `wsm_section_i18n` (
   `items`      MEDIUMTEXT,
   PRIMARY KEY (`section_id`, `lang`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Les noms des fichiers de la médiathèque : l'adresse (media/<hash>.webp) est
+-- stable et citée partout, le nom est pour les gens — modifiable dans Media.
+CREATE TABLE IF NOT EXISTS `wsm_media` (
+  `url`        VARCHAR(80)  NOT NULL,
+  `title`      VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL,
+  `updated_by` VARCHAR(120) NOT NULL DEFAULT '',
+  PRIMARY KEY (`url`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

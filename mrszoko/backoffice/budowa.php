@@ -154,8 +154,9 @@ $stylAkt = $posted ? (array) ($_POST['styl'] ?? []) : (array) ($edit['styl'] ?? 
 $ustAkt  = $posted ? (array) ($_POST['ustawienia'] ?? []) : (array) ($edit['ustawienia'] ?? []);
 $pub     = $posted ? !empty($_POST['published']) : ($edit ? (int) $edit['published'] === 1 : true);
 $img     = (string) ($edit['image_url'] ?? '');
-$media   = wsm_media_list();
-$nazwa   = fn(string $url) => basename($url);
+$media   = wsm_media_list($pdo);
+// Un choix se fait par nom : les fichiers nommés d'abord, par ordre naturel, les sans-nom à la fin.
+usort($media, fn($a, $b) => [($a['title'] === '' ? 1 : 0), strnatcasecmp($a['label'], $b['label'])] <=> [($b['title'] === '' ? 1 : 0), 0] ?: strnatcasecmp($a['label'], $b['label']));
 
 // La liste : l'accueil vient d'Układ (sections mêlées aux blocs natifs) ; les autres cibles, du Kreator.
 $liste = [];
@@ -193,7 +194,7 @@ $css = <<<CSS
   @media (min-width: 900px) { .poz-pola.z-obrazem { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
   .media-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 8px; }
   .media-pick figure { margin: 0; text-align: center; } .media-pick img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--cream-200); }
-  .media-pick figcaption { font-family: var(--font-mono); font-size: 10px; word-break: break-all; margin-top: 4px; }
+  .media-pick figcaption { font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; margin-top: 4px; }
   .str-foto { display: block; max-width: 100%; max-height: 180px; border-radius: 10px; margin-bottom: 8px; }
   .podglad { width: 100%; height: 64vh; border: 1px solid var(--border-subtle); border-radius: 12px; background: #fff; }
   .inline-form { display: inline; }
@@ -342,7 +343,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Kreator strony' => ($formulaire || $c
         <small>Z komputera: JPEG · PNG · WebP, maks. 8 MB. Albo z medioteki:</small>
         <select name="obraz__z_medioteki"<?= $isAdmin ? '' : ' disabled' ?>>
           <option value="">— bez zmian —</option>
-          <?php foreach ($media as $m): ?><option value="<?= h($m['url']) ?>"><?= h($nazwa($m['url'])) ?></option><?php endforeach; ?>
+          <?php foreach ($media as $m): ?><option value="<?= h($m['url']) ?>"><?= h($m['label']) ?></option><?php endforeach; ?>
         </select>
         <?php if ($img !== ''): ?><label class="chk"><input type="checkbox" name="obraz__usun" value="1"><span>Usuń zdjęcie przy zapisie</span></label><?php endif; ?>
       </label>
@@ -406,7 +407,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Kreator strony' => ($formulaire || $c
               <?php if ($akt !== ''): ?><img src="<?= h(img_src($akt)) ?>" alt="" class="str-foto" style="max-height:72px"><?php endif; ?>
               <select name="t[<?= h($l) ?>][items][<?= $i ?>][img]"<?= $isAdmin ? '' : ' disabled' ?>>
                 <option value="">— bez zdjęcia —</option>
-                <?php foreach ($media as $m): ?><option value="<?= h($m['url']) ?>"<?= $m['url'] === $akt ? ' selected' : '' ?>><?= h($nazwa($m['url'])) ?></option><?php endforeach; ?>
+                <?php foreach ($media as $m): ?><option value="<?= h($m['url']) ?>"<?= $m['url'] === $akt ? ' selected' : '' ?>><?= h($m['label']) ?></option><?php endforeach; ?>
                 <?php if ($akt !== '' && !in_array($akt, array_column($media, 'url'), true)): ?><option value="<?= h($akt) ?>" selected><?= h($akt) ?></option><?php endif; ?>
               </select>
             </label>
@@ -441,12 +442,12 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Kreator strony' => ($formulaire || $c
     <?php if ($def['obraz'] || ($def['items'] && !empty($def['items']['obraz'])) || in_array('body', $def['pola'], true)): ?>
     <div class="panel" style="margin-top:20px">
       <h2>Medioteka</h2>
-      <p class="why">Zdjęcia do wyboru w polach obok. Nowe pliki dodaje się w <a href="media.php">Media</a>; w treści wstawia się je przez <code>![opis](media/plik.webp)</code>.</p>
+      <p class="why">Zdjęcia do wyboru w polach obok, po nazwie. Nowe pliki i nazwy: <a href="media.php">Media</a>; w treści wstawia się je przez <code>![opis](media/plik.webp)</code>.</p>
       <?php if (!$media): ?><p class="muted">Medioteka jest pusta — dodaj zdjęcia w <a href="media.php">Media</a>.</p>
       <?php else: ?>
       <div class="media-pick">
         <?php foreach (array_slice($media, 0, 24) as $m): ?>
-        <figure><img src="<?= h(img_src($m['url'])) ?>" alt="" loading="lazy"><figcaption><?= h($nazwa($m['url'])) ?></figcaption></figure>
+        <figure><img src="<?= h(img_src($m['url'])) ?>" alt="" loading="lazy"><figcaption><b><?= h($m['label']) ?></b></figcaption></figure>
         <?php endforeach; ?>
       </div>
       <?php endif; ?>

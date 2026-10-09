@@ -66,6 +66,27 @@ $pdo->prepare("DELETE FROM wsm_settings WHERE cle = 'promise_icon_3'")->execute(
 if ($avantIk !== '') $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES (?,?,0,?,?)")
     ->execute(["promise_icon_3", $avantIk, date('Y-m-d H:i:s'), 'test']);
 
+// ---- 3. Nazwy --------------------------------------------------------------------------
+echo "\n-- nazwy: adres jest stały, nazwa jest dla ludzi --\n";
+ok('un nom se tire du nom du fichier envoyé', wsm_media_title_from_filename('IMG_2031-czekolada_70.JPG') === 'IMG 2031 czekolada 70', wsm_media_title_from_filename('IMG_2031-czekolada_70.JPG'));
+ok('… sans chemin, sans extension, borné à 120', wsm_media_title_from_filename('../../etc/passwd') === 'passwd' && mb_strlen(wsm_media_title_from_filename(str_repeat('ą', 300) . '.png')) === 120);
+ok('… et vide reste vide', wsm_media_title_from_filename('.webp') === '' && wsm_media_title_from_filename('___') === '');
+ok('un nom se pose et se relit', wsm_media_title_set($pdo, $urlA, "Logo firmy $sfx", 'test') && (wsm_media_titles($pdo)[$urlA] ?? '') === "Logo firmy $sfx", wsm_media_titles($pdo)[$urlA] ?? null);
+ok('… se change, nettoyé (une ligne, sans caractère de contrôle)', wsm_media_title_set($pdo, $urlA, "  Logo\tfirmy\n v2 $sfx ", 'test') && (wsm_media_titles($pdo)[$urlA] ?? '') === "Logo firmy v2 $sfx", wsm_media_titles($pdo)[$urlA] ?? null);
+$l = []; foreach (wsm_media_list($pdo) as $m) $l[$m['url']] = $m;
+ok('la liste porte le nom et une étiquette', ($l[$urlA]['title'] ?? '') === "Logo firmy v2 $sfx" && ($l[$urlA]['label'] ?? '') === "Logo firmy v2 $sfx", $l[$urlA] ?? null);
+ok('un fichier sans nom se présente par le début de son adresse', ($l[$urlB]['title'] ?? 'x') === '' && ($l[$urlB]['label'] ?? '') === 'plik ' . substr($nomB, 0, 8), $l[$urlB] ?? null);
+ok('sans base, la liste vit sans nom', !array_filter(wsm_media_list(), fn($m) => $m['title'] !== '') && array_column(wsm_media_list(), 'label') !== []);
+ok('un nom ne se pose que sur notre média', !wsm_media_title_set($pdo, 'media/../../api/config.php', 'x') && !wsm_media_title_set($pdo, 'https://x.test/a.png', 'x') && !isset(wsm_media_titles($pdo)['https://x.test/a.png']));
+wsm_media_title_register($urlB, 'termo_izolacja-lato.png');
+ok('l\'envoi enregistre le nom du fichier', (wsm_media_titles($pdo)[$urlB] ?? '') === 'termo izolacja lato', wsm_media_titles($pdo)[$urlB] ?? null);
+ok('un nom vide efface le nom, pas le fichier', wsm_media_title_set($pdo, $urlB, '') && !isset(wsm_media_titles($pdo)[$urlB]) && is_file("$dir/$nomB"));
+$ekran = (string) @file_get_contents(dirname(__DIR__, 2) . '/media.php');
+ok('l\'écran Media : un champ Nazwa à l\'envoi, un renommage par fichier, une recherche', str_contains($ekran, 'name="nazwa"') && str_contains($ekran, 'name="nazwij"') && str_contains($ekran, 'name="szukaj"'));
+$rac = dirname(__DIR__, 4);
+ok('le Kreator et Strony montrent le nom, pas le hash', str_contains((string) @file_get_contents("$rac/mrszoko/backoffice/budowa.php"), "h(\$m['label'])") && str_contains((string) @file_get_contents("$rac/mrszoko/backoffice/strony.php"), "h(\$m['label'])"));
+ok('les deux schémas et db.php connaissent wsm_media', str_contains((string) @file_get_contents("$rac/mrszoko/backoffice/php-api/schema/webshop_mrszoko.mysql.sql"), '`wsm_media`') && str_contains((string) @file_get_contents("$rac/mrszoko/backoffice/php-api/schema/webshop_mrszoko.sqlite.sql"), 'wsm_media (') && str_contains((string) @file_get_contents("$rac/mrszoko/backoffice/php-api/db.php"), "'wsm_media'"));
+
 echo "\n-- usuwanie: tylko sierota, tylko nasz plik --\n";
 ok('un nom hors de notre forme ne se supprime pas d\'ici', !wsm_media_delete("media/intruz-$sfx.txt") && is_file("$dir/intruz-$sfx.txt"));
 ok('un chemin tordu non plus', !wsm_media_delete('media/../../api/config.php'));
@@ -77,6 +98,7 @@ wsm_page_delete($pdo, (int) $pid);
 $u2 = wsm_media_usages($pdo);
 ok('la page supprimée, les deux fichiers redeviennent orphelins', !isset($u2[$urlA]) && !isset($u2[$urlB]));
 ok('un orphelin se supprime', wsm_media_delete($urlA) && !is_file("$dir/$nomA"));
+ok('… et son nom part avec lui', !isset(wsm_media_titles($pdo)[$urlA]));
 ok('… et disparaît de la liste', !in_array($nomA, array_column(wsm_media_list(), 'name'), true));
 
 // ---- Nettoyage ------------------------------------------------------------------------
