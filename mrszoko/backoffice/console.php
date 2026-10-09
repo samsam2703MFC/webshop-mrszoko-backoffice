@@ -334,6 +334,8 @@ function console_sections(?array $me = null): array {
             'rabaty.php'   => 'Rabaty',
             'tresci.php'   => 'Treści',
             'wyglad.php'   => 'Wygląd',
+            'strony.php'   => 'Strony i bloki',
+            'media.php'    => 'Media',
             'allegro.php'  => 'Allegro',
         ],
 

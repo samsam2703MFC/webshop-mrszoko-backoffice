@@ -20,6 +20,10 @@ $WSM_API_DIR = is_dir(__DIR__ . '/../backoffice/api')
 require_once $WSM_API_DIR . '/db.php';
 require_once $WSM_API_DIR . '/auth.php';    // wsm_is_https() et la session partagée
 require_once $WSM_API_DIR . '/shop.php';
+// Les pages et blocs écrits dans la console (Strony). Fail-soft : si le
+// fichier manque à l'assemblage, la boutique vit sans pages — et le contrôle
+// de déploiement le dit — au lieu de tomber entière.
+if (is_file($WSM_API_DIR . '/pages.php')) require_once $WSM_API_DIR . '/pages.php';
 require_once $WSM_API_DIR . '/tpay.php';
 
 const WSM_CART_COOKIE = 'ms_cart';
@@ -249,6 +253,42 @@ function theme_values(): array {
     if (!function_exists('wsm_theme_get') && is_file($f)) require_once $f;
     if (function_exists('wsm_theme_get')) return $t = wsm_theme_get(wsm_pdo());
     return $t = ['show_promises' => '1', 'show_pro' => '1', 'hero_align' => 'lewo'];
+}
+
+/**
+ * L'adresse d'un bouton ou d'un lien écrit dans Strony : https et locale
+ * telles quelles, l'adresse d'une page de la boutique passée par u().
+ */
+function page_href(string $url): string {
+    if (str_starts_with($url, 'https://') || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
+    return u($url);
+}
+
+/**
+ * Les blocs écrits dans Strony pour un emplacement de l'accueil. Rien à
+ * afficher = rien d'imprimé : la page ne change pas quand l'équipe n'a
+ * encore rien écrit.
+ */
+function bloki_html(PDO $pdo, string $lang, string $placement): void {
+    if (!function_exists('wsm_page_bloki')) return;
+    foreach (wsm_page_bloki($pdo, $lang, $placement) as $b) {
+        $img = (string) ($b['image_url'] ?? '');
+        ?>
+  <section class="wrap block blok<?= $img !== '' ? ' blok--foto' : '' ?>" id="blok-<?= (int) $b['id'] ?>">
+    <div class="blok-in">
+      <?php if ($img !== ''): ?><img class="blok-img" src="<?= e(media_src($img)) ?>" alt="" loading="lazy" decoding="async"><?php endif; ?>
+      <div class="blok-txt">
+        <?php if ($b['title'] !== ''): ?><h2><?= e($b['title']) ?></h2><?php endif; ?>
+        <?php if ($b['lead'] !== ''): ?><p class="lead"><?= e($b['lead']) ?></p><?php endif; ?>
+        <?php if ($b['body'] !== ''): ?><div class="prose"><?= wsm_page_render($b['body'], fn(string $x) => u($x)) ?></div><?php endif; ?>
+        <?php if ($b['cta_label'] !== '' && $b['cta_url'] !== ''): ?>
+        <a class="btn btn--accent" href="<?= e(page_href($b['cta_url'])) ?>"><?= e($b['cta_label']) ?></a>
+        <?php endif; ?>
+      </div>
+    </div>
+  </section>
+        <?php
+    }
 }
 
 /** Ce que <head> imprime après shop.css : les jetons redéfinis, ou rien. */

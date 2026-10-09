@@ -1225,3 +1225,39 @@ CREATE TABLE IF NOT EXISTS `wsm_role_screens` (
   `droit` CHAR(1)     NOT NULL DEFAULT 'r',
   PRIMARY KEY (`rola`, `ekran`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Pages et blocs ecrits depuis la console (pages.php). Une « strona » a une
+--  adresse ; un « blok » s'insere dans l'accueil. Les textes vivent a part,
+--  une ligne par langue, avec repli sur le polonais a la lecture.
+--  Le slug est NULL pour un bloc : UNIQUE accepte plusieurs NULL, pas
+--  plusieurs chaines vides.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_pages` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `slug`       VARCHAR(80) NULL,
+  `kind`       VARCHAR(10) NOT NULL DEFAULT 'strona',
+  `placement`  VARCHAR(20) NOT NULL DEFAULT '',
+  `published`  TINYINT(1) NOT NULL DEFAULT 0,
+  `in_nav`     TINYINT(1) NOT NULL DEFAULT 0,
+  `in_footer`  TINYINT(1) NOT NULL DEFAULT 0,
+  `sort_order` INT NOT NULL DEFAULT 100,
+  `image_url`  VARCHAR(255) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  `updated_by` VARCHAR(120) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_pages_slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_page_i18n` (
+  `page_id`   INT UNSIGNED NOT NULL,
+  `lang`      VARCHAR(5) NOT NULL,
+  `title`     VARCHAR(200) NOT NULL DEFAULT '',
+  `lead`      TEXT,
+  `body`      MEDIUMTEXT,
+  `meta_desc` VARCHAR(300) NOT NULL DEFAULT '',
+  `cta_label` VARCHAR(120) NOT NULL DEFAULT '',
+  `cta_url`   VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`page_id`, `lang`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -101,6 +101,10 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
             // la réponse sans écrire, et personne ici n'a à la taper. ?>
       <a class="navlink" href="<?= e(u('moje-zamowienie')) ?>"><?= e($S['nav.order'] ?? 'Moje zamówienie') ?></a>
       <a class="navlink" href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? 'Kontakt') ?></a>
+      <?php // Les pages écrites dans Strony et cochées « w górnym menu ».
+            foreach (function_exists('wsm_page_liens') ? wsm_page_liens(wsm_pdo(), $lang, 'nav') : [] as $pg): ?>
+      <a class="navlink" href="<?= e(u($pg['slug'])) ?>"><?= e($pg['title']) ?></a>
+      <?php endforeach; ?>
     </nav>
     <div class="head-right">
       <div class="langs" role="group" aria-label="<?= e($S['a11y.lang'] ?? '') ?>">
@@ -119,7 +123,8 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
 <?php
 }
 
-function layout_footer(array $S): void {
+function layout_footer(array $S, string $lang = ''): void {
+    if ($lang === '') $lang = (string) ($GLOBALS['lang'] ?? WSM_SHOP_DEFAULT_LANG);
     ?>
 <footer class="site-foot">
   <div class="wrap foot-in">
@@ -155,6 +160,10 @@ function layout_footer(array $S): void {
       <a href="<?= e(u('regulamin')) ?>"><?= e($S['legal.terms'] ?? '') ?></a>
       <a href="<?= e(u('prywatnosc')) ?>"><?= e($S['legal.privacy'] ?? '') ?></a>
       <a href="<?= e(u('kontakt')) ?>"><?= e($S['nav.contact'] ?? '') ?></a>
+      <?php // Les pages écrites dans Strony et cochées « w stopce ».
+            foreach (function_exists('wsm_page_liens') ? wsm_page_liens(wsm_pdo(), $lang, 'footer') : [] as $pg): ?>
+      <a href="<?= e(u($pg['slug'])) ?>"><?= e($pg['title']) ?></a>
+      <?php endforeach; ?>
       <a href="<?= e(shop_base() . '/../backoffice/') ?>"><?= e($S['footer.console'] ?? '') ?></a>
     </nav>
   </div>

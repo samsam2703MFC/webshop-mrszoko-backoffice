@@ -861,6 +861,18 @@ jobs:
               NO=$(mysql -N -e "$QO" 2>/dev/null || echo 0)
               NU=$(mysql -N -e "$QU" 2>/dev/null || echo 0)
             fi
+            # Les tables du CMS (pages.php). Elles naissent au premier appel
+            # web après le déploiement (db.php les assure) : si elles manquent
+            # ici, l'écran Strony s'ouvre et la première page enregistrée
+            # tombe en 500 — sans rien dire à personne.
+            QP="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name IN ('wsm_pages','wsm_page_i18n')"
+            if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+              NP=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QP" 2>/dev/null || echo 0)
+            else
+              NP=$(mysql -N -e "$QP" 2>/dev/null || echo 0)
+            fi
+            echo "  tabele CMS (wsm_pages, wsm_page_i18n) : $NP/2"
+            if [ "${NP:-0}" -lt 2 ]; then echo "  ^ NOT OK : brak tabel CMS — pierwsza zapisana strona skonczy sie bledem 500"; fail=1; fi
             QK="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko' AND table_name='wsm_countries'"
             if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
               NK=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$QK" 2>/dev/null || echo 0)
@@ -2480,6 +2492,53 @@ jobs:
             || echo "  skala: nic poniżej 12 px — potwierdzone"
 
           if [ "$fail" = "0" ]; then echo "ALL CONSOLE FEATURES OK"; else echo "CONSOLE FEATURES FAILED"; exit 1; fi
+          REMOTE
+
+      # LE CMS : pages, blocs, médiathèque. Une étape à part : la précédente
+      # touche la limite de taille d'un script d'étape, et ce contrôle a sa
+      # propre surface — la vitrine, par le plan du site.
+      - name: Verify CMS (pages, blocks, media)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+          fail=0
+          SH="http://localhost/mrszoko/shop"
+          echo "== strony i bloki (CMS) =="
+          # Les pièces : l'API, les deux écrans, le rail, la vitrine qui route
+          # les pages et lit le menu, le style, le schéma MySQL. Le rsync
+          # tourne sans --delete : une pièce oubliée à l'assemblage laisse un
+          # écran qui s'ouvre et une vitrine qui ignore ce qu'on y écrit.
+          [ -f "$DIR_BO/api/pages.php" ] && [ -f "$DIR_BO/strony.php" ] && [ -f "$DIR_BO/media.php" ] \
+            && grep -q "'strony.php'" "$DIR_BO/console.php" && grep -q "'media.php'" "$DIR_BO/console.php" \
+            && grep -q 'wsm_page_find' "$DIR_BO/../shop/index.php" \
+            && grep -q 'bloki_html' "$DIR_BO/../shop/index.php" \
+            && grep -q 'wsm_page_liens' "$DIR_BO/../shop/layout.php" \
+            && grep -q 'wsm_pages' "$DIR_BO/api/db.php" \
+            && grep -q '\.blok-in' "$DIR_BO/../shop/shop.css" \
+            && grep -q 'wsm_page_i18n' "$DIR_BO/api/schema/webshop_mrszoko.mysql.sql" \
+            && echo "  api + ekrany + szyna + witryna + styl + schemat: obecne" \
+            || { echo "  ^ NOT OK : CMS niekompletny"; fail=1; }
+          # L'EFFET, pas le script : une adresse inventée doit répondre 404 —
+          # ni 200 (la route avalerait tout), ni 500 (pages.php cassé ou
+          # table absente). C'est la ligne qui dit que la route VIT.
+          c=$(curl -skL -o /dev/null -w '%{http_code}' "$SH/nie-ma-takiej-strony-$(date +%s)")
+          [ "$c" = "404" ] && echo "  nieznana strona: 404 — poprawnie" \
+            || { echo "  ^ NOT OK : nieznana strona odpowiada $c zamiast 404"; fail=1; }
+          # Les pages publiées, s'il y en a, s'ouvrent. Le plan du site les
+          # liste : c'est par là qu'on les trouve sans lire la base.
+          N=0; BAD=0
+          for p in $(curl -skL "$SH/sitemap.xml" | grep -o '<loc>[^<]*</loc>' | sed 's/<loc>//;s|</loc>||' \
+                       | sed 's|?.*||' | grep "/shop/[a-z0-9-]*$" | sed 's|.*/shop/||' | grep -v '^kontakt$' | sort -u); do
+            [ -n "$p" ] || continue
+            N=$((N+1)); c=$(curl -skL -o /dev/null -w '%{http_code}' "$SH/$p")
+            [ "$c" = "200" ] || { BAD=$((BAD+1)); echo "  ^ NOT OK : strona /$p odpowiada $c"; fail=1; }
+          done
+          echo "  strony z planu witryny: $N, niedzialajacych: $BAD"
+          if [ "$fail" = "0" ]; then echo "ALL CMS CHECKS OK"; else echo "CMS CHECKS FAILED"; exit 1; fi
           REMOTE
 
 
