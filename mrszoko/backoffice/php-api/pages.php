@@ -336,6 +336,10 @@ function wsm_page_delete(PDO $pdo, int $id): ?array {
     if (!$p) return null;
     $pdo->prepare("DELETE FROM wsm_page_i18n WHERE page_id = ?")->execute([$id]);
     $pdo->prepare("DELETE FROM wsm_pages WHERE id = ?")->execute([$id]);
+    // Ses sections du Kreator partent avec elle : une section orpheline ne
+    // se verrait nulle part et garderait ses images « utilisées ».
+    if (!function_exists('wsm_section_delete_page')) { $f = __DIR__ . '/sections.php'; if (is_file($f)) require_once $f; }
+    if (function_exists('wsm_section_delete_page')) { try { wsm_section_delete_page($pdo, $id); } catch (Throwable $e) {} }
     return $p;
 }
 

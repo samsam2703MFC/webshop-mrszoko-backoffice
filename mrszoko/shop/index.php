@@ -416,9 +416,12 @@ if ($page === '') {
                                       ['hero', 'pasek', 'obietnice', 'katalog', 'pro']);
       $pasekOn = true;
       foreach ($uklad as $it) if ($it['k'] === 'pasek') $pasekOn = (bool) $it['on'];
+      // Le nagłówek natif caché, le premier nagłówek du Kreator porte le h1.
+      $heroOn = true; foreach ($uklad as $it) if ($it['k'] === 'hero') $heroOn = (bool) $it['on'];
       foreach ($uklad as $it): $typ = (string) $it['k'];
           if ($typ === 'pasek') continue;                                      // rendu dans le hero
           if ($it['type'] === 'blok') { if ($it['on']) blok_html($pdo, $lang, (int) $it['id']); continue; }
+          if ($it['type'] === 'sekcja') { if ($it['on']) sekcja_id_html($pdo, $lang, (int) $it['id'], ['h1' => !$heroOn]); continue; }
           if (!$it['on']) { echo '  ' . wsm_layout_marker($typ) . "\n"; continue; } ?>
   <?php if ($typ === 'hero'): ?>
   <?php // LA PHOTO DU HERO, si elle est posée dans Ustawienia.
@@ -1507,16 +1510,20 @@ if (count($seg) === 1 && $page !== '' && function_exists('wsm_page_find')) {
         layout_head($S, $lang, $langs, $pg['title'], $pg['meta_desc'] !== '' ? $pg['meta_desc'] : $pg['lead'], $page, $og);
         layout_header($S, $lang, $langs, $cartCount);
         ?>
-<main class="wrap block page">
+<main>
+  <div class="wrap block page">
   <article>
     <h1><?= e($pg['title']) ?></h1>
     <?php if ($pg['lead'] !== ''): ?><p class="lead"><?= e($pg['lead']) ?></p><?php endif; ?>
     <?php if ($img !== ''): ?><img class="page-hero" src="<?= e(media_src($img)) ?>" alt="" decoding="async"><?php endif; ?>
-    <div class="prose"><?= wsm_page_render($pg['body'], fn(string $x) => u($x)) ?></div>
+    <?php if ($pg['body'] !== ''): ?><div class="prose"><?= wsm_page_render($pg['body'], fn(string $x) => u($x)) ?></div><?php endif; ?>
     <?php if ($pg['cta_label'] !== '' && $pg['cta_url'] !== ''): ?>
     <p><a class="btn btn--accent" href="<?= e(page_href($pg['cta_url'])) ?>"><?= e($pg['cta_label']) ?></a></p>
     <?php endif; ?>
   </article>
+  </div>
+  <?php // Les sections composées dans le Kreator, sous le corps de la page.
+        sekcje_html($pdo, $lang, (int) $pg['id']); ?>
 </main>
 <?php
         layout_footer($S, $lang);

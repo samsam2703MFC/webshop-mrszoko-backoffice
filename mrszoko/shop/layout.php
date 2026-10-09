@@ -84,6 +84,8 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
                   'fr' => 'FR', 'cs' => 'CS', 'sk' => 'SK', 'hu' => 'HU'];
     $self = strtok((string) ($_SERVER['REQUEST_URI'] ?? u()), '?');
     ?>
+<?php // La barre d'annonce du Kreator (cible « cały sklep »), sur toutes les pages.
+      sekcje_html(wsm_pdo(), $lang, defined('WSM_SECTION_SITE') ? WSM_SECTION_SITE : -1); ?>
 <header class="site-head">
   <div class="wrap head-in">
     <a class="head-logo" href="<?= e(u()) ?>" aria-label="<?= e($S['a11y.home'] ?? '') ?>">

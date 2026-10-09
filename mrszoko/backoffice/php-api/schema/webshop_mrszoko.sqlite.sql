@@ -978,3 +978,35 @@ CREATE TABLE IF NOT EXISTS wsm_page_i18n (
   cta_url    TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (page_id, lang)
 );
+
+-- ---------------------------------------------------------------------------
+--  Le Kreator (sections.php) : des sections typées, composées depuis la
+--  console, pour l'accueil (page_id = 0), une page (page_id > 0) ou tout le
+--  site (page_id = -1, la barre d'annonce). Textes à part, une ligne par
+--  langue, avec repli sur le polonais à la lecture ; items en JSON.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS wsm_sections (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  page_id     INTEGER NOT NULL DEFAULT 0,
+  type        TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 100,
+  published   INTEGER NOT NULL DEFAULT 0,
+  styl        TEXT NOT NULL DEFAULT '',
+  image_url   TEXT NOT NULL DEFAULT '',
+  settings    TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  updated_by  TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS wsm_section_i18n (
+  section_id INTEGER NOT NULL,
+  lang       TEXT NOT NULL,
+  title      TEXT NOT NULL DEFAULT '',
+  lead       TEXT,
+  body       TEXT,
+  cta_label  TEXT NOT NULL DEFAULT '',
+  cta_url    TEXT NOT NULL DEFAULT '',
+  items      TEXT,
+  PRIMARY KEY (section_id, lang)
+);

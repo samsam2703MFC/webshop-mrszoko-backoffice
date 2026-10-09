@@ -219,6 +219,13 @@ function wsm_media_usages(PDO $pdo): array {
             }
         }
     } catch (Throwable $e) {}
+    // Les sections du Kreator : image principale et images d'items.
+    try {
+        if (!function_exists('wsm_section_media_cites')) { $f = __DIR__ . '/sections.php'; if (is_file($f)) require_once $f; }
+        if (function_exists('wsm_section_media_cites')) {
+            foreach (wsm_section_media_cites($pdo) as $url => $etiqs) foreach ($etiqs as $e) $add($url, $e);
+        }
+    } catch (Throwable $e) {}
     foreach ($u as &$liste) $liste = array_values(array_unique($liste));
     unset($liste);
     return $u;
