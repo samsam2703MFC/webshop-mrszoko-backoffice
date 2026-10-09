@@ -255,9 +255,44 @@ foreach ($nvr2 as $m) { $nNouv += (int) $m['nouveau']; $nFid += (int) $m['fidele
 ok('le second achat bascule du côté « fidèle »', $nFid > 0, [$nNouv, $nFid]);
 ok('et le premier reste du côté « nouveau »', $nNouv > 0, [$nNouv, $nFid]);
 
+// ---- 7. Ce qu'il achète : pièces, kilos — et un produit renommé reste un produit -----------------
+//
+// L'équipe parle en kilos (« ten kontrahent bierze 100 kg miesięcznie »),
+// jamais en pièces ni en zlotys. Et le regroupement se fait par IDENTIFIANT :
+// un produit renommé en console coupait son historique en deux lignes, et la
+// meilleure vente de la maison passait pour deux ventes moyennes.
+echo "\n-- co kupuje: sztuki, kilogramy, zmiana nazwy --\n";
+$kup = "kupuje.$sfx@example.com";
+$o1 = $cmd($kup, 'dostarczone', 'oplacone', 30000, $vieux);
+$o2 = $cmd($kup, 'dostarczone', 'oplacone', 20000, $hier);
+$o3 = $cmd($kup, 'nowe',        'oczekuje', 90000, $hier);     // impayée : hors du compte
+$li = $pdo->prepare("INSERT INTO wsm_order_items (order_id, product_id, name, qty, line_gross, weight_g) VALUES (?,?,?,?,?,?)");
+$li->execute([$o1, "prod-a-$sfx", 'Tabliczka 70% (stara nazwa)', 10, 20000, 1000]);
+$li->execute([$o1, "prod-b-$sfx", 'Praliny',                      2, 10000,  500]);
+$li->execute([$o2, "prod-a-$sfx", 'Tabliczka 70%',                5, 10000,  500]);
+$li->execute([$o2, "prod-c-$sfx", 'Kakao',                        1, 10000,  250]);
+$li->execute([$o3, "prod-a-$sfx", 'Tabliczka 70%',              100, 90000, 10000]);
+$fk = wsm_crm_client($pdo, $kup);
+$top = $fk['top'] ?? [];
+ok('trois produits, pas quatre — le renommé est regroupé', count($top) === 3, array_column($top, 'name'));
+$pa = null; foreach ($top as $tp) if (($tp['product_id'] ?? '') === "prod-a-$sfx") $pa = $tp;
+ok('le produit renommé porte son nom le plus récent', ($pa['name'] ?? '') === 'Tabliczka 70%', $pa['name'] ?? null);
+ok('ses pièces s\'additionnent — l\'impayée exclue', (int) ($pa['q'] ?? 0) === 15, $pa['q'] ?? null);
+ok('ses kilos aussi', (int) ($pa['g'] ?? 0) === 1500, $pa['g'] ?? null);
+ok('trié par valeur, le meilleur d\'abord',
+   ($top[0]['product_id'] ?? '') === "prod-a-$sfx" && (int) ($top[0]['v'] ?? 0) === 30000, $top[0] ?? null);
+ok('la fiche porte le total en grammes', (int) ($fk['weight_g'] ?? -1) === 2250, $fk['weight_g'] ?? null);
+$lk = null; foreach (wsm_crm_list($pdo) as $c) if (strtolower($c['email']) === $kup) $lk = $c;
+ok('… et la liste aussi, pour la colonne Waga', (int) ($lk['weight_g'] ?? -1) === 2250, $lk['weight_g'] ?? null);
+ok('une ligne sans poids retombe sur la fiche produit × quantité',
+   wsm_crm_ligne_g(['weight_g' => 0, 'qty' => 3, 'unit_g' => 100]) === 300);
+ok('… et un poids écrit à la commande gagne', wsm_crm_ligne_g(['weight_g' => 1200, 'qty' => 3, 'unit_g' => 100]) === 1200);
+ok('une adresse sans achat n\'a pas de liste', wsm_crm_achats($pdo, "nikt.$sfx@example.com") === []);
+
 // ---- Nettoyage -----------------------------------------------------------------------------------
-foreach ([$mail, strtoupper($mail), $jamais, $dort, $parti, $frais, $sep] as $m) {
+foreach ([$mail, strtoupper($mail), $jamais, $dort, $parti, $frais, $sep, $kup] as $m) {
     $pdo->prepare("DELETE FROM wsm_client_notes WHERE LOWER(email) = ?")->execute([strtolower($m)]);
+    $pdo->prepare("DELETE FROM wsm_order_items WHERE order_id IN (SELECT id FROM wsm_orders WHERE LOWER(email) = ?)")->execute([strtolower($m)]);
     $pdo->prepare("DELETE FROM wsm_orders WHERE LOWER(email) = ?")->execute([strtolower($m)]);
 }
 

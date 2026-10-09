@@ -734,3 +734,11 @@ button.niebezpieczny:hover { filter: brightness(1.08); }
 details.usun-konto { margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 12px; }
 details.usun-konto > summary { cursor: pointer; color: var(--danger); font-weight: 600; font-size: 14px; }
 details.usun-konto[open] > summary { margin-bottom: 8px; }
+
+/* ---- Ustawienia : aperçu d'un fichier déposé ----------------------------- */
+/* La photo du hero se montre en bandeau ; une icône se montre PETITE et sur
+   damier : c'est le seul moyen de voir que la transparence a survécu avant
+   de la découvrir sur la vitrine. */
+.ust-foto  { display: block; max-width: 100%; max-height: 160px; border-radius: 8px; margin-bottom: 8px; }
+.ust-ikona { display: block; width: 64px; height: 64px; object-fit: contain; border-radius: 8px; margin-bottom: 8px;
+             background: repeating-conic-gradient(var(--border-subtle) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }

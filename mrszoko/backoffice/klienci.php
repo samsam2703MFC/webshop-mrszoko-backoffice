@@ -69,6 +69,12 @@ $liste = wsm_crm_list($pdo);
 $seuil = wsm_crm_seuil_vip($liste);
 $tot   = wsm_crm_totaux($liste);
 
+/** Des grammes en kilos lisibles : « 12,5 kg », « 12 kg », « 0 kg ». */
+function kg_pl(int $g): string {
+    $kg = $g / 1000;
+    return number_format($kg, ($g % 1000) === 0 ? 0 : 1, ',', "\u{202F}") . "\u{202F}kg";
+}
+
 $q    = trim((string) ($_GET['q'] ?? ''));
 $seg  = (string) ($_GET['seg'] ?? '');
 $mail = strtolower(trim((string) ($_GET['email'] ?? '')));
@@ -129,7 +135,7 @@ console_head('Klienci', $me, <<<'CSS'
   .idc h2 { margin: 0 0 2px; }
   .idc .em { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); }
   .mini { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin: 14px 0; }
-  @media (min-width: 720px) { .mini { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+  @media (min-width: 720px) { .mini { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
   .mini .m { border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 12px; }
   .mini .m b { display: block; font-family: var(--font-display); font-size: 19px; color: var(--text-strong); }
   .mini .m span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
@@ -417,7 +423,7 @@ console_crumbs($fiche
   <?php else: ?>
   <table class="rwd">
     <thead><tr>
-      <th>Klient</th><th class="num">Zakupy</th><th class="num">Obrót</th>
+      <th>Klient</th><th class="num">Zakupy</th><th class="num">Obrót</th><th class="num">Waga</th>
       <th>Ostatnio</th><th>Plakietki</th>
     </tr></thead>
     <tbody>
@@ -432,6 +438,7 @@ console_crumbs($fiche
           <?php if ((int) $c['unpaid'] > 0): ?><br><small style="color:var(--danger)">+<?= (int) $c['unpaid'] ?> nieopł.</small><?php endif; ?>
         </td>
         <td data-l="Obrót" class="num"><b><?= h(pln((int) $c['revenue'])) ?></b></td>
+        <td data-l="Waga" class="num"><?= h(kg_pl((int) ($c['weight_g'] ?? 0))) ?></td>
         <td data-l="Ostatnio"><?= h(depuis((string) $c['last_at'])) ?></td>
         <td data-l="Plakietki">
           <?php foreach ($bd as $code => $lbl): ?>
@@ -478,6 +485,7 @@ console_crumbs($fiche
     <div class="m"><b><?= (int) $fiche['paid_orders'] ?></b><span>Zapłacone zamówienia</span></div>
     <div class="m"><b><?= h(pln((int) $fiche['revenue'])) ?></b><span>Obrót brutto</span></div>
     <div class="m"><b><?= h(pln((int) $fiche['basket'])) ?></b><span>Średni koszyk</span></div>
+    <div class="m"><b><?= h(kg_pl((int) ($fiche['weight_g'] ?? 0))) ?></b><span>Kupione kilogramy</span></div>
     <div class="m"><b><?= h(depuis((string) $fiche['last_at'])) ?></b><span>Ostatnie zamówienie</span></div>
   </div>
   <p class="why">
@@ -511,18 +519,20 @@ console_crumbs($fiche
     <?php endif; ?>
 
     <?php if ($fiche['top']): ?>
-    <h3 style="margin-top:20px;font-size:15px">Co kupuje</h3>
+    <h3 style="margin-top:20px;font-size:15px">Co kupuje <span class="code"><?= count($fiche['top']) ?></span></h3>
     <p class="why">
       Ilości, nie linie: dziesięć razy kilogram to nie to samo co raz dziesięć kilogramów.
-      Liczone tylko z zapłaconych zamówień.
+      Liczone tylko z zapłaconych zamówień. Produkt, któremu zmieniono nazwę, zostaje
+      jednym wierszem — liczy się to, co kupiono, nie jak się wtedy nazywało.
     </p>
     <table class="rwd">
-      <thead><tr><th>Produkt</th><th class="num">Sztuk</th><th class="num">Wartość</th></tr></thead>
+      <thead><tr><th>Produkt</th><th class="num">Sztuk</th><th class="num">Waga</th><th class="num">Wartość</th></tr></thead>
       <tbody>
       <?php foreach ($fiche['top'] as $t): ?>
         <tr>
           <td data-l="Produkt"><?= h((string) $t['name']) ?></td>
           <td data-l="Sztuk" class="num"><?= (int) $t['q'] ?></td>
+          <td data-l="Waga" class="num"><?= h(kg_pl((int) $t['g'])) ?></td>
           <td data-l="Wartość" class="num"><?= h(pln((int) $t['v'])) ?></td>
         </tr>
       <?php endforeach; ?>

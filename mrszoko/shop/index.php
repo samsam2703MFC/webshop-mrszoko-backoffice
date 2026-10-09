@@ -430,14 +430,31 @@ if ($page === '') {
     <?php endif; ?>
   </section>
 
+  <?php // Les trois promesses se cachent depuis Wygląd. Cachées, la page le
+        // DIT en commentaire : un contrôle qui ne les trouve pas doit pouvoir
+        // distinguer « voulu » de « cassé ».
+        if (theme_values()['show_promises'] !== '0'): ?>
   <section class="wrap promises">
-    <?php for ($i = 1; $i <= 3; $i++): if (!isset($S["promise.$i.t"])) continue; ?>
-    <div class="promise">
+    <?php // L'ICÔNE D'UNE PROMESSE, si elle est déposée dans Ustawienia → Sklep.
+          // Même règle que la photo du hero : absente, le bloc reste du texte.
+          // La page ne dépend pas d'un fichier qui peut manquer, et « xxxx »
+          // (le masque d'un réglage vidé) n'est pas une adresse.
+          $cfgSklep = wsm_config()['shop'] ?? [];
+          for ($i = 1; $i <= 3; $i++): if (!isset($S["promise.$i.t"])) continue;
+          $ikona = trim((string) ($cfgSklep["promise_icon_$i"] ?? ''));
+          if (preg_match('/^x{2,}$/i', $ikona)) $ikona = ''; ?>
+    <div class="promise<?= $ikona !== '' ? ' promise--ikona' : '' ?>">
+      <?php if ($ikona !== ''): ?>
+      <img class="promise-ikona" src="<?= e(media_src($ikona)) ?>" alt="" width="56" height="56" loading="lazy" decoding="async">
+      <?php endif; ?>
       <h2><?= e($S["promise.$i.t"]) ?></h2>
       <p><?= e($S["promise.$i.d"] ?? '') ?></p>
     </div>
     <?php endfor; ?>
   </section>
+  <?php else: ?>
+  <!-- obietnice: ukryte w Wyglądzie -->
+  <?php endif; ?>
 
   <section class="wrap block" id="katalog">
     <div class="section-head">
@@ -497,7 +514,11 @@ if ($page === '') {
   </section>
 
   <?php // ---- Panneau pro : compte B2B ------------------------------------- ?>
-  <?php if (isset($S['story.pro.title'])): ?>
+  <?php // Le bloc se cache depuis Wygląd — le compte firmowe, lui, reste :
+        // on cache une réclame, pas un service. Et la page le dit.
+        $proWidoczny = theme_values()['show_pro'] !== '0';
+        if (!$proWidoczny) echo "  <!-- sekcja pro: ukryta w Wyglądzie -->\n"; ?>
+  <?php if ($proWidoczny && isset($S['story.pro.title'])): ?>
   <section class="wrap block" id="pro" style="padding-top:0">
     <div class="pro">
       <div class="pro-in">

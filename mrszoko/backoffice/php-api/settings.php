@@ -36,6 +36,21 @@ function wsm_setting_blank(string $v): bool {
 }
 
 /**
+ * Un champ qui reçoit un FICHIER d'image. Deux types pour un même geste :
+ * « image » (photo, fond opaque) et « ikona » (pictogramme, transparence
+ * conservée). Tout ce qui lit ou enregistre un fichier passe par ici, pour
+ * qu'un troisième type un jour n'oublie pas la moitié des écrans.
+ */
+function wsm_setting_obraz(string $type): bool {
+    return $type === 'image' || $type === 'ikona';
+}
+
+/** Le canal alpha est-il à conserver à l'enregistrement ? */
+function wsm_setting_alpha(string $type): bool {
+    return $type === 'ikona';
+}
+
+/**
  * Les réglages pilotables depuis la console.
  *   cle => [groupe, libellé, chemin dans wsm_config, variable d'env, type, aide]
  * type : text | secret | bool | select:a|b|c
@@ -117,6 +132,19 @@ function wsm_settings_fields(): array {
         // produit — même stockage, mêmes contrôles, même limite de 8 Mo.
         'hero_image' => ['sklep', 'Zdjęcie na stronie głównej', ['shop', 'hero_image'], 'WSM_SHOP_HERO', 'image',
                          'Szerokie zdjęcie w tle nagłówka. Najlepiej ciemne albo ze spokojnym miejscem po lewej — tam stoi tytuł. Puste = gradient jak dotąd.'],
+
+        // LES ICÔNES DES TROIS PROMESSES (« Wysyłka 24h », « Paczkomat /
+        // kurier », « Pakowanie termiczne »). Le texte vit dans Treści ; ici
+        // ne se dépose que l'image. Type « ikona », pas « image » : le canal
+        // alpha est conservé à l'enregistrement, sinon un pictogramme sur fond
+        // transparent ressortirait dans un carré crème au milieu d'une carte
+        // blanche. Vide = le bloc reste du texte, comme avant.
+        'promise_icon_1' => ['sklep', 'Ikona obietnicy 1', ['shop', 'promise_icon_1'], 'WSM_SHOP_ICON_1', 'ikona',
+                             'Pierwsza z trzech obietnic pod nagłówkiem (jej tekst: Treści → promise.1). Kwadrat, PNG lub WebP z przezroczystym tłem, ok. 200×200 px. Puste = sam tekst.'],
+        'promise_icon_2' => ['sklep', 'Ikona obietnicy 2', ['shop', 'promise_icon_2'], 'WSM_SHOP_ICON_2', 'ikona',
+                             'Druga obietnica (Treści → promise.2). Ten sam format co wyżej.'],
+        'promise_icon_3' => ['sklep', 'Ikona obietnicy 3', ['shop', 'promise_icon_3'], 'WSM_SHOP_ICON_3', 'ikona',
+                             'Trzecia obietnica (Treści → promise.3). Ten sam format co wyżej.'],
 
         'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z tpay.'],
 
@@ -242,11 +270,11 @@ function wsm_settings_save(PDO $pdo, array $post, string $actor = '', array &$re
         // exception, le champ image sortait de la boucle avant d'être lu, et
         // l'envoi ne faisait rien sans rien dire.
         $poste = array_key_exists($formKey, $post)
-              || ($type === 'image' && (isset($_FILES[$formKey]) || !empty($post[$formKey . '__usun'])));
+              || (wsm_setting_obraz($type) && (isset($_FILES[$formKey]) || !empty($post[$formKey . '__usun'])));
         if (!$poste) continue;
         $v = trim((string) ($post[$formKey] ?? ''));
         if ($type === 'secret' && ($v === '' || str_starts_with($v, '•'))) continue;   // inchangé
-        if ($type === 'image') {
+        if (wsm_setting_obraz($type)) {
             // Le formulaire poste un champ texte VIDE et, à côté, un fichier.
             // Vide + aucun fichier = on ne touche à rien : sinon enregistrer
             // l'écran effacerait l'image à chaque passage, exactement comme le
@@ -258,7 +286,7 @@ function wsm_settings_save(PDO $pdo, array $post, string $actor = '', array &$re
                 $v = WSM_SETTING_PLACEHOLDER;
             } else {
                 require_once __DIR__ . '/media.php';
-                [$url, $err] = wsm_media_store($f);
+                [$url, $err] = wsm_media_store($f, wsm_setting_alpha($type));
                 if ($err !== null) { $refus[$key] = $err; continue; }
                 $v = (string) $url;
             }

@@ -235,6 +235,28 @@ function media_src(string $url): string {
     return u($url);
 }
 
+/**
+ * Le thème réglé dans Wygląd (console) : polices, couleurs, coins, et les
+ * blocs de l'accueil à montrer. theme.php vit dans l'API ; s'il manque à
+ * l'assemblage, la boutique garde son habit par défaut au lieu de tomber —
+ * et le contrôle de déploiement, lui, le dit.
+ */
+function theme_values(): array {
+    static $t = null;
+    if ($t !== null) return $t;
+    global $WSM_API_DIR;
+    $f = (string) $WSM_API_DIR . '/theme.php';
+    if (!function_exists('wsm_theme_get') && is_file($f)) require_once $f;
+    if (function_exists('wsm_theme_get')) return $t = wsm_theme_get(wsm_pdo());
+    return $t = ['show_promises' => '1', 'show_pro' => '1', 'hero_align' => 'lewo'];
+}
+
+/** Ce que <head> imprime après shop.css : les jetons redéfinis, ou rien. */
+function theme_head(): string {
+    theme_values();
+    return function_exists('wsm_theme_head') ? wsm_theme_head() : '';
+}
+
 function product_visual(array $p, string $class, string $sizes = ''): string {
     if (($p['image'] ?? '') !== '') {
         return '<img class="' . e($class) . '" src="' . e(media_src((string) $p['image'])) . '" alt="' . e($p['name'])

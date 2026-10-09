@@ -53,7 +53,12 @@ $cfg = [
     // inopérant — il accepterait l'image, dirait « Zapisano », et rien ne
     // changerait sur le site.
     'shop' => [
-        'hero_image' => getenv('WSM_SHOP_HERO') ?: '',
+        'hero_image'     => getenv('WSM_SHOP_HERO') ?: '',
+        // Les icônes des trois promesses de la page d'accueil. Même règle :
+        // vides ici, déposées depuis Ustawienia → Sklep.
+        'promise_icon_1' => getenv('WSM_SHOP_ICON_1') ?: '',
+        'promise_icon_2' => getenv('WSM_SHOP_ICON_2') ?: '',
+        'promise_icon_3' => getenv('WSM_SHOP_ICON_3') ?: '',
     ],
 
     // ---- tpay.com : encaissement ------------------------------------------
