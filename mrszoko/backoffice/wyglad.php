@@ -105,7 +105,8 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Wygląd sklepu' => null]);
   <div class="panel">
     <h2>Czcionka</h2>
     <p class="why">Próbki poniżej są pisane prawdziwymi czcionkami — tak będzie wyglądał sklep.
-      Jedna rodzina do wszystkiego czyta się najlepiej; druga, do nagłówków, tylko gdy wyraźnie kontrastuje.</p>
+      Domyślnie: Lora w tekście i Playfair Display w nagłówkach. Druga rodzina do nagłówków ma sens
+      tylko wtedy, gdy wyraźnie kontrastuje z tekstem.</p>
 
     <label class="field"><span><?= h($pola['font_body'][0]) ?></span></label>
     <div class="wyg-fonty">
@@ -123,7 +124,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Wygląd sklepu' => null]);
     <div class="wyg-fonty">
       <label class="wyg-font">
         <input type="radio" name="font_head" value="same"<?= $t['font_head'] === 'same' ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>>
-        <span><span class="probka">Taka sama jak tekst</span><small>Zalecane — jedna rodzina, bez przypadkowego kontrastu.</small></span>
+        <span><span class="probka">Taka sama jak tekst</span><small>Jedna rodzina do wszystkiego — spokojnie, bez kontrastu.</small></span>
       </label>
       <?php foreach ($fonts as $k => $f): ?>
       <label class="wyg-font">

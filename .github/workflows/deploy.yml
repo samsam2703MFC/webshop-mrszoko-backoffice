@@ -662,6 +662,11 @@ jobs:
           else
             echo "  ^ NOT OK : strona nie czyta motywu z Wygladu"; fail=1
           fi
+          # La police que la page porte VRAIMENT — une information, pas un
+          # verdict : l'équipe peut en choisir une autre depuis Wygląd, et ce
+          # serait voulu. Le défaut de la boutique est Lora (theme.php).
+          CZ=$(printf '%s' "$HOME_HTML" | grep -o "font-sans:'[^']*'" | head -1 | cut -d"'" -f2)
+          echo "  czcionka tekstu na stronie: ${CZ:-Mulish (baza design systemu)}"
           # Fiche produit : on suit un vrai lien du catalogue.
           SLUG=$(printf '%s' "$HOME_HTML" | grep -o 'href="[^"]*/shop/p/[^"]*"' | head -1 | sed 's/.*\/p\///;s/"$//')
           if [ -n "$SLUG" ]; then run "$SH/p/$SLUG" 4000; else echo "  ^ NOT OK : aucun lien produit"; fail=1; fi

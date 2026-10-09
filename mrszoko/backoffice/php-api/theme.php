@@ -31,6 +31,17 @@ declare(strict_types=1);
 const WSM_THEME_PREFIX = 'theme.';
 
 /**
+ * LA BASE n'est pas LE DÉFAUT. La base, c'est ce que tokens.css déclare
+ * (Mulish) : ce que la page porte quand le thème n'imprime rien, et ce que
+ * la console garde. Le défaut de la BOUTIQUE est autre chose — Lora pour le
+ * texte, Playfair Display pour les titres, demandé par l'équipe en octobre
+ * 2026 (« inny wygląd »). Un défaut différent de la base doit donc être
+ * IMPRIMÉ pour s'appliquer ; « Przywróć domyślne » y ramène, et Mulish reste
+ * dans la liste pour qui préfère l'ancien habit.
+ */
+const WSM_THEME_FONT_BAZA = 'mulish';
+
+/**
  * Les familles proposées : clé → [nom, pile CSS, étiquette lue par l'équipe].
  * Toutes HÉBERGÉES ICI (tools/fetch-fonts.sh), jamais chez Google : un
  * @font-face inutilisé ne coûte rien au visiteur, seule la famille choisie
@@ -38,11 +49,11 @@ const WSM_THEME_PREFIX = 'theme.';
  */
 function wsm_theme_fonts(): array {
     return [
-        'mulish'   => ['Mulish',           "'Mulish', system-ui, sans-serif",    'Mulish — obecna: humanistyczna, neutralna'],
+        'mulish'   => ['Mulish',           "'Mulish', system-ui, sans-serif",    'Mulish — poprzednia: humanistyczna, neutralna (czcionka konsoli)'],
         'nunito'   => ['Nunito',           "'Nunito', system-ui, sans-serif",    'Nunito — zaokrąglona, przyjazna'],
         'jost'     => ['Jost',             "'Jost', system-ui, sans-serif",      'Jost — geometryczna, nowoczesna'],
-        'lora'     => ['Lora',             "'Lora', Georgia, serif",             'Lora — szeryfowa, klasyczna'],
-        'playfair' => ['Playfair Display', "'Playfair Display', Georgia, serif", 'Playfair Display — szeryfowa, elegancka; najlepiej do nagłówków'],
+        'lora'     => ['Lora',             "'Lora', Georgia, serif",             'Lora — szeryfowa, klasyczna (domyślna dla tekstu)'],
+        'playfair' => ['Playfair Display', "'Playfair Display', Georgia, serif", 'Playfair Display — szeryfowa, elegancka (domyślna dla nagłówków)'],
     ];
 }
 
@@ -55,9 +66,9 @@ function wsm_theme_fields(): array {
     $fonts = [];
     foreach (wsm_theme_fonts() as $k => $f) $fonts[$k] = $f[2];
     return [
-        'font_body'  => ['Czcionka tekstu', 'select', 'mulish', $fonts,
+        'font_body'  => ['Czcionka tekstu', 'select', 'lora', $fonts,
                          'Cały tekst sklepu: opisy, ceny, przyciski, stopka.'],
-        'font_head'  => ['Czcionka nagłówków', 'select', 'same', ['same' => 'Taka sama jak tekst (zalecane)'] + $fonts,
+        'font_head'  => ['Czcionka nagłówków', 'select', 'playfair', ['same' => 'Taka sama jak tekst'] + $fonts,
                          'Druga rodzina tylko wtedy, gdy ma KONTRASTOWAĆ — dwie podobne wyglądają jak pomyłka, nie jak zamysł.'],
         'brand'      => ['Kolor marki', 'color', '#41281A', [],
                          'Nagłówek strony głównej, stopka, ceny. Z niego wyliczają się jaśniejsze i ciemniejsze odcienie. Musi być ciemny — niesie jasny tekst.'],
@@ -186,8 +197,10 @@ function wsm_theme_is_default(array $t): bool {
 
 /**
  * La feuille qui habille la boutique : des JETONS redéfinis sur :root, et
- * deux règles de mise en page. Vide quand tout est au défaut — la feuille du
- * design system fait alors foi, et aucun octet n'est envoyé pour rien.
+ * deux règles de mise en page. Vide quand tout est à la BASE du design
+ * system (Mulish, couleurs de colors.css) — la feuille du design system fait
+ * alors foi. Au défaut de la boutique elle porte au moins la paire de
+ * polices, puisque ce défaut n'est pas la base.
  *
  * Les nuances d'une couleur se calculent en CSS (color-mix), pas en PHP :
  * c'est le navigateur qui mélange, dans l'espace où il peint, et la formule
@@ -200,10 +213,13 @@ function wsm_theme_css(array $t): string {
     $vars = [];
     $rules = [];
 
-    $body = $fonts[$t['font_body']] ?? $fonts['mulish'];
+    // Les polices se comparent à la BASE (ce que tokens.css déclare), pas au
+    // défaut du thème : le défaut est Lora/Playfair et doit être imprimé.
+    $baza = $fonts[WSM_THEME_FONT_BAZA];
+    $body = $fonts[$t['font_body']] ?? $baza;
     $head = $t['font_head'] === 'same' ? $body : ($fonts[$t['font_head']] ?? $body);
-    if ($t['font_body'] !== $d['font_body']) $vars['--font-sans'] = $body[1];
-    if ($t['font_body'] !== $d['font_body'] || $t['font_head'] !== 'same') $vars['--font-display'] = $head[1];
+    if ($body !== $baza) $vars['--font-sans'] = $body[1];
+    if ($head !== $baza) $vars['--font-display'] = $head[1];
 
     if (strcasecmp($t['brand'], $d['brand']) !== 0) {
         $b = $t['brand'];
