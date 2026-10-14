@@ -652,3 +652,143 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .ogloszenie-in { display: flex; gap: var(--space-4); justify-content: center; align-items: center; padding: var(--space-2) 0; flex-wrap: wrap; text-align: center; }
 .ogloszenie a { color: inherit; font-weight: 600; text-decoration: underline; }
 .ogloszenie strong { color: inherit; }
+
+/* ============================================================================
+   Market Levano — nom, illustration, icônes, contact, logos de livraison et
+   de paiement, fiche produit en trois blocs. Mêmes jetons que le reste : le
+   thème de Wygląd s'applique à tout ce qui suit.
+   ============================================================================ */
+
+/* Le logo et le nom, côte à côte. */
+.head-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.head-logo img { height: 44px; width: auto; }
+.head-nazwa { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--brand);
+              letter-spacing: -0.01em; white-space: nowrap; line-height: 1; }
+/* Sur un téléphone, le nom ne tient pas avec les langues et le panier : le
+   monogramme reste, le nom revient dans le pied de page. Sans ça la barre
+   débordait de 9 px et toute la page glissait de côté. */
+@media (max-width: 560px) { .head-nazwa { display: none; } .head-logo img { height: 40px; } }
+
+/* L'illustration du haut de page, quand aucune photo n'est déposée. Le voile
+   à gauche garde le titre lisible, même sur un téléphone où l'image passe
+   sous le texte. */
+.hero--art { background-image:
+    linear-gradient(90deg, rgba(43,26,18,.55) 0%, rgba(43,26,18,0) 55%),
+    url("assets/hero-art.svg"),
+    radial-gradient(130% 120% at 15% 10%, var(--choco-600), var(--choco-900));
+  background-repeat: no-repeat;
+  background-position: 0 0, right max(-40px, calc((100% - var(--container)) / 2 - 20px)) bottom -6px, 0 0;
+  background-size: cover, auto 104%, cover; }
+@media (max-width: 760px) {
+  .hero--art { background-image:
+      linear-gradient(180deg, rgba(43,26,18,.15) 0%, rgba(43,26,18,.78) 70%),
+      url("assets/hero-art.svg"),
+      radial-gradient(130% 120% at 15% 10%, var(--choco-600), var(--choco-900));
+    background-position: 0 0, right -80px bottom -20px, 0 0; background-size: cover, auto 70%, cover; }
+  /* Le bandeau du bas passe sur les pastilles : un fond sombre le garde lisible. */
+  .hero--art .hero-strip { background: rgba(28,16,10,.8); }
+}
+
+/* Les trois promesses : l'icône à gauche du texte, comme sur la maquette. */
+.promise.promise--ikona { display: flex; gap: var(--space-4); align-items: flex-start; }
+.promise.promise--ikona .promise-ikona { margin-bottom: 0; flex: 0 0 auto; width: 48px; height: 48px; }
+.promise-ikona--rys { display: inline-flex; align-items: center; justify-content: center; color: var(--brand); }
+.promise-ikona--rys svg { width: 48px; height: 48px; }
+.promise-txt { min-width: 0; }
+
+/* ---- Logos de livraison et de paiement ------------------------------------ */
+.metody { display: flex; flex-wrap: wrap; gap: var(--space-5) var(--space-8); }
+.metody-tytul { font-family: var(--font-display); font-weight: 700; font-size: var(--text-md);
+                letter-spacing: 0.02em; text-transform: uppercase; margin-bottom: var(--space-3); }
+.znaki { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.znak { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; text-align: center; }
+.znak-tile { width: 72px; height: 54px; border-radius: 12px; background: #fff; display: flex; flex-direction: column;
+             align-items: center; justify-content: center; gap: 2px; overflow: hidden; position: relative;
+             box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 1px rgba(0,0,0,.05); }
+.znak-label { font-size: 11px; line-height: 1.25; }
+.znak-svg { width: 74%; height: auto; max-height: 62%; display: block; }
+.znak-svg--visa { width: 70%; } .znak-svg--mc { width: 58%; } .znak-svg--apple { width: 68%; max-height: 66%; }
+.znak-svg--gpay { width: 72%; } .znak-svg--ikona { width: 46%; max-height: 70%; color: var(--choco-800); }
+.znak-tile--inpost { background: #FFCD00; color: #1D1D1B; justify-content: flex-start; padding-top: 9px; }
+.znak-tile--inpost b { font-family: var(--font-sans); font-weight: 800; font-size: 15px; letter-spacing: -0.02em; line-height: 1; }
+.znak-tile--inpost i { position: absolute; left: 0; right: 0; bottom: 0; background: #1D1D1B; color: #FFCD00;
+                       font-style: normal; font-size: 8.5px; font-weight: 700; letter-spacing: .02em; padding: 3px 0; }
+.znak-tile--dpd { flex-direction: row; gap: 3px; }
+.znak-tile--dpd .znak-svg--dpd { width: 20px; height: 22px; max-height: none; }
+.znak-tile--dpd b { font-family: var(--font-sans); font-weight: 800; font-size: 17px; color: #DC0032; letter-spacing: -0.03em; }
+.znak-tile--pickup { padding-bottom: 14px; }
+.znak-tile--pickup i { position: absolute; left: 0; right: 0; bottom: 0; background: #DC0032; color: #fff;
+                       font-style: normal; font-size: 9px; font-weight: 700; padding: 3px 0; }
+.znak-tile--blik { background: #000; }
+.znak-tile--blik b { color: #fff; font-family: var(--font-sans); font-weight: 900; font-size: 19px; letter-spacing: -0.04em; }
+
+/* Dans le pied de page : sur le chocolat, comme la maquette. */
+.foot-metody { background: var(--choco-900); border-bottom: 1px solid var(--choco-800); }
+.foot-metody .wrap { padding-top: var(--space-6); padding-bottom: var(--space-6); }
+.metody--stopka .metody-tytul { color: var(--cream-50); }
+.metody--stopka .znak-label { color: var(--choco-200); }
+
+/* Sur la fiche produit : plus petit, sous le bouton. */
+.metody--karta { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--border-subtle);
+                 gap: var(--space-4) var(--space-6); }
+.metody--karta .metody-tytul { font-size: var(--text-sm); color: var(--text-strong); margin-bottom: var(--space-2); }
+.metody--karta .znak { width: 60px; } .metody--karta .znak-tile { width: 60px; height: 44px; border-radius: 10px; }
+.metody--karta .znak-label { color: var(--text-muted); font-size: 10.5px; }
+.metody--karta .znak-tile--inpost b { font-size: 12.5px; } .metody--karta .znak-tile--inpost { padding-top: 7px; }
+.metody--karta .znak-tile--inpost i { font-size: 7px; } .metody--karta .znak-tile--dpd b { font-size: 14px; }
+.metody--karta .znak-tile--dpd .znak-svg--dpd { width: 16px; height: 18px; } .metody--karta .znak-tile--blik b { font-size: 16px; }
+
+/* ---- Pied de page : la police du texte, plus le mono ---------------------- */
+.site-foot { font-family: var(--font-sans); font-size: var(--text-sm); }
+.foot-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--cream-50); text-decoration: none;
+              margin-bottom: var(--space-3); }
+.foot-brand span { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; }
+.site-foot .foot-logo { height: 40px; width: auto; margin-bottom: 0; opacity: 1; }
+.foot-tagline { color: var(--choco-200); max-width: 42ch; }
+.foot-copy { color: var(--choco-400); font-size: var(--text-xs); }
+.site-foot .seller { font-size: var(--text-xs); }
+.foot-links { font-size: var(--text-sm); }
+
+/* ---- Le contact sur la page d'accueil ------------------------------------- */
+.kontakt-karta { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6);
+                 align-items: center; background: var(--surface-card); border: 1px solid var(--border-subtle);
+                 border-radius: var(--radius-2xl); padding: var(--space-7); box-shadow: var(--shadow-sm); }
+.kontakt-txt .eyebrow { color: var(--caramel-600); margin-bottom: var(--space-2); }
+.kontakt-txt h2 { margin-bottom: var(--space-2); }
+.kontakt-txt p { color: var(--text-muted); max-width: 46ch; }
+.kontakt-dane { display: grid; gap: var(--space-3); }
+.kontakt-poz { display: flex; align-items: center; gap: var(--space-3); padding: 12px 16px; border-radius: var(--radius-lg);
+               border: 1px solid var(--border-default); background: var(--cream-50); color: var(--text-strong);
+               text-decoration: none; transition: border-color var(--dur-base) var(--ease-out); }
+.kontakt-poz:hover { border-color: var(--accent); }
+.kontakt-poz .kontakt-ikona { color: var(--brand); flex: 0 0 auto; }
+.kontakt-poz span { display: flex; flex-direction: column; min-width: 0; }
+.kontakt-poz small { color: var(--text-muted); font-size: var(--text-xs); }
+.kontakt-poz b { font-size: var(--text-lg); overflow-wrap: anywhere; }
+.kontakt-poz--form b { font-size: var(--text-md); }
+@media (max-width: 760px) { .kontakt-karta { grid-template-columns: minmax(0, 1fr); padding: var(--space-5); } }
+
+/* ---- Fiche produit : la référence, le rayon, puis trois blocs ------------- */
+.buy-meta { display: grid; gap: 4px; margin-top: var(--space-4); font-size: var(--text-sm); }
+.buy-meta div { display: flex; gap: 8px; }
+.buy-meta dt { color: var(--text-muted); } .buy-meta dt::after { content: ":"; }
+.buy-meta dd { color: var(--text-strong); font-weight: 600; }
+.buy-meta a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.product-info { margin-top: var(--space-8); display: grid; gap: var(--space-6); }
+.product-opis { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+                padding: var(--space-6); }
+.product-opis h2, .product-tabela h2 { font-size: var(--text-lg); text-transform: uppercase; letter-spacing: 0.03em;
+                                      margin-bottom: var(--space-4); }
+.product-opis .prose { max-width: 76ch; }
+.product-opis .prose p + p, .product-opis .prose ul { margin-top: var(--space-3); }
+.product-opis .prose ul { padding-left: 1.2em; }
+.product-tabele { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-5); align-items: start; }
+.product-tabela { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+                  padding: var(--space-6); }
+.tabela div { display: flex; justify-content: space-between; gap: var(--space-4); padding: 8px 0;
+              border-bottom: 1px solid var(--border-subtle); }
+.tabela div:last-child { border-bottom: 0; }
+.tabela dt { font-weight: 600; color: var(--text-strong); }
+.tabela dd { color: var(--text-body); text-align: right; }
+.tabela .pod dt { font-weight: 400; color: var(--text-muted); padding-left: 1em; }
+@media (max-width: 640px) { .foot-links { align-items: flex-start; } }

@@ -343,6 +343,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 if ($n < 0 || $n > $max) { $fieldErrors[$k] = 'od 0 do ' . $max; continue; }
                 $mesures[$k] = $n;
             }
+            // ── LES VALEURS NUTRITIVES POUR 100 g ─────────────────────────
+            // Des chiffres, plus une phrase perdue dans la description. Le
+            // témoin « nutri__on » dit que la fiche les portait : sans lui, un
+            // autre formulaire (stock, visibilité) les effacerait.
+            $nutri = null;
+            if (!empty($_POST['nutri__on'])) {
+                $nErr = [];
+                $nutri = wsm_nutrition_clean((array) ($_POST['nutri'] ?? []), $nErr);
+                foreach (array_keys($nErr) as $nk) $fieldErrors['nutri_' . $nk] = 'liczba, np. 32,5 albo <0,5';
+            }
             // Le stock ne se pose plus directement : il se corrige, et la
             // correction laisse une trace dans le magasin (qui, quand, pourquoi).
             $wantStock = isset($_POST['stock']) ? max(0, (int) $_POST['stock']) : null;
@@ -412,6 +422,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                         $set[] = 'brand_id = ?'; $vals[] = $bid > 0 ? $bid : null;
                     }
                     foreach ($mesures as $k => $v) { $set[] = "$k = ?"; $vals[] = $v; }
+                    if ($nutri !== null) { $set[] = 'nutrition = ?'; $vals[] = wsm_nutrition_encode($nutri); }
                     // Le gabarit se DÉDUIT des dimensions : le laisser en
                     // arrière ferait payer un tarif qui ne correspond plus au
                     // colis. Même règle que le semis (wsm_seed_shop).
@@ -448,6 +459,27 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                                 ->execute([WSM_CMS_BASE_LANG, $cle]);
                         }
                         $vals[$cle] = [WSM_CMS_BASE_LANG => (string) $_POST[$champ]];
+                    }
+                    // LES PROPRIÉTÉS, ligne à ligne : product.<id>.prop.<n>.k/.v,
+                    // des textes traduisibles dans Treści comme la description.
+                    // Une ligne vide jamais remplie ne crée rien ; une ligne
+                    // remplie puis vidée est vidée — la fiche n'en montre plus.
+                    foreach ((array) ($_POST['prop'] ?? []) as $n => $ligne) {
+                        $n = (int) $n;
+                        if ($n < 1 || $n > WSM_PRODUCT_PROPS_MAX || !is_array($ligne)) continue;
+                        foreach (['k' => 80, 'v' => 300] as $moitie => $max) {
+                            $cle = 'product.' . $id . '.prop.' . $n . '.' . $moitie;
+                            $val = mb_substr(trim(str_replace(["\r", "\n"], ' ', (string) ($ligne[$moitie] ?? ''))), 0, $max);
+                            $st2 = $pdo->prepare("SELECT COUNT(*) FROM wsm_shop_i18n WHERE lang = ? AND k = ?");
+                            $st2->execute([WSM_CMS_BASE_LANG, $cle]);
+                            $existe = (bool) (int) $st2->fetchColumn();
+                            if (!$existe && $val === '') continue;
+                            if (!$existe) {
+                                $pdo->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES (?,?,'')")
+                                    ->execute([WSM_CMS_BASE_LANG, $cle]);
+                            }
+                            $vals[$cle] = [WSM_CMS_BASE_LANG => $val];
+                        }
                     }
                     $nTxt = 0;
                     if ($vals) {
@@ -596,6 +628,12 @@ console_head('Produkty i zdjęcia', $me, <<<'CSS'
   button.danger { background: transparent; border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); }
   a.view { font-size: 13px; color: var(--brand); font-weight: 600; text-decoration: none; }
   a.view:hover { text-decoration: underline; }
+  fieldset.fs { grid-column: 1 / -1; border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 14px 4px; margin: 0 0 14px; }
+  fieldset.fs legend { font-size: 13px; font-weight: 700; color: var(--text-strong); padding: 0 6px; }
+  fieldset.fs legend small { font-weight: 400; color: var(--text-muted); }
+  .props-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 8px; margin-bottom: 8px; }
+  .props-row input { width: 100%; }
+  .nutri-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0 12px; }
 CSS, '');
 console_flash($flash, $kind);
 console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
@@ -730,9 +768,56 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Produkty' => null]);
             <small>Jedna linia pod nazwą na karcie produktu.</small>
           </label>
           <label class="f" style="grid-column:1/-1">Opis
-            <textarea name="opis" rows="4"<?= $isAdmin ? '' : ' disabled' ?>><?= h($vv('opis', $txt((string) $p['id'], 'desc'))) ?></textarea>
-            <small>Tekst na stronie produktu. Puste pole = bez opisu.</small>
+            <textarea name="opis" rows="6"<?= $isAdmin ? '' : ' disabled' ?>><?= h($vv('opis', $txt((string) $p['id'], 'desc'))) ?></textarea>
+            <small>Tekst na stronie produktu. Pusta linia = nowy akapit, „- ” na początku linii = punkt listy, **pogrubienie**.
+              Opakowanie, skład czy wartości odżywcze wpisz niżej — sklep pokaże je w osobnych tabelach.</small>
           </label>
+
+          <?php if (!$nowy):
+            // LES PROPRIÉTÉS ET LES VALEURS NUTRITIVES — en champs, plus dans
+            // la description. Les lignes remplies, plus trois vides : il en
+            // vient trois autres à chaque enregistrement, jusqu'à douze.
+            $pid = (string) $p['id'];
+            $refait = fn(string $grp, string $k, string $i, string $def) =>
+                ($fieldErrors && $openId === $pid && isset($_POST[$grp][$k][$i])) ? (string) $_POST[$grp][$k][$i] : $def;
+            $derniere = 0;
+            for ($n = 1; $n <= WSM_PRODUCT_PROPS_MAX; $n++) if ($txt($pid, "prop.$n.k") !== '' || $txt($pid, "prop.$n.v") !== '') $derniere = $n;
+            $exemples = [1 => ['Opakowanie', 'Zgrzewany worek z zapięciem strunowym'], 2 => ['Opakowanie zbiorcze', '10 kg (4 × 2,5 kg), karton'],
+                         3 => ['Skład', 'cukier, masło kakaowe, mleko w proszku…'], 4 => ['Przechowywanie', 'W suchym i zacienionym miejscu'],
+                         5 => ['Kraj pochodzenia', 'Belgia']]; ?>
+          <fieldset class="fs">
+            <legend>Właściwości produktu <small>— tabela pod opisem w sklepie. Tłumaczenia: Treści → product.<?= h($pid) ?>.prop</small></legend>
+            <?php for ($n = 1; $n <= min(WSM_PRODUCT_PROPS_MAX, max($derniere + 3, 5)); $n++): ?>
+            <div class="props-row">
+              <input type="text" name="prop[<?= $n ?>][k]" maxlength="80" aria-label="Nazwa <?= $n ?>"
+                     value="<?= h($refait('prop', (string) $n, 'k', $txt($pid, "prop.$n.k"))) ?>"
+                     placeholder="<?= h($exemples[$n][0] ?? 'Nazwa') ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+              <input type="text" name="prop[<?= $n ?>][v]" maxlength="300" aria-label="Wartość <?= $n ?>"
+                     value="<?= h($refait('prop', (string) $n, 'v', $txt($pid, "prop.$n.v"))) ?>"
+                     placeholder="<?= h($exemples[$n][1] ?? 'Wartość') ?>"<?= $isAdmin ? '' : ' disabled' ?>>
+            </div>
+            <?php endfor; ?>
+            <small class="muted">Wiersz bez nazwy albo bez wartości się nie pokazuje. Pochodzenie, kakao, gramatura i EAN dochodzą same z pól niżej.</small>
+          </fieldset>
+
+          <fieldset class="fs">
+            <legend>Wartości odżywcze w 100 g <small>— same liczby, np. 32,5 albo &lt;0,5; jednostki dopisuje sklep. Puste = bez tabeli.</small></legend>
+            <input type="hidden" name="nutri__on" value="1">
+            <?php $nAkt = wsm_nutrition_decode((string) ($p['nutrition'] ?? ''));
+                  $nLbl = ['energy_kj' => 'Wartość energetyczna (kJ)', 'energy_kcal' => 'Wartość energetyczna (kcal)', 'fat' => 'Tłuszcz (g)',
+                           'saturates' => 'w tym kwasy nasycone (g)', 'carbs' => 'Węglowodany (g)', 'sugars' => 'w tym cukry (g)',
+                           'fibre' => 'Błonnik (g)', 'protein' => 'Białko (g)', 'salt' => 'Sól (g)']; ?>
+            <div class="nutri-grid">
+              <?php foreach (array_keys(WSM_NUTRITION_FIELDS) as $nk):
+                    $nVal = ($fieldErrors && $openId === $pid && isset($_POST['nutri'][$nk])) ? (string) $_POST['nutri'][$nk] : (string) ($nAkt[$nk] ?? ''); ?>
+              <label class="f"><?= h($nLbl[$nk]) ?>
+                <input type="text" name="nutri[<?= h($nk) ?>]" value="<?= h($nVal) ?>" inputmode="decimal" maxlength="12"<?= $isAdmin ? '' : ' disabled' ?>>
+                <?php if (isset($fieldErrors['nutri_' . $nk]) && $openId === $pid): ?><small class="err"><?= h($fieldErrors['nutri_' . $nk]) ?></small><?php endif; ?>
+              </label>
+              <?php endforeach; ?>
+            </div>
+          </fieldset>
+          <?php endif; ?>
 
           <label class="f">Adres w sklepie (slug)
             <?php $slugVal = (string) $p['slug'] !== ''

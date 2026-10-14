@@ -71,12 +71,12 @@ rm -rf site && mkdir -p site/backoffice site/landing
 
 BO=mrszoko/backoffice
 cp -r "$BO"/_ds site/backoffice/
-mkdir -p site/backoffice/img && cp "$BO"/img/logo.png site/backoffice/img/
+mkdir -p site/backoffice/img && cp "$BO"/img/logo.svg site/backoffice/img/
 cat > site/backoffice/index.html <<'HTML'
 <!doctype html><html lang="pl"><head><meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
 <meta http-equiv="refresh" content="0; url=login.php">
-<title>Konsola Mister Szoko</title></head>
+<title>Konsola Market Levano</title></head>
 <body><p><a href="login.php">Przejdź do logowania</a></p></body></html>
 HTML
 # php-api → api : c'est le chemin que la console dérive de sa propre adresse.
@@ -108,9 +108,9 @@ cat > site/index.html <<'HTML'
 <!DOCTYPE html>
 <html lang="pl"><head><meta charset="utf-8">
 <meta http-equiv="refresh" content="0; url=shop/">
-<title>Mister Szoko</title>
+<title>Market Levano</title>
 <link rel="canonical" href="shop/">
-</head><body><p><a href="shop/">Mister Szoko</a></p></body></html>
+</head><body><p><a href="shop/">Market Levano</a></p></body></html>
 HTML
 
 echo "══ 2/5 · contrôles AVANT envoi ════════════════════════════════════════"
@@ -291,6 +291,15 @@ grep -q 'function wsm_media_titles(PDO' site/backoffice/api/media.php \
   && grep -q 'wsm_media' site/backoffice/api/schema/webshop_mrszoko.mysql.sql \
   || { echo "  nazwy plikow w mediotece incompletes dans l'assemblage"; exit 1; }
 echo "  nazwy plikow w mediotece : obecne"
+# MARKET LEVANO : dessins, logique des logos de paiement, monogramme,
+# illustration, valeurs nutritives, contact.
+[ -f site/shop/znaki.php ] && [ -f site/backoffice/api/metody.php ] \
+  && [ -f site/shop/assets/logo.svg ] && [ -f site/shop/assets/hero-art.svg ] && [ -f site/backoffice/img/logo.svg ] \
+  && grep -q 'function metody_html' site/shop/lib.php && grep -q 'metody_html(wsm_pdo()' site/shop/layout.php \
+  && grep -q 'function wsm_nutrition_rows' site/backoffice/api/shop.php \
+  && grep -q "'kontakt'   =>" site/backoffice/api/layout.php && grep -q 'function wsm_brand_name' site/backoffice/api/db.php \
+  || { echo "  Market Levano incomplet dans l'assemblage"; exit 1; }
+echo "  market levano (rysunki, logotypy, monogram, kontakt, tabele produktu) : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte

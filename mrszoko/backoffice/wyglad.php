@@ -113,7 +113,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Wygląd sklepu' => null]);
       <?php foreach ($fonts as $k => $f): ?>
       <label class="wyg-font">
         <input type="radio" name="font_body" value="<?= h($k) ?>"<?= $t['font_body'] === $k ? ' checked' : '' ?><?= $isAdmin ? '' : ' disabled' ?>>
-        <span><span class="probka" style="font-family: <?= h($f[1]) ?>">Mister Szoko — czekolada z Wrocławia, 70 % kakao</span>
+        <span><span class="probka" style="font-family: <?= h($f[1]) ?>"><?= h(wsm_brand_name()) ?> — czekolada, cukry i mąki dla cukierni</span>
           <small><?= h($f[2]) ?></small></span>
       </label>
       <?php endforeach; ?>

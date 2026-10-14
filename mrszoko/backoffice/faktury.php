@@ -110,7 +110,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 'subject'  => ($inv['kind'] === 'paragon' ? 'E-paragon ' : 'Faktura ') . $inv['number'],
                 'body'     => "Dzień dobry,\n\nw załączeniu dane dokumentu " . $inv['number'] . " na kwotę "
                             . wsm_money((int) $inv['total_gross']) . " zł.\n\nTermin płatności: " . $inv['due_at']
-                            . "\nRachunek: " . $inv['iban'] . "\n\nMister Szoko",
+                            . "\nRachunek: " . $inv['iban'] . "\n\n" . wsm_brand_name(),
                 'template_code' => 'faktura',
                 'event_key' => 'faktura:' . (int) $inv['id'],
                 'actor'    => (string) ($me['nom'] ?? ''),

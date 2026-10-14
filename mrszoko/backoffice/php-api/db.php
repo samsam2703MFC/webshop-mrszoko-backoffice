@@ -25,6 +25,25 @@ function wsm_config_overlay(?array $patch = null): array {
 }
 
 /** Open a PDO connection to the configured engine. */
+/**
+ * LE NOM DE LA BOUTIQUE, là où il ne passe pas par la vitrine : titres de la
+ * console, objets et signatures des e-mails, description du paiement. Il vit
+ * dans Treści (clé « brand », en polonais) — un seul endroit à changer, et
+ * pas un nom écrit en dur dans dix fichiers comme l'était « Mister Szoko ».
+ */
+function wsm_brand_name(): string {
+    static $nom = null;
+    if ($nom !== null) return $nom;
+    $nom = 'Market Levano';
+    try {
+        $st = wsm_pdo()->prepare("SELECT v FROM wsm_shop_i18n WHERE lang = 'pl' AND k = 'brand'");
+        $st->execute();
+        $v = trim((string) $st->fetchColumn());
+        if ($v !== '') $nom = $v;
+    } catch (Throwable $e) { /* table absente : le nom par défaut */ }
+    return $nom;
+}
+
 function wsm_pdo(): PDO {
     static $pdo = null;
     if ($pdo instanceof PDO) return $pdo;
@@ -489,6 +508,9 @@ function wsm_ensure_shop(PDO $pdo): void {
         'cocoa'        => $txt(16),
         'unit_label'   => $txt(40),
         'badge'        => $txt(40),
+        // Les valeurs nutritives pour 100 g, en JSON (shop.php :
+        // WSM_NUTRITION_FIELDS). Vide = la fiche n'affiche pas le tableau.
+        'nutrition'    => ['TEXT', 'TEXT'],
     ]);
 
     // Contenu de la boutique : modes de livraison + libellés traduits.

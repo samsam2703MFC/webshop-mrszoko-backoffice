@@ -77,13 +77,13 @@ $manque = array_filter($o['items'], fn($l) => (int) ($l['backorder'] ?? 0) > 0);
       <h1>Zamówienie</h1>
       <div class="no"><?= h($o['code']) ?></div>
     </div>
-    <img src="img/logo.png" alt="Mister Szoko">
+    <img src="<?= h(console_logo_src()) ?>" alt="">
   </div>
 
   <div class="grid">
     <div>
       <h2>Sprzedawca</h2>
-      <p><b><?= h((string) ($cfg['seller_name'] ?? 'Mister Szoko')) ?></b><br>
+      <p><b><?= h((string) ($cfg['seller_name'] ?? wsm_brand_name())) ?></b><br>
          <?= h((string) ($cfg['seller_address'] ?? '')) ?></p>
     </div>
     <div>

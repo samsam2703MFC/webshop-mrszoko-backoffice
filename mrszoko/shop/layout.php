@@ -22,7 +22,7 @@
  */
 function layout_head(array $S, string $lang, array $langs, string $title = '',
                      string $desc = '', string $page = '', string $image = ''): void {
-    $title = $title !== '' ? $title . ', ' . ($S['brand'] ?? 'Mister Szoko') : ($S['meta.title'] ?? 'Mister Szoko');
+    $title = $title !== '' ? $title . ', ' . ($S['brand'] ?? 'Market Levano') : ($S['meta.title'] ?? 'Market Levano');
     $desc  = $desc !== '' ? $desc : ($S['meta.desc'] ?? '');
     ?><!DOCTYPE html>
 <html lang="<?= e($lang) ?>">
@@ -89,7 +89,11 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
 <header class="site-head">
   <div class="wrap head-in">
     <a class="head-logo" href="<?= e(u()) ?>" aria-label="<?= e($S['a11y.home'] ?? '') ?>">
-      <img src="<?= e(logo_src()) ?>" alt="<?= e($S['brand'] ?? 'Mister Szoko') ?>" width="150" height="44">
+      <?php // Le logo, et le NOM à côté : sans lui, un monogramme ne dit à
+            // personne chez qui il achète. Un logo déposé qui porte déjà le
+            // nom se règle à « 0 » dans Integracje → Sklep. ?>
+      <img src="<?= e(logo_src()) ?>" alt="<?= e(logo_nazwa_on() ? '' : ($S['brand'] ?? 'Market Levano')) ?>" height="44">
+      <?php if (logo_nazwa_on()): ?><span class="head-nazwa"><?= e($S['brand'] ?? 'Market Levano') ?></span><?php endif; ?>
     </a>
     <nav class="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
       <?php // L'ORDRE ET LA PRÉSENCE DES LIENS VIENNENT D'UKŁAD STRONY : Sklep,
@@ -121,23 +125,31 @@ function layout_footer(array $S, string $lang = ''): void {
     if ($lang === '') $lang = (string) ($GLOBALS['lang'] ?? WSM_SHOP_DEFAULT_LANG);
     ?>
 <footer class="site-foot">
+  <?php // COMMENT PAYER, COMMENT RECEVOIR — sur toutes les pages, avant de
+        // commander. Ce que la caisse offre vraiment (metody.php). ?>
+  <?php $metody = metody_html(wsm_pdo(), $S, 'metody--stopka'); if ($metody !== ''): ?>
+  <div class="foot-metody"><div class="wrap"><?= $metody ?></div></div>
+  <?php endif; ?>
   <div class="wrap foot-in">
-    <div>
-      <img class="foot-logo" src="<?= e(logo_src()) ?>" alt="<?= e($S['brand'] ?? '') ?>" width="120" height="36" loading="lazy">
-      <p class="mono"><?= e($S['footer.tagline'] ?? '') ?></p>
+    <div class="foot-main">
+      <a class="foot-brand" href="<?= e(u()) ?>">
+        <img class="foot-logo" src="<?= e(logo_src()) ?>" alt="" height="40" loading="lazy">
+        <?php if (logo_nazwa_on()): ?><span><?= e($S['brand'] ?? '') ?></span><?php endif; ?>
+      </a>
+      <p class="foot-tagline"><?= e($S['footer.tagline'] ?? '') ?></p>
       <?php // Vente à distance en Pologne : raison sociale, adresse du siège et
             // numéros d'immatriculation doivent figurer sur le site. ?>
       <?php if (($S['seller.name'] ?? '') !== ''): ?>
-      <p class="mono seller">
+      <p class="seller">
         <span class="seller-label"><?= e($S['seller.legal'] ?? '') ?></span>
         <?= e($S['seller.name']) ?><br>
         <?= e($S['seller.address'] ?? '') ?><br>
         <?= e($S['seller.ids'] ?? '') ?>
       </p>
       <?php endif; ?>
-      <p class="mono"><?= e(date('Y')) ?> · <?= e($S['brand'] ?? '') ?> · <?= e($S['footer.rights'] ?? '') ?></p>
+      <p class="foot-copy"><?= e(date('Y')) ?> · <?= e($S['brand'] ?? '') ?> · <?= e($S['footer.rights'] ?? '') ?></p>
     </div>
-    <nav class="foot-links mono" aria-label="<?= e($S['footer.contact'] ?? '') ?>">
+    <nav class="foot-links" aria-label="<?= e($S['footer.contact'] ?? '') ?>">
       <?php // L'ORDRE VIENT D'UKŁAD STRONY, mais deux liens n'y ont pas
             // d'interrupteur : le règlement et la politique de confidentialité.
             // « W ŁATWO DOSTĘPNYM MIEJSCU », mot pour mot ce que demande

@@ -60,8 +60,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         } else {
             $id = wsm_mail_queue($pdo, [
                 'email' => $to, 'direction' => 'wyjscie',
-                'subject' => 'Mister Szoko — test poczty',
-                'body' => "To jest wiadomość testowa z konsoli Mister Szoko.\nJeśli ją widzisz, wysyłka działa.",
+                'subject' => wsm_brand_name() . ' — test poczty',
+                'body' => "To jest wiadomość testowa z konsoli " . wsm_brand_name() . ".\nJeśli ją widzisz, wysyłka działa.",
                 'actor' => (string) ($me['nom'] ?? ''),
             ]);
             [$ok, $err] = $id ? wsm_mail_send($pdo, $id) : [false, 'nie zapisano wiadomości'];
@@ -118,7 +118,11 @@ $state = [
     'ksef'    => function_exists('wsm_ksef_enabled') && wsm_ksef_enabled(),
 ];
 
-console_head('Integracje', $me);
+console_head('Integracje', $me, <<<CSS
+  .multi { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 6px; }
+  .multi label.chk { display: inline-flex; gap: 8px; align-items: center; margin: 0; cursor: pointer; }
+  .multi label.chk span { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text-strong); }
+CSS);
 console_flash($flash, $flashKind);
 console_crumbs(['Pulpit' => 'pulpit.php', 'Integracje' => null]);
 ?>
@@ -218,14 +222,24 @@ if ($orphelins): ?>
       <?php endif; ?>
 
     <div class="grid2">
-    <?php foreach ($fields as $key => $f): ?>
-      <label class="field">
+    <?php foreach ($fields as $key => $f): $multi = str_starts_with($f['type'], 'multi:'); ?>
+      <<?= $multi ? 'div' : 'label' ?> class="field">
         <span><?= h($f['label']) ?>
           <?php if ($f['locked']): ?><em class="tag">serwer</em>
           <?php elseif ($f['source'] === 'baza'): ?><em class="tag ok">zapisane</em>
           <?php endif; ?>
         </span>
-        <?php if (str_starts_with($f['type'], 'select:')):
+        <?php if (str_starts_with($f['type'], 'multi:')):
+          // Des cases, une par logo. Cochées = ce que la boutique montre
+          // MAINTENANT (le défaut tant que personne n'a choisi).
+          $coches = function_exists('wsm_metody') ? wsm_metody($pdo, $key === 'metody_wysylki' ? 'wysylka' : 'platnosc') : []; ?>
+          <input type="hidden" name="<?= h($f['form']) ?>__multi" value="1">
+          <span class="multi">
+          <?php foreach (explode('|', substr($f['type'], 6)) as $o): [$kod, $lbl] = array_pad(explode(':', $o, 2), 2, ''); ?>
+            <label class="chk"><input type="checkbox" name="<?= h($f['form']) ?>[]" value="<?= h($kod) ?>"<?= in_array($kod, $coches, true) ? ' checked' : '' ?><?= $f['locked'] ? ' disabled' : '' ?>><span><?= h($lbl !== '' ? $lbl : $kod) ?></span></label>
+          <?php endforeach; ?>
+          </span>
+        <?php elseif (str_starts_with($f['type'], 'select:')):
           $opts = explode('|', substr($f['type'], 7)); ?>
           <select name="<?= h($f['form']) ?>"<?= $f['locked'] ? ' disabled' : '' ?>>
             <?php foreach ($opts as $o): ?>
@@ -260,7 +274,7 @@ if ($orphelins): ?>
                  autocomplete="off" spellcheck="false"<?= $f['locked'] ? ' disabled' : '' ?>>
         <?php endif; ?>
         <span class="hint"><?= h($f['help']) ?><?php if ($f['locked']): ?> Ustawione na serwerze (<?= h($f['env']) ?>) — tu tylko do wglądu.<?php endif; ?></span>
-      </label>
+      </<?= $multi ? 'div' : 'label' ?>>
     <?php endforeach; ?>
     </div>
   </div>

@@ -68,7 +68,10 @@ $prod('test-dpd-abc', $czek, 1);   // artefact de mise au point
 echo "-- sprzatanie nie niszczy --\n";
 $n = 0;
 foreach (wsm_content_menage() as [$sql, $args]) {
-    $st = $db->prepare($sql); $st->execute($args); $n += $st->rowCount();
+    // Comme wsm_sync_content() : une opération sur une table que cette base
+    // n'a pas (wsm_shop_i18n, ici) se tait au lieu de tout arrêter.
+    try { $st = $db->prepare($sql); $st->execute($args); $n += $st->rowCount(); }
+    catch (Throwable $e) { /* table absente : rien à nettoyer */ }
 }
 ok('il a touché quelque chose', $n > 0, $n);
 
@@ -90,7 +93,8 @@ ok('aucun produit supprimé', (int) $db->query("SELECT COUNT(*) FROM wsm_product
 // Idempotence : rejoué, il ne trouve plus rien.
 $n2 = 0;
 foreach (wsm_content_menage() as [$sql, $args]) {
-    $st = $db->prepare($sql); $st->execute($args); $n2 += $st->rowCount();
+    try { $st = $db->prepare($sql); $st->execute($args); $n2 += $st->rowCount(); }
+    catch (Throwable $e) { /* table absente, comme au premier passage */ }
 }
 ok('rejoué, il ne change plus rien', $n2 === 0, $n2);
 

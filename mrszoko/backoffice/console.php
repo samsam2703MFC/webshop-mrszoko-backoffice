@@ -161,6 +161,13 @@ if (!function_exists('img_src')) {
     }
 }
 
+/** Le logo de la console et des documents : celui déposé pour la boutique, sinon le monogramme. */
+function console_logo_src(): string {
+    $l = trim((string) (wsm_config()['shop']['logo_image'] ?? ''));
+    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return 'img/logo.svg';
+    return img_src($l);
+}
+
 function console_api_dir(): string {
     return is_dir(__DIR__ . '/api') ? __DIR__ . '/api' : __DIR__ . '/php-api';
 }
@@ -468,8 +475,8 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
-<title><?= h($title) ?> — Mister Szoko</title>
-<link rel="icon" type="image/png" href="img/logo.png">
+<title><?= h($title) ?> — <?= h(wsm_brand_name()) ?></title>
+<link rel="icon" href="<?= h(console_logo_src()) ?>">
 <link rel="stylesheet" href="_ds/mister-szoko/global.css">
 <link rel="stylesheet" href="_ds/mister-szoko/brand.css">
 <link rel="stylesheet" href="<?= h(console_asset('console.css')) ?>">
@@ -485,8 +492,8 @@ function console_head(string $title, array $me, string $extraCss = '', string $b
 <div class="shell">
   <aside class="side">
     <a class="brand" href="pulpit.php">
-      <img src="img/logo.png" alt="Mister Szoko">
-      <span>Konsola<br><b>Mister Szoko</b></span>
+      <img src="<?= h(console_logo_src()) ?>" alt="">
+      <span>Konsola<br><b><?= h(wsm_brand_name()) ?></b></span>
     </a>
     <!-- Fermer le tiroir depuis l'intérieur : le voile n'est tapable que sur
          la bande restée visible, ce qui ne suffit pas sur un petit écran. -->

@@ -44,6 +44,10 @@ function wsm_layout_home_builtins(): array {
         'obietnice' => ['label' => 'Trzy obietnice z ikonami',             'fixed' => false],
         'katalog'   => ['label' => 'Katalog produktów',                    'fixed' => true],
         'pro'       => ['label' => 'Blok dla firm (B2B)',                  'fixed' => false],
+        // Le téléphone et l'e-mail sur la page d'accueil — demandés par
+        // l'équipe. Les deux viennent de Treści (footer.phone, footer.email) :
+        // un seul endroit à corriger le jour où le numéro change.
+        'kontakt'   => ['label' => 'Kontakt — telefon i e-mail (z Treści: footer.phone, footer.email)', 'fixed' => false],
     ];
 }
 
@@ -61,6 +65,7 @@ function wsm_layout_nav_builtins(): array {
 function wsm_layout_footer_builtins(): array {
     return [
         'email'      => ['label' => 'Adres e-mail (z Treści: footer.email)'],
+        'telefon'    => ['label' => 'Telefon (z Treści: footer.phone)'],
         // Le pied de page est le seul endroit présent sur TOUTES les pages,
         // téléphone compris : le suivi de commande y reste, sinon il
         // n'existerait que sur l'écran où on en a le moins besoin.
@@ -377,6 +382,7 @@ function wsm_layout_liens(PDO $pdo, string $which): array {
 function wsm_layout_marker(string $k): string {
     return match ($k) {
         'pro'       => '<!-- sekcja pro: ukryta w Układzie strony -->',
+        'kontakt'   => '<!-- kontakt: ukryty w Układzie strony -->',
         'obietnice' => '<!-- obietnice: ukryte w Układzie strony -->',
         'pasek'     => '<!-- pasek: ukryty w Układzie strony -->',
         default     => '<!-- ' . $k . ': ukryte w Układzie strony -->',

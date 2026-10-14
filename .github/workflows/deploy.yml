@@ -55,7 +55,7 @@ jobs:
           # Ce qui reste est ce dont les écrans PHP se servent VRAIMENT : les
           # feuilles du design system et le logo.
           cp -r "$BO"/_ds site/backoffice/
-          mkdir -p site/backoffice/img && cp "$BO"/img/logo.png site/backoffice/img/
+          mkdir -p site/backoffice/img && cp "$BO"/img/logo.svg site/backoffice/img/
           # Une adresse partagée ou mise en favori pointe encore sur index.html.
           # On la garde donc, réduite à ce qu'elle doit faire : renvoyer vers la
           # porte. Sans JavaScript, pour la même raison que login.php.
@@ -63,7 +63,7 @@ jobs:
           <!doctype html><html lang="pl"><head><meta charset="utf-8">
           <meta name="robots" content="noindex, nofollow">
           <meta http-equiv="refresh" content="0; url=login.php">
-          <title>Konsola Mister Szoko</title></head>
+          <title>Konsola Market Levano</title></head>
           <body><p><a href="login.php">Przejdź do logowania</a></p></body></html>
           HTML
           # webshop_mrszoko API — deployed as ./api/ because the app (served at
@@ -157,9 +157,9 @@ jobs:
           <!DOCTYPE html>
           <html lang="pl"><head><meta charset="utf-8">
           <meta http-equiv="refresh" content="0; url=shop/">
-          <title>Mister Szoko</title>
+          <title>Market Levano</title>
           <link rel="canonical" href="shop/">
-          </head><body><p><a href="shop/">Mister Szoko</a></p></body></html>
+          </head><body><p><a href="shop/">Market Levano</a></p></body></html>
           HTML
 
           ls -R site | head -60
@@ -492,7 +492,7 @@ jobs:
               # LE MOT DE PASSE N'Y EST PAS : il vit dans le secret GitHub, qui
               # est sa seule source. Un fichier qui le répète est une copie de
               # plus à perdre.
-              printf 'Mister Szoko — konsola marki\nURL    : /mrszoko/backoffice\nE-mail : %s\nHasło  : secret GitHub WSM_ADMIN_PASSWORD (posé à chaque déploiement)\n' "$EMAIL" > /root/mrszoko-admin.txt
+              printf 'Market Levano — konsola sklepu\nURL    : /mrszoko/backoffice\nE-mail : %s\nHasło  : secret GitHub WSM_ADMIN_PASSWORD (posé à chaque déploiement)\n' "$EMAIL" > /root/mrszoko-admin.txt
               chmod 600 /root/mrszoko-admin.txt
             else
               echo "  ^ ATTENTION : mot de passe de la console NON posé"
@@ -574,7 +574,7 @@ jobs:
           # support.js, bo_server.js, menu_*.js ni vendor/react*. Ne restent
           # que la porte et ce dont les écrans PHP se servent.
           for f in / /login.php "/$DS/global.css" "/$DS/brand.css" "/$DS/_ds_bundle.js" \
-                   /img/logo.png; do
+                   /img/logo.svg; do
             run "$BO$f" 1
           done
 
@@ -2516,7 +2516,7 @@ jobs:
           sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
           fail=0
           SH="http://localhost/mrszoko/shop"
           echo "== strony i bloki (CMS) =="
@@ -2579,6 +2579,43 @@ jobs:
             [ "$c" = "200" ] || { BAD=$((BAD+1)); echo "  ^ NOT OK : strona /$p odpowiada $c"; fail=1; }
           done
           echo "  strony z planu witryny: $N, niedzialajacych: $BAD"
+          echo "== Market Levano =="
+          # Les pièces : dessins, logique des logos de paiement, monogramme,
+          # illustration, valeurs nutritives, contact. rsync sans --delete :
+          # un fichier oublié laisse une vitrine qui appelle une fonction absente.
+          [ -f "$DIR_BO/../shop/znaki.php" ] && [ -f "$DIR_BO/api/metody.php" ] \
+            && [ -f "$DIR_BO/../shop/assets/logo.svg" ] && [ -f "$DIR_BO/../shop/assets/hero-art.svg" ] \
+            && [ -f "$DIR_BO/img/logo.svg" ] \
+            && grep -q 'function metody_html' "$DIR_BO/../shop/lib.php" \
+            && grep -q 'metody_html(wsm_pdo()' "$DIR_BO/../shop/layout.php" \
+            && grep -q 'function wsm_nutrition_rows' "$DIR_BO/api/shop.php" \
+            && grep -q "'kontakt'   =>" "$DIR_BO/api/layout.php" \
+            && grep -q 'function wsm_brand_name' "$DIR_BO/api/db.php" \
+            && echo "  rysunki, logotypy, monogram, ilustracja, kontakt, tabele produktu: obecne" \
+            || { echo "  ^ NOT OK : Market Levano niekompletny"; fail=1; }
+          # L'EFFET : la page servie ne porte plus l'ancien nom, le téléphone y
+          # est (ou caché exprès dans Układ), la fiche produit a son nouveau cadre.
+          if printf '%s' "$HH" | grep -q 'Mister Szoko'; then echo "  ^ NOT OK : strona glowna nosi stara nazwe"; fail=1
+          else echo "  stara nazwa na stronie glownej: brak"; fi
+          printf '%s' "$HH" | grep -q 'href="tel:+48' || printf '%s' "$HH" | grep -q 'kontakt: ukryty' \
+            && echo "  telefon na stronie glownej: obecny (albo ukryty w Ukladzie)" \
+            || { echo "  ^ NOT OK : brak telefonu na stronie glownej"; fail=1; }
+          PP=$(printf '%s' "$HH" | grep -o 'href="[^"]*/p/[^"]*"' | head -1 | sed 's/href="//;s/"$//')
+          if [ -n "$PP" ]; then
+            curl -skL "http://localhost$PP" | grep -q 'class="buy-meta"' \
+              && echo "  karta produktu ($PP): symbol, kategoria, logotypy" \
+              || { echo "  ^ NOT OK : karta produktu bez nowego ukladu ($PP)"; fail=1; }
+          fi
+          # En base : le nom a vraiment changé (le fichier de contenu ne
+          # réécrit jamais une clé existante), la colonne nutrition existe.
+          sq() { if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
+                   mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$1" 2>/dev/null; else mysql -N -e "$1" 2>/dev/null; fi; }
+          NB=$(sq "SELECT v FROM mrszoko.wsm_shop_i18n WHERE lang='pl' AND k='brand'")
+          NN=$(sq "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='mrszoko' AND table_name='wsm_products' AND column_name='nutrition'")
+          echo "  nazwa sklepu w bazie (Tresci, brand): ${NB:-?}"
+          { [ -n "$NB" ] && [ "$NB" != "Mister Szoko" ]; } || { echo "  ^ NOT OK : zmiana nazwy nie dotarla do bazy"; fail=1; }
+          [ "${NN:-0}" = "1" ] && echo "  kolumna wsm_products.nutrition: obecna" \
+            || { echo "  ^ NOT OK : brak kolumny nutrition, zapis karty produktu sie nie uda"; fail=1; }
           if [ "$fail" = "0" ]; then echo "ALL CMS CHECKS OK"; else echo "CMS CHECKS FAILED"; exit 1; fi
           REMOTE
 

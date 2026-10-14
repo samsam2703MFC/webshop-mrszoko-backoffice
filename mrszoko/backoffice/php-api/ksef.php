@@ -382,7 +382,7 @@ function wsm_ksef_xml(PDO $pdo, array $inv, string $now = ''): string {
     $o[] = '    <KodFormularza kodSystemowy="FA (2)" wersjaSchemy="1-0E">FA</KodFormularza>';
     $o[] = '    <WariantFormularza>' . WSM_KSEF_WARIANT . '</WariantFormularza>';
     $o[] = '    <DataWytworzeniaFa>' . $x($now) . '</DataWytworzeniaFa>';
-    $o[] = '    <SystemInfo>Mister Szoko back office</SystemInfo>';
+    $o[] = '    <SystemInfo>' . htmlspecialchars(wsm_brand_name(), ENT_XML1) . ' back office</SystemInfo>';
     $o[] = '  </Naglowek>';
 
     // Podmiot1 — le vendeur, tel qu'il était au jour de l'émission.
