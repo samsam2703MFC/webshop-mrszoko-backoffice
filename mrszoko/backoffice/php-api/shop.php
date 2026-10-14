@@ -249,7 +249,94 @@ function wsm_shop_row_to_product(array $r, array $S): array {
         'ean'       => (string) ($r['ean'] ?? ''),
         'category'  => (string) ($r['category_name'] ?? ''),
         'category_id' => (int) ($r['category_id'] ?? 0),
+        'nutrition' => wsm_nutrition_decode((string) ($r['nutrition'] ?? '')),
     ];
+}
+
+// ─── LES VALEURS NUTRITIVES ─────────────────────────────────────────────────
+//
+// L'équipe les tapait dans la description, au milieu du reste : « wszystko
+// zlane w 1 tekst ». Ce sont des chiffres, rangés dans l'ordre que fixe le
+// règlement européen (UE 1169/2011, annexe XV) — énergie, graisses dont
+// saturées, glucides dont sucres, fibres, protéines, sel — pour 100 g. On
+// stocke ce qui est tapé (« 32,5 », « <0,5 »), sans unité : l'unité est celle
+// du règlement, ajoutée à l'affichage, et elle ne peut donc pas être fausse.
+const WSM_NUTRITION_FIELDS = [
+    'energy_kj'   => 'kJ',
+    'energy_kcal' => 'kcal',
+    'fat'         => 'g',
+    'saturates'   => 'g',
+    'carbs'       => 'g',
+    'sugars'      => 'g',
+    'fibre'       => 'g',
+    'protein'     => 'g',
+    'salt'        => 'g',
+];
+
+/** Le nombre de lignes « właściwości » qu'une fiche peut porter. */
+const WSM_PRODUCT_PROPS_MAX = 12;
+
+/**
+ * Nettoie les valeurs saisies : un nombre (virgule ou point), précédé au plus
+ * d'un « < » (« <0,5 g » est la façon légale d'écrire une trace). Vide = absent.
+ * Un refus porte le nom du champ dans $errs.
+ */
+function wsm_nutrition_clean(array $in, array &$errs = []): array {
+    $out = [];
+    foreach (array_keys(WSM_NUTRITION_FIELDS) as $k) {
+        $v = trim(str_replace(' ', '', (string) ($in[$k] ?? '')));
+        if ($v === '') continue;
+        if (!preg_match('/^<?\d{1,5}([.,]\d{1,3})?$/', $v)) { $errs[$k] = $v; continue; }
+        $out[$k] = str_replace('.', ',', $v);
+    }
+    return $out;
+}
+
+function wsm_nutrition_decode(string $json): array {
+    $j = $json !== '' ? json_decode($json, true) : null;
+    if (!is_array($j)) return [];
+    $e = [];
+    return wsm_nutrition_clean($j, $e);
+}
+
+function wsm_nutrition_encode(array $n): string {
+    return $n ? (string) json_encode($n, JSON_UNESCAPED_UNICODE) : '';
+}
+
+/**
+ * Les lignes du tableau tel que la fiche l'affiche : [libellé, valeur, sous-ligne].
+ * L'énergie tient sur une ligne, « 2475 kJ / 598 kcal ».
+ */
+function wsm_nutrition_rows(array $n, array $S): array {
+    if (!$n) return [];
+    $rows = [];
+    $en = array_values(array_filter([
+        isset($n['energy_kj']) ? $n['energy_kj'] . ' kJ' : '',
+        isset($n['energy_kcal']) ? $n['energy_kcal'] . ' kcal' : '',
+    ]));
+    if ($en) $rows[] = [$S['nutri.energy'] ?? 'Wartość energetyczna', implode(' / ', $en), false];
+    foreach (['fat' => false, 'saturates' => true, 'carbs' => false, 'sugars' => true, 'fibre' => false, 'protein' => false, 'salt' => false] as $k => $sous) {
+        if (!isset($n[$k])) continue;
+        $rows[] = [$S['nutri.' . $k] ?? $k, $n[$k] . ' g', $sous];
+    }
+    return $rows;
+}
+
+/**
+ * Les « właściwości » d'un produit : des paires libellé/valeur écrites dans la
+ * console (Opakowanie, Skład, Przechowywanie…). Ce sont des TEXTES traduits,
+ * comme le nom et la description : product.<id>.prop.<n>.k / .v dans
+ * wsm_shop_i18n, avec le même repli sur le polonais, et Treści pour les
+ * traduire. Une ligne n'est montrée que si elle a les deux moitiés.
+ */
+function wsm_product_props(array $S, string $id): array {
+    $out = [];
+    for ($i = 1; $i <= WSM_PRODUCT_PROPS_MAX; $i++) {
+        $k = trim((string) ($S["product.$id.prop.$i.k"] ?? ''));
+        $v = trim((string) ($S["product.$id.prop.$i.v"] ?? ''));
+        if ($k !== '' && $v !== '') $out[] = [$k, $v];
+    }
+    return $out;
 }
 
 /**

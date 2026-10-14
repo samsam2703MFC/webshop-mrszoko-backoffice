@@ -25,6 +25,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/metody.php';   // les choix « multi » des logos de livraison et de paiement
 
 /** L'espace réservé livré dans le formulaire : présent = pas encore réglé. */
 const WSM_SETTING_PLACEHOLDER = 'xxxx';
@@ -150,6 +151,14 @@ function wsm_settings_fields(): array {
         // le pied de page et l'icône d'onglet. Vide = le logo du dépôt.
         'logo_image'     => ['sklep', 'Logo sklepu', ['shop', 'logo_image'], 'WSM_SHOP_LOGO', 'ikona',
                              'Górna belka, stopka i ikona karty. PNG lub WebP z przezroczystym tłem, szerokość ok. 300–600 px. Puste = logo z repozytorium.'],
+        'logo_nazwa'     => ['sklep', 'Nazwa sklepu obok logo', ['shop', 'logo_nazwa'], 'WSM_SHOP_LOGO_NAZWA', 'select:1|0',
+                             '1 = obok logo stoi nazwa sklepu (Treści → brand). 0 = samo logo — gdy wgrane logo zawiera już nazwę.'],
+        // LES LOGOS DE LIVRAISON ET DE PAIEMENT (pied de page, fiche produit).
+        // Rien de coché jamais enregistré = la réalité : modes actifs, tpay.
+        'metody_wysylki'   => ['sklep', 'Sposoby wysyłki — logotypy dla klienta', ['shop', 'metody_wysylki'], 'WSM_SHOP_METODY_WYSYLKI', wsm_metody_typ('wysylka'),
+                               'Pokazywane w stopce każdej strony i przy przycisku „Dodaj do koszyka”. Zaznacz tylko to, co kasa naprawdę oferuje — DPD Pickup dopiero wtedy, gdy będzie w kasie.'],
+        'metody_platnosci' => ['sklep', 'Formy płatności — logotypy dla klienta', ['shop', 'metody_platnosci'], 'WSM_SHOP_METODY_PLATNOSCI', wsm_metody_typ('platnosc'),
+                               'Jak wyżej. Bez skonfigurowanego tpay domyślnie tylko przelew tradycyjny — zaznacz resztę, gdy tpay ruszy.'],
 
         'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z tpay.'],
 
@@ -275,9 +284,20 @@ function wsm_settings_save(PDO $pdo, array $post, string $actor = '', array &$re
         // exception, le champ image sortait de la boucle avant d'être lu, et
         // l'envoi ne faisait rien sans rien dire.
         $poste = array_key_exists($formKey, $post)
-              || (wsm_setting_obraz($type) && (isset($_FILES[$formKey]) || !empty($post[$formKey . '__usun'])));
+              || (wsm_setting_obraz($type) && (isset($_FILES[$formKey]) || !empty($post[$formKey . '__usun'])))
+              // Une case décochée n'est PAS envoyée : sans ce témoin, tout
+              // décocher ne changerait rien, et « rien » serait impossible.
+              || (str_starts_with($type, 'multi:') && !empty($post[$formKey . '__multi']));
         if (!$poste) continue;
+        if (str_starts_with($type, 'multi:')) {
+            // Les codes connus, dans l'ordre du dictionnaire ; aucun = « brak ».
+            $permis = array_map(fn($o) => explode(':', $o, 2)[0], explode('|', substr($type, 6)));
+            $coches = array_map('strval', (array) ($post[$formKey] ?? []));
+            $v = implode(',', array_values(array_filter($permis, fn($c) => in_array($c, $coches, true))));
+            if ($v === '') $v = 'brak';
+        } else {
         $v = trim((string) ($post[$formKey] ?? ''));
+        }
         if ($type === 'secret' && ($v === '' || str_starts_with($v, '•'))) continue;   // inchangé
         if (wsm_setting_obraz($type)) {
             // Le formulaire poste un champ texte VIDE et, à côté, un fichier.

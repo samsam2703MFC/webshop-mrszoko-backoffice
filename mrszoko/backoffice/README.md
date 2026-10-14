@@ -143,6 +143,6 @@ React, design-system CSS and fonts all return `200`.
 - `menu_api.js`, `menu_seed.js` — Menu Builder data + server simulation
 - `_ds/mister-szoko/` — design system (global.css + brand.css + bundle)
 - `vendor/` — React 18.3.1 (UMD), vendored
-- `img/logo.png` — Mister Szoko brand mark
+- `img/logo.svg` — Market Levano monogram (the shop logo uploaded in Integracje → Sklep replaces it)
 - `php-api/` — `webshop_mrszoko` backend: PHP router, `wsm_` schema (MySQL +
   SQLite mirror), seed, migrate CLI, delivery module, end-to-end test

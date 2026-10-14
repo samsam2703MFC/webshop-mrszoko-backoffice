@@ -112,11 +112,14 @@ if ($home === false || $home === '') {
     $h1 = (string) @file_get_contents($base . '/?t=' . time(), false, $ctx);
     ok('la page d\'accueil servie porte l\'icône', str_contains($h1, 'class="promise-ikona"'), substr_count($h1, 'promise-ikona'));
     ok('… à son adresse absolue', str_contains($h1, 'src="/media/dddddddddddddddddddddddd.webp"'));
-    ok('… une seule fois : les deux autres promesses restent du texte', substr_count($h1, 'class="promise-ikona"') === 1);
+    ok('… une seule fois : les deux autres gardent l\'icône dessinée de la maison', substr_count($h1, 'class="promise-ikona"') === 1
+       && substr_count($h1, 'promise-ikona--rys') === 2);
     $pdo->prepare("DELETE FROM wsm_settings WHERE cle = 'promise_icon_1'")->execute();
     $h0 = (string) @file_get_contents($base . '/?t=' . (time() + 1), false, $ctx);
-    ok('sans icône, le bloc redevient du texte — la page ne dépend d\'aucun fichier',
-       !str_contains($h0, 'dddddddddddddddddddddddd') && str_contains($h0, 'class="promise"'));
+    // Sans icône déposée, le dessin en ligne (znaki.php) : la page ne dépend
+    // toujours d'aucun fichier, et elle n'est plus un bloc de texte nu.
+    ok('sans icône déposée, l\'icône dessinée revient — la page ne dépend d\'aucun fichier',
+       !str_contains($h0, 'dddddddddddddddddddddddd') && substr_count($h0, 'promise-ikona--rys') === 3 && !str_contains($h0, '<img class="promise-ikona"'));
 }
 
 // ---- Remise en place -------------------------------------------------------------------

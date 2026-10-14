@@ -51,9 +51,14 @@ $ids = [];
 
 // ---- 1. Défauts et éléments fixes ----------------------------------------------------
 echo "-- domyślnie: kolejność z kodu; stałych nie da się ukryć --\n";
-ok('l\'accueil dans son ordre d\'origine', $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', 'pro'], $cles('home'));
+ok('l\'accueil dans son ordre d\'origine', $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', 'pro', 'kontakt'], $cles('home'));
 ok('le menu aussi', $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'kontakt'], $cles('nav'));
-ok('et le pied de page', $cles('footer') === ['email', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', 'konsola'], $cles('footer'));
+ok('et le pied de page', $cles('footer') === ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', 'konsola'], $cles('footer'));
+// Le téléphone et l'e-mail sur l'accueil — demandés par l'équipe — se cachent
+// et se déplacent comme le reste ; le téléphone a aussi sa ligne en pied de page.
+ok('le bloc contact se cache', wsm_layout_toggle($pdo, 'home', 'kontakt') && wsm_layout_get($pdo, 'home')[5]['on'] === 0);
+ok('… et se remontre', wsm_layout_toggle($pdo, 'home', 'kontakt') && wsm_layout_get($pdo, 'home')[5]['on'] === 1);
+ok('le téléphone du pied de page aussi', wsm_layout_toggle($pdo, 'footer', 'telefon') && wsm_layout_toggle($pdo, 'footer', 'telefon'));
 ok('tout est visible', !array_filter(wsm_layout_get($pdo, 'home'), fn($it) => !$it['on']));
 ok('le catalogue ne se cache pas', !wsm_layout_toggle($pdo, 'home', 'katalog') && wsm_layout_get($pdo, 'home')[3]['on'] === 1);
 ok('le règlement et la politique non plus', !wsm_layout_toggle($pdo, 'footer', 'regulamin') && !wsm_layout_toggle($pdo, 'footer', 'prywatnosc'));
@@ -75,9 +80,9 @@ echo "\n-- przesuwanie: nagłówek zawsze pierwszy, pasek tuż za nim --\n";
 ok('le hero ne descend pas', !wsm_layout_move($pdo, 'home', 'hero', 'down'));
 ok('le pasek ne bouge pas seul', !wsm_layout_move($pdo, 'home', 'pasek', 'down') && !wsm_layout_move($pdo, 'home', 'pasek', 'up'));
 ok('les promesses ne passent pas devant le pasek', !wsm_layout_move($pdo, 'home', 'obietnice', 'up'));
-ok('le B2B monte au-dessus du catalogue', wsm_layout_move($pdo, 'home', 'pro', 'up') && $cles('home') === ['hero', 'pasek', 'obietnice', 'pro', 'katalog'], $cles('home'));
-ok('… et redescend', wsm_layout_move($pdo, 'home', 'pro', 'down') && $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', 'pro']);
-ok('le dernier ne descend pas', !wsm_layout_move($pdo, 'home', 'pro', 'down'));
+ok('le B2B monte au-dessus du catalogue', wsm_layout_move($pdo, 'home', 'pro', 'up') && $cles('home') === ['hero', 'pasek', 'obietnice', 'pro', 'katalog', 'kontakt'], $cles('home'));
+ok('… et redescend', wsm_layout_move($pdo, 'home', 'pro', 'down') && $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', 'pro', 'kontakt']);
+ok('le dernier ne descend pas', !wsm_layout_move($pdo, 'home', 'kontakt', 'down'));
 ok('Kontakt passe devant Sklep en deux crans', wsm_layout_move($pdo, 'nav', 'kontakt', 'up') && wsm_layout_move($pdo, 'nav', 'kontakt', 'up')
    && wsm_layout_move($pdo, 'nav', 'kontakt', 'up') && $cles('nav') === ['kontakt', 'sklep', 'b2b', 'zamowienie'], $cles('nav'));
 wsm_layout_reset($pdo, 'nav');
@@ -86,7 +91,7 @@ ok('Przywróć ramène l\'ordre d\'origine', $cles('nav') === ['sklep', 'b2b', '
 // Une préférence qui cite un bloc disparu, et oublie une section intégrée.
 wsm_layout_write($pdo, 'home', [['k' => 'hero', 'on' => 1], ['k' => 'blok:999999', 'on' => 1], ['k' => 'pro', 'on' => 1], ['k' => 'katalog', 'on' => 1]], 'test');
 ok('un bloc disparu sort, une section oubliée reprend sa place, l\'ordre voulu reste',
-   $cles('home') === ['hero', 'pasek', 'obietnice', 'pro', 'katalog'], $cles('home'));
+   $cles('home') === ['hero', 'pasek', 'obietnice', 'pro', 'kontakt', 'katalog'], $cles('home'));
 wsm_layout_reset($pdo, 'home');
 
 // ---- 3. Blocs et pages ----------------------------------------------------------------
@@ -95,14 +100,14 @@ $e = [];
 $idB = wsm_page_save($pdo, null, ['kind' => 'blok', 'published' => 1, 'styl' => ['ciemny', 'xxx'],
     't' => ['pl' => ['title' => "Blok $sfx", 'body' => 'Treść **bloku**.']]], 'test', $e);
 $ids[] = $idB;
-ok('un bloc publié entre dans l\'accueil, avant le B2B', $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', "blok:$idB", 'pro'], $cles('home'));
+ok('un bloc publié entre dans l\'accueil, avant le B2B', $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', "blok:$idB", 'pro', 'kontakt'], $cles('home'));
 ok('ses styles sont filtrés sur la liste connue', (wsm_page_blok($pdo, (int) $idB, 'pl')['styl'] ?? null) === ['ciemny']);
 $e = [];
 $idB2 = wsm_page_save($pdo, null, ['kind' => 'blok', 'published' => 1, 'placement' => 'po_obietnicach',
     't' => ['pl' => ['title' => "Blok wyżej $sfx"]]], 'test', $e);
 $ids[] = $idB2;
 ok('un bloc d\'avant (emplacement « pod obietnicami ») se place là la première fois',
-   $cles('home') === ['hero', 'pasek', 'obietnice', "blok:$idB2", 'katalog', "blok:$idB", 'pro'], $cles('home'));
+   $cles('home') === ['hero', 'pasek', 'obietnice', "blok:$idB2", 'katalog', "blok:$idB", 'pro', 'kontakt'], $cles('home'));
 ok('cacher un bloc le dépublie — une seule vérité', wsm_layout_toggle($pdo, 'home', "blok:$idB")
    && (int) wsm_page_get($pdo, (int) $idB)['published'] === 0 && wsm_page_blok($pdo, (int) $idB, 'pl') === null);
 ok('… il reste dans la liste, marqué caché, à sa place', in_array("blok:$idB", $cles('home'), true)
@@ -119,7 +124,7 @@ $idS = wsm_page_save($pdo, null, ['kind' => 'strona', 'slug' => "menu-$sfx", 'pu
     't' => ['pl' => ['title' => "Strona $sfx"]]], 'test', $e);
 $ids[] = $idS;
 ok('une page cochée « w menu » entre à la fin du menu', end($cles) === null || $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'kontakt', "strona:$idS"], $cles('nav'));
-ok('… et avant le lien console dans le pied de page', $cles('footer') === ['email', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', "strona:$idS", 'konsola'], $cles('footer'));
+ok('… et avant le lien console dans le pied de page', $cles('footer') === ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', "strona:$idS", 'konsola'], $cles('footer'));
 ok('la page monte devant Kontakt', wsm_layout_move($pdo, 'nav', "strona:$idS", 'up') && $cles('nav')[3] === "strona:$idS", $cles('nav'));
 ok('la cacher du menu décoche « w menu » — et la garde dans la stopka',
    wsm_layout_toggle($pdo, 'nav', "strona:$idS") && (int) wsm_page_get($pdo, (int) $idS)['in_nav'] === 0 && (int) wsm_page_get($pdo, (int) $idS)['in_footer'] === 1);
@@ -145,7 +150,7 @@ ok('la vitrine le lit par logo_src() dans la barre, le pied de page et l\'icône
 echo "\n-- witryna i konsola --\n";
 $vit = $lire('mrszoko/shop/index.php');
 ok('l\'accueil se lit dans l\'ordre d\'Układ', str_contains($vit, 'wsm_layout_home($pdo)') && str_contains($vit, 'blok_html($pdo, $lang, (int) $it[\'id\'])'));
-ok('… avec un repli sur l\'ordre d\'origine si layout.php manque', str_contains($vit, "['hero', 'pasek', 'obietnice', 'katalog', 'pro']"));
+ok('… avec un repli sur l\'ordre d\'origine si layout.php manque', str_contains($vit, "['hero', 'pasek', 'obietnice', 'katalog', 'pro', 'kontakt']"));
 ok('… et un marqueur à la place d\'une section cachée', str_contains($vit, 'wsm_layout_marker($typ)') && str_contains($vit, "wsm_layout_marker('pasek')"));
 ok('les marqueurs gardent les mots que les contrôles cherchent',
    str_contains(wsm_layout_marker('pro'), 'sekcja pro: ukryta') && str_contains(wsm_layout_marker('obietnice'), 'obietnice: ukryte') && str_contains(wsm_layout_marker('pasek'), 'pasek: ukryty'));
@@ -201,7 +206,7 @@ if ($home === false || $home === '') {
        substr_count($h, '/media/abcdefabcdefabcdefabcdef.webp') >= 2 && str_contains($h, 'rel="icon" href="/media/abcdefabcdefabcdefabcdef.webp"'));
     $pdo->prepare("DELETE FROM wsm_settings WHERE cle = 'logo_image'")->execute();
     $h = $get();
-    ok('sans logo déposé, celui du dépôt', str_contains($h, 'assets/logo.png'));
+    ok('sans logo déposé, le monogramme du dépôt', str_contains($h, 'assets/logo.svg') && !str_contains($h, 'assets/logo.png'));
 }
 
 // ---- Remise en place ----------------------------------------------------------------------

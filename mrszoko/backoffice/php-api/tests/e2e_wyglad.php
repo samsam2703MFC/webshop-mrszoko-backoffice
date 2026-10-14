@@ -199,13 +199,13 @@ if ($home === false || $home === '') {
     $h1 = (string) @file_get_contents($base . '/?t=' . time(), false, $ctx);
     ok('la page servie porte l\'accent', str_contains($h1, '--caramel-500:#1F5F8B'));
     ok('le bloc B2B est caché — et la page le dit', !str_contains($h1, 'id="pro"') && str_contains($h1, 'sekcja pro: ukryta'));
-    ok('les promesses aussi', !str_contains($h1, 'class="promise"') && str_contains($h1, 'obietnice: ukryte'));
+    ok('les promesses aussi', !preg_match('/class="promise[ "]/', $h1) && str_contains($h1, 'obietnice: ukryte'));
     ok('le catalogue, lui, est toujours là', str_contains($h1, 'id="katalog"'));
     wsm_theme_reset($pdo);
     wsm_layout_reset($pdo, 'home');
     if ($ukladAvant) $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES ('layout.home', ?, 0, ?, 'test')")->execute([$ukladAvant, date('Y-m-d H:i:s')]);
     $h0 = (string) @file_get_contents($base . '/?t=' . (time() + 1), false, $ctx);
-    ok('après Przywróć, tout revient', str_contains($h0, 'id="pro"') && str_contains($h0, 'class="promise"')
+    ok('après Przywróć, tout revient', str_contains($h0, 'id="pro"') && preg_match('/class="promise[ "]/', $h0) === 1
        && str_contains($h0, "--font-sans:'Lora'") && !str_contains($h0, '--caramel-500:#1F5F8B'));
 }
 

@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS `wsm_products` (
   `cocoa`           VARCHAR(16)  NOT NULL DEFAULT '',
   `unit_label`      VARCHAR(40)  NOT NULL DEFAULT '',
   `badge`           VARCHAR(40)  NOT NULL DEFAULT '',
+  `nutrition`       TEXT,                          -- wartości odżywcze / 100 g, JSON
   -- Expédition InPost + fiscalité tpay
   `sku`             VARCHAR(60)  NOT NULL DEFAULT '',
   `ean`             VARCHAR(14)  NOT NULL DEFAULT '',

@@ -655,10 +655,10 @@ function wsm_order_document(PDO $pdo, array $order, string $actor = ''): array {
             $id = wsm_mail_queue($pdo, [
                 'order_id'      => (int) $order['id'],
                 'email'         => $mail,
-                'subject'       => $est . ' ' . $doc['number'] . ' — Mister Szoko',
+                'subject'       => $est . ' ' . $doc['number'] . ' — ' . wsm_brand_name(),
                 'body'          => $est . " do zamówienia " . (string) $order['code'] . ".\n\n"
                                  . ($lien !== '' ? "Dokument: " . $lien . "\n\n" : '')
-                                 . "Dziękujemy za zakupy.\nMister Szoko",
+                                 . "Dziękujemy za zakupy.\n" . wsm_brand_name(),
                 'template_code' => 'dokument',
                 'event_key'     => 'dok:' . $doc['number'],
                 'actor'         => $actor !== '' ? $actor : 'system',

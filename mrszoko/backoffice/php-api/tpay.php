@@ -188,7 +188,7 @@ function wsm_tpay_start(PDO $pdo, array $order, string $returnUrl, string $notif
 
     [$code, $res] = wsm_tpay_http('POST', '/transactions', [
         'amount'      => round($amount, 2),
-        'description' => 'Mister Szoko ' . $title,
+        'description' => wsm_brand_name() . ' ' . $title,
         'hiddenDescription' => $title,                    // revient dans tr_crc
         'lang'        => $order['lang'] ?? 'pl',
         'payer' => [

@@ -60,6 +60,14 @@ $cfg = [
         'promise_icon_2' => getenv('WSM_SHOP_ICON_2') ?: '',
         'promise_icon_3' => getenv('WSM_SHOP_ICON_3') ?: '',
         'logo_image'     => getenv('WSM_SHOP_LOGO') ?: '',
+        // Les logos de livraison et de paiement montrés au client (metody.php).
+        // Vides ici : la liste suit alors la réalité (modes actifs, tpay) ;
+        // Integracje → Sklep permet de choisir à la main.
+        'metody_wysylki'   => getenv('WSM_SHOP_METODY_WYSYLKI') ?: '',
+        'metody_platnosci' => getenv('WSM_SHOP_METODY_PLATNOSCI') ?: '',
+        // Le nom à côté du logo, dans la barre du haut. Un logo déposé qui
+        // porte déjà le nom l'afficherait deux fois : « 0 » le retire.
+        'logo_nazwa'       => (getenv('WSM_SHOP_LOGO_NAZWA') ?: '1') !== '0',
     ],
 
     // ---- tpay.com : encaissement ------------------------------------------

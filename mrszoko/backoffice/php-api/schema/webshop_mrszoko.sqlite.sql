@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS wsm_products (
   cocoa           TEXT NOT NULL DEFAULT '',
   unit_label      TEXT NOT NULL DEFAULT '',
   badge           TEXT NOT NULL DEFAULT '',
+  nutrition       TEXT,                          -- wartości odżywcze / 100 g, JSON
   -- Expédition InPost + fiscalité tpay
   sku             TEXT NOT NULL DEFAULT '',
   ean             TEXT NOT NULL DEFAULT '',

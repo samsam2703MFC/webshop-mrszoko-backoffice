@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 480" width="600" height="480">
+<title>Czekolada w pastylkach</title>
+<defs>
+  <radialGradient id="gD" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#5A3422"/><stop offset="1" stop-color="#21110A"/></radialGradient>
+  <radialGradient id="gDt" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#6E4129"/><stop offset="1" stop-color="#2E180E"/></radialGradient>
+  <radialGradient id="gM" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#A26B44"/><stop offset="1" stop-color="#5E3520"/></radialGradient>
+  <radialGradient id="gMt" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#B98058"/><stop offset="1" stop-color="#7A4A2C"/></radialGradient>
+  <radialGradient id="gW" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#F6EBDC"/><stop offset="1" stop-color="#CDB28C"/></radialGradient>
+  <radialGradient id="gWt" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#FFF8EE"/><stop offset="1" stop-color="#E2CDAE"/></radialGradient>
+  <radialGradient id="gC" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#D9A05A"/><stop offset="1" stop-color="#93601F"/></radialGradient>
+  <radialGradient id="gCt" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#E8B774"/><stop offset="1" stop-color="#B07A34"/></radialGradient>
+  <radialGradient id="gB" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#8C5634"/><stop offset="1" stop-color="#3F2213"/></radialGradient>
+  <radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#C68A3C" stop-opacity=".22"/><stop offset="1" stop-color="#C68A3C" stop-opacity="0"/></radialGradient>
+  <g id="cd"><ellipse cx="0" cy="3" rx="23" ry="16" fill="url(#gD)"/><ellipse cx="0" cy="-0.5" rx="21" ry="12.5" fill="url(#gDt)"/><ellipse cx="-7" cy="-5" rx="7" ry="3" fill="#fff" opacity=".22"/></g>
+  <g id="cm"><ellipse cx="0" cy="3" rx="23" ry="16" fill="url(#gM)"/><ellipse cx="0" cy="-0.5" rx="21" ry="12.5" fill="url(#gMt)"/><ellipse cx="-7" cy="-5" rx="7" ry="3" fill="#fff" opacity=".22"/></g>
+  <g id="cw"><ellipse cx="0" cy="3" rx="23" ry="16" fill="url(#gW)"/><ellipse cx="0" cy="-0.5" rx="21" ry="12.5" fill="url(#gWt)"/><ellipse cx="-7" cy="-5" rx="7" ry="3" fill="#fff" opacity=".22"/></g>
+  <g id="cc"><ellipse cx="0" cy="3" rx="23" ry="16" fill="url(#gC)"/><ellipse cx="0" cy="-0.5" rx="21" ry="12.5" fill="url(#gCt)"/><ellipse cx="-7" cy="-5" rx="7" ry="3" fill="#fff" opacity=".22"/></g>
+  <g id="bean"><path d="M0-34C19-28 21 26 0 34-21 26-19-28 0-34Z" fill="url(#gB)"/><path d="M0-29C7-12 7 12 0 29" fill="none" stroke="#2A160C" stroke-width="2.4" stroke-linecap="round" opacity=".7"/><ellipse cx="-7" cy="-14" rx="4" ry="9" fill="#fff" opacity=".12"/></g>
+</defs>
+<ellipse cx="400" cy="360" rx="230" ry="150" fill="url(#glow)"/>
+<path d="M600 40C520 70 470 120 455 190S470 300 420 330" fill="none" stroke="#C68A3C" stroke-width="3" stroke-linecap="round" opacity=".45"/>
+<path d="M600 72C540 98 505 140 494 196" fill="none" stroke="#C68A3C" stroke-width="1.6" stroke-linecap="round" opacity=".3"/>
+<use href="#cw" transform="translate(439 323) rotate(-6) scale(0.89)"/>
+<use href="#cm" transform="translate(491 325) rotate(0) scale(0.90)"/>
+<use href="#cm" transform="translate(327 327) rotate(2) scale(0.90)"/>
+<use href="#cw" transform="translate(295 328) rotate(7) scale(0.90)"/>
+<use href="#cm" transform="translate(355 334) rotate(-4) scale(0.92)"/>
+<use href="#cm" transform="translate(389 335) rotate(11) scale(0.92)"/>
+<use href="#cd" transform="translate(338 341) rotate(1) scale(0.93)"/>
+<use href="#cw" transform="translate(425 342) rotate(2) scale(0.93)"/>
+<use href="#cd" transform="translate(462 345) rotate(4) scale(0.94)"/>
+<use href="#cd" transform="translate(295 348) rotate(-1) scale(0.94)"/>
+<use href="#cd" transform="translate(383 349) rotate(4) scale(0.94)"/>
+<use href="#cd" transform="translate(307 351) rotate(-4) scale(0.95)"/>
+<use href="#cm" transform="translate(311 353) rotate(11) scale(0.95)"/>
+<use href="#cd" transform="translate(294 353) rotate(9) scale(0.95)"/>
+<use href="#cc" transform="translate(430 366) rotate(-7) scale(0.98)"/>
+<use href="#cd" transform="translate(368 367) rotate(-9) scale(0.98)"/>
+<use href="#cm" transform="translate(430 379) rotate(-4) scale(1.00)"/>
+<use href="#cd" transform="translate(375 385) rotate(4) scale(1.01)"/>
+<use href="#cm" transform="translate(509 392) rotate(-10) scale(1.03)"/>
+<use href="#cd" transform="translate(508 397) rotate(-3) scale(1.04)"/>
+<use href="#cd" transform="translate(553 401) rotate(-5) scale(1.04)"/>
+<use href="#cc" transform="translate(476 402) rotate(6) scale(1.05)"/>
+<use href="#cw" transform="translate(261 411) rotate(-9) scale(1.06)"/>
+<use href="#cc" transform="translate(379 412) rotate(4) scale(1.06)"/>
+<use href="#cd" transform="translate(466 413) rotate(-10) scale(1.07)"/>
+<use href="#cc" transform="translate(422 431) rotate(10) scale(1.10)"/>
+<use href="#bean" transform="translate(255 420) rotate(-28) scale(.95)"/>
+<use href="#bean" transform="translate(560 430) rotate(22) scale(.85)"/>
+<use href="#cw" transform="translate(470 120) rotate(-8) scale(0.8)"/>
+<use href="#cd" transform="translate(548 200) rotate(14) scale(0.9)"/>
+<use href="#cc" transform="translate(395 210) rotate(5) scale(0.7)"/>
+<use href="#cm" transform="translate(515 285) rotate(-14) scale(0.75)"/>
+<use href="#cd" transform="translate(330 150) rotate(10) scale(0.55)"/>
+</svg>

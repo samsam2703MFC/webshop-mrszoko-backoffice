@@ -77,7 +77,7 @@ $labelUrl = (string) ($ship['label_url'] ?? '');
 
 <div class="label">
   <div class="from">
-    <b><?= h((string) ($cfg['seller_name'] ?? 'Mister Szoko')) ?></b><br>
+    <b><?= h((string) ($cfg['seller_name'] ?? wsm_brand_name())) ?></b><br>
     <?= h((string) ($cfg['seller_address'] ?? '')) ?>
     <?php if (($cfg['seller_nip'] ?? '') !== ''): ?><br>NIP <?= h((string) $cfg['seller_nip']) ?><?php endif; ?>
   </div>

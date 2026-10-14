@@ -87,7 +87,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
-$titre = 'Logowanie — Konsola Mister Szoko';
+$titre = 'Logowanie — Konsola ' . wsm_brand_name();
 ?><!doctype html>
 <html lang="pl">
 <head>
@@ -95,7 +95,7 @@ $titre = 'Logowanie — Konsola Mister Szoko';
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title><?= lg_h($titre) ?></title>
-<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="icon" href="img/logo.svg">
 <link rel="stylesheet" href="_ds/mister-szoko/global.css">
 <link rel="stylesheet" href="_ds/mister-szoko/brand.css">
 <style>
@@ -134,8 +134,8 @@ $titre = 'Logowanie — Konsola Mister Szoko';
 <body>
   <div class="box">
     <div class="mark">
-      <img src="img/logo.png" alt="">
-      <span><b>Konsola Mister Szoko</b><span>Zaplecze sklepu</span></span>
+      <img src="img/logo.svg" alt="">
+      <span><b>Konsola <?= lg_h(wsm_brand_name()) ?></b><span>Zaplecze sklepu</span></span>
     </div>
 
     <?php if ($erreur !== ''): ?>

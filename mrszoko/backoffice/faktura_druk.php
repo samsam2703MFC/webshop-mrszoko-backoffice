@@ -160,7 +160,7 @@ $zl = fn(int $g) => number_format($g / 100, 2, ',', ' ');
         <div class="no">do faktury <?= h($src['number'] ?? '') ?></div>
       <?php endif; ?>
     </div>
-    <img src="img/logo.png" alt="<?= h($i['seller_name']) ?>">
+    <img src="<?= h(console_logo_src()) ?>" alt="<?= h($i['seller_name']) ?>">
   </div>
 
   <div class="parties">

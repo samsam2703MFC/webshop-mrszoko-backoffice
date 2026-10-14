@@ -413,7 +413,7 @@ if ($page === '') {
       // (assemblage incomplet), l'ordre d'origine, tout visible.
       $uklad = function_exists('wsm_layout_home') ? wsm_layout_home($pdo) : [];
       if (!$uklad) $uklad = array_map(fn($k) => ['k' => $k, 'type' => 'builtin', 'id' => 0, 'on' => 1],
-                                      ['hero', 'pasek', 'obietnice', 'katalog', 'pro']);
+                                      ['hero', 'pasek', 'obietnice', 'katalog', 'pro', 'kontakt']);
       $pasekOn = true;
       foreach ($uklad as $it) if ($it['k'] === 'pasek') $pasekOn = (bool) $it['on'];
       // Le nagłówek natif caché, le premier nagłówek du Kreator porte le h1.
@@ -433,7 +433,10 @@ if ($page === '') {
         // la page ne dépend pas d'un fichier qui peut manquer.
         $heroImg = trim((string) (wsm_config()['shop']['hero_image'] ?? ''));
         if ($heroImg === '' || strtolower($heroImg) === 'xxxx') $heroImg = ''; ?>
-  <section class="hero<?= $heroImg !== '' ? ' hero--foto' : '' ?>"<?= $heroImg !== ''
+  <?php // Sans photo, une illustration (assets/hero-art.svg) : des pastilles
+        // de chocolat à droite du titre. « Jest pusto » disait l'équipe — un
+        // seul aplat de couleur, sans image. La photo déposée la remplace. ?>
+  <section class="hero<?= $heroImg !== '' ? ' hero--foto' : ' hero--art' ?>"<?= $heroImg !== ''
       ? ' style="--hero-foto:url(' . e($heroImg) . ')"' : '' ?>>
     <div class="wrap hero-in">
       <p class="eyebrow"><?= e($S['home.eyebrow'] ?? '') ?></p>
@@ -462,20 +465,31 @@ if ($page === '') {
           for ($i = 1; $i <= 3; $i++): if (!isset($S["promise.$i.t"])) continue;
           $ikona = trim((string) ($cfgSklep["promise_icon_$i"] ?? ''));
           if (preg_match('/^x{2,}$/i', $ikona)) $ikona = ''; ?>
-    <div class="promise<?= $ikona !== '' ? ' promise--ikona' : '' ?>">
+    <?php // Sans icône déposée, le dessin de la maison (znaki.php) : camion,
+          // colis, thermomètre — comme sur la maquette de l'équipe. ?>
+    <?php $rys = $ikona === '' && function_exists('ikona_obietnicy') ? ikona_obietnicy($i) : ''; ?>
+    <div class="promise<?= $ikona !== '' || $rys !== '' ? ' promise--ikona' : '' ?>">
       <?php if ($ikona !== ''): ?>
       <img class="promise-ikona" src="<?= e(media_src($ikona)) ?>" alt="" width="56" height="56" loading="lazy" decoding="async">
+      <?php elseif ($rys !== ''): ?>
+      <span class="promise-ikona promise-ikona--rys"><?= $rys ?></span>
       <?php endif; ?>
-      <h2><?= e($S["promise.$i.t"]) ?></h2>
-      <p><?= e($S["promise.$i.d"] ?? '') ?></p>
+      <div class="promise-txt">
+        <h2><?= e($S["promise.$i.t"]) ?></h2>
+        <p><?= e($S["promise.$i.d"] ?? '') ?></p>
+      </div>
     </div>
     <?php endfor; ?>
   </section>
   <?php elseif ($typ === 'katalog'): ?>
   <section class="wrap block" id="katalog">
+    <?php // LE TITRE SUIT LE RAYON. « Nasze produkty » pour tout le catalogue ;
+          // le nom de la catégorie quand un onglet est choisi — « Mąki »
+          // au-dessus des farines, pas un titre de chocolaterie. ?>
+    <?php $katNom = ''; foreach ($kategorie as $c) if ((int) $c['id'] === $katId) $katNom = (string) $c['name']; ?>
     <div class="section-head">
-      <h2><?= e($S['catalog.title'] ?? '') ?></h2>
-      <p class="sub"><?= e($S['catalog.sub'] ?? '') ?></p>
+      <h2><?= e($katNom !== '' ? $katNom : ($S['catalog.title'] ?? '')) ?></h2>
+      <?php if ($katNom === ''): ?><p class="sub"><?= e($S['catalog.sub'] ?? '') ?></p><?php endif; ?>
     </div>
     <?php // UN RAYON PAR CATÉGORIE, s'il y en a plus d'une à montrer. Avec une
           // seule, le filtre ne filtre rien : il ferait cliquer pour rien.
@@ -561,6 +575,34 @@ if ($page === '') {
       </div>
     </div>
   </section>
+  <?php elseif ($typ === 'kontakt'):
+        // LE TÉLÉPHONE ET L'E-MAIL, sur la page d'accueil — et cliquables :
+        // sur un téléphone, « zadzwoń » doit appeler, pas faire recopier.
+        $tel = trim((string) ($S['footer.phone'] ?? '')); $mail = trim((string) ($S['footer.email'] ?? ''));
+        $telHref = tel_href($tel);
+        if ($telHref !== '' || $mail !== ''): ?>
+  <section class="wrap block kontakt-dom" id="kontakt-dane">
+    <div class="kontakt-karta">
+      <div class="kontakt-txt">
+        <p class="eyebrow"><?= e($S['home.contact.eyebrow'] ?? '') ?></p>
+        <h2><?= e($S['home.contact.title'] ?? '') ?></h2>
+        <p><?= e($S['home.contact.lead'] ?? '') ?></p>
+      </div>
+      <div class="kontakt-dane">
+        <?php if ($telHref !== ''): ?>
+        <a class="kontakt-poz" href="<?= e($telHref) ?>"><?= function_exists('ikona_kontaktu') ? ikona_kontaktu('telefon') : '' ?>
+          <span><small><?= e($S['home.contact.phone'] ?? '') ?></small><b><?= e($tel) ?></b></span></a>
+        <?php endif; ?>
+        <?php if ($mail !== ''): ?>
+        <a class="kontakt-poz" href="<?= e('mailto:' . $mail) ?>"><?= function_exists('ikona_kontaktu') ? ikona_kontaktu('email') : '' ?>
+          <span><small><?= e($S['home.contact.email'] ?? '') ?></small><b><?= e($mail) ?></b></span></a>
+        <?php endif; ?>
+        <a class="kontakt-poz kontakt-poz--form" href="<?= e(u('kontakt')) ?>"><?= function_exists('ikona_kontaktu') ? ikona_kontaktu('formularz') : '' ?>
+          <span><b><?= e($S['home.contact.form'] ?? '') ?></b></span></a>
+      </div>
+    </div>
+  </section>
+  <?php endif; ?>
   <?php endif; ?>
 <?php endforeach; ?>
 </main>
@@ -599,11 +641,12 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
     seo_product($p, $lang, WSM_SHOP_DEFAULT_LANG);
     ?>
 <main class="wrap block">
-  <?php layout_crumbs([
-      ($S['nav.shop'] ?? 'Sklep') => u(),
-      ($S['catalog.title'] ?? $S['nav.shop'] ?? 'Katalog') => u() . '#katalog',
-      $p['name'] => null,
-  ]); ?>
+  <?php // Le fil d'Ariane passe par le RAYON du produit : « Sklep › Mąki ›
+        // Mąka tortowa », et le rayon ramène à son onglet du catalogue.
+        $rayon = ($p['category'] !== '' && $p['category_id'] > 0)
+            ? [$p['category'] => u('', ['k' => $p['category_id']]) . '#katalog']
+            : [($S['catalog.title'] ?? $S['nav.shop'] ?? 'Katalog') => u() . '#katalog'];
+        layout_crumbs([($S['nav.shop'] ?? 'Sklep') => u()] + $rayon + [$p['name'] => null]); ?>
   <div class="product">
     <div class="product-media"><?= product_visual($p, 'product-photo') ?></div>
     <div class="product-buy">
@@ -620,9 +663,8 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
         </span>
       </div>
       <?php endif; ?>
-      <p class="mono eyebrow"><?= e($p['subtitle']) ?></p>
+      <?php if ($p['subtitle'] !== ''): ?><p class="mono eyebrow"><?= e($p['subtitle']) ?></p><?php endif; ?>
       <h1><?= e($p['name']) ?></h1>
-      <p class="lead"><?= e($p['desc']) ?></p>
       <p class="price price--lg"><?= e(zl($p['price'])) ?><small><?= e($S['price.vat_incl'] ?? '') ?></small><?php
         if (!empty($p['price_per_kg'])): ?><span class="za-kg mono"><?= e(zl($p['price_per_kg'])) ?><?= e($S['price.per_kg'] ?? '') ?></span><?php endif; ?></p>
       <p class="mono muted"><?= e(zl($p['price_net'])) ?> <?= e($S['price.net'] ?? '') ?>
@@ -641,15 +683,61 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
       </form>
       <p class="mono muted stock"><?= e($stockLabel) ?></p>
 
-      <dl class="specs">
-        <?php if ($p['origin'] !== ''): ?><dt><?= e($S['product.origin'] ?? '') ?></dt><dd><?= e($p['origin']) ?></dd><?php endif; ?>
-        <?php if ($p['cocoa'] !== ''): ?><dt><?= e($S['product.cocoa'] ?? '') ?></dt><dd><?= e($p['cocoa']) ?></dd><?php endif; ?>
-        <?php if ($p['weight_g'] > 0): ?><dt><?= e($S['product.weight'] ?? '') ?></dt><dd><?= e(number_format($p['weight_g'] / 1000, 3, ',', ' ')) ?> kg</dd><?php endif; ?>
-        <?php if ($p['sku'] !== ''): ?><dt><?= e($S['product.sku'] ?? '') ?></dt><dd class="mono"><?= e($p['sku']) ?></dd><?php endif; ?>
-        <?php if ($p['ean'] !== ''): ?><dt><?= e($S['product.ean'] ?? '') ?></dt><dd class="mono"><?= e($p['ean']) ?></dd><?php endif; ?>
+      <?php // CE QUE LE CLIENT CHERCHE AVANT DE PAYER, en clair et dans l'ordre
+            // de la maquette de l'équipe : la référence, le rayon, puis comment
+            // il recevra et comment il paiera. ?>
+      <dl class="buy-meta">
+        <?php if ($p['sku'] !== ''): ?><div><dt><?= e($S['product.sku'] ?? '') ?></dt><dd class="mono"><?= e($p['sku']) ?></dd></div><?php endif; ?>
+        <?php if ($p['category'] !== '' && $p['category_id'] > 0): ?>
+        <div><dt><?= e($S['product.category'] ?? '') ?></dt><dd><a href="<?= e(u('', ['k' => $p['category_id']]) . '#katalog') ?>"><?= e($p['category']) ?></a></dd></div>
+        <?php endif; ?>
       </dl>
+      <?= metody_html($pdo, $S, 'metody--karta') ?>
     </div>
   </div>
+
+  <?php // LA DESCRIPTION, LES PROPRIÉTÉS, LES VALEURS NUTRITIVES — trois blocs
+        // distincts, plus « tout fondu dans un seul texte ». Les propriétés
+        // s'écrivent ligne à ligne dans la console (Opakowanie, Skład…) ; les
+        // valeurs nutritives sont des chiffres pour 100 g, dans l'ordre légal.
+        $opis = opis_html((string) $p['desc']);
+        $wlasc = [];
+        if ($p['origin'] !== '') $wlasc[] = [$S['product.origin'] ?? '', $p['origin']];
+        if ($p['cocoa'] !== '')  $wlasc[] = [$S['product.cocoa'] ?? '', $p['cocoa']];
+        if ($p['weight_g'] > 0)  $wlasc[] = [$S['product.weight'] ?? '', number_format($p['weight_g'] / 1000, 3, ',', ' ') . ' kg'];
+        foreach (wsm_product_props($S, (string) $p['id']) as $pr) $wlasc[] = $pr;
+        if ($p['ean'] !== '')    $wlasc[] = [$S['product.ean'] ?? 'EAN', $p['ean']];
+        $nutri = wsm_nutrition_rows((array) ($p['nutrition'] ?? []), $S); ?>
+  <?php if ($opis !== '' || $wlasc || $nutri): ?>
+  <div class="product-info">
+    <?php if ($opis !== ''): ?>
+    <section class="product-opis">
+      <h2><?= e($S['product.desc_title'] ?? '') ?></h2>
+      <div class="prose"><?= $opis ?></div>
+    </section>
+    <?php endif; ?>
+    <?php if ($wlasc || $nutri): ?>
+    <div class="product-tabele">
+      <?php if ($wlasc): ?>
+      <section class="product-tabela">
+        <h2><?= e($S['product.props'] ?? '') ?></h2>
+        <dl class="tabela"><?php foreach ($wlasc as [$k, $v]): ?>
+          <div><dt><?= e((string) $k) ?></dt><dd><?= e((string) $v) ?></dd></div><?php endforeach; ?>
+        </dl>
+      </section>
+      <?php endif; ?>
+      <?php if ($nutri): ?>
+      <section class="product-tabela product-tabela--nutri">
+        <h2><?= e($S['product.nutrition'] ?? '') ?></h2>
+        <dl class="tabela"><?php foreach ($nutri as [$k, $v, $sous]): ?>
+          <div<?= $sous ? ' class="pod"' : '' ?>><dt><?= e((string) $k) ?></dt><dd><?= e((string) $v) ?></dd></div><?php endforeach; ?>
+        </dl>
+      </section>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
 
   <?php if ($related): ?>
   <section class="block">

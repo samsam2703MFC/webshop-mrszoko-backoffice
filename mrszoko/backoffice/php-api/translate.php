@@ -82,7 +82,7 @@ function wsm_tr_call(array $lot, string $cible): array {
     $nom = WSM_LANGS[$cible][2] ?? $cible;
 
     $sys = "Tu traduis l'interface d'une boutique en ligne de chocolat artisanal "
-         . "polonaise (Mister Szoko) du polonais vers le $nom.\n\n"
+         . "polonaise (" . wsm_brand_name() . ") du polonais vers le $nom.\n\n"
          . "RÈGLES :\n"
          . "- Registre : commerçant soigné, chaleureux, jamais familier.\n"
          . "- Ce sont des chaînes d'INTERFACE : garde-les aussi courtes que la source. "
@@ -90,7 +90,7 @@ function wsm_tr_call(array $lot, string $cible): array {
          . "- La clé indique le contexte (checkout.submit = un bouton, meta.title = un titre de page).\n"
          . "- Les marqueurs comme {qty}, {total}, %s doivent être RECOPIÉS À L'IDENTIQUE, "
          . "sans les traduire ni les modifier.\n"
-         . "- « Mister Szoko » ne se traduit jamais.\n"
+         . "- « " . wsm_brand_name() . " » ne se traduit jamais.\n"
          . "- Ne traduis pas les unités techniques (zł, kg, g).\n\n"
          . "Réponds UNIQUEMENT par un objet JSON {clé: traduction}, sans texte autour.";
 
@@ -373,7 +373,7 @@ function wsm_tr_text(string $texte, string $source, string $cible): array {
     $nomC = WSM_LANGS[$cible][2] ?? $cible;
     $nomS = WSM_LANGS[$source][2] ?? 'une langue inconnue';
 
-    $sys = "Tu traduis la correspondance d'une chocolaterie polonaise (Mister Szoko) "
+    $sys = "Tu traduis la correspondance d'une boutique polonaise (" . wsm_brand_name() . ") "
          . "depuis le $nomS vers le $nomC.\n\n"
          . "RÈGLES :\n"
          . "- Traduis FIDÈLEMENT, sans résumer, sans ajouter de politesse absente, "
@@ -381,7 +381,7 @@ function wsm_tr_text(string $texte, string $source, string $cible): array {
          . "un message qui n'a pas été écrit.\n"
          . "- Garde la mise en forme : sauts de ligne, listes, numéros de commande, "
          . "références, montants et unités À L'IDENTIQUE.\n"
-         . "- « Mister Szoko » ne se traduit pas.\n"
+         . "- « " . wsm_brand_name() . " » ne se traduit pas.\n"
          . "- Registre commerçant soigné.\n"
          . "- Si le texte est déjà en $nomC, renvoie-le inchangé.\n\n"
          . "Réponds UNIQUEMENT par la traduction, sans préambule ni guillemets.";

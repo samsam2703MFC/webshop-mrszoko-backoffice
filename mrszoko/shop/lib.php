@@ -30,6 +30,11 @@ if (is_file($WSM_API_DIR . '/layout.php')) require_once $WSM_API_DIR . '/layout.
 // Les sections du Kreator (sections.php). Même règle : absent, la boutique
 // vit sans sections — et le contrôle de déploiement le dit.
 if (is_file($WSM_API_DIR . '/sections.php')) require_once $WSM_API_DIR . '/sections.php';
+// Les logos de livraison et de paiement (quoi montrer) et les dessins de la
+// boutique (comment). Absents, la vitrine vit sans eux — le contrôle de
+// déploiement le dit.
+if (is_file($WSM_API_DIR . '/metody.php')) require_once $WSM_API_DIR . '/metody.php';
+if (is_file(__DIR__ . '/znaki.php')) require_once __DIR__ . '/znaki.php';
 require_once $WSM_API_DIR . '/tpay.php';
 
 const WSM_CART_COOKIE = 'ms_cart';
@@ -267,8 +272,79 @@ function theme_values(): array {
  */
 function logo_src(): string {
     $l = trim((string) (wsm_config()['shop']['logo_image'] ?? ''));
-    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return u('assets/logo.png');
+    // Sans logo déposé : le monogramme de Market Levano, dessiné en SVG.
+    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return u('assets/logo.svg');
     return media_src($l);
+}
+
+/** Le nom à côté du logo ? Oui, sauf si Integracje → Sklep dit « 0 ». */
+function logo_nazwa_on(): bool {
+    $v = wsm_config()['shop']['logo_nazwa'] ?? true;
+    return !($v === false || $v === 0 || $v === '0');
+}
+
+/**
+ * Le lien d'appel d'un numéro tel qu'on l'écrit (« 660 884 677 ») : chiffres
+ * seuls, et l'indicatif polonais quand il manque. Un numéro illisible ne fait
+ * pas de lien — un tel: faux sonne chez quelqu'un d'autre.
+ */
+function tel_href(string $tel): string {
+    $c = preg_replace('/[^0-9+]/', '', $tel) ?? '';
+    if (str_starts_with($c, '00')) $c = '+' . substr($c, 2);
+    if (preg_match('/^\d{9}$/', $c)) $c = '+48' . $c;
+    return preg_match('/^\+\d{8,15}$/', $c) ? 'tel:' . $c : '';
+}
+
+/**
+ * Les logos de livraison et de paiement, en deux rangées titrées. Vide quand
+ * rien n'est à montrer (metody.php décide quoi).
+ */
+function metody_html(PDO $pdo, array $S, string $cls = ''): string {
+    if (!function_exists('wsm_metody') || !function_exists('znaki_lista')) return '';
+    $etiq = fn(string $c) => (string) ($S['metoda.' . $c] ?? (WSM_METODY_WYSYLKI[$c] ?? WSM_METODY_PLATNOSCI[$c] ?? $c));
+    $out = '';
+    foreach (['wysylka' => 'metody.ship', 'platnosc' => 'metody.pay'] as $co => $titre) {
+        $l = znaki_lista(wsm_metody($pdo, $co), $etiq);
+        if ($l === '') continue;
+        $out .= '<div class="metody-grupa metody-grupa--' . $co . '"><p class="metody-tytul">' . e($S[$titre] ?? '') . '</p>' . $l . '</div>';
+    }
+    return $out === '' ? '' : '<div class="metody' . ($cls !== '' ? ' ' . $cls : '') . '">' . $out . '</div>';
+}
+
+/**
+ * La description d'un produit, en paragraphes et en listes. Elle s'affichait
+ * en UN paragraphe : les retours à la ligne tapés dans la console étaient
+ * perdus, et les « - jako polewę… » s'enchaînaient dans le texte. La même
+ * grammaire que les pages (pages.php) : ligne vide = nouveau paragraphe,
+ * « - » = liste, **gras**. Un retour simple reste un retour à la ligne.
+ */
+function opis_html(string $desc): string {
+    $desc = trim(str_replace("\r\n", "\n", $desc));
+    if ($desc === '') return '';
+    if (!function_exists('wsm_page_inline')) return '<p>' . nl2br(e($desc)) . '</p>';
+    $u = fn(string $x) => u($x);
+    $out = '';
+    foreach (preg_split('/\n\s*\n/', $desc) ?: [] as $bloc) {
+        // Dans un bloc, les lignes « - … » consécutives font une liste, les
+        // autres un paragraphe où chaque retour reste un retour : « Zastosowanie: »
+        // suivi de trois tirets donne une phrase, puis une vraie liste.
+        $p = []; $ul = [];
+        $vide = function () use (&$p, &$ul, &$out, $u): void {
+            if ($p)  $out .= '<p>' . implode('<br>', array_map(fn($l) => wsm_page_inline($l, $u), $p)) . '</p>';
+            if ($ul) $out .= '<ul>' . implode('', array_map(fn($l) => '<li>' . wsm_page_inline($l, $u) . '</li>', $ul)) . '</ul>';
+            $p = []; $ul = [];
+        };
+        foreach (explode("\n", $bloc) as $l) {
+            $l = trim($l);
+            if ($l === '') continue;
+            if (preg_match('/^[-•]\s+(.+)$/u', $l, $m)) { if ($p) $vide(); $ul[] = $m[1]; continue; }
+            if (preg_match('/^#{2,3}\s+(.+)$/u', $l, $m)) { $vide(); $out .= '<h3>' . wsm_page_inline($m[1], $u) . '</h3>'; continue; }
+            if ($ul) $vide();
+            $p[] = $l;
+        }
+        $vide();
+    }
+    return $out;
 }
 
 /**
@@ -280,7 +356,7 @@ function logo_src(): string {
 function liens_uklad(PDO $pdo, array $S, string $lang, string $which): array {
     $def = $which === 'nav'
         ? ['sklep', 'b2b', 'zamowienie', 'kontakt']
-        : ['email', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', 'konsola'];
+        : ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', 'konsola'];
     $items = function_exists('wsm_layout_liens')
         ? wsm_layout_liens($pdo, $which)
         : array_map(fn($k) => ['k' => $k, 'type' => 'builtin', 'id' => 0, 'slug' => ''], $def);
@@ -308,6 +384,10 @@ function liens_uklad(PDO $pdo, array $S, string $lang, string $which): array {
             case 'konsola':    $out[] = ['href' => shop_base() . '/../backoffice/', 'label' => (string) ($S['footer.console'] ?? '')]; break;
             case 'email':
                 if (($S['footer.email'] ?? '') !== '') $out[] = ['href' => 'mailto:' . $S['footer.email'], 'label' => (string) $S['footer.email']];
+                break;
+            case 'telefon':
+                $tel = trim((string) ($S['footer.phone'] ?? ''));
+                if ($tel !== '' && tel_href($tel) !== '') $out[] = ['href' => tel_href($tel), 'label' => $tel];
                 break;
         }
     }
@@ -606,7 +686,7 @@ function legal_valeurs(PDO $pdo, array $S): array {
     } catch (Throwable $e) { /* table absente : le document reste lisible */ }
 
     return [
-        '{sklep}'      => (string) ($S['brand'] ?? 'Mister Szoko'),
+        '{sklep}'      => (string) ($S['brand'] ?? 'Market Levano'),
         '{sprzedawca}' => (string) ($S['seller.name'] ?? ''),
         '{adres}'      => (string) ($S['seller.address'] ?? ''),
         '{ids}'        => (string) ($S['seller.ids'] ?? ''),

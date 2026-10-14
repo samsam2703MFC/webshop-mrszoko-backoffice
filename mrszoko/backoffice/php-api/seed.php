@@ -71,10 +71,10 @@ function wsm_seed(PDO $pdo): void {
         ['p-foiegras', 'Katering', 'Foie gras mi-cuit', 28.00, 12.00, 'Opublikowany', '', 1, 0, 41, null, [350, 150, 90, 70]],
         ['p-glace', 'Lody', 'Lody rzemieślnicze', 6.50, 2.10, 'Opublikowany', 'Lato', 0, 0, 30, null, [500, 120, 120, 110]],
         // menu products (menu builder)
-        ['p-midi', 'Menu i zestawy', "Menu lunchowe — Mister Szoko", 8.50, 2.40, 'Opublikowany', '', 0, 0, 0, 'on'],
-        ['p-gouter', 'Menu i zestawy', "Zestaw podwieczorkowy — Mister Szoko", 3.20, 0.90, 'Opublikowany', '', 0, 0, 0, 'on'],
-        ['p-cafe', 'Menu i zestawy', "Café Gourmand — Mister Szoko", 6.50, 2.10, 'Opublikowany', '', 0, 0, 0, 'off'],
-        ['p-brunch', 'Menu i zestawy', "Brunch weekendowy — Mister Szoko", 18.00, 5.50, 'Opublikowany', '', 0, 0, 0, null],
+        ['p-midi', 'Menu i zestawy', "Menu lunchowe — Market Levano", 8.50, 2.40, 'Opublikowany', '', 0, 0, 0, 'on'],
+        ['p-gouter', 'Menu i zestawy', "Zestaw podwieczorkowy — Market Levano", 3.20, 0.90, 'Opublikowany', '', 0, 0, 0, 'on'],
+        ['p-cafe', 'Menu i zestawy', "Café Gourmand — Market Levano", 6.50, 2.10, 'Opublikowany', '', 0, 0, 0, 'off'],
+        ['p-brunch', 'Menu i zestawy', "Brunch weekendowy — Market Levano", 18.00, 5.50, 'Opublikowany', '', 0, 0, 0, null],
     ];
     foreach ($products as $i => $p) {
         // Logistique InPost + TVA tpay : gabarit déduit des dimensions.
@@ -557,6 +557,18 @@ function wsm_content_remplacements(): array {
         // polonais : « Dostawa gratis — próg osiągnięty » devient « Dostawa
         // gratis, próg osiągnięty ».
         ['wsm_shop_i18n', 'v', ' — ', ', '],
+        // MISTER SZOKO DEVIENT MARKET LEVANO — le nom de la boutique sur
+        // Allegro. En place, et seulement le nom : une phrase retouchée dans
+        // Treści garde tout le reste de ce qu'on y a écrit. Même chose pour
+        // l'adresse de contact, et pour la signature des messages aux clients.
+        ['wsm_shop_i18n', 'v', 'Mister Szoko', 'Market Levano'],
+        ['wsm_landing_i18n', 'v', 'Mister Szoko', 'Market Levano'],
+        ['wsm_shop_i18n', 'v', 'pro@misterszoko.com', 'MarketLevano@gmail.com'],
+        ['wsm_landing_i18n', 'v', 'pro@misterszoko.com', 'MarketLevano@gmail.com'],
+        ['wsm_mail_templates', 'subject', 'Mister Szoko', 'Market Levano'],
+        ['wsm_mail_templates', 'body', 'Mister Szoko', 'Market Levano'],
+        ['wsm_shops', 'nom', 'Mister Szoko', 'Market Levano'],
+        ['wsm_products', 'nom', 'Mister Szoko', 'Market Levano'],
     ];
 }
 
@@ -604,6 +616,14 @@ function wsm_content_menage(): array {
         $ops[] = ['UPDATE wsm_categories SET active = 0 WHERE name = ? AND active = 1'
                 . ' AND id NOT IN (SELECT category_id FROM wsm_products'
                 . '                 WHERE shop_visible = 1 AND active = 1)', [$nom]];
+    }
+    // LE TITRE DU CATALOGUE, quand il est encore celui d'origine. Market
+    // Levano vend aussi des sucres et des farines : « Nasze czekolady »
+    // au-dessus d'un rayon « Mąki » serait faux. On ne remplace que la phrase
+    // LIVRÉE, mot pour mot — un titre retouché dans Treści reste intact.
+    foreach ([['pl', 'Nasze czekolady', 'Nasze produkty'], ['uk', 'Наш шоколад', 'Наші продукти'],
+              ['en', 'Our chocolate', 'Our products']] as [$l, $de, $vers]) {
+        $ops[] = ['UPDATE wsm_shop_i18n SET v = ? WHERE k = ? AND lang = ? AND v = ?', [$vers, 'catalog.title', $l, $de]];
     }
     return $ops;
 }
@@ -935,7 +955,7 @@ Podgląd zamówienia: {{link}}
 
 Odezwiemy się, gdy paczka ruszy w drogę.
 
-Mister Szoko", 'zamowienie'];
+Market Levano", 'zamowienie'];
 
     $t[] = ['zamowienie', 'uk', 'Підтвердження замовлення', 'Замовлення {{numer}} прийнято',
 "Доброго дня, {{imie}}!
@@ -948,7 +968,7 @@ Mister Szoko", 'zamowienie'];
 
 Ми напишемо, щойно посилка вирушить.
 
-Mister Szoko", 'zamowienie'];
+Market Levano", 'zamowienie'];
 
     $t[] = ['zamowienie', 'en', 'Order confirmation', 'Order {{numer}} received',
 "Hello {{imie}},
@@ -961,7 +981,7 @@ Order details: {{link}}
 
 We will write again as soon as the parcel is on its way.
 
-Mister Szoko", 'zamowienie'];
+Market Levano", 'zamowienie'];
 
     // ---- Commande au-delà du stock ----------------------------------------
     $t[] = ['na_zamowienie', 'pl', 'Zamówienie ponad stan — kontakt', 'Zamówienie {{numer}} — skontaktujemy się mailowo',
@@ -974,7 +994,7 @@ na świeżo, dlatego skontaktujemy się mailowo z terminem wysyłki:
 
 Reszta zamówienia czeka spakowana. Podgląd: {{link}}
 
-Mister Szoko", 'na_zamowienie'];
+Market Levano", 'na_zamowienie'];
 
     $t[] = ['na_zamowienie', 'uk', 'Замовлення понад запас — контакт', 'Замовлення {{numer}} — ми напишемо вам',
 "Доброго дня, {{imie}}!
@@ -986,7 +1006,7 @@ Mister Szoko", 'na_zamowienie'];
 
 Решта замовлення вже спакована. Перегляд: {{link}}
 
-Mister Szoko", 'na_zamowienie'];
+Market Levano", 'na_zamowienie'];
 
     $t[] = ['na_zamowienie', 'en', 'Order beyond stock — contact', 'Order {{numer}} — we will contact you by e-mail',
 "Hello {{imie}},
@@ -998,7 +1018,7 @@ so we will contact you by e-mail with the shipping date:
 
 The rest of your order is already packed. Details: {{link}}
 
-Mister Szoko", 'na_zamowienie'];
+Market Levano", 'na_zamowienie'];
 
     // ---- Paiement reçu -----------------------------------------------------
     $t[] = ['platnosc', 'pl', 'Płatność otrzymana', 'Płatność za {{numer}} zaksięgowana',
@@ -1007,7 +1027,7 @@ Mister Szoko", 'na_zamowienie'];
 potwierdzamy wpłatę {{kwota}} za zamówienie {{numer}}.
 Zabieramy się do pakowania.
 
-Mister Szoko", 'platnosc'];
+Market Levano", 'platnosc'];
 
     $t[] = ['platnosc', 'uk', 'Оплату отримано', 'Оплату за {{numer}} зараховано',
 "Доброго дня, {{imie}}!
@@ -1015,7 +1035,7 @@ Mister Szoko", 'platnosc'];
 Підтверджуємо оплату {{kwota}} за замовлення {{numer}}.
 Беремося пакувати.
 
-Mister Szoko", 'platnosc'];
+Market Levano", 'platnosc'];
 
     $t[] = ['platnosc', 'en', 'Payment received', 'Payment for {{numer}} confirmed',
 "Hello {{imie}},
@@ -1023,7 +1043,7 @@ Mister Szoko", 'platnosc'];
 we confirm your payment of {{kwota}} for order {{numer}}.
 We are getting it packed.
 
-Mister Szoko", 'platnosc'];
+Market Levano", 'platnosc'];
 
     // ---- Expédition --------------------------------------------------------
     $t[] = ['wysylka', 'pl', 'Przesyłka nadana', 'Zamówienie {{numer}} wysłane',
@@ -1034,7 +1054,7 @@ Punkt odbioru: {{paczkomat}}
 
 Śledzenie: {{link}}
 
-Mister Szoko", 'wysylka'];
+Market Levano", 'wysylka'];
 
     $t[] = ['wysylka', 'uk', 'Посилку відправлено', 'Замовлення {{numer}} відправлено',
 "Доброго дня, {{imie}}!
@@ -1044,7 +1064,7 @@ Mister Szoko", 'wysylka'];
 
 Відстеження: {{link}}
 
-Mister Szoko", 'wysylka'];
+Market Levano", 'wysylka'];
 
     $t[] = ['wysylka', 'en', 'Parcel dispatched', 'Order {{numer}} dispatched',
 "Hello {{imie}},
@@ -1054,7 +1074,7 @@ Pick-up point: {{paczkomat}}
 
 Tracking: {{link}}
 
-Mister Szoko", 'wysylka'];
+Market Levano", 'wysylka'];
 
     // ---- Demande de paiement (proforma) ------------------------------------
     $t[] = ['zadanie_zaplaty', 'pl', 'Prośba o płatność', 'Prośba o płatność — {{numer}}',
@@ -1070,7 +1090,7 @@ W tytule prosimy podać {{numer}}.
 
 Po zaksięgowaniu wpłaty wystawimy fakturę i ruszamy z realizacją.
 
-Mister Szoko", 'zadanie_zaplaty'];
+Market Levano", 'zadanie_zaplaty'];
 
     $t[] = ['zadanie_zaplaty', 'en', 'Payment request', 'Payment request — {{numer}}',
 "Hello {{imie}},
@@ -1085,7 +1105,7 @@ Please quote {{numer}} as the reference.
 
 We issue the invoice and start production as soon as the payment clears.
 
-Mister Szoko", 'zadanie_zaplaty'];
+Market Levano", 'zadanie_zaplaty'];
 
     $t[] = ['zadanie_zaplaty', 'uk', 'Запит на оплату', 'Запит на оплату — {{numer}}',
 "Доброго дня, {{imie}}!
@@ -1100,7 +1120,7 @@ Mister Szoko", 'zadanie_zaplaty'];
 
 Після зарахування оплати виставимо рахунок і почнемо виконання.
 
-Mister Szoko", 'zadanie_zaplaty'];
+Market Levano", 'zadanie_zaplaty'];
 
     // ---- Relance ------------------------------------------------------------
     $t[] = ['przypomnienie', 'pl', 'Przypomnienie o płatności', 'Przypomnienie — {{numer}} po terminie',
@@ -1114,7 +1134,7 @@ bezprzedmiotową i dać nam znać — sprawdzimy księgowanie.
 
 Rachunek: {{rachunek}}
 
-Mister Szoko", 'przypomnienie'];
+Market Levano", 'przypomnienie'];
 
     $t[] = ['przypomnienie', 'en', 'Payment reminder', 'Reminder — {{numer}} overdue',
 "Hello {{imie}},
@@ -1126,7 +1146,7 @@ us know — we will check our records.
 
 Account: {{rachunek}}
 
-Mister Szoko", 'przypomnienie'];
+Market Levano", 'przypomnienie'];
 
     $t[] = ['przypomnienie', 'uk', 'Нагадування про оплату', 'Нагадування — {{numer}} прострочено',
 "Доброго дня, {{imie}}!
@@ -1139,7 +1159,7 @@ Mister Szoko", 'przypomnienie'];
 
 Рахунок: {{rachunek}}
 
-Mister Szoko", 'przypomnienie'];
+Market Levano", 'przypomnienie'];
 
     // ---- Changements d'état saisis dans la console -------------------------
     //  Le texte reste court : un client qui reçoit quatre messages pour une
@@ -1151,7 +1171,7 @@ zabraliśmy się do Państwa zamówienia {{numer}}. Damy znać, gdy paczka ruszy
 
 Podgląd zamówienia: {{link}}
 
-Mister Szoko", 'w_realizacji'];
+Market Levano", 'w_realizacji'];
 
     $t[] = ['w_realizacji', 'en', 'In progress', 'Order {{numer}} is being prepared',
 "Hello {{imie}},
@@ -1160,7 +1180,7 @@ we have started preparing your order {{numer}}. We will write again when the par
 
 Order details: {{link}}
 
-Mister Szoko", 'w_realizacji'];
+Market Levano", 'w_realizacji'];
 
     $t[] = ['w_realizacji', 'uk', 'У роботі', 'Замовлення {{numer}} у роботі',
 "Доброго дня, {{imie}}!
@@ -1169,7 +1189,7 @@ Mister Szoko", 'w_realizacji'];
 
 Перегляд замовлення: {{link}}
 
-Mister Szoko", 'w_realizacji'];
+Market Levano", 'w_realizacji'];
 
     $t[] = ['wyslane', 'pl', 'Wysłane', 'Zamówienie {{numer}} wysłane',
 "Dzień dobry {{imie}},
@@ -1181,7 +1201,7 @@ Sposób dostawy: {{dostawa}} {{paczkomat}}
 
 Podgląd zamówienia: {{link}}
 
-Mister Szoko", 'wyslane'];
+Market Levano", 'wyslane'];
 
     $t[] = ['wyslane', 'en', 'Shipped', 'Order {{numer}} has been shipped',
 "Hello {{imie}},
@@ -1193,7 +1213,7 @@ Delivery: {{dostawa}} {{paczkomat}}
 
 Order details: {{link}}
 
-Mister Szoko", 'wyslane'];
+Market Levano", 'wyslane'];
 
     $t[] = ['wyslane', 'uk', 'Відправлено', 'Замовлення {{numer}} відправлено',
 "Доброго дня, {{imie}}!
@@ -1205,7 +1225,7 @@ Mister Szoko", 'wyslane'];
 
 Перегляд замовлення: {{link}}
 
-Mister Szoko", 'wyslane'];
+Market Levano", 'wyslane'];
 
     $t[] = ['dostarczone', 'pl', 'Dostarczone', 'Zamówienie {{numer}} dostarczone',
 "Dzień dobry {{imie}},
@@ -1213,7 +1233,7 @@ Mister Szoko", 'wyslane'];
 zamówienie {{numer}} zostało dostarczone. Mamy nadzieję, że wszystko dotarło w porządku —
 jeśli coś jest nie tak, prosimy o odpowiedź na tę wiadomość.
 
-Mister Szoko", 'dostarczone'];
+Market Levano", 'dostarczone'];
 
     $t[] = ['dostarczone', 'en', 'Delivered', 'Order {{numer}} delivered',
 "Hello {{imie}},
@@ -1221,7 +1241,7 @@ Mister Szoko", 'dostarczone'];
 order {{numer}} has been delivered. We hope everything arrived in good condition —
 if anything is wrong, simply reply to this message.
 
-Mister Szoko", 'dostarczone'];
+Market Levano", 'dostarczone'];
 
     $t[] = ['dostarczone', 'uk', 'Доставлено', 'Замовлення {{numer}} доставлено',
 "Доброго дня, {{imie}}!
@@ -1229,7 +1249,7 @@ Mister Szoko", 'dostarczone'];
 Замовлення {{numer}} доставлено. Сподіваємось, усе прибуло в порядку —
 якщо щось не так, просто дайте відповідь на цей лист.
 
-Mister Szoko", 'dostarczone'];
+Market Levano", 'dostarczone'];
 
     $t[] = ['anulowane', 'pl', 'Anulowane', 'Zamówienie {{numer}} anulowane',
 "Dzień dobry {{imie}},
@@ -1237,7 +1257,7 @@ Mister Szoko", 'dostarczone'];
 zamówienie {{numer}} zostało anulowane. Jeśli była to pomyłka albo płatność już wyszła,
 prosimy o kontakt — wyjaśnimy to od razu.
 
-Mister Szoko", 'anulowane'];
+Market Levano", 'anulowane'];
 
     $t[] = ['anulowane', 'en', 'Cancelled', 'Order {{numer}} cancelled',
 "Hello {{imie}},
@@ -1245,7 +1265,7 @@ Mister Szoko", 'anulowane'];
 order {{numer}} has been cancelled. If this was a mistake, or your payment has already left,
 please get in touch — we will sort it out straight away.
 
-Mister Szoko", 'anulowane'];
+Market Levano", 'anulowane'];
 
     $t[] = ['anulowane', 'uk', 'Скасовано', 'Замовлення {{numer}} скасовано',
 "Доброго дня, {{imie}}!
@@ -1253,7 +1273,7 @@ Mister Szoko", 'anulowane'];
 Замовлення {{numer}} скасовано. Якщо це помилка або оплата вже пішла,
 будь ласка, зв'яжіться з нами — ми одразу все з'ясуємо.
 
-Mister Szoko", 'anulowane'];
+Market Levano", 'anulowane'];
 
     // ---- Formulaire de contact : l'accusé de réception ----------------------
     //  Court, et il ne promet pas de délai qu'on ne tiendrait pas. Il rappelle
@@ -1266,7 +1286,7 @@ tak szybko, jak to możliwe.
 
 Ten e-mail jest tylko potwierdzeniem: nie trzeba na niego odpowiadać.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'formularz'];
 
     $t[] = ['formularz', 'en', 'Contact confirmation', 'We have received your message',
@@ -1277,7 +1297,7 @@ we will get back to you as soon as we can.
 
 This e-mail is a confirmation only; there is no need to reply to it.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'formularz'];
 
     $t[] = ['formularz', 'uk', 'Підтвердження звернення', 'Ми отримали ваше повідомлення',
@@ -1288,7 +1308,7 @@ Mister Szoko
 
 Цей лист — лише підтвердження, відповідати на нього не потрібно.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'formularz'];
 
     // ---- Commande abandonnée à la caisse -----------------------------------
@@ -1308,7 +1328,7 @@ Do zapłaty: {{kwota}}. Płatność zajmie chwilę:
 
 Jeśli zmieniłeś zdanie — nic nie musisz robić, zamówienie samo wygaśnie.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'niedokonczone'];
 
     $t[] = ['niedokonczone', 'en', 'Your order is waiting', 'Your order {{numer}} is waiting for payment',
@@ -1323,7 +1343,7 @@ Amount: {{kwota}}. Paying takes a moment:
 
 Changed your mind? Do nothing — the order will simply expire.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'niedokonczone'];
 
     $t[] = ['niedokonczone', 'uk', 'Замовлення чекає', 'Ваше замовлення {{numer}} чекає на оплату',
@@ -1338,7 +1358,7 @@ Mister Szoko
 
 Передумали? Нічого не робіть — замовлення просто скасується.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'niedokonczone'];
 
     // Le dernier message le DIT. « Ostatnie » évite au client de se demander
@@ -1353,7 +1373,7 @@ Do zapłaty: {{kwota}}
 
 Jeśli nie chcesz go realizować, po prostu zignoruj ten list.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'niedokonczone2'];
 
     $t[] = ['niedokonczone2', 'en', 'Last reminder', 'Last reminder — {{numer}}',
@@ -1366,7 +1386,7 @@ Amount: {{kwota}}
 
 If you no longer want it, simply ignore this e-mail.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'niedokonczone2'];
 
     $t[] = ['niedokonczone2', 'uk', 'Останнє нагадування', 'Останнє нагадування — {{numer}}',
@@ -1379,7 +1399,7 @@ Mister Szoko
 
 Якщо ви передумали, просто проігноруйте цей лист.
 
-Mister Szoko
+Market Levano
 {{sklep}}", 'niedokonczone2'];
 
     // ---- Abonnement : l'échéance est PRÊTE, elle n'est pas PRÉLEVÉE --------
@@ -1393,7 +1413,7 @@ Mister Szoko
     $t[] = ['kontakt', 'pl', 'Odpowiedź do klienta (pusty)', 'W sprawie zamówienia {{numer}}',
 "Dzień dobry {{imie}},
 
-Mister Szoko", ''];
+Market Levano", ''];
 
     foreach ($t as $row) $ins->execute($row);
 }
