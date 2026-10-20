@@ -161,10 +161,10 @@ if (!function_exists('img_src')) {
     }
 }
 
-/** Le logo de la console et des documents : celui déposé pour la boutique, sinon le monogramme. */
+/** Le logo de la console et des documents : celui déposé pour la boutique, sinon celui d'origine. */
 function console_logo_src(): string {
     $l = trim((string) (wsm_config()['shop']['logo_image'] ?? ''));
-    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return 'img/logo.svg';
+    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return 'img/logo.png';
     return img_src($l);
 }
 

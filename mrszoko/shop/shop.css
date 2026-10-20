@@ -654,9 +654,10 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .ogloszenie strong { color: inherit; }
 
 /* ============================================================================
-   Market Levano — nom, illustration, icônes, contact, logos de livraison et
-   de paiement, fiche produit en trois blocs. Mêmes jetons que le reste : le
-   thème de Wygląd s'applique à tout ce qui suit.
+   La vitrine demandée par l'équipe en octobre 2026 — nom et logo, illustration,
+   icônes, bandeau du haut, contact, logos de livraison et de paiement, fiche
+   produit en trois blocs. Mêmes jetons que le reste : le thème de Wygląd
+   s'applique à tout ce qui suit.
    ============================================================================ */
 
 /* Le logo et le nom, côte à côte. */
@@ -665,7 +666,7 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .head-nazwa { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--brand);
               letter-spacing: -0.01em; white-space: nowrap; line-height: 1; }
 /* Sur un téléphone, le nom ne tient pas avec les langues et le panier : le
-   monogramme reste, le nom revient dans le pied de page. Sans ça la barre
+   logo reste, le nom revient dans le pied de page. Sans ça la barre
    débordait de 9 px et toute la page glissait de côté. */
 @media (max-width: 560px) { .head-nazwa { display: none; } .head-logo img { height: 40px; } }
 
@@ -792,3 +793,18 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .tabela dd { color: var(--text-body); text-align: right; }
 .tabela .pod dt { font-weight: 400; color: var(--text-muted); padding-left: 1em; }
 @media (max-width: 640px) { .foot-links { align-items: flex-start; } }
+
+/* Le bandeau du haut de l'accueil (livraison gratuite, heure limite) : sous
+   la barre de navigation, sur le chocolat du hero, icônes en couleur. Il
+   remplace le bandeau mono du bas. */
+.hero-strip--gora { border-top: 0; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(18,10,6,.32); }
+.hero-strip--gora .hero-strip-in { justify-content: center; align-items: center; gap: 10px 44px;
+                                   padding-top: 12px; padding-bottom: 12px; color: var(--cream-100);
+                                   font-family: var(--font-sans); font-size: var(--text-sm); letter-spacing: 0; }
+.korzysc { display: inline-flex; align-items: center; gap: 12px; }
+.korzysc > span { font-weight: 600; }
+.korzysc-ikona { width: 44px; height: 28px; flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .hero-strip--gora .hero-strip-in { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .korzysc-ikona { width: 38px; height: 24px; }
+}

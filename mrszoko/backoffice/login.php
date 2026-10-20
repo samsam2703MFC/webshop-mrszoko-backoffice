@@ -95,7 +95,7 @@ $titre = 'Logowanie — Konsola ' . wsm_brand_name();
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title><?= lg_h($titre) ?></title>
-<link rel="icon" href="img/logo.svg">
+<link rel="icon" href="img/logo.png">
 <link rel="stylesheet" href="_ds/mister-szoko/global.css">
 <link rel="stylesheet" href="_ds/mister-szoko/brand.css">
 <style>
@@ -134,7 +134,7 @@ $titre = 'Logowanie — Konsola ' . wsm_brand_name();
 <body>
   <div class="box">
     <div class="mark">
-      <img src="img/logo.svg" alt="">
+      <img src="img/logo.png" alt="">
       <span><b>Konsola <?= lg_h(wsm_brand_name()) ?></b><span>Zaplecze sklepu</span></span>
     </div>
 

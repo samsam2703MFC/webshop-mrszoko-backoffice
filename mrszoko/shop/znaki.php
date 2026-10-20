@@ -99,26 +99,62 @@ function znaki_lista(array $codes, callable $etiquette, string $cls = ''): strin
 
 /**
  * Les icônes des trois promesses, quand aucune n'est déposée dans
- * Integracje → Sklep. Dessinées au trait, comme la maquette de l'équipe :
- * camion et horloge (24 h), colis (Paczkomat ou kurier), thermomètre et
- * flocon (emballage isotherme).
+ * Integracje → Sklep. EN COULEUR, à la demande de l'équipe : le camion
+ * caramel avec son horloge (24 h), le colis couleur carton, le thermomètre
+ * et son flocon bleu. Le trait reste celui de la marque (currentColor) :
+ * Wygląd change le contour avec le reste, les couleurs disent la chose.
  */
 function ikona_obietnicy(int $i): string {
     $d = match ($i) {
-        1 => '<path d="M4.5 12h20a1.5 1.5 0 0 1 1.5 1.5V30H3V13.5A1.5 1.5 0 0 1 4.5 12Z"/>'
-           . '<path d="M26 18h7.4a2 2 0 0 1 1.6.8l5.6 7.4a2 2 0 0 1 .4 1.2V30H26"/><path d="M29.5 21h3.6l3 4H29.5Z"/>'
-           . '<circle cx="11" cy="33" r="3"/><circle cx="33" cy="33" r="3"/>'
-           . '<circle cx="14.5" cy="21" r="5"/><path d="M14.5 18.3V21l1.9 1.3"/><path d="M42.5 38h-6M30 38h-3"/>',
-        2 => '<path d="M24 5 41 13.5v21L24 43 7 34.5v-21Z"/><path d="M7 13.5 24 22l17-8.5M24 22v21"/>'
-           . '<path d="M15.5 9.3 32.5 17.8v7.4"/>',
-        3 => '<path d="M15.5 29.4V10a4 4 0 0 1 8 0v19.4a7 7 0 1 1-8 0Z"/><path d="M19.5 16v15"/>'
-           . '<circle cx="19.5" cy="35.3" r="2.8" fill="currentColor" stroke="none"/>'
-           . '<path d="M36 5.5v15M29.5 9.25l13 7.5M29.5 16.75l13-7.5"/><path d="M34 7.2l2 1.6 2-1.6M34 18.8l2-1.6 2 1.6"/>',
+        1 => '<rect x="3" y="13" width="24" height="17" rx="2" fill="#C68A3C"/>'
+           . '<path d="M27 18h7.2a2 2 0 0 1 1.6.8l5.4 7.2a2 2 0 0 1 .4 1.2V30H27Z" fill="#F4E3C8"/>'
+           . '<path d="M30 21h3.8l3.4 4.5H30Z" fill="#7CC0EA" stroke-width="1.4"/>'
+           . '<path d="M3 30h38.6"/>'
+           . '<circle cx="11" cy="33.5" r="3.6" fill="#3B2416" stroke="none"/><circle cx="11" cy="33.5" r="1.3" fill="#E8D9C4" stroke="none"/>'
+           . '<circle cx="33" cy="33.5" r="3.6" fill="#3B2416" stroke="none"/><circle cx="33" cy="33.5" r="1.3" fill="#E8D9C4" stroke="none"/>'
+           . '<circle cx="15" cy="21.5" r="5.8" fill="#FFFFFF"/><path d="M15 18.5v3l2.2 1.5" stroke-width="1.6"/>',
+        2 => '<path d="M24 6 41 14.5 24 23 7 14.5Z" fill="#E2B97E"/>'
+           . '<path d="M7 14.5 24 23v20L7 34.5Z" fill="#C99558"/>'
+           . '<path d="M24 23 41 14.5v20L24 43Z" fill="#B07B40"/>'
+           . '<path d="M13.6 11.3 17.6 9.3 34.4 17.7 30.4 19.7Z" fill="#F4E2BF" stroke="none"/>'
+           . '<path d="M30.4 19.7 34.4 17.7v6.8l-4 2Z" fill="#E6C994" stroke="none"/>'
+           . '<path d="M24 6 41 14.5v20L24 43 7 34.5v-20Z" fill="none"/><path d="M7 14.5 24 23l17-8.5M24 23v20" fill="none"/>'
+           . '<path d="M10.5 29.5l5 2.5" stroke-width="1.4"/>',
+        3 => '<path d="M14.5 29.4V10a4 4 0 0 1 8 0v19.4a7 7 0 1 1-8 0Z" fill="#FFFFFF"/>'
+           . '<rect x="17" y="16" width="3" height="16" rx="1.5" fill="#E0473C" stroke="none"/>'
+           . '<circle cx="18.5" cy="35.3" r="4.3" fill="#E0473C" stroke="none"/>'
+           . '<path d="M23.5 13h2M23.5 17h2M23.5 21h2" stroke-width="1.3"/>'
+           . '<g stroke="#2E8BD8" stroke-width="2.2"><path d="M36 4.5v17M28.6 8.75l14.8 8.5M28.6 17.25l14.8-8.5"/>'
+           . '<path d="M33.6 6.2 36 8.4l2.4-2.2M33.6 19.8l2.4-2.2 2.4 2.2M29.3 11.9l3.1.9-.8 3.2M42.7 11.9l-3.1.9.8 3.2"/></g>',
         default => '',
     };
     if ($d === '') return '';
     return '<svg class="promise-rys" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="currentColor" '
-         . 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $d . '</svg>';
+         . 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $d . '</svg>';
+}
+
+/**
+ * Les icônes du bandeau en haut de la page d'accueil, sur fond chocolat :
+ * le fourgon (darmowa dostawa) et l'horloge (wysyłka tego samego dnia).
+ * Claires, pour se lire sur le sombre.
+ */
+function ikona_korzysci(string $co): string {
+    $d = match ($co) {
+        'bus' => '<path d="M4 6h26l7.5 6.5h5A2.5 2.5 0 0 1 45 15v9H4Z" fill="#F4E3C8"/>'
+               . '<path d="M31.4 8.6 36.4 13H31.4Z" fill="#7CC0EA"/>'
+               . '<rect x="8" y="9" width="7" height="5" rx="1" fill="#7CC0EA"/><rect x="18" y="9" width="9" height="5" rx="1" fill="#7CC0EA"/>'
+               . '<rect x="4" y="17" width="41" height="2.6" fill="#C68A3C"/>'
+               . '<circle cx="13" cy="24.5" r="3.9" fill="#1E120B" stroke="#F4E3C8" stroke-width="1.6"/>'
+               . '<circle cx="36" cy="24.5" r="3.9" fill="#1E120B" stroke="#F4E3C8" stroke-width="1.6"/>'
+               . '<path d="M0 10h2.5M0 14h1.8" stroke="#C68A3C" stroke-width="1.6" stroke-linecap="round"/>',
+        'zegar' => '<circle cx="24" cy="15" r="12" fill="#FFF6E8" stroke="#C68A3C" stroke-width="2.6"/>'
+                 . '<path d="M24 5.5v2M24 22.5v2M14.5 15h2M31.5 15h2" stroke="#7A5A3E" stroke-width="1.6" stroke-linecap="round"/>'
+                 . '<path d="M24 9.5V15l4 2.6" fill="none" stroke="#2B1A12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+                 . '<circle cx="24" cy="15" r="1.4" fill="#2B1A12"/>',
+        default => '',
+    };
+    if ($d === '') return '';
+    return '<svg class="korzysc-ikona" viewBox="0 0 48 30" width="40" height="25" aria-hidden="true" focusable="false">' . $d . '</svg>';
 }
 
 /** Les pictogrammes du contact : telefon, e-mail, formularz. */

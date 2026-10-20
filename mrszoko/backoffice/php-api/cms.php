@@ -90,6 +90,7 @@ const WSM_CMS_SECTIONS = [
     'status' => 'Statusy zamówienia',
     'pay' => 'Statusy płatności',
     'ship' => 'Sposoby dostawy',
+    'info' => 'Pasek u góry strony głównej ({prog} = próg darmowej dostawy z Dostawy)',
     'metody' => 'Logotypy wysyłki i płatności — nagłówki',
     'metoda' => 'Logotypy wysyłki i płatności — podpisy',
     'nutri' => 'Wartości odżywcze — nazwy wierszy',

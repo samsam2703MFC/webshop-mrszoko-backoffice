@@ -29,12 +29,13 @@ function wsm_config_overlay(?array $patch = null): array {
  * LE NOM DE LA BOUTIQUE, là où il ne passe pas par la vitrine : titres de la
  * console, objets et signatures des e-mails, description du paiement. Il vit
  * dans Treści (clé « brand », en polonais) — un seul endroit à changer, et
- * pas un nom écrit en dur dans dix fichiers comme l'était « Mister Szoko ».
+ * pas un nom écrit en dur dans dix fichiers. Mister Szoko, puis Market
+ * Levano, puis Szoko Shop : trois noms en deux semaines, ce n'est pas fini.
  */
 function wsm_brand_name(): string {
     static $nom = null;
     if ($nom !== null) return $nom;
-    $nom = 'Market Levano';
+    $nom = 'Szoko Shop';
     try {
         $st = wsm_pdo()->prepare("SELECT v FROM wsm_shop_i18n WHERE lang = 'pl' AND k = 'brand'");
         $st->execute();

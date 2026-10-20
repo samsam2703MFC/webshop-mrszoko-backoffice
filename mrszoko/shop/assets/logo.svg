@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <title>Market Levano</title>
-  <circle cx="32" cy="32" r="32" fill="#41281A"/>
-  <circle cx="32" cy="32" r="28.2" fill="none" stroke="#C68A3C" stroke-width="1.4"/>
-  <path d="M14.5 42.5V21.5l10 13.5 10-13.5v21M40.5 21.5v21H50" fill="none" stroke="#FBF6EF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
