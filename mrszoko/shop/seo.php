@@ -160,12 +160,12 @@ function seo_org(array $S, string $lang, string $defaut = 'pl'): void {
     $d = [
         '@context' => 'https://schema.org',
         '@type'    => 'Organization',
-        'name'     => (string) ($S['brand'] ?? 'Market Levano'),
+        'name'     => (string) ($S['brand'] ?? 'Szoko Shop'),
         'url'      => $url,
     ];
     // Le logo déposé dans Ustawienia, sinon celui du dépôt — le même que la page montre.
     $logo = function_exists('logo_src') && !str_starts_with(logo_src(), 'http') ? seo_origin() . logo_src()
-          : (function_exists('logo_src') ? logo_src() : seo_origin() . shop_base() . '/assets/logo.svg');
+          : (function_exists('logo_src') ? logo_src() : seo_origin() . shop_base() . '/assets/logo.png');
     if (seo_origin() !== '') $d['logo'] = $logo;
     if (($S['meta.desc'] ?? '') !== '') $d['description'] = (string) $S['meta.desc'];
     seo_jsonld($d);

@@ -438,22 +438,33 @@ if ($page === '') {
         // seul aplat de couleur, sans image. La photo déposée la remplace. ?>
   <section class="hero<?= $heroImg !== '' ? ' hero--foto' : ' hero--art' ?>"<?= $heroImg !== ''
       ? ' style="--hero-foto:url(' . e($heroImg) . ')"' : '' ?>>
+    <?php // LE BANDEAU DU HAUT, juste sous la barre de navigation — là où
+          // l'équipe l'a entouré : la livraison gratuite (le seuil que la
+          // caisse applique, pas un chiffre recopié) et l'heure limite
+          // d'expédition (promise.1.d, la MÊME phrase que la promesse
+          // « Wysyłka w 24 h » : une heure, un seul texte). Il remplace le
+          // bandeau du bas et ses trois slogans, retirés à sa demande.
+          // Układ strony le cache ; caché, il laisse son marqueur.
+          if ($pasekOn):
+            $darm = z_progiem((string) ($S['info.darmowa'] ?? ''), prog_darmowej($pdo));
+            $wys  = trim((string) ($S['promise.1.d'] ?? ''));
+            if ($darm !== '' || $wys !== ''): ?>
+    <div class="hero-strip hero-strip--gora">
+      <div class="wrap hero-strip-in">
+        <?php if ($darm !== ''): ?><span class="korzysc"><?= function_exists('ikona_korzysci') ? ikona_korzysci('bus') : '' ?><span><?= e($darm) ?></span></span><?php endif; ?>
+        <?php if ($wys !== ''): ?><span class="korzysc"><?= function_exists('ikona_korzysci') ? ikona_korzysci('zegar') : '' ?><span><?= e($wys) ?></span></span><?php endif; ?>
+      </div>
+    </div>
+    <?php // Ni seuil dans Dostawa ni heure dans Treści : rien à dire, mais
+          // la page le dit — un contrôle distingue « vide » de « perdu ».
+          else: echo "    <!-- pasek: pusty, brak progu i godziny wysyłki -->\n"; endif;
+          else: echo '    ' . wsm_layout_marker('pasek') . "\n"; endif; ?>
     <div class="wrap hero-in">
       <p class="eyebrow"><?= e($S['home.eyebrow'] ?? '') ?></p>
       <h1><?= e($S['home.title'] ?? '') ?></h1>
       <p class="lead"><?= e($S['home.lead'] ?? '') ?></p>
       <a class="btn btn--accent" href="#katalog"><?= e($S['home.cta'] ?? '') ?></a>
     </div>
-    <?php // Le pasek suit Układ strony ; caché, il laisse son marqueur ici.
-          if ($pasekOn && isset($S['promise.1.t']  /* MÊME champ que le bloc des promesses : deux textes pour un seul engagement divergent toujours */)): ?>
-    <div class="hero-strip">
-      <div class="wrap hero-strip-in mono">
-        <span><?= e($S['promise.1.t']  /* MÊME champ que le bloc des promesses : deux textes pour un seul engagement divergent toujours */) ?></span>
-        <span><?= e($S['story.strip.2'] ?? '') ?></span>
-        <span><?= e($S['story.strip.3'] ?? '') ?></span>
-      </div>
-    </div>
-    <?php elseif (!$pasekOn): echo '    ' . wsm_layout_marker('pasek') . "\n"; endif; ?>
   </section>
   <?php elseif ($typ === 'obietnice'): ?>
   <section class="wrap promises">
@@ -476,7 +487,7 @@ if ($page === '') {
       <?php endif; ?>
       <div class="promise-txt">
         <h2><?= e($S["promise.$i.t"]) ?></h2>
-        <p><?= e($S["promise.$i.d"] ?? '') ?></p>
+        <p><?= e(z_progiem((string) ($S["promise.$i.d"] ?? ''), prog_darmowej($pdo))) ?></p>
       </div>
     </div>
     <?php endfor; ?>

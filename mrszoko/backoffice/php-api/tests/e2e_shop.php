@@ -96,14 +96,16 @@ foreach (['pl', 'uk', 'en'] as $L) {
 // La page annonçait « Wysyłka w 48 h » dans le bandeau du haut et « Wysyłka
 // w 24 h » trois centimètres plus bas. Deux champs pour un seul engagement
 // divergent toujours : il n'en reste qu'un, et l'autre est retiré de la base
-// pour que personne ne corrige un texte que plus rien n'affiche.
+// pour que personne ne corrige un texte que plus rien n'affiche. Depuis, le
+// bandeau du bas est parti à la demande de l'équipe, et celui du haut cite
+// l'heure limite par la phrase même de la promesse (promise.1.d).
 [, $rD] = http('GET', "$BASE/shop/catalog?lang=pl");
-ok('le libellé orphelin du bandeau a disparu de la base',
-   !isset($rD['strings']['story.strip.1']), array_keys(array_filter(
+ok('les libellés orphelins des bandeaux ont disparu de la base',
+   !array_filter(array_keys($rD['strings'] ?? []), fn($k) => str_starts_with($k, 'story.strip.')), array_keys(array_filter(
        $rD['strings'] ?? [], fn($k) => str_starts_with($k, 'story.strip.'), ARRAY_FILTER_USE_KEY)));
 $vitrine = (string) @file_get_contents(__DIR__ . '/../../../shop/index.php');
-ok('… et le bandeau lit le champ du bloc des promesses',
-   substr_count($vitrine, "\$S['promise.1.t']") >= 1 && !str_contains($vitrine, "story.strip.1"));
+ok('… et le bandeau du haut lit la phrase du bloc des promesses',
+   str_contains($vitrine, "\$S['promise.1.d']") && !str_contains($vitrine, "story.strip."));
 
 [, $rPl] = http('GET', "$BASE/shop/catalog?lang=pl");
 [, $rEn] = http('GET', "$BASE/shop/catalog?lang=en");
@@ -144,8 +146,16 @@ ok('nieistniejący produkt → 422', $cu === 422, $cu);
 // Franco de port : au-dessus du seuil, la livraison tombe à zéro.
 $method = null;
 foreach ($cat['shipping'] as $m) if ($m['id'] === 'inpost_locker') $method = $m;
+// Le seuil se juge sur la marchandise APRÈS le palier au poids. Depuis que
+// la livraison est gratuite dès 700 zł, le panier qui l'atteint au prix plein
+// passe un palier et retombe en dessous : on ajoute ce qu'il faut, comme le
+// ferait l'acheteur, jusqu'à le franchir pour de bon.
 $need = (int) ceil($method['free_from'] / $prod['price']);
-[, $qFree] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $prod['id'], 'qty' => $need]], 'delivery_method' => 'inpost_locker']);
+for ($i = 0; $i < 25; $i++) {
+    [, $qFree] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $prod['id'], 'qty' => $need]], 'delivery_method' => 'inpost_locker']);
+    if (($qFree['items_gross'] ?? 0) >= $method['free_from']) break;
+    $need++;
+}
 ok('powyżej progu dostawa jest darmowa',
     ($qFree['shipping_gross'] ?? -1) === 0 && !empty($qFree['shipping_free']), $qFree['shipping_gross'] ?? null);
 [, $qPaid] = http('POST', "$BASE/shop/quote", ['items' => [['id' => $prod['id'], 'qty' => 1]], 'delivery_method' => 'inpost_locker']);

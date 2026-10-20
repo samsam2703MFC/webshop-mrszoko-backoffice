@@ -55,7 +55,7 @@ jobs:
           # Ce qui reste est ce dont les écrans PHP se servent VRAIMENT : les
           # feuilles du design system et le logo.
           cp -r "$BO"/_ds site/backoffice/
-          mkdir -p site/backoffice/img && cp "$BO"/img/logo.svg site/backoffice/img/
+          mkdir -p site/backoffice/img && cp "$BO"/img/logo.png site/backoffice/img/
           # Une adresse partagée ou mise en favori pointe encore sur index.html.
           # On la garde donc, réduite à ce qu'elle doit faire : renvoyer vers la
           # porte. Sans JavaScript, pour la même raison que login.php.
@@ -63,7 +63,7 @@ jobs:
           <!doctype html><html lang="pl"><head><meta charset="utf-8">
           <meta name="robots" content="noindex, nofollow">
           <meta http-equiv="refresh" content="0; url=login.php">
-          <title>Konsola Market Levano</title></head>
+          <title>Konsola Szoko Shop</title></head>
           <body><p><a href="login.php">Przejdź do logowania</a></p></body></html>
           HTML
           # webshop_mrszoko API — deployed as ./api/ because the app (served at
@@ -157,9 +157,9 @@ jobs:
           <!DOCTYPE html>
           <html lang="pl"><head><meta charset="utf-8">
           <meta http-equiv="refresh" content="0; url=shop/">
-          <title>Market Levano</title>
+          <title>Szoko Shop</title>
           <link rel="canonical" href="shop/">
-          </head><body><p><a href="shop/">Market Levano</a></p></body></html>
+          </head><body><p><a href="shop/">Szoko Shop</a></p></body></html>
           HTML
 
           ls -R site | head -60
@@ -492,7 +492,7 @@ jobs:
               # LE MOT DE PASSE N'Y EST PAS : il vit dans le secret GitHub, qui
               # est sa seule source. Un fichier qui le répète est une copie de
               # plus à perdre.
-              printf 'Market Levano — konsola sklepu\nURL    : /mrszoko/backoffice\nE-mail : %s\nHasło  : secret GitHub WSM_ADMIN_PASSWORD (posé à chaque déploiement)\n' "$EMAIL" > /root/mrszoko-admin.txt
+              printf 'Szoko Shop — konsola sklepu\nURL    : /mrszoko/backoffice\nE-mail : %s\nHasło  : secret GitHub WSM_ADMIN_PASSWORD (posé à chaque déploiement)\n' "$EMAIL" > /root/mrszoko-admin.txt
               chmod 600 /root/mrszoko-admin.txt
             else
               echo "  ^ ATTENTION : mot de passe de la console NON posé"
@@ -574,7 +574,7 @@ jobs:
           # support.js, bo_server.js, menu_*.js ni vendor/react*. Ne restent
           # que la porte et ce dont les écrans PHP se servent.
           for f in / /login.php "/$DS/global.css" "/$DS/brand.css" "/$DS/_ds_bundle.js" \
-                   /img/logo.svg; do
+                   /img/logo.png; do
             run "$BO$f" 1
           done
 
@@ -650,7 +650,7 @@ jobs:
             if printf '%s' "$HOME_HTML" | grep -q "$anchor"; then
               echo "  section $anchor : présente"
             elif { [ "$anchor" = 'id="pro"' ] && printf '%s' "$HOME_HTML" | grep -q 'sekcja pro: ukryta'; } \
-                 || { [ "$anchor" = 'hero-strip' ] && printf '%s' "$HOME_HTML" | grep -q 'pasek: ukryty\|hero: ukryte'; }; then
+                 || { [ "$anchor" = 'hero-strip' ] && printf '%s' "$HOME_HTML" | grep -q 'pasek: ukryty\|pasek: pusty\|hero: ukryte'; }; then
               echo "  section $anchor : cachée depuis Układ strony — voulu"
             else
               echo "  ^ NOT OK : section $anchor absente de la page unique"; fail=1
@@ -2058,19 +2058,19 @@ jobs:
               '?') echo "  ^ ATTENTION : nie udało się sprawdzić martwego klucza";;
               *) echo "  ^ ATTENTION : story.pro.mail_subject nadal w bazie ($NMS) — edytowalny, bez efektu";;
             esac
-            # MÊME CONTRÔLE POUR L'ANCIEN DÉLAI D'EXPÉDITION. story.strip.1
-            # annonçait « Wysyłka w 48 h » au-dessus d'un bloc qui promet 24 h.
-            # Le bandeau lit maintenant le champ des promesses, donc plus
-            # personne ne lit celui-là : resté en base, il s'afficherait encore
-            # dans Treści, quelqu'un corrigerait un jour un délai que la page
-            # n'affiche plus, et le croirait corrigé. On regarde la BASE, pas
-            # l'exécution du script : « contenu synchronisé » ne prouve rien.
+            # MÊME CONTRÔLE POUR L'ANCIEN BANDEAU. story.strip.1 annonçait
+            # « Wysyłka w 48 h » au-dessus d'un bloc qui promet 24 h ; .2 et .3
+            # sont partis avec le bandeau du bas, retiré à la demande de
+            # l'équipe. Restés en base, ils s'afficheraient encore dans Treści :
+            # quelqu'un corrigerait un jour un texte que la page n'affiche plus,
+            # et le croirait corrigé. On regarde la BASE, pas l'exécution du
+            # script : « contenu synchronisé » ne prouve rien.
             NST=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -e \
-              "SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n WHERE k='story.strip.1'" 2>/dev/null || echo '?')
+              "SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n WHERE k LIKE 'story.strip.%'" 2>/dev/null || echo '?')
             case "$NST" in
-              0) echo "  martwy klucz story.strip.1 usunięty — potwierdzone";;
-              '?') echo "  ^ ATTENTION : nie udało się sprawdzić story.strip.1";;
-              *) echo "  ^ ATTENTION : story.strip.1 nadal w bazie ($NST) — dwa terminy wysyłki mogą wrócić";;
+              0) echo "  martwe klucze story.strip.* usunięte — potwierdzone";;
+              '?') echo "  ^ ATTENTION : nie udało się sprawdzić story.strip.*";;
+              *) echo "  ^ ATTENTION : story.strip.* nadal w bazie ($NST) — teksty, których strona już nie pokazuje";;
             esac
             # ET ON DIT LE DÉLAI À VOIX HAUTE. Le champ est unique depuis qu'on
             # a retiré son doublon, mais « unique » ne veut pas dire « juste » :
@@ -2579,24 +2579,36 @@ jobs:
             [ "$c" = "200" ] || { BAD=$((BAD+1)); echo "  ^ NOT OK : strona /$p odpowiada $c"; fail=1; }
           done
           echo "  strony z planu witryny: $N, niedzialajacych: $BAD"
-          echo "== Market Levano =="
-          # Les pièces : dessins, logique des logos de paiement, monogramme,
-          # illustration, valeurs nutritives, contact. rsync sans --delete :
-          # un fichier oublié laisse une vitrine qui appelle une fonction absente.
+          echo "== Szoko Shop =="
+          # Les pièces : dessins en couleur (et le bus, l'horloge du bandeau),
+          # logique des logos de paiement, logo d'origine, illustration, seuil
+          # de livraison gratuite lu dans Dostawa, valeurs nutritives, contact.
+          # rsync sans --delete : un fichier oublié laisse une vitrine qui
+          # appelle une fonction absente.
           [ -f "$DIR_BO/../shop/znaki.php" ] && [ -f "$DIR_BO/api/metody.php" ] \
-            && [ -f "$DIR_BO/../shop/assets/logo.svg" ] && [ -f "$DIR_BO/../shop/assets/hero-art.svg" ] \
-            && [ -f "$DIR_BO/img/logo.svg" ] \
+            && [ -f "$DIR_BO/../shop/assets/logo.png" ] && [ -f "$DIR_BO/../shop/assets/hero-art.svg" ] \
+            && [ -f "$DIR_BO/img/logo.png" ] \
+            && grep -q 'function ikona_korzysci' "$DIR_BO/../shop/znaki.php" \
+            && grep -q 'function prog_darmowej(PDO' "$DIR_BO/../shop/lib.php" \
+            && grep -q "u('assets/logo.png')" "$DIR_BO/../shop/lib.php" \
             && grep -q 'function metody_html' "$DIR_BO/../shop/lib.php" \
             && grep -q 'metody_html(wsm_pdo()' "$DIR_BO/../shop/layout.php" \
             && grep -q 'function wsm_nutrition_rows' "$DIR_BO/api/shop.php" \
             && grep -q "'kontakt'   =>" "$DIR_BO/api/layout.php" \
             && grep -q 'function wsm_brand_name' "$DIR_BO/api/db.php" \
-            && echo "  rysunki, logotypy, monogram, ilustracja, kontakt, tabele produktu: obecne" \
-            || { echo "  ^ NOT OK : Market Levano niekompletny"; fail=1; }
-          # L'EFFET : la page servie ne porte plus l'ancien nom, le téléphone y
-          # est (ou caché exprès dans Układ), la fiche produit a son nouveau cadre.
-          if printf '%s' "$HH" | grep -q 'Mister Szoko'; then echo "  ^ NOT OK : strona glowna nosi stara nazwe"; fail=1
+            && echo "  rysunki, logotypy, logo, ilustracja, prog dostawy, kontakt, tabele produktu: obecne" \
+            || { echo "  ^ NOT OK : Szoko Shop niekompletny"; fail=1; }
+          # L'EFFET : la page servie ne porte plus le nom d'une semaine, le
+          # bandeau du haut est là sans {prog} brut (ou caché dans Układ, ou
+          # vide faute de seuil et d'heure : il le dit), le téléphone y est
+          # (ou caché exprès), la fiche produit a son nouveau cadre.
+          if printf '%s' "$HH" | grep -q 'Market Levano'; then echo "  ^ NOT OK : strona glowna nosi stara nazwe"; fail=1
           else echo "  stara nazwa na stronie glownej: brak"; fi
+          if printf '%s' "$HH" | grep -q '{prog}'; then echo "  ^ NOT OK : surowe {prog} na stronie glownej"; fail=1
+          elif printf '%s' "$HH" | grep -q 'hero-strip--gora'; then
+            echo "  pasek u gory: $(printf '%s' "$HH" | grep -o 'class="korzysc"' | wc -l) pozycje (dostawa, godzina)"
+          elif printf '%s' "$HH" | grep -q 'pasek: '; then echo "  pasek u gory: ukryty albo pusty (znacznik obecny)"
+          else echo "  ^ NOT OK : brak paska u gory i brak znacznika"; fail=1; fi
           printf '%s' "$HH" | grep -q 'href="tel:+48' || printf '%s' "$HH" | grep -q 'kontakt: ukryty' \
             && echo "  telefon na stronie glownej: obecny (albo ukryty w Ukladzie)" \
             || { echo "  ^ NOT OK : brak telefonu na stronie glownej"; fail=1; }
@@ -2606,14 +2618,24 @@ jobs:
               && echo "  karta produktu ($PP): symbol, kategoria, logotypy" \
               || { echo "  ^ NOT OK : karta produktu bez nowego ukladu ($PP)"; fail=1; }
           fi
-          # En base : le nom a vraiment changé (le fichier de contenu ne
-          # réécrit jamais une clé existante), la colonne nutrition existe.
+          # En base : les deux migrations à un seul coup ont posé leur
+          # marqueur — il se pose APRÈS leurs opérations, et mysql s'arrête à
+          # la première erreur : 2/2 veut dire qu'elles sont passées. Le nom a
+          # vraiment changé (le fichier de contenu ne réécrit jamais une clé
+          # existante) ; si l'équipe reprend un jour ce nom-là, cette ligne
+          # change avec sa demande. Les seuils sont dits, pas imposés : un
+          # seuil réglé dans Dostawa est le sien. La colonne nutrition existe.
           sq() { if [ -n "$DB_USER" ] && mysql -u"$DB_USER" -p"$DB_PASS" -e 'SELECT 1' >/dev/null 2>&1; then
                    mysql -u"$DB_USER" -p"$DB_PASS" -N -e "$1" 2>/dev/null; else mysql -N -e "$1" 2>/dev/null; fi; }
           NB=$(sq "SELECT v FROM mrszoko.wsm_shop_i18n WHERE lang='pl' AND k='brand'")
+          NM=$(sq "SELECT COUNT(*) FROM mrszoko.wsm_settings WHERE cle IN ('migracja.2026_10_szoko_shop','migracja.2026_10_dostawa_700')")
+          NP=$(sq "SELECT GROUP_CONCAT(CONCAT(id, ' ', free_from DIV 100, ' zl') ORDER BY sort_order SEPARATOR ', ') FROM mrszoko.wsm_shipping_methods WHERE active = 1 AND free_from > 0")
           NN=$(sq "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='mrszoko' AND table_name='wsm_products' AND column_name='nutrition'")
           echo "  nazwa sklepu w bazie (Tresci, brand): ${NB:-?}"
-          { [ -n "$NB" ] && [ "$NB" != "Mister Szoko" ]; } || { echo "  ^ NOT OK : zmiana nazwy nie dotarla do bazy"; fail=1; }
+          echo "  darmowa dostawa od (Dostawa): ${NP:-brak progu}"
+          [ "${NM:-0}" = "2" ] && echo "  migracje jednorazowe (nazwa, prog 700 zl): 2/2" \
+            || { echo "  ^ NOT OK : migracje jednorazowe ${NM:-0}/2 — SQL tresci przerwany?"; fail=1; }
+          { [ -n "$NB" ] && [ "$NB" != "Market Levano" ]; } || { echo "  ^ NOT OK : zmiana nazwy nie dotarla do bazy"; fail=1; }
           [ "${NN:-0}" = "1" ] && echo "  kolumna wsm_products.nutrition: obecna" \
             || { echo "  ^ NOT OK : brak kolumny nutrition, zapis karty produktu sie nie uda"; fail=1; }
           if [ "$fail" = "0" ]; then echo "ALL CMS CHECKS OK"; else echo "CMS CHECKS FAILED"; exit 1; fi

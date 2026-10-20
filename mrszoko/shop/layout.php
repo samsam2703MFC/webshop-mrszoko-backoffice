@@ -22,7 +22,7 @@
  */
 function layout_head(array $S, string $lang, array $langs, string $title = '',
                      string $desc = '', string $page = '', string $image = ''): void {
-    $title = $title !== '' ? $title . ', ' . ($S['brand'] ?? 'Market Levano') : ($S['meta.title'] ?? 'Market Levano');
+    $title = $title !== '' ? $title . ', ' . ($S['brand'] ?? 'Szoko Shop') : ($S['meta.title'] ?? 'Szoko Shop');
     $desc  = $desc !== '' ? $desc : ($S['meta.desc'] ?? '');
     ?><!DOCTYPE html>
 <html lang="<?= e($lang) ?>">
@@ -89,11 +89,11 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
 <header class="site-head">
   <div class="wrap head-in">
     <a class="head-logo" href="<?= e(u()) ?>" aria-label="<?= e($S['a11y.home'] ?? '') ?>">
-      <?php // Le logo, et le NOM à côté : sans lui, un monogramme ne dit à
+      <?php // Le logo, et le NOM à côté : sans lui, une image ne dit à
             // personne chez qui il achète. Un logo déposé qui porte déjà le
             // nom se règle à « 0 » dans Integracje → Sklep. ?>
-      <img src="<?= e(logo_src()) ?>" alt="<?= e(logo_nazwa_on() ? '' : ($S['brand'] ?? 'Market Levano')) ?>" height="44">
-      <?php if (logo_nazwa_on()): ?><span class="head-nazwa"><?= e($S['brand'] ?? 'Market Levano') ?></span><?php endif; ?>
+      <img src="<?= e(logo_src()) ?>" alt="<?= e(logo_nazwa_on() ? '' : ($S['brand'] ?? 'Szoko Shop')) ?>" height="44">
+      <?php if (logo_nazwa_on()): ?><span class="head-nazwa"><?= e($S['brand'] ?? 'Szoko Shop') ?></span><?php endif; ?>
     </a>
     <nav class="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
       <?php // L'ORDRE ET LA PRÉSENCE DES LIENS VIENNENT D'UKŁAD STRONY : Sklep,

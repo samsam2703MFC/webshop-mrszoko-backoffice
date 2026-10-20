@@ -40,7 +40,7 @@ function wsm_layout_home_builtins(): array {
         // un autre (section « Nagłówek ze zdjęciem ») — mais s'il est là, il
         // reste premier.
         'hero'      => ['label' => 'Nagłówek — zdjęcie, tytuł, przycisk', 'fixed' => false, 'pin' => 'first'],
-        'pasek'     => ['label' => 'Pasek pod nagłówkiem — trzy hasła',    'fixed' => false, 'pin' => 'hero'],
+        'pasek'     => ['label' => 'Pasek u góry — darmowa dostawa i wysyłka tego samego dnia', 'fixed' => false, 'pin' => 'hero'],
         'obietnice' => ['label' => 'Trzy obietnice z ikonami',             'fixed' => false],
         'katalog'   => ['label' => 'Katalog produktów',                    'fixed' => true],
         'pro'       => ['label' => 'Blok dla firm (B2B)',                  'fixed' => false],

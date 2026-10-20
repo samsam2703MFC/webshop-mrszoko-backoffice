@@ -128,6 +128,9 @@ ok('la couverture est un pourcentage sensé',
 echo "\n-- dostawa liczona w obie strony --\n";
 $saveCost = $pdo->query("SELECT cost_net FROM wsm_shipping_methods WHERE id = 'inpost_locker'")->fetchColumn();
 $savePrix = (int) $pdo->query("SELECT price_net FROM wsm_shipping_methods WHERE id = 'inpost_locker'")->fetchColumn();
+// Le seuil aussi, tel qu'il était : le remettre « à 200 zł » de mémoire
+// effaçait celui que l'équipe a choisi (700 zł depuis octobre 2026).
+$saveFree = (int) $pdo->query("SELECT free_from FROM wsm_shipping_methods WHERE id = 'inpost_locker'")->fetchColumn();
 
 // On vend le port 10,00 et il nous coûte 20,00 : le client en couvre la moitié.
 $pdo->prepare("UPDATE wsm_shipping_methods SET price_net = 1000, cost_net = 2000, free_from = 0 WHERE id = ?")
@@ -172,8 +175,8 @@ ok($offert > 0
    $offert > 0 ? $m2['coverage_pct'] < 100.0 : $m2['coverage_pct'] === 100.0,
    [$offert, $m2['coverage_pct']]);
 
-$pdo->prepare("UPDATE wsm_shipping_methods SET price_net = ?, cost_net = ?, free_from = 20000 WHERE id = ?")
-    ->execute([$savePrix, (int) $saveCost, 'inpost_locker']);
+$pdo->prepare("UPDATE wsm_shipping_methods SET price_net = ?, cost_net = ?, free_from = ? WHERE id = ?")
+    ->execute([$savePrix, (int) $saveCost, $saveFree, 'inpost_locker']);
 
 // ---- 4. La série des douze mois -------------------------------------------------
 echo "\n-- seria dwunastu miesięcy --\n";

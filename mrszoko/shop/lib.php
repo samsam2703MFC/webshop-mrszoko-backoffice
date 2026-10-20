@@ -272,9 +272,44 @@ function theme_values(): array {
  */
 function logo_src(): string {
     $l = trim((string) (wsm_config()['shop']['logo_image'] ?? ''));
-    // Sans logo déposé : le monogramme de Market Levano, dessiné en SVG.
-    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return u('assets/logo.svg');
+    // Sans logo déposé : le logo historique de la maison (Mister Szoko),
+    // que l'équipe a voulu retrouver pour Szoko Shop.
+    if ($l === '' || preg_match('/^x{2,}$/i', $l)) return u('assets/logo.png');
     return media_src($l);
+}
+
+/**
+ * LE SEUIL DE LIVRAISON GRATUITE QUE LA CAISSE APPLIQUE VRAIMENT : le plus
+ * bas des modes actifs qui en ont un, en grosze. Null quand aucun mode
+ * n'est gratuit. Le bandeau du haut et la promesse « Paczkomat lub kurier »
+ * l'écrivent par {prog} : un chiffre tapé à la main dans un texte finit
+ * toujours par contredire Dostawa.
+ */
+function prog_darmowej(PDO $pdo): ?int {
+    static $memo = [];
+    $k = spl_object_id($pdo);
+    if (array_key_exists($k, $memo)) return $memo[$k];
+    try {
+        $v = $pdo->query("SELECT MIN(free_from) FROM wsm_shipping_methods WHERE active = 1 AND free_from > 0")->fetchColumn();
+        return $memo[$k] = ($v === false || $v === null) ? null : (int) $v;
+    } catch (Throwable $e) { return $memo[$k] = null; }
+}
+
+/** « 700 zł », ou « 699,99 zł » quand il y a des grosze. */
+function kwota_krotka(int $grosze): string {
+    return $grosze % 100 === 0
+        ? number_format(intdiv($grosze, 100), 0, ',', "\u{00A0}") . "\u{00A0}zł"
+        : number_format($grosze / 100, 2, ',', "\u{00A0}") . "\u{00A0}zł";
+}
+
+/**
+ * Remplit {prog} dans un texte de Treści. Sans livraison gratuite, la phrase
+ * qui la promet disparaît plutôt que d'annoncer « od  zł ».
+ */
+function z_progiem(string $t, ?int $prog): string {
+    if (!str_contains($t, '{prog}')) return $t;
+    if ($prog === null) return trim((string) preg_replace('/[^.!?]*\{prog\}[^.!?]*[.!?]?\s*/u', '', $t));
+    return str_replace('{prog}', kwota_krotka($prog), $t);
 }
 
 /** Le nom à côté du logo ? Oui, sauf si Integracje → Sklep dit « 0 ». */
@@ -686,7 +721,7 @@ function legal_valeurs(PDO $pdo, array $S): array {
     } catch (Throwable $e) { /* table absente : le document reste lisible */ }
 
     return [
-        '{sklep}'      => (string) ($S['brand'] ?? 'Market Levano'),
+        '{sklep}'      => (string) ($S['brand'] ?? 'Szoko Shop'),
         '{sprzedawca}' => (string) ($S['seller.name'] ?? ''),
         '{adres}'      => (string) ($S['seller.address'] ?? ''),
         '{ids}'        => (string) ($S['seller.ids'] ?? ''),
