@@ -138,7 +138,8 @@ if ($page === 'sitemap.xml') {
     // sont pas : elles portent un `noindex`, et les lister ici reviendrait à
     // signaler leur existence à un robot pour lui demander de les ignorer.
     $urls = [['path' => '/', 'priority' => '1.0'],
-             ['path' => '/kontakt', 'priority' => '0.5']];
+             ['path' => '/kontakt', 'priority' => '0.5'],
+             ['path' => '/zwroty', 'priority' => '0.4']];
     foreach (wsm_shop_products($pdo, $lang) as $prod) {
         if (($prod['slug'] ?? '') === '') continue;
         $urls[] = ['path' => '/p/' . $prod['slug'], 'priority' => '0.8'];
@@ -1405,6 +1406,58 @@ if ($page === 'regulamin' || $page === 'prywatnosc') {
     exit;
 }
 
+// ---------------------------------------------------------------- ZWROTY ----
+//
+// Demandée par tpay : une page à part où le client trouve l'adresse COMPLÈTE
+// pour renvoyer un colis, et comment s'y prendre. L'adresse vient de
+// zwrot_adres() — la même que le règlement et le pied de page, un seul
+// endroit à corriger. Les règles (14 jours, produit non ouvert, rembourse-
+// ment) sont celles du règlement, redites simplement et traduites ; le
+// règlement, en polonais, reste le texte qui engage, et la page y renvoie.
+if ($page === 'zwroty') {
+    $adr  = zwrot_adres($S);
+    $mail = (string) ($S['footer.email'] ?? '');
+    $t = fn(string $k) => str_replace(['{email}', '{dni}'], [$mail, '14'], (string) ($S[$k] ?? ''));
+
+    layout_head($S, $lang, $langs, (string) ($S['returns.title'] ?? ''), $t('returns.lead'), 'zwroty');
+    layout_header($S, $lang, $langs, $cartCount);
+    ?>
+<main class="wrap block zwroty">
+  <h1><?= e($S['returns.title'] ?? '') ?></h1>
+  <p class="lead"><?= e($t('returns.lead')) ?></p>
+  <div class="zwroty-uklad">
+    <section class="zwroty-adres" aria-labelledby="zw-adres">
+      <h2 id="zw-adres"><?= e($S['returns.address'] ?? '') ?></h2>
+      <address>
+        <?php if ($adr['odbiorca'] !== ''): ?><strong><?= e($adr['odbiorca']) ?></strong><br><?php endif; ?>
+        <?= implode('<br>', array_map(fn($l) => e($l), $adr['linie'])) ?>
+      </address>
+      <p class="hint"><?= e($t('returns.address_hint')) ?></p>
+    </section>
+    <section class="zwroty-kroki" aria-labelledby="zw-kroki">
+      <h2 id="zw-kroki"><?= e($S['returns.steps'] ?? '') ?></h2>
+      <ol>
+        <?php for ($i = 1; $i <= 6; $i++): if (trim((string) ($S["returns.step.$i"] ?? '')) === '') continue; ?>
+        <li><?= e($t("returns.step.$i")) ?></li>
+        <?php endfor; ?>
+      </ol>
+      <p class="muted"><?= e($t('returns.food')) ?></p>
+    </section>
+  </div>
+  <section class="zwroty-reklamacja">
+    <h2><?= e($S['returns.claim.title'] ?? '') ?></h2>
+    <p><?= e($t('returns.claim.text')) ?></p>
+  </section>
+  <p class="zwroty-cta">
+    <a class="btn btn--brand" href="<?= e(u('moje-zamowienie')) ?>"><?= e($S['returns.cta.order'] ?? '') ?></a>
+    <a class="btn btn--ghost" href="<?= e(u('regulamin')) ?>"><?= e($S['returns.cta.terms'] ?? '') ?></a>
+  </p>
+</main>
+<?php
+    layout_footer($S);
+    exit;
+}
+
 // ------------------------------------------------- RETROUVER SA COMMANDE ----
 //
 // Le lien signé du mail de confirmation reste la voie normale. Celle-ci existe
@@ -1562,6 +1615,9 @@ if ($page === 'zamowienie') {
   <details class="claim"<?= ($dejaCl !== '' || isset($claimErr)) ? ' open' : '' ?>>
     <summary><?= e($S['claim.title'] ?? '') ?></summary>
     <p class="muted"><?= e($S['claim.lead'] ?? '') ?></p>
+    <?php // Celui qui se rétracte doit savoir OÙ renvoyer : l'adresse est
+          // là, avant comme après l'envoi du formulaire. ?>
+    <p class="muted claim-adres"><?= e($S['returns.address'] ?? '') ?>: <?= e(zwrot_adres_linia($S)) ?> · <a href="<?= e(u('zwroty')) ?>"><?= e($S['returns.footer_link'] ?? '') ?></a></p>
     <p class="mono muted"><?= $reste['jours'] > 0
         ? e(str_replace('{n}', (string) $reste['jours'], $S['claim.left'] ?? ''))
         : e($S['claim.over'] ?? '') ?></p>

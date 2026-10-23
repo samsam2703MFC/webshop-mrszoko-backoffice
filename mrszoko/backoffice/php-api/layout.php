@@ -57,6 +57,7 @@ function wsm_layout_nav_builtins(): array {
         'sklep'      => ['label' => 'Sklep — do katalogu'],
         'b2b'        => ['label' => 'B2B — do bloku dla firm'],
         'zamowienie' => ['label' => 'Moje zamówienie'],
+        'zwroty'     => ['label' => 'Zwroty — adres do odsyłania paczek'],
         'kontakt'    => ['label' => 'Kontakt'],
     ];
 }
@@ -72,6 +73,9 @@ function wsm_layout_footer_builtins(): array {
         'zamowienie' => ['label' => 'Moje zamówienie — zawsze w stopce (telefon)', 'fixed' => true],
         'regulamin'  => ['label' => 'Regulamin sklepu — wymagany prawem', 'fixed' => true],
         'prywatnosc' => ['label' => 'Polityka prywatności — wymagana prawem', 'fixed' => true],
+        // L'adresse des retours, demandée par tpay « dans un endroit
+        // facilement accessible » : comme le règlement, sans interrupteur.
+        'zwroty'     => ['label' => 'Zwroty — adres do odsyłania paczek (wymaga tpay)', 'fixed' => true],
         'kontakt'    => ['label' => 'Kontakt'],
         'konsola'    => ['label' => 'Panel marki — link do konsoli'],
     ];

@@ -147,6 +147,17 @@ function layout_footer(array $S, string $lang = ''): void {
         <?= e($S['seller.ids'] ?? '') ?>
       </p>
       <?php endif; ?>
+      <?php // L'ADRESSE DES RETOURS, à côté des données de la société : tpay
+            // l'exige ici, en bas de chaque page. Même source que le
+            // règlement et la page « Zwroty » (zwrot_adres). ?>
+      <?php $zw = zwrot_adres($S); if ($zw['linie']): ?>
+      <p class="seller seller--zwrot">
+        <span class="seller-label"><?= e($S['returns.address'] ?? '') ?></span>
+        <?php if ($zw['odbiorca'] !== ''): ?><?= e($zw['odbiorca']) ?><br><?php endif; ?>
+        <?= e(implode(', ', $zw['linie'])) ?><br>
+        <a href="<?= e(u('zwroty')) ?>"><?= e($S['returns.footer_link'] ?? '') ?></a>
+      </p>
+      <?php endif; ?>
       <p class="foot-copy"><?= e(date('Y')) ?> · <?= e($S['brand'] ?? '') ?> · <?= e($S['footer.rights'] ?? '') ?></p>
     </div>
     <nav class="foot-links" aria-label="<?= e($S['footer.contact'] ?? '') ?>">

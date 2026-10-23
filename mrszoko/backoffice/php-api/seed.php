@@ -625,7 +625,37 @@ function wsm_content_jednorazowe(): array {
     }
     $ops['migracja.2026_10_dostawa_700'] = $d;
 
+    // ADRES DO ZWROTÓW W REGULAMINIE (tpay, octobre 2026). Le règlement vit
+    // en base : le fichier de contenu ne le réécrit plus. La phrase entre
+    // devant une phrase d'ancrage restée telle que livrée — un paragraphe
+    // réécrit dans Treści n'est pas touché, et le contrôle de déploiement dit
+    // alors que l'adresse manque au règlement. {adres_zwrotu} est rempli à
+    // l'affichage (zwrot_adres) : changer l'adresse ne demande pas de
+    // retoucher le texte.
+    $z = [];
+    foreach (wsm_regulamin_zwroty() as $k => [$ancre, $neuf]) {
+        $z[] = ['UPDATE wsm_shop_i18n SET v = REPLACE(v, ?, ?) WHERE lang = ? AND k = ? AND v NOT LIKE ?',
+                 [$ancre, $neuf, 'pl', $k, '%{adres_zwrotu}%']];
+    }
+    $ops['migracja.2026_10_adres_zwrotu'] = $z;
+
     return $ops;
+}
+
+/**
+ * Les deux phrases du règlement qui donnent l'adresse des retours, et la
+ * phrase livrée devant laquelle chacune entre. Le fichier de contenu porte
+ * déjà le résultat ; le test vérifie que les deux disent la même chose.
+ *
+ * @return array<string, array{0:string,1:string}> clé => [ancre, ancre précédée de la phrase]
+ */
+function wsm_regulamin_zwroty(): array {
+    $a8 = 'Bezpośrednie koszty zwrotu towaru ponosi Klient.';
+    $a9 = 'Reklamację rozpatrujemy w terminie **14 dni**';
+    return [
+        'terms.s8.b' => [$a8, "Towar należy odesłać na adres do zwrotów: **{adres_zwrotu}**. Ten sam adres jest podany w stopce sklepu i na stronie „Zwroty”.\n\n" . $a8],
+        'terms.s9.b' => [$a9, "Jeżeli do rozpatrzenia reklamacji potrzebny jest towar, prosimy odesłać go na adres do zwrotów: **{adres_zwrotu}**.\n\n" . $a9],
+    ];
 }
 
 /** Applique les migrations à un seul coup sur une base ouverte. @return int lignes changées */

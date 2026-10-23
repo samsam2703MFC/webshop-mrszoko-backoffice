@@ -91,6 +91,7 @@ const WSM_CMS_SECTIONS = [
     'pay' => 'Statusy płatności',
     'ship' => 'Sposoby dostawy',
     'info' => 'Pasek u góry strony głównej ({prog} = próg darmowej dostawy z Dostawy)',
+    'returns' => 'Strona „Zwroty” i stopka ({email}, {dni}); sam adres: Integracje → Sklep',
     'metody' => 'Logotypy wysyłki i płatności — nagłówki',
     'metoda' => 'Logotypy wysyłki i płatności — podpisy',
     'nutri' => 'Wartości odżywcze — nazwy wierszy',

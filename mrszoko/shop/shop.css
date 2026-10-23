@@ -808,3 +808,41 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
   .hero-strip--gora .hero-strip-in { flex-direction: column; align-items: flex-start; gap: 8px; }
   .korzysc-ikona { width: 38px; height: 24px; }
 }
+
+/* ============================================================================
+   Zwroty — l'adresse où renvoyer un colis (exigée par tpay) : une page à
+   part, une ligne en pied de page, une ligne dans le formulaire de la
+   commande. L'adresse se lit d'un coup d'œil et se recopie telle quelle.
+   ============================================================================ */
+.zwroty h1 { margin-bottom: var(--space-2); }
+.zwroty .lead { max-width: 62ch; margin-bottom: var(--space-6); }
+.zwroty-uklad { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-6); align-items: start; }
+.zwroty-adres { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+               padding: var(--space-5); box-shadow: var(--shadow-sm); }
+.zwroty-adres h2, .zwroty-kroki h2, .zwroty-reklamacja h2 { font-size: var(--text-xl); margin-bottom: var(--space-3); }
+.zwroty-adres address { font-style: normal; font-size: var(--text-lg); line-height: 1.6; color: var(--text-strong); margin-bottom: var(--space-3); }
+.zwroty-adres .hint { color: var(--text-muted); font-size: var(--text-sm); }
+.zwroty-kroki ol { padding-left: 1.3em; margin-bottom: var(--space-3); }
+.zwroty-kroki li { margin-bottom: var(--space-2); line-height: var(--leading-relaxed); }
+.zwroty-reklamacja { margin-top: var(--space-6); max-width: 72ch; }
+.zwroty-cta { margin-top: var(--space-6); display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.site-foot .seller--zwrot a { color: var(--choco-200, var(--cream-200)); text-decoration: underline; }
+.claim-adres a { text-decoration: underline; }
+@media (max-width: 760px) { .zwroty-uklad { grid-template-columns: 1fr; gap: var(--space-5); } }
+
+/* Cinq liens en haut depuis « Zwroty » : sur une tablette, en ukrainien
+   surtout, la barre ne tenait plus et poussait la page hors de l'écran. Les
+   écarts se resserrent d'abord ; sous 1000 px, le menu passe sur sa propre
+   ligne, sous le logo, et défile de côté s'il le faut encore — rien n'est
+   caché, rien ne déborde. Sous 640 px il disparaît comme avant (le pied de
+   page porte les mêmes liens). */
+@media (max-width: 1180px) {
+  .head-in { gap: var(--space-4); }
+  .head-nav { gap: var(--space-4); margin-left: 0; }
+  .navlink { white-space: nowrap; }
+}
+@media (max-width: 1000px) and (min-width: 641px) {
+  .head-in { flex-wrap: wrap; row-gap: 6px; }
+  .head-nav { order: 3; flex: 1 0 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .head-nav::-webkit-scrollbar { display: none; }
+}

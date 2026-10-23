@@ -68,6 +68,15 @@ $cfg = [
         // Le nom à côté du logo, dans la barre du haut. Un logo déposé qui
         // porte déjà le nom l'afficherait deux fois : « 0 » le retire.
         'logo_nazwa'       => (getenv('WSM_SHOP_LOGO_NAZWA') ?: '1') !== '0',
+        // L'adresse où le client renvoie un colis (retour, réclamation),
+        // exigée par tpay : dans le règlement, en pied de page, sur la page
+        // « Zwroty ». Vide ici : tant que rue, code et ville ne sont pas
+        // posés dans Integracje → Sklep, c'est l'adresse du siège (Treści,
+        // seller.address) qui s'affiche — jamais une adresse à moitié.
+        'zwrot_odbiorca'   => getenv('WSM_SHOP_ZWROT_ODBIORCA') ?: '',
+        'zwrot_ulica'      => getenv('WSM_SHOP_ZWROT_ULICA') ?: '',
+        'zwrot_kod'        => getenv('WSM_SHOP_ZWROT_KOD') ?: '',
+        'zwrot_miasto'     => getenv('WSM_SHOP_ZWROT_MIASTO') ?: '',
     ],
 
     // ---- tpay.com : encaissement ------------------------------------------

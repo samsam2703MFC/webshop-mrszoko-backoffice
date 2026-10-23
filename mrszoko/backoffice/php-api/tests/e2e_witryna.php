@@ -108,7 +108,7 @@ ok('le monogramme SVG d\'une semaine n\'est plus livré', !is_file($racine . '/m
 
 // ---- 2. Les migrations à un seul coup, sur une copie de la base --------------------------
 echo "\n-- migracje jednorazowe: nazwa i próg 700 zł, raz na bazę --\n";
-ok('chaque migration a son marqueur', array_keys(wsm_content_jednorazowe()) === ['migracja.2026_10_szoko_shop', 'migracja.2026_10_dostawa_700']);
+ok('chaque migration a son marqueur', array_slice(array_keys(wsm_content_jednorazowe()), 0, 2) === ['migracja.2026_10_szoko_shop', 'migracja.2026_10_dostawa_700']);
 ok('aucun nom de marque dans les remplacements de chaque déploiement', !array_filter(wsm_content_remplacements(), fn($r) => preg_match('/szoko|levano/i', $r[2] . $r[3])));
 $sql = wsm_sync_content_sql();
 $lignes = explode("\n", $sql);

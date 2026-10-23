@@ -286,6 +286,13 @@ echo "  nazwy plikow w mediotece : obecne"
   && grep -q "'kontakt'   =>" site/backoffice/api/layout.php && grep -q 'function wsm_brand_name' site/backoffice/api/db.php \
   || { echo "  Szoko Shop incomplet dans l'assemblage"; exit 1; }
 echo "  szoko shop (rysunki, logotypy, logo, prog dostawy, kontakt, tabele produktu) : obecne"
+# ZWROTY : l'adresse des retours exigée par tpay, au règlement, en pied de
+# page et sur une page à part. Une pièce oubliée laisse un des trois muet.
+grep -q 'function zwrot_adres(array' site/shop/lib.php && grep -q "'{adres_zwrotu}' => zwrot_adres_linia" site/shop/lib.php \
+  && grep -q "if (\$page === 'zwroty')" site/shop/index.php && grep -q 'seller--zwrot' site/shop/layout.php \
+  && grep -q "'zwroty'     =>" site/backoffice/api/layout.php && grep -q "'zwrot_ulica'" site/backoffice/api/settings.php \
+  || { echo "  zwroty incomplets dans l'assemblage"; exit 1; }
+echo "  zwroty (adres do zwrotow : strona, stopka, regulamin, ustawienia) : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte
