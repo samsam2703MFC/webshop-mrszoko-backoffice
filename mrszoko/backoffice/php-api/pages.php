@@ -55,7 +55,7 @@ const WSM_PAGE_STYLE = [
 
 /** Les routes de la boutique et les dossiers servis : aucune page ne peut les prendre. */
 const WSM_PAGE_RESERVED = [
-    'p', 'koszyk', 'kasa', 'zamowienie', 'kontakt', 'regulamin', 'prywatnosc',
+    'p', 'koszyk', 'kasa', 'zamowienie', 'kontakt', 'regulamin', 'prywatnosc', 'zwroty',
     'moje-zamowienie', 'catalog', 'robots.txt', 'sitemap.xml', 'assets', 'media',
     'fonts', 'img', 'api', 'backoffice', 'shop', 'landing', 'index.php', 'strona',
     'strony', 'blok', 'bloki', 'admin', 'login', 'logout', 'tpay', 'inpost',

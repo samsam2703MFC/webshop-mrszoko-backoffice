@@ -160,6 +160,17 @@ function wsm_settings_fields(): array {
         'metody_platnosci' => ['sklep', 'Formy płatności — logotypy dla klienta', ['shop', 'metody_platnosci'], 'WSM_SHOP_METODY_PLATNOSCI', wsm_metody_typ('platnosc'),
                                'Jak wyżej. Bez skonfigurowanego tpay domyślnie tylko przelew tradycyjny — zaznacz resztę, gdy tpay ruszy.'],
 
+        // L'ADRESSE DES RETOURS, exigée par tpay : règlement, pied de page,
+        // page « Zwroty ». Les trois champs ou rien : une adresse à moitié
+        // remplie renverrait un colis nulle part, donc tant qu'il en manque
+        // un, la vitrine montre l'adresse du siège (Treści → seller.address).
+        'zwrot_odbiorca' => ['sklep', 'Zwroty — odbiorca', ['shop', 'zwrot_odbiorca'], 'WSM_SHOP_ZWROT_ODBIORCA', 'text',
+                             'Nazwa na paczce zwrotnej, np. nazwa firmy albo „Szoko Shop — zwroty”. Puste = sprzedawca z Treści (seller.name).'],
+        'zwrot_ulica'    => ['sklep', 'Zwroty — ulica i numer', ['shop', 'zwrot_ulica'], 'WSM_SHOP_ZWROT_ULICA', 'text',
+                             'Adres, na który klient odsyła towar: w regulaminie, w stopce i na stronie „Zwroty” (wymaga tego tpay). Ulica, kod i miasto razem — dopóki któregoś brakuje, pokazujemy adres siedziby z Treści (seller.address).'],
+        'zwrot_kod'      => ['sklep', 'Zwroty — kod pocztowy', ['shop', 'zwrot_kod'], 'WSM_SHOP_ZWROT_KOD', 'text', 'Np. 50-078.'],
+        'zwrot_miasto'   => ['sklep', 'Zwroty — miasto', ['shop', 'zwrot_miasto'], 'WSM_SHOP_ZWROT_MIASTO', 'text', ''],
+
         'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z tpay.'],
 
         // ---- Faktury : ce qui figure sur le document ----------------------

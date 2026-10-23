@@ -2638,6 +2638,32 @@ jobs:
           { [ -n "$NB" ] && [ "$NB" != "Market Levano" ]; } || { echo "  ^ NOT OK : zmiana nazwy nie dotarla do bazy"; fail=1; }
           [ "${NN:-0}" = "1" ] && echo "  kolumna wsm_products.nutrition: obecna" \
             || { echo "  ^ NOT OK : brak kolumny nutrition, zapis karty produktu sie nie uda"; fail=1; }
+          echo "== Zwroty (adres do zwrotow, wymaga tpay) =="
+          # Trois endroits exigés par tpay : le règlement, le pied de page à
+          # côté des données de la société, la page « Zwroty ». Les pièces,
+          # puis l'EFFET sur les pages servies — l'adresse est dite dans le
+          # journal, c'est une adresse publique.
+          grep -q 'function zwrot_adres(array' "$DIR_BO/../shop/lib.php" \
+            && grep -q "'{adres_zwrotu}' => zwrot_adres_linia" "$DIR_BO/../shop/lib.php" \
+            && grep -q "if (\$page === 'zwroty')" "$DIR_BO/../shop/index.php" \
+            && grep -q 'seller--zwrot' "$DIR_BO/../shop/layout.php" \
+            && grep -q "'zwroty'     =>" "$DIR_BO/api/layout.php" && grep -q "'zwrot_ulica'" "$DIR_BO/api/settings.php" \
+            && echo "  adres, strona, stopka, regulamin, ustawienia: obecne" \
+            || { echo "  ^ NOT OK : zwroty niekompletne"; fail=1; }
+          ZW=$(curl -skL -w '\n%{http_code}' "$SH/zwroty"); ZC=$(printf '%s' "$ZW" | tail -1)
+          ZA=$(printf '%s' "$ZW" | tr '\n' ' ' | grep -o '<address>.*</address>' | sed 's/<[^>]*>/ /g;s/  */ /g;s/^ //;s/ $//')
+          { [ "$ZC" = "200" ] && [ -n "$ZA" ]; } && echo "  strona /zwroty: 200, adres: $ZA" \
+            || { echo "  ^ NOT OK : strona /zwroty odpowiada $ZC albo bez adresu"; fail=1; }
+          printf '%s' "$HH" | grep -q 'seller--zwrot' && printf '%s' "$HH" | grep -q 'href="[^"]*/zwroty"' \
+            && echo "  stopka: adres do zwrotow i link" \
+            || { echo "  ^ NOT OK : stopka bez adresu do zwrotow"; fail=1; }
+          RG=$(curl -skL "$SH/regulamin")
+          NR=$(printf '%s' "$RG" | grep -o 'adres do zwrotów: <strong>[^<]' | wc -l)
+          if printf '%s' "$RG" | grep -q '{adres_zwrotu}'; then echo "  ^ NOT OK : surowe {adres_zwrotu} w regulaminie"; fail=1
+          elif [ "${NR:-0}" -ge 1 ]; then echo "  regulamin: adres do zwrotow w $NR miejscach"
+          else echo "  ^ NOT OK : regulamin bez adresu do zwrotow (punkt 8 przepisany w Tresciach?)"; fail=1; fi
+          NZ=$(sq "SELECT COUNT(*) FROM mrszoko.wsm_pages WHERE slug = 'zwroty'")
+          [ "${NZ:-0}" = "0" ] || echo "  ^ ATTENTION : strona z Stron pod adresem /zwroty ($NZ) — zastapiona strona wbudowana"
           if [ "$fail" = "0" ]; then echo "ALL CMS CHECKS OK"; else echo "CMS CHECKS FAILED"; exit 1; fi
           REMOTE
 

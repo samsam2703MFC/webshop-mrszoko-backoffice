@@ -319,6 +319,39 @@ function logo_nazwa_on(): bool {
 }
 
 /**
+ * L'ADRESSE OÙ LE CLIENT RENVOIE UN COLIS — retour dans les 14 jours ou
+ * réclamation. tpay l'exige à trois endroits : le règlement, le pied de page
+ * à côté des données de la société, une page à part (« Zwroty »). Les trois
+ * lisent CETTE fonction : une adresse, un seul endroit à corriger.
+ *
+ * Rue, code et ville se posent ensemble dans Integracje → Sklep. Tant qu'il
+ * en manque un, c'est l'adresse du siège (Treści, seller.address) — une
+ * adresse à moitié remplie renverrait un colis nulle part.
+ *
+ * @return array{odbiorca:string, linie:list<string>, wlasny:bool}
+ */
+function zwrot_adres(array $S): array {
+    $c = wsm_config()['shop'] ?? [];
+    $v = function (string $k) use ($c): string {
+        $x = trim((string) ($c[$k] ?? ''));
+        return preg_match('/^x{2,}$/i', $x) ? '' : $x;      // le masque d'un réglage vidé
+    };
+    $odbiorca = $v('zwrot_odbiorca') !== '' ? $v('zwrot_odbiorca') : trim((string) ($S['seller.name'] ?? ''));
+    if ($v('zwrot_ulica') !== '' && $v('zwrot_kod') !== '' && $v('zwrot_miasto') !== '') {
+        return ['odbiorca' => $odbiorca, 'linie' => [$v('zwrot_ulica'), $v('zwrot_kod') . ' ' . $v('zwrot_miasto'), 'Polska'], 'wlasny' => true];
+    }
+    // « ul. …, 50-078 Wrocław, Polska » : une ligne par virgule.
+    $linie = array_values(array_filter(array_map('trim', explode(',', (string) ($S['seller.address'] ?? ''))), fn($l) => $l !== ''));
+    return ['odbiorca' => $odbiorca, 'linie' => $linie, 'wlasny' => false];
+}
+
+/** La même adresse sur une ligne, pour une phrase du règlement. */
+function zwrot_adres_linia(array $S): string {
+    $a = zwrot_adres($S);
+    return implode(', ', array_filter(array_merge([$a['odbiorca']], $a['linie']), fn($l) => $l !== ''));
+}
+
+/**
  * Le lien d'appel d'un numéro tel qu'on l'écrit (« 660 884 677 ») : chiffres
  * seuls, et l'indicatif polonais quand il manque. Un numéro illisible ne fait
  * pas de lien — un tel: faux sonne chez quelqu'un d'autre.
@@ -390,8 +423,8 @@ function opis_html(string $desc): string {
  */
 function liens_uklad(PDO $pdo, array $S, string $lang, string $which): array {
     $def = $which === 'nav'
-        ? ['sklep', 'b2b', 'zamowienie', 'kontakt']
-        : ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', 'konsola'];
+        ? ['sklep', 'b2b', 'zamowienie', 'zwroty', 'kontakt']
+        : ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'zwroty', 'kontakt', 'konsola'];
     $items = function_exists('wsm_layout_liens')
         ? wsm_layout_liens($pdo, $which)
         : array_map(fn($k) => ['k' => $k, 'type' => 'builtin', 'id' => 0, 'slug' => ''], $def);
@@ -416,6 +449,7 @@ function liens_uklad(PDO $pdo, array $S, string $lang, string $which): array {
             case 'kontakt':    $out[] = ['href' => u('kontakt'), 'label' => (string) ($S['nav.contact'] ?? 'Kontakt')]; break;
             case 'regulamin':  $out[] = ['href' => u('regulamin'), 'label' => (string) ($S['legal.terms'] ?? '')]; break;
             case 'prywatnosc': $out[] = ['href' => u('prywatnosc'), 'label' => (string) ($S['legal.privacy'] ?? '')]; break;
+            case 'zwroty':     $out[] = ['href' => u('zwroty'), 'label' => (string) ($S['returns.nav'] ?? 'Zwroty')]; break;
             case 'konsola':    $out[] = ['href' => shop_base() . '/../backoffice/', 'label' => (string) ($S['footer.console'] ?? '')]; break;
             case 'email':
                 if (($S['footer.email'] ?? '') !== '') $out[] = ['href' => 'mailto:' . $S['footer.email'], 'label' => (string) $S['footer.email']];
@@ -734,6 +768,7 @@ function legal_valeurs(PDO $pdo, array $S): array {
                             ? seo_origin() . shop_base() . '/' : shop_base() . '/',
         '{wysylka_h}'  => (string) $h,
         '{zwrot_dni}'  => '14',
+        '{adres_zwrotu}' => zwrot_adres_linia($S),
         '{dostawa}'    => $lignes ? implode("\n", $lignes) : '- (brak aktywnych sposobów dostawy)',
     ];
 }

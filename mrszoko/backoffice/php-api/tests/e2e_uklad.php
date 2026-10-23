@@ -52,8 +52,8 @@ $ids = [];
 // ---- 1. Défauts et éléments fixes ----------------------------------------------------
 echo "-- domyślnie: kolejność z kodu; stałych nie da się ukryć --\n";
 ok('l\'accueil dans son ordre d\'origine', $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', 'pro', 'kontakt'], $cles('home'));
-ok('le menu aussi', $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'kontakt'], $cles('nav'));
-ok('et le pied de page', $cles('footer') === ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', 'konsola'], $cles('footer'));
+ok('le menu aussi', $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'zwroty', 'kontakt'], $cles('nav'));
+ok('et le pied de page', $cles('footer') === ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'zwroty', 'kontakt', 'konsola'], $cles('footer'));
 // Le téléphone et l'e-mail sur l'accueil — demandés par l'équipe — se cachent
 // et se déplacent comme le reste ; le téléphone a aussi sa ligne en pied de page.
 ok('le bloc contact se cache', wsm_layout_toggle($pdo, 'home', 'kontakt') && wsm_layout_get($pdo, 'home')[5]['on'] === 0);
@@ -83,10 +83,11 @@ ok('les promesses ne passent pas devant le pasek', !wsm_layout_move($pdo, 'home'
 ok('le B2B monte au-dessus du catalogue', wsm_layout_move($pdo, 'home', 'pro', 'up') && $cles('home') === ['hero', 'pasek', 'obietnice', 'pro', 'katalog', 'kontakt'], $cles('home'));
 ok('… et redescend', wsm_layout_move($pdo, 'home', 'pro', 'down') && $cles('home') === ['hero', 'pasek', 'obietnice', 'katalog', 'pro', 'kontakt']);
 ok('le dernier ne descend pas', !wsm_layout_move($pdo, 'home', 'kontakt', 'down'));
-ok('Kontakt passe devant Sklep en deux crans', wsm_layout_move($pdo, 'nav', 'kontakt', 'up') && wsm_layout_move($pdo, 'nav', 'kontakt', 'up')
-   && wsm_layout_move($pdo, 'nav', 'kontakt', 'up') && $cles('nav') === ['kontakt', 'sklep', 'b2b', 'zamowienie'], $cles('nav'));
+ok('Kontakt passe devant Sklep en quatre crans', wsm_layout_move($pdo, 'nav', 'kontakt', 'up') && wsm_layout_move($pdo, 'nav', 'kontakt', 'up')
+   && wsm_layout_move($pdo, 'nav', 'kontakt', 'up') && wsm_layout_move($pdo, 'nav', 'kontakt', 'up')
+   && $cles('nav') === ['kontakt', 'sklep', 'b2b', 'zamowienie', 'zwroty'], $cles('nav'));
 wsm_layout_reset($pdo, 'nav');
-ok('Przywróć ramène l\'ordre d\'origine', $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'kontakt']);
+ok('Przywróć ramène l\'ordre d\'origine', $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'zwroty', 'kontakt']);
 
 // Une préférence qui cite un bloc disparu, et oublie une section intégrée.
 wsm_layout_write($pdo, 'home', [['k' => 'hero', 'on' => 1], ['k' => 'blok:999999', 'on' => 1], ['k' => 'pro', 'on' => 1], ['k' => 'katalog', 'on' => 1]], 'test');
@@ -118,14 +119,15 @@ ok('un bloc monte au-dessus du catalogue', wsm_layout_move($pdo, 'home', "blok:$
 ok('une clé avec un chiffre (b2b) survit à la lecture — le premier jet la perdait',
    (function () use ($pdo) { wsm_layout_write($pdo, 'nav', [['k' => 'kontakt', 'on' => 1], ['k' => 'b2b', 'on' => 0], ['k' => 'sklep', 'on' => 1], ['k' => 'zamowienie', 'on' => 1]], 'test');
        $l = wsm_layout_get($pdo, 'nav'); wsm_layout_reset($pdo, 'nav');
-       return array_column($l, 'k') === ['kontakt', 'b2b', 'sklep', 'zamowienie'] && $l[1]['on'] === 0; })());
+       // « zwroty », arrivé après cette préférence, reprend sa place d'origine.
+       return array_column($l, 'k') === ['kontakt', 'b2b', 'sklep', 'zamowienie', 'zwroty'] && $l[1]['on'] === 0; })());
 $e = [];
 $idS = wsm_page_save($pdo, null, ['kind' => 'strona', 'slug' => "menu-$sfx", 'published' => 1, 'in_nav' => 1, 'in_footer' => 1,
     't' => ['pl' => ['title' => "Strona $sfx"]]], 'test', $e);
 $ids[] = $idS;
-ok('une page cochée « w menu » entre à la fin du menu', end($cles) === null || $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'kontakt', "strona:$idS"], $cles('nav'));
-ok('… et avant le lien console dans le pied de page', $cles('footer') === ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'kontakt', "strona:$idS", 'konsola'], $cles('footer'));
-ok('la page monte devant Kontakt', wsm_layout_move($pdo, 'nav', "strona:$idS", 'up') && $cles('nav')[3] === "strona:$idS", $cles('nav'));
+ok('une page cochée « w menu » entre à la fin du menu', end($cles) === null || $cles('nav') === ['sklep', 'b2b', 'zamowienie', 'zwroty', 'kontakt', "strona:$idS"], $cles('nav'));
+ok('… et avant le lien console dans le pied de page', $cles('footer') === ['email', 'telefon', 'zamowienie', 'regulamin', 'prywatnosc', 'zwroty', 'kontakt', "strona:$idS", 'konsola'], $cles('footer'));
+ok('la page monte devant Kontakt', wsm_layout_move($pdo, 'nav', "strona:$idS", 'up') && $cles('nav')[4] === "strona:$idS", $cles('nav'));
 ok('la cacher du menu décoche « w menu » — et la garde dans la stopka',
    wsm_layout_toggle($pdo, 'nav', "strona:$idS") && (int) wsm_page_get($pdo, (int) $idS)['in_nav'] === 0 && (int) wsm_page_get($pdo, (int) $idS)['in_footer'] === 1);
 ok('les liens visibles du menu ne la portent plus', !in_array("strona:$idS", array_column(wsm_layout_liens($pdo, 'nav'), 'k'), true));
@@ -192,9 +194,9 @@ if ($home === false || $home === '') {
     ok('le catalogue, lui, est toujours là', str_contains($h, 'id="katalog"'));
     ok('le menu du haut porte la page, dans son ordre (devant Kontakt)',
        preg_match('/navlink" href="[^"]*\/menu-' . $sfx . '">Strona ' . $sfx . '<\/a>\s*<a class="navlink" href="[^"]*kontakt">/s', $h) === 1);
-    wsm_layout_move($pdo, 'nav', 'kontakt', 'up'); wsm_layout_move($pdo, 'nav', 'kontakt', 'up'); wsm_layout_move($pdo, 'nav', 'kontakt', 'up'); wsm_layout_move($pdo, 'nav', 'kontakt', 'up');
+    for ($i = 0; $i < 5; $i++) wsm_layout_move($pdo, 'nav', 'kontakt', 'up');
     $h = $get();
-    ok('Kontakt en tête du menu après quatre crans', preg_match('/<nav class="head-nav"[^>]*>\s*<a class="navlink" href="[^"]*kontakt">/s', $h) === 1);
+    ok('Kontakt en tête du menu après cinq crans', preg_match('/<nav class="head-nav"[^>]*>\s*<a class="navlink" href="[^"]*kontakt">/s', $h) === 1);
     wsm_layout_toggle($pdo, 'footer', 'konsola');
     $h = $get();
     ok('le lien console disparaît du pied de page, le règlement y reste',
