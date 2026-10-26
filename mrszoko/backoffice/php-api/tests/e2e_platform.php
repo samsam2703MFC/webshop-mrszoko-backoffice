@@ -229,7 +229,7 @@ echo "\n-- tylko zapłacone liczy się --\n";
 $v = wsm_platform_volume($pdo, $moisCourant);
 $q = $pdo->prepare("SELECT COUNT(*) FROM wsm_orders
                      WHERE status <> 'anulowane' AND payment_status = 'oplacone'
-                       AND SUBSTR(COALESCE(NULLIF(paid_at,''), created_at), 1, 7) = ?");
+                       AND SUBSTR(COALESCE(" . wsm_sql_date($pdo, 'paid_at') . ", created_at), 1, 7) = ?");
 $q->execute([$moisCourant]);
 ok('le nombre de commandes correspond aux encaissées du mois',
     $v['orders'] === (int) $q->fetchColumn(), $v['orders']);

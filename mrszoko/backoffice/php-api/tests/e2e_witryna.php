@@ -126,13 +126,22 @@ foreach (array_keys(wsm_content_jednorazowe()) as $m) {
 // La même histoire jouée deux fois, par chaque voie, sur une copie : une base
 // qui n'a jamais vu ces migrations, puis la même base après que l'équipe a
 // remis « Mister Szoko » dans une phrase et 200 zł dans Dostawa.
-$copie = function () use ($pdo): array {
+// Une COPIE de la base : sous SQLite, un fichier (VACUUM INTO) ; sous MySQL,
+// le moteur de production, la même base dans une transaction annulée à la
+// fin. Chaque voie se joue ainsi sur le moteur qui l'exécutera vraiment.
+$mysql = wsm_sql_mysql($pdo);
+$copie = function () use ($pdo, $mysql): array {
+    if ($mysql) { $pdo->beginTransaction(); return [$pdo, null]; }
     $f = sys_get_temp_dir() . '/wsm-witryna-' . bin2hex(random_bytes(4)) . '.sqlite';
     $pdo->exec('VACUUM INTO ' . $pdo->quote($f));
     return [new PDO('sqlite:' . $f, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]), $f];
 };
+$jeter = function (PDO $c, ?string $f): void {
+    if ($f === null) { if ($c->inTransaction()) $c->rollBack(); return; }
+    @unlink($f);
+};
 $un = function (PDO $c, string $q, array $a = []) { $st = $c->prepare($q); $st->execute($a); return $st->fetchColumn(); };
-$scenario = function (string $voie, callable $jouer) use ($copie, $un, $sfx): void {
+$scenario = function (string $voie, callable $jouer) use ($copie, $jeter, $un, $sfx): void {
     [$c, $f] = $copie();
     $c->exec("DELETE FROM wsm_settings WHERE cle LIKE 'migracja.%'");
     $c->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES ('pl', ?, ?)")->execute(["test.witryna.$sfx", 'Napisz do Market Levano: pro@misterszoko.com, dziękujemy']);
@@ -151,7 +160,9 @@ $scenario = function (string $voie, callable $jouer) use ($copie, $un, $sfx): vo
     ok("$voie : l'ancien nom et l'ancienne adresse changent, le reste de la phrase reste",
        $v('pl', "test.witryna.$sfx") === 'Napisz do Szoko Shop: MarketLevano@gmail.com, dziękujemy', $v('pl', "test.witryna.$sfx"));
     ok("$voie : … les deux anciens noms, jusque dans les messages aux clients", $v('en', "test.witryna.$sfx") === 'Szoko Shop, since 2019'
-       && $un($c, "SELECT subject || '|' || body FROM wsm_mail_templates WHERE code = ?", ["test-$sfx"]) === "Zamówienie, Szoko Shop|Dziękujemy.\nSzoko Shop");
+       // Deux lectures, pas « subject || body » : sous MySQL, || est un OU logique.
+       && $un($c, "SELECT subject FROM wsm_mail_templates WHERE code = ?", ["test-$sfx"]) === 'Zamówienie, Szoko Shop'
+       && $un($c, "SELECT body FROM wsm_mail_templates WHERE code = ?", ["test-$sfx"]) === "Dziękujemy.\nSzoko Shop");
     ok("$voie : les seuils d'origine passent à 700 zł, un seuil réglé à la main reste",
        [$seuil('inpost_locker'), $seuil('inpost_courier'), $seuil('dpd_courier')] === [70000, 25000, 70000],
        [$seuil('inpost_locker'), $seuil('inpost_courier'), $seuil('dpd_courier')]);
@@ -164,15 +175,14 @@ $scenario = function (string $voie, callable $jouer) use ($copie, $un, $sfx): vo
     $c->exec("UPDATE wsm_shipping_methods SET free_from = 20000 WHERE id = 'inpost_locker'");
     $jouer($c);
     ok("$voie : rejouée, elle ne reprend rien à l'équipe", $v('pl', "test.witryna.$sfx") === 'Logo: Mister Szoko' && $seuil('inpost_locker') === 20000);
-    $c = null;
-    @unlink($f);
+    $jeter($c, $f);
 };
 $scenario('voie PHP', fn(PDO $c) => wsm_sync_content($c));
 // Le SQL de production, tel qu'émis, traduit en dialecte SQLite : les
 // littéraux hexadécimaux en texte, INSERT IGNORE et NOW() en leurs
 // équivalents. Seules les lignes des migrations sont jouées.
 $hexMig = bin2hex('migracja.');
-$migSql = array_map(fn($l) => str_replace(['INSERT IGNORE INTO', 'NOW()'], ['INSERT OR IGNORE INTO', "datetime('now')"],
+$migSql = array_map(fn($l) => $mysql ? $l : str_replace(['INSERT IGNORE INTO', 'NOW()'], ['INSERT OR IGNORE INTO', "datetime('now')"],
     preg_replace('/_utf8mb4 0x([0-9a-f]+)/', 'CAST(X\'$1\' AS TEXT)', $l)), array_values(array_filter($lignes, fn($l) => str_contains($l, $hexMig))));
 $scenario('voie SQL', function (PDO $c) use ($migSql) { foreach ($migSql as $q) $c->exec($q); });
 
@@ -328,7 +338,7 @@ else {
     ok('le pied de page n\'est plus en police mono', !preg_match('#<footer class="site-foot">.*class="[^"]*\bmono\b#s', $h));
     // Une fiche complète, sur un produit de la base.
     $p = $pdo->query("SELECT p.id, p.slug, p.category_id, c.name AS cat FROM wsm_products p JOIN wsm_categories c ON c.id = p.category_id
-                       WHERE p.shop_visible = 1 AND p.active = 1 AND p.slug <> '' ORDER BY p.sort_order LIMIT 1")->fetch();
+                       WHERE p.shop_visible = 1 AND p.active = 1 AND p.slug <> '' AND c.active = 1 ORDER BY p.sort_order LIMIT 1")->fetch();
     $avantN = $pdo->query("SELECT nutrition FROM wsm_products WHERE id = " . $pdo->quote($p['id']))->fetchColumn();
     $avantD = $val("product.{$p['id']}.desc");
     $pdo->prepare("UPDATE wsm_products SET nutrition = ? WHERE id = ?")->execute([wsm_nutrition_encode(['energy_kj' => '2475', 'energy_kcal' => '598', 'fat' => '54', 'saturates' => '32,5']), $p['id']]);

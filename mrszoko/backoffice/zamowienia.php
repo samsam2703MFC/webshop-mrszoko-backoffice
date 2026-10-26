@@ -256,8 +256,8 @@ $hurtowa = $kolejka === 'wysylka';        // la seule où le lot a un sens
 // La condition « en retard », écrite UNE fois : le compteur de l'onglet et la
 // liste qu'il ouvre doivent porter sur exactement le même ensemble. Un onglet
 // qui annonce 7 et ouvre 5 lignes fait chercher les deux qui manquent.
-$ouTermin = " AND paid_at IS NOT NULL AND paid_at <> '' AND paid_at < ?"
-          . " AND (shipped_at IS NULL OR shipped_at = '')";
+$ouTermin = ' AND ' . wsm_sql_avec_date($pdo, 'paid_at') . ' AND paid_at < ?'
+          . ' AND ' . wsm_sql_sans_date($pdo, 'shipped_at');
 
 $licznik = [];
 foreach ($KOLEJKI as $k => [$nazwa, $sts]) {

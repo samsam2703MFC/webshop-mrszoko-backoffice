@@ -123,6 +123,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $nazwa = trim((string) ($_POST['nazwa'] ?? ''));
             $kat   = (int) ($_POST['category_id'] ?? 0);
             if ($nazwa === '') $fieldErrors['nazwa'] = 'wymagana';
+            elseif (mb_strlen($nazwa) > WSM_PRODUCT_NAME_MAX) $fieldErrors['nazwa'] = 'maks. ' . WSM_PRODUCT_NAME_MAX . ' znaków';
             if ($kat <= 0) {
                 $fieldErrors['category_id'] = 'wybierz kategorie';
             } else {
@@ -171,7 +172,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     // On enchaine sur l'edition, avec le produit tout neuf.
                     $id = $newId; $openId = $newId; $_POST['id'] = $newId; $creation = true;
                 } catch (Throwable $e) {
-                    $flash = 'Nie udalo sie utworzyc produktu.'; $kind = 'err';
+                    // Le MOTIF, pas un mur : wsm_db_powod() le dit en clair et
+                    // écrit l'erreur complète dans le journal du serveur.
+                    $flash = 'Nie udało się utworzyć produktu: ' . wsm_db_powod($e, 'produkty: nowy produkt') . '.'; $kind = 'err';
                 }
             } else {
                 $flash = 'Popraw zaznaczone pola.'; $kind = 'err';
@@ -193,13 +196,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $knom = trim((string) ($_POST['kat_nazwa'] ?? ''));
             if ($knom === '') {
                 $flash = 'Nazwa kategorii jest wymagana.'; $kind = 'err';
+            } elseif (mb_strlen($knom) > 80) {
+                // Même borne que la création (wsm_categorie_assure) ; la
+                // colonne en tient 120, mais un rayon se lit dans un onglet.
+                $flash = 'Nazwa kategorii może mieć najwyżej 80 znaków.'; $kind = 'err';
             } else {
                 if ($kid > 0) {
                     try {
                         $pdo->prepare("UPDATE wsm_categories SET name = ? WHERE id = ?")->execute([$knom, $kid]);
                         $flash = 'Zapisano kategorię ' . $knom . '.';
                     } catch (Throwable $e) {
-                        $flash = 'Inna kategoria nazywa sie juz tak samo.'; $kind = 'err';
+                        // Le doublon est le cas courant ; les autres refus disent leur motif.
+                        $powod = wsm_db_powod($e, 'produkty: kategoria');
+                        $flash = $powod === 'taki wpis już istnieje' ? 'Inna kategoria nazywa się już tak samo.'
+                                                                   : 'Nie udało się zapisać kategorii: ' . $powod . '.';
+                        $kind = 'err';
                     }
                 } else {
                     // MÊME RÈGLE QUE DEPUIS LA FICHE PRODUIT. Avant, taper ici
@@ -357,6 +368,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             // correction laisse une trace dans le magasin (qui, quand, pourquoi).
             $wantStock = isset($_POST['stock']) ? max(0, (int) $_POST['stock']) : null;
             $body['shop_visible'] = !empty($_POST['shop_visible']) ? 1 : 0;
+            // Le nom tient dans sa colonne (VARCHAR(160)) : au-delà, MySQL
+            // refuse l'enregistrement entier — on le dit sur le champ.
+            if (mb_strlen(trim((string) ($_POST['nazwa'] ?? ''))) > WSM_PRODUCT_NAME_MAX) {
+                $fieldErrors['nazwa'] = 'maks. ' . WSM_PRODUCT_NAME_MAX . ' znaków';
+            }
 
             $old = (string) $cur['image_url'];
             $newUrl = null;

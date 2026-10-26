@@ -295,38 +295,42 @@ function wsm_section_save(PDO $pdo, ?int $id, array $in, string $actor = '', arr
 
     if ($errs) return null;
 
-    $now = date('Y-m-d H:i:s');
-    $vals = [
-        'page_id'    => $pageId,
-        'type'       => $type,
-        'published'  => !empty($in['published']) ? 1 : 0,
-        'styl'       => implode(',', wsm_section_styl($type, (array) ($in['styl'] ?? []))),
-        'image_url'  => $img,
-        'settings'   => json_encode(wsm_section_ustawienia($type, (array) ($in['ustawienia'] ?? [])), JSON_UNESCAPED_UNICODE),
-        'updated_at' => $now,
-        'updated_by' => mb_substr($actor, 0, 120),
-    ];
-    if ($id === null) {
-        $max = (int) $pdo->query("SELECT COALESCE(MAX(sort_order), 0) FROM wsm_sections WHERE page_id = " . (int) $pageId)->fetchColumn();
-        $vals['sort_order'] = $max + 10;
-        $vals['created_at'] = $now;
-        $cols = array_keys($vals);
-        $pdo->prepare("INSERT INTO wsm_sections (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")
-            ->execute(array_values($vals));
-        $id = (int) $pdo->lastInsertId();
-    } else {
-        $set = implode(', ', array_map(fn($c) => "$c = ?", array_keys($vals)));
-        $pdo->prepare("UPDATE wsm_sections SET $set WHERE id = ?")->execute([...array_values($vals), $id]);
-    }
-    // Ce qui est envoyé est ce qui reste : le formulaire porte toutes ses
-    // langues, une langue absente de l'envoi est une langue effacée.
-    $pdo->prepare("DELETE FROM wsm_section_i18n WHERE section_id = ?")->execute([$id]);
-    $ins = $pdo->prepare("INSERT INTO wsm_section_i18n (section_id, lang, title, lead, body, cta_label, cta_url, items) VALUES (?,?,?,?,?,?,?,?)");
-    foreach ($t as $lang => $row) {
-        if (implode('', $row) === '') continue;
-        $ins->execute([$id, $lang, $row['title'], $row['lead'], $row['body'], $row['cta_label'], $row['cta_url'], $row['items']]);
-    }
-    return $id;
+    // Tout ou rien : la ligne et ses textes (wsm_tx, db.php).
+    return wsm_tx($pdo, function () use ($pdo, $id, $pageId, $type, $in, $img, $actor, $t) {
+        $now = date('Y-m-d H:i:s');
+        $vals = [
+            'page_id'    => $pageId,
+            'type'       => $type,
+            'published'  => !empty($in['published']) ? 1 : 0,
+            'styl'       => implode(',', wsm_section_styl($type, (array) ($in['styl'] ?? []))),
+            'image_url'  => $img,
+            'settings'   => json_encode(wsm_section_ustawienia($type, (array) ($in['ustawienia'] ?? [])), JSON_UNESCAPED_UNICODE),
+            'updated_at' => $now,
+            'updated_by' => mb_substr($actor, 0, 120),
+        ];
+        if ($id === null) {
+            $max = (int) $pdo->query("SELECT COALESCE(MAX(sort_order), 0) FROM wsm_sections WHERE page_id = " . (int) $pageId)->fetchColumn();
+            $vals['sort_order'] = $max + 10;
+            $vals['created_at'] = $now;
+            $cols = array_keys($vals);
+            $pdo->prepare("INSERT INTO wsm_sections (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")
+                ->execute(array_values($vals));
+            $id = (int) $pdo->lastInsertId();
+        } else {
+            $set = implode(', ', array_map(fn($c) => "$c = ?", array_keys($vals)));
+            $pdo->prepare("UPDATE wsm_sections SET $set WHERE id = ?")->execute([...array_values($vals), $id]);
+        }
+        // Ce qui est envoyé est ce qui reste : le formulaire porte toutes ses
+        // langues, une langue absente de l'envoi est une langue effacée.
+        $pdo->prepare("DELETE FROM wsm_section_i18n WHERE section_id = ?")->execute([$id]);
+        // `lead` entre accents graves : mot réservé de MySQL 8 (voir pages.php).
+        $ins = $pdo->prepare("INSERT INTO wsm_section_i18n (`section_id`, `lang`, `title`, `lead`, `body`, `cta_label`, `cta_url`, `items`) VALUES (?,?,?,?,?,?,?,?)");
+        foreach ($t as $lang => $row) {
+            if (implode('', $row) === '') continue;
+            $ins->execute([$id, $lang, $row['title'], $row['lead'], $row['body'], $row['cta_label'], $row['cta_url'], $row['items']]);
+        }
+        return $id;
+    });
 }
 
 /** Supprime une section et ses textes ; renvoie la ligne (pour ranger son image). */

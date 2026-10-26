@@ -69,6 +69,44 @@ if ($pris !== '') {
 }
 ok('un nom vide ne donne jamais une clé vide', wsm_slug_libre($pdo, '', 'id') !== '');
 
+// ---- 2bis. La clé tient dans sa colonne ------------------------------------
+//
+// LE DÉFAUT VU EN PRODUCTION : « Nie udało się utworzyć produktu » dès que le
+// nom dépassait une cinquantaine de lettres. L'identifiant dérivé faisait
+// jusqu'à 80 caractères, la colonne wsm_products.id en tient 48 ; SQLite
+// laissait passer, MySQL refusait. On crée ici, pour de vrai, un produit au
+// nom très long — sur le moteur où tourne le test (MySQL : celui de la prod).
+echo "\n-- klucz mieści się w kolumnie --\n";
+$long = 'Czekolada mleczna w kaletkach Callebaut 823 33,6% 2,5 kg ' . bin2hex(random_bytes(2)) . ' edycja świąteczna dla cukierni';
+$idL = wsm_slug_libre($pdo, wsm_slugify($long, 'produkt'), 'id');
+ok('un nom de 80 lettres donne une clé de 40 au plus, coupée entre deux mots', strlen($idL) <= WSM_PRODUCT_ID_MAX && !str_ends_with($idL, '-') && str_starts_with($idL, 'czekolada-mleczna-w-kaletkach'), $idL);
+$slL = wsm_slug_libre($pdo, wsm_slugify($long, 'produkt'), 'slug', $idL);
+ok('l\'adresse publique garde jusqu\'à 80 caractères', strlen($slL) <= WSM_PRODUCT_SLUG_MAX && strlen($slL) > WSM_PRODUCT_ID_MAX, $slL);
+$catL = (int) $pdo->query("SELECT id FROM wsm_categories ORDER BY id LIMIT 1")->fetchColumn();
+$okL = true;
+try {
+    $pdo->prepare("INSERT INTO wsm_products (id, category_id, nom, slug, statut, active, shop_visible, sort_order) VALUES (?,?,?,?,'Szkic',1,0,999)")
+        ->execute([$idL, $catL, $long, $slL]);
+    foreach (['name', 'subtitle', 'desc', 'prop.12.k'] as $suf) {
+        $pdo->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES ('pl', ?, '')")->execute(['product.' . $idL . '.' . $suf]);
+    }
+} catch (Throwable $e) { $okL = $e->getMessage(); }
+ok('… et le produit se crée vraiment, clés de texte comprises', $okL === true, $okL);
+$pdo->prepare("DELETE FROM wsm_shop_i18n WHERE k LIKE ?")->execute(['product.' . $idL . '.%']);
+$pdo->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$idL]);
+$doublons = [];
+for ($i = 0; $i < 3; $i++) {
+    $d = wsm_slug_libre($pdo, wsm_slugify($long, 'produkt'), 'id');
+    $pdo->prepare("INSERT INTO wsm_products (id, category_id, nom, slug, statut, active, shop_visible, sort_order) VALUES (?,?,?,?,'Szkic',1,0,999)")
+        ->execute([$d, $catL, $long, $d]);
+    $doublons[] = $d;
+}
+ok('trois produits du même nom : trois clés distinctes, toutes dans la colonne', count(array_unique($doublons)) === 3 && max(array_map('strlen', $doublons)) <= WSM_PRODUCT_ID_MAX, $doublons);
+foreach ($doublons as $d) $pdo->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$d]);
+$ecran = (string) @file_get_contents(dirname(__DIR__, 2) . '/produkty.php');
+ok('l\'écran refuse un nom trop long sur le champ, et dit le motif d\'un refus de la base',
+   str_contains($ecran, "mb_strlen(\$nazwa) > WSM_PRODUCT_NAME_MAX") && str_contains($ecran, "wsm_db_powod(\$e, 'produkty: nowy produkt')"));
+
 // ---- 3. Ce que la création écrit ------------------------------------------
 //
 // On rejoue ici ce que fait l'écran, pour que la règle soit tenue même si

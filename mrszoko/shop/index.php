@@ -1082,6 +1082,9 @@ if ($page === 'kasa') {
            . (isset($opt['autocomplete']) ? ' autocomplete="' . e($opt['autocomplete']) . '"' : '')
            . (isset($opt['inputmode']) ? ' inputmode="' . e($opt['inputmode']) . '"' : '')
            . (isset($opt['placeholder']) ? ' placeholder="' . e($opt['placeholder']) . '"' : '')
+           // La longueur de la colonne, dite au navigateur : on ne tape pas
+           // ce que la base refusera (le serveur le vérifie de toute façon).
+           . (defined('WSM_BUYER_MAX') && isset(WSM_BUYER_MAX[$name]) ? ' maxlength="' . (int) WSM_BUYER_MAX[$name] . '"' : '')
            . ($err ? ' aria-invalid="true" aria-describedby="' . e($id) . '-e"' : '') . '>';
         if (isset($opt['hint'])) echo '<small class="hint">' . e($opt['hint']) . '</small>';
         if ($err) echo '<small class="err" id="' . e($id) . '-e">' . e($err) . '</small>';

@@ -348,7 +348,7 @@ function wsm_platform_volume(PDO $pdo, string $ym): array {
     $out = ['gross' => 0, 'goods_gross' => 0, 'shipping_gross' => 0, 'net' => 0, 'orders' => 0];
     $cols = wsm_table_columns($pdo, 'wsm_orders');
     $quand = in_array('paid_at', $cols, true)
-        ? "COALESCE(NULLIF(paid_at, ''), created_at)"
+        ? 'COALESCE(' . wsm_sql_date($pdo, 'paid_at') . ', created_at)'
         : "created_at";
     try {
         $st = $pdo->prepare("SELECT items_gross, shipping_gross, total_gross, total_net

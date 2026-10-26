@@ -45,6 +45,70 @@ function wsm_brand_name(): string {
     return $nom;
 }
 
+/**
+ * LE JOURNAL DES ERREURS, côté serveur : data/bledy.log (hors du site — le
+ * dossier data/ répond 404 et n'est pas touché par le déploiement).
+ *
+ * Pourquoi un journal à nous : en production, une requête refusée par MySQL
+ * et rattrapée par un « catch » qui rend un tableau vide ne laisse AUCUNE
+ * trace. C'est ainsi qu'une comparaison de date à '' a fait afficher 0 dans
+ * le B2B et le CRM sans que personne le sache. Désormais chaque refus de la
+ * base est écrit ici, avec la requête — et le déploiement en affiche la fin.
+ *
+ * Les tests (ligne de commande) n'écrivent pas, sauf WSM_JOURNAL=1 : ils
+ * provoquent des erreurs exprès.
+ */
+function wsm_journal(string $ou, string $quoi): void {
+    static $vus = [];
+    if (PHP_SAPI === 'cli' && getenv('WSM_JOURNAL') !== '1') return;
+    $cle = md5($ou . $quoi);
+    if (isset($vus[$cle]) || count($vus) > 20) return;     // pas d'avalanche dans une requête
+    $vus[$cle] = true;
+    $f = __DIR__ . '/data/bledy.log';
+    if (!is_dir(dirname($f))) @mkdir(dirname($f), 0775, true);
+    if (@filesize($f) > 512 * 1024) @rename($f, $f . '.1');      // une génération de réserve
+    $ligne = date('Y-m-d H:i:s') . ' | ' . $ou . ' | ' . preg_replace('/\s+/', ' ', $quoi);
+    @file_put_contents($f, mb_substr($ligne, 0, 1500) . "\n", FILE_APPEND | LOCK_EX);
+}
+
+/** Où l'erreur est arrivée : la page demandée, ou le script. */
+function wsm_journal_ou(): string {
+    return (string) ($_SERVER['REQUEST_URI'] ?? ($_SERVER['SCRIPT_NAME'] ?? PHP_SAPI));
+}
+
+/** Une requête refusée : le message de la base et le début de la requête. */
+function wsm_sql_trace(PDOException $e, string $sql): void {
+    wsm_journal(wsm_journal_ou(), $e->getMessage() . ' | SQL: ' . mb_substr(trim($sql), 0, 400));
+}
+
+/**
+ * PDO, avec une seule différence : toute requête refusée est écrite au
+ * journal AVANT de remonter. Le comportement ne change pas — l'exception
+ * remonte telle quelle, les « catch » existants font ce qu'ils faisaient —
+ * mais plus aucun refus n'est muet.
+ */
+class WsmPDO extends PDO {
+    public function prepare(string $query, array $options = []): PDOStatement|false {
+        try { return parent::prepare($query, $options); }
+        catch (PDOException $e) { wsm_sql_trace($e, $query); throw $e; }
+    }
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false {
+        try { return $fetchMode === null ? parent::query($query) : parent::query($query, $fetchMode, ...$fetchModeArgs); }
+        catch (PDOException $e) { wsm_sql_trace($e, $query); throw $e; }
+    }
+    public function exec(string $statement): int|false {
+        try { return parent::exec($statement); }
+        catch (PDOException $e) { wsm_sql_trace($e, $statement); throw $e; }
+    }
+}
+class WsmStatement extends PDOStatement {
+    protected function __construct() {}
+    public function execute(?array $params = null): bool {
+        try { return parent::execute($params); }
+        catch (PDOException $e) { wsm_sql_trace($e, $this->queryString); throw $e; }
+    }
+}
+
 function wsm_pdo(): PDO {
     static $pdo = null;
     if ($pdo instanceof PDO) return $pdo;
@@ -54,17 +118,24 @@ function wsm_pdo(): PDO {
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
+        PDO::ATTR_STATEMENT_CLASS    => [WsmStatement::class],
     ];
 
     if ($cfg['engine'] === 'mysql') {
         $m = $cfg['mysql'];
         $dsn = "mysql:host={$m['host']};port={$m['port']};dbname={$m['name']};charset=utf8mb4";
-        $pdo = new PDO($dsn, $m['user'], $m['pass'], $opts);
+        // rowCount() d'un UPDATE : les lignes TROUVÉES, comme SQLite — pas
+        // seulement celles qui ont changé. Tout le code (et tous les tests,
+        // joués sous SQLite) lit « > 0 » comme « la ligne existe et a été
+        // traitée » ; sans ce drapeau, réécrire une valeur identique passait
+        // pour un échec en production seulement.
+        $opts[PDO::MYSQL_ATTR_FOUND_ROWS] = true;
+        $pdo = new WsmPDO($dsn, $m['user'], $m['pass'], $opts);
     } else {
         $path = $cfg['sqlite_path'];
         $dir = dirname($path);
         if (!is_dir($dir)) mkdir($dir, 0775, true);
-        $pdo = new PDO('sqlite:' . $path, null, null, $opts);
+        $pdo = new WsmPDO('sqlite:' . $path, null, null, $opts);
         $pdo->exec('PRAGMA foreign_keys = ON');
     }
     return $pdo;
@@ -152,6 +223,72 @@ function wsm_bootstrap(bool $seed = true): PDO {
     $roles = __DIR__ . '/roles.php';
     if (is_file($roles)) require_once $roles;
     return $pdo;
+}
+
+/**
+ * CE QUE LA BASE A REFUSÉ, DIT À LA PERSONNE DEVANT L'ÉCRAN — et écrit en
+ * entier dans le journal PHP du serveur. « Nie udało się utworzyć produktu »,
+ * sans motif, a laissé l'équipe devant un mur : la cause (un identifiant trop
+ * long pour MySQL) n'était lisible nulle part. Le motif dit ici est court et
+ * sans détail technique ; le message complet est dans le journal.
+ */
+function wsm_db_powod(Throwable $e, string $kontekst = ''): string {
+    $m = $e->getMessage();
+    error_log('[wsm] ' . ($kontekst !== '' ? $kontekst . ': ' : '') . get_class($e) . ': ' . $m);
+    wsm_journal($kontekst !== '' ? $kontekst : wsm_journal_ou(), get_class($e) . ': ' . $m . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+    if (preg_match("/Data too long for column '([^']+)'/", $m, $x)) return 'za długi tekst w polu „' . $x[1] . '”';
+    if (str_contains($m, 'Duplicate entry') || str_contains($m, 'UNIQUE constraint failed')) return 'taki wpis już istnieje';
+    if (stripos($m, 'foreign key constraint') !== false) return 'odwołanie do rekordu, którego nie ma';
+    if (preg_match('/Incorrect (date|datetime)/i', $m)) return 'nieprawidłowa data';
+    if (preg_match("/Field '([^']+)' doesn't have a default value|NOT NULL constraint failed: \\w+\\.(\\w+)/", $m, $x)) return 'brak wartości w polu „' . ($x[1] ?: ($x[2] ?? '')) . '”';
+    $kod = $e instanceof PDOException ? (string) ($e->errorInfo[1] ?? $e->getCode()) : '';
+    return 'błąd bazy danych' . ($kod !== '' && $kod !== '0' ? ' (kod ' . $kod . ')' : '') . ', szczegóły w dzienniku serwera';
+}
+
+/**
+ * TOUT OU RIEN. Une page, c'est une ligne et ses textes : enregistrés en deux
+ * temps hors transaction, une erreur au second laissait la ligne SANS textes
+ * (les anciens déjà effacés) — et la liste de Strony tombait ensuite dessus.
+ * Dans une transaction déjà ouverte, c'est elle qui décide.
+ */
+function wsm_tx(PDO $pdo, callable $fn): mixed {
+    if ($pdo->inTransaction()) return $fn();
+    $pdo->beginTransaction();
+    try {
+        $r = $fn();
+        $pdo->commit();
+        return $r;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+}
+
+/**
+ * UNE DATE ABSENTE, DANS LE DIALECTE DE LA BASE.
+ *
+ * Sous SQLite une date est du texte : « pas encore expédiée » peut y valoir
+ * NULL ou ''. Sous MySQL 8, en mode strict, comparer une colonne DATETIME à
+ * '' est une ERREUR (1292/1525) — pas un faux, une exception. Le code écrit
+ * pour les deux, « shipped_at IS NULL OR shipped_at = '' », passait donc
+ * tous les tests (SQLite) et faisait tomber en production le passage d'une
+ * commande en « Wysłane ». Ces trois fonctions disent la même chose dans la
+ * langue de chaque base.
+ */
+function wsm_sql_mysql(PDO $pdo): bool {
+    return $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
+}
+/** « la date manque » */
+function wsm_sql_sans_date(PDO $pdo, string $col): string {
+    return wsm_sql_mysql($pdo) ? "$col IS NULL" : "($col IS NULL OR $col = '')";
+}
+/** « la date est là » */
+function wsm_sql_avec_date(PDO $pdo, string $col): string {
+    return wsm_sql_mysql($pdo) ? "$col IS NOT NULL" : "($col IS NOT NULL AND $col <> '')";
+}
+/** la date, ou NULL quand elle manque (pour COALESCE) */
+function wsm_sql_date(PDO $pdo, string $col): string {
+    return wsm_sql_mysql($pdo) ? $col : "NULLIF($col, '')";
 }
 
 /** Les colonnes d'une table existantes, en minuscules (MySQL + SQLite). */

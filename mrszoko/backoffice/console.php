@@ -32,6 +32,23 @@ function console_boot(): array {
     header('Referrer-Policy: same-origin');
     header('Cache-Control: private, no-store');
 
+    // UNE ERREUR QUE PERSONNE N'A PRÉVUE NE DONNE PLUS UNE PAGE BLANCHE.
+    // En production les erreurs ne s'affichent pas (et ne doivent pas) : un
+    // enregistrement refusé par la base laissait l'écran vide, sans un mot.
+    // Ici : le motif en clair (wsm_db_powod), l'erreur complète dans le
+    // journal du serveur, et un lien pour revenir.
+    set_exception_handler(function (Throwable $e): void {
+        $powod = wsm_db_powod($e, 'konsola ' . ($_SERVER['SCRIPT_NAME'] ?? ''));
+        if (!headers_sent()) { http_response_code(500); header('Content-Type: text/html; charset=utf-8'); }
+        $wroc = htmlspecialchars(basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'pulpit.php')), ENT_QUOTES);
+        echo '<!doctype html><html lang="pl"><meta charset="utf-8"><title>Błąd</title>'
+           . '<body style="font:16px/1.5 system-ui,sans-serif;max-width:640px;margin:10vh auto;padding:0 16px">'
+           . '<h1 style="font-size:1.4rem">Nie udało się wykonać tej operacji</h1>'
+           . '<p>Powód: ' . htmlspecialchars($powod, ENT_QUOTES) . '.</p>'
+           . '<p>Pełny opis błędu jest w dzienniku serwera. Jeśli się powtarza, przekaż tę wiadomość.</p>'
+           . '<p><a href="' . $wroc . '">← Wróć</a> · <a href="pulpit.php">Pulpit</a></p></body></html>';
+    });
+
     $pdo = wsm_bootstrap();
     wsm_session_start();
 

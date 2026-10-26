@@ -166,7 +166,10 @@ function wsm_promo_check(PDO $pdo, string $code, int $itemsGross, string $email 
     // La fin est INCLUSIVE : un bon « jusqu'au 31 » vaut tout le 31. Comparer
     // une date nue à un horodatage la lirait comme minuit et volerait un jour.
     if ($fin !== '') {
-        $borne = strlen($fin) <= 10 ? $fin . ' 23:59:59' : $fin;
+        // MySQL range la date nue en DATETIME : « 2026-10-31 » revient
+        // « 2026-10-31 00:00:00 », et le bon mourait à minuit le premier
+        // instant de son dernier jour. Minuit pile vaut donc la journée.
+        $borne = (strlen($fin) <= 10 || substr($fin, 11) === '00:00:00') ? substr($fin, 0, 10) . ' 23:59:59' : $fin;
         if ($quand > $borne) return $non('Ten kod stracił ważność ' . substr($fin, 0, 10) . '.');
     }
 
@@ -358,6 +361,7 @@ function wsm_promo_save(PDO $pdo, array $in, string $actor): array {
     $code = wsm_promo_norm((string) ($in['code'] ?? ''));
     if ($code === '') $code = wsm_promo_code($pdo);
     if (strlen($code) < 4) return [false, 'Kod musi mieć co najmniej 4 znaki.', 0];
+    if (strlen($code) > 60) return [false, 'Kod może mieć najwyżej 60 znaków.', 0];     // wsm_vouchers.code VARCHAR(60)
 
     $pct = (float) str_replace(',', '.', (string) ($in['pct'] ?? 0));
     $kwota = wsm_promo_grosze($in['kwota'] ?? 0);

@@ -293,6 +293,17 @@ grep -q 'function zwrot_adres(array' site/shop/lib.php && grep -q "'{adres_zwrot
   && grep -q "'zwroty'     =>" site/backoffice/api/layout.php && grep -q "'zwrot_ulica'" site/backoffice/api/settings.php \
   || { echo "  zwroty incomplets dans l'assemblage"; exit 1; }
 echo "  zwroty (adres do zwrotow : strona, stopka, regulamin, ustawienia) : obecne"
+# MYSQL STRICT : ce que SQLite (les tests) laissait passer et que la
+# production refusait — identifiant de produit trop long, date comparée à
+# '', mot réservé `lead`, rowCount des UPDATE ; plus le journal des refus
+# et les pages d'erreur lisibles.
+grep -q 'WSM_PRODUCT_ID_MAX   = 40' site/backoffice/api/shop.php && grep -q 'function wsm_sql_sans_date' site/backoffice/api/db.php \
+  && grep -q 'MYSQL_ATTR_FOUND_ROWS' site/backoffice/api/db.php && grep -q 'class WsmPDO' site/backoffice/api/db.php \
+  && grep -q '`lead`' site/backoffice/api/pages.php && grep -q '`lead`' site/backoffice/api/sections.php \
+  && grep -q 'set_exception_handler' site/backoffice/console.php && grep -q 'set_exception_handler' site/shop/lib.php \
+  && grep -q 'WSM_BUYER_MAX' site/backoffice/api/shop.php \
+  || { echo "  poprawki MySQL incompletes dans l'assemblage"; exit 1; }
+echo "  poprawki MySQL (id produktu, daty, lead, FOUND_ROWS, dziennik, strony bledu) : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
 # rayons de la maquette : il n'en restait qu'un allume, sur un champ
 # obligatoire. Trois pieces, et deux sur trois donnent un ecran qui accepte

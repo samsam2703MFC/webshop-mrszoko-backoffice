@@ -37,6 +37,21 @@ if (is_file($WSM_API_DIR . '/metody.php')) require_once $WSM_API_DIR . '/metody.
 if (is_file(__DIR__ . '/znaki.php')) require_once __DIR__ . '/znaki.php';
 require_once $WSM_API_DIR . '/tpay.php';
 
+// UNE ERREUR IMPRÉVUE NE DONNE PAS UNE PAGE BLANCHE AU CLIENT. Rien de
+// technique ne s'affiche (ni requête, ni chemin) : une excuse, un lien vers
+// l'accueil et le contact. Le détail part dans le journal du serveur.
+set_exception_handler(function (Throwable $e): void {
+    error_log('[wsm] sklep ' . ($_SERVER['REQUEST_URI'] ?? '') . ': ' . get_class($e) . ': ' . $e->getMessage()
+              . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    if (function_exists('wsm_journal')) wsm_journal('sklep ' . wsm_journal_ou(), get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+    if (!headers_sent()) { http_response_code(500); header('Content-Type: text/html; charset=utf-8'); }
+    echo '<!doctype html><html lang="pl"><meta charset="utf-8"><meta name="robots" content="noindex">'
+       . '<title>Przepraszamy</title><body style="font:17px/1.6 system-ui,sans-serif;max-width:600px;margin:12vh auto;padding:0 16px;color:#2b1a12">'
+       . '<h1 style="font-size:1.5rem">Przepraszamy, coś poszło nie tak</h1>'
+       . '<p>Spróbuj ponownie za chwilę. Jeśli składałeś zamówienie, sprawdź skrzynkę e-mail, zanim zamówisz drugi raz.</p>'
+       . '<p><a href="' . htmlspecialchars(function_exists('u') ? u() : '/', ENT_QUOTES) . '">Strona główna</a></p></body></html>';
+});
+
 const WSM_CART_COOKIE = 'ms_cart';
 const WSM_LANG_COOKIE = 'ms_lang';
 const WSM_VOUCHER_COOKIE = 'ms_kod';

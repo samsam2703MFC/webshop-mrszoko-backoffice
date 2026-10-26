@@ -146,7 +146,10 @@ function wsm_page_list(PDO $pdo, ?string $kind = null): array {
     }
     foreach ($rows as &$r) {
         $id = (int) $r['id'];
-        $r['title'] = (string) ($titres[$id][WSM_PAGE_BASE_LANG] ?? (reset($titres[$id]) ?: ''));
+        // Une page sans aucun titre (ses textes perdus, ou jamais écrits) ne
+        // doit pas faire tomber la liste : reset() sur null est une erreur fatale.
+        $tous = $titres[$id] ?? [];
+        $r['title'] = (string) ($tous[WSM_PAGE_BASE_LANG] ?? ($tous ? reset($tous) : ''));
         $r['langs'] = array_keys($titres[$id] ?? []);
         sort($r['langs']);
     }
@@ -292,41 +295,47 @@ function wsm_page_save(PDO $pdo, ?int $id, array $in, string $actor = '', array 
 
     if ($errs) return null;
 
-    $now = date('Y-m-d H:i:s');
-    $vals = [
-        'slug'       => $kind === 'strona' ? $slug : null,
-        'kind'       => $kind,
-        'placement'  => $placement,
-        'published'  => !empty($in['published']) ? 1 : 0,
-        'in_nav'     => $kind === 'strona' && !empty($in['in_nav']) ? 1 : 0,
-        'in_footer'  => $kind === 'strona' && !empty($in['in_footer']) ? 1 : 0,
-        'sort_order' => max(0, min(9999, (int) ($in['sort_order'] ?? 100))),
-        'image_url'  => $img,
-        'styl'       => $styl,
-        'updated_at' => $now,
-        'updated_by' => mb_substr($actor, 0, 120),
-    ];
-    if ($id === null) {
-        $vals['created_at'] = $now;
-        $cols = array_keys($vals);
-        $pdo->prepare("INSERT INTO wsm_pages (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")
-            ->execute(array_values($vals));
-        $id = (int) $pdo->lastInsertId();
-    } else {
-        $set = implode(', ', array_map(fn($c) => "$c = ?", array_keys($vals)));
-        $pdo->prepare("UPDATE wsm_pages SET $set WHERE id = ?")->execute([...array_values($vals), $id]);
-    }
+    // Tout ou rien : la ligne et ses textes (wsm_tx, db.php).
+    return wsm_tx($pdo, function () use ($pdo, $id, $kind, $slug, $placement, $in, $img, $styl, $actor, $t) {
+        $now = date('Y-m-d H:i:s');
+        $vals = [
+            'slug'       => $kind === 'strona' ? $slug : null,
+            'kind'       => $kind,
+            'placement'  => $placement,
+            'published'  => !empty($in['published']) ? 1 : 0,
+            'in_nav'     => $kind === 'strona' && !empty($in['in_nav']) ? 1 : 0,
+            'in_footer'  => $kind === 'strona' && !empty($in['in_footer']) ? 1 : 0,
+            'sort_order' => max(0, min(9999, (int) ($in['sort_order'] ?? 100))),
+            'image_url'  => $img,
+            'styl'       => $styl,
+            'updated_at' => $now,
+            'updated_by' => mb_substr($actor, 0, 120),
+        ];
+        if ($id === null) {
+            $vals['created_at'] = $now;
+            $cols = array_keys($vals);
+            $pdo->prepare("INSERT INTO wsm_pages (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")
+                ->execute(array_values($vals));
+            $id = (int) $pdo->lastInsertId();
+        } else {
+            $set = implode(', ', array_map(fn($c) => "$c = ?", array_keys($vals)));
+            $pdo->prepare("UPDATE wsm_pages SET $set WHERE id = ?")->execute([...array_values($vals), $id]);
+        }
 
-    // Les textes : une ligne par langue saisie ; une langue vidée disparaît.
-    $del = $pdo->prepare("DELETE FROM wsm_page_i18n WHERE page_id = ? AND lang = ?");
-    $ins = $pdo->prepare("INSERT INTO wsm_page_i18n (page_id, lang, title, lead, body, meta_desc, cta_label, cta_url)
-                          VALUES (?,?,?,?,?,?,?,?)");
-    foreach ($t as $lang => $row) {
-        $del->execute([$id, $lang]);
-        if (implode('', $row) === '') continue;
-        $ins->execute([$id, $lang, $row['title'], $row['lead'], $row['body'], $row['meta_desc'], $row['cta_label'], $row['cta_url']]);
-    }
-    return $id;
+        // Les textes : une ligne par langue saisie ; une langue vidée disparaît.
+        $del = $pdo->prepare("DELETE FROM wsm_page_i18n WHERE page_id = ? AND lang = ?");
+        // `lead` ENTRE ACCENTS GRAVES : c'est un mot réservé de MySQL 8 (la
+        // fonction de fenêtre LEAD). Nu, l'ordre passait sous SQLite et tombait
+        // en production — aucune page de Strony ne s'enregistrait.
+        $ins = $pdo->prepare("INSERT INTO wsm_page_i18n (`page_id`, `lang`, `title`, `lead`, `body`, `meta_desc`, `cta_label`, `cta_url`)
+                              VALUES (?,?,?,?,?,?,?,?)");
+        foreach ($t as $lang => $row) {
+            $del->execute([$id, $lang]);
+            if (implode('', $row) === '') continue;
+            $ins->execute([$id, $lang, $row['title'], $row['lead'], $row['body'], $row['meta_desc'], $row['cta_label'], $row['cta_url']]);
+        }
+        return $id;
+    });
 }
 
 /** Supprime une page et ses textes ; renvoie la ligne supprimée (pour ranger son image). */
@@ -351,6 +360,9 @@ function wsm_page_delete(PDO $pdo, int $id): ?array {
 function wsm_page_url_ok(string $url): bool {
     $url = trim($url);
     if ($url === '') return false;
+    // La colonne cta_url est un VARCHAR(255) : plus long, MySQL refuserait
+    // l'enregistrement entier de la page (SQLite, lui, laissait passer).
+    if (strlen($url) > 255) return false;
     if (preg_match('#^https://[^\s<>"\']+$#i', $url)) return true;
     if (preg_match('#^(/|\#)[^\s<>"\']*$#', $url)) return true;
     if (preg_match('/^[a-z0-9][a-z0-9-]*(#[a-z0-9-]*)?$/', $url)) return true;

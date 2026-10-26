@@ -60,7 +60,9 @@ function serie_jours(PDO $pdo, int $days = 30): array {
 /** Clients cumulés : chaque adresse compte une fois, au mois de sa première commande. */
 function serie_clients(PDO $pdo, int $months = 12): array {
     $first = [];
-    $rows = $pdo->query("SELECT email, MIN(created_at) AS d FROM wsm_orders
+    // LOWER(email) dans la liste ET dans le GROUP BY : MySQL 8 (ONLY_FULL_GROUP_BY)
+    // refuse une colonne nue qui n'est pas celle du regroupement — l'écran tombait.
+    $rows = $pdo->query("SELECT LOWER(email) AS email, MIN(created_at) AS d FROM wsm_orders
                           WHERE email <> '' GROUP BY LOWER(email)")->fetchAll() ?: [];
     foreach ($rows as $r) $first[] = substr((string) $r['d'], 0, 7);
 

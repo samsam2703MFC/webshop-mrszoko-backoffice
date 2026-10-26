@@ -1079,18 +1079,44 @@ function wsm_slugify(string $texte, string $repli = ''): string {
 }
 
 /**
+ * LA LONGUEUR DES COLONNES, que SQLite ignore et que MySQL refuse.
+ *
+ * wsm_products.id est un VARCHAR(48) — et toutes les tables qui le citent
+ * (lignes de commande, stock, abonnements) aussi. L'identifiant dérivé d'un
+ * nom pouvait faire 80 caractères : sous SQLite (développement, tests) ça
+ * passait, sous MySQL strict (production) l'INSERT tombait — « Nie udało się
+ * utworzyć produktu » dès qu'un nom dépassait une cinquantaine de lettres.
+ * 40 laisse la place du suffixe « -2 » … « -50 » et des clés de texte
+ * (« product.<id>.prop.12.k » tient dans les 80 de wsm_shop_i18n.k).
+ */
+const WSM_PRODUCT_ID_MAX   = 40;
+const WSM_PRODUCT_SLUG_MAX = 80;
+const WSM_PRODUCT_NAME_MAX = 160;   // wsm_products.nom VARCHAR(160)
+
+/** Coupe une adresse à $max, entre deux mots quand c'est possible. */
+function wsm_slug_coupe(string $s, int $max): string {
+    if (strlen($s) <= $max) return $s;
+    $c = substr($s, 0, $max);
+    $p = strrpos($c, '-');
+    if ($p !== false && $p >= (int) ($max * 0.6)) $c = substr($c, 0, $p);
+    return rtrim($c, '-');
+}
+
+/**
  * La même chose, mais garantie libre dans une colonne : deux produits qui
- * partagent une adresse en rendent un inatteignable.
+ * partagent une adresse en rendent un inatteignable. Et jamais plus longue
+ * que la colonne : voir WSM_PRODUCT_ID_MAX.
  */
 function wsm_slug_libre(PDO $pdo, string $base, string $colonne, string $saufId = ''): string {
-    $base = $base !== '' ? $base : 'produkt';
+    $max = $colonne === 'id' ? WSM_PRODUCT_ID_MAX : WSM_PRODUCT_SLUG_MAX;
+    $base = wsm_slug_coupe($base !== '' ? $base : 'produkt', $max);
     $st = $pdo->prepare("SELECT 1 FROM wsm_products WHERE $colonne = ? AND id <> ?");
     for ($i = 0; $i < 50; $i++) {
-        $essai = $i === 0 ? $base : substr($base, 0, 74) . '-' . ($i + 1);
+        $essai = $i === 0 ? $base : wsm_slug_coupe($base, $max - 3) . '-' . ($i + 1);
         $st->execute([$essai, $saufId]);
         if (!$st->fetchColumn()) return $essai;
     }
-    return substr($base, 0, 68) . '-' . bin2hex(random_bytes(4));
+    return wsm_slug_coupe($base, $max - 9) . '-' . bin2hex(random_bytes(4));
 }
 
 function wsm_validate_product_shop(PDO $pdo, array $in, string $id): array {
@@ -1257,8 +1283,25 @@ function wsm_validate_buyer(array $in, string $method, bool $invoice, ?string $k
 
     $out['note'] = mb_substr(trim((string) ($in['note'] ?? '')), 0, 500);
 
+    // LA LONGUEUR DES CHAMPS, que MySQL impose et que SQLite ignorait. Un
+    // numéro de rue « 12/4 lok. 5, klatka B, wejście od podwórza » (42 signes
+    // pour une colonne de 30) faisait refuser la commande ENTIÈRE par la
+    // base — et l'acheteur lisait « Popraw zaznaczone pola » sans qu'aucun
+    // champ soit marqué. Le refus est maintenant sur le champ, avec la suite.
+    foreach (WSM_BUYER_MAX as $k => $max) {
+        if (isset($e[$k]) || mb_strlen((string) ($out[$k] ?? '')) <= $max) continue;
+        $e[$k] = 'maks. ' . $max . ' znaków' . (str_ends_with($k, '_building') ? ', resztę wpisz w uwagach do zamówienia' : '');
+    }
+
     return [$out, $e];
 }
+
+/** Longueur maximale des champs de l'acheteur : celle des colonnes de wsm_orders. */
+const WSM_BUYER_MAX = [
+    'email' => 200, 'first_name' => 120, 'last_name' => 120, 'company' => 200,
+    'bill_street' => 200, 'bill_building' => 30, 'bill_city' => 120,
+    'ship_street' => 200, 'ship_building' => 30, 'ship_city' => 120,
+];
 
 /**
  * Crée la commande : devis recalculé, acheteur validé, stock décrémenté,
@@ -1696,8 +1739,8 @@ function wsm_orders_po_terminie(PDO $pdo, int $limit, array $statuts, string $se
     if (!$ok) return [];
     $st = $pdo->prepare("SELECT id FROM wsm_orders
                           WHERE status IN ('" . implode("','", $ok) . "')
-                            AND paid_at IS NOT NULL AND paid_at <> '' AND paid_at < ?
-                            AND (shipped_at IS NULL OR shipped_at = '')
+                            AND " . wsm_sql_avec_date($pdo, 'paid_at') . " AND paid_at < ?
+                            AND " . wsm_sql_sans_date($pdo, 'shipped_at') . "
                           ORDER BY paid_at ASC LIMIT " . max(1, min(1000, $limit)));
     $st->execute([$seuil]);
     $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
@@ -1862,7 +1905,7 @@ function wsm_order_status_set(PDO $pdo, int $id, string $new, string $actor = ''
     // indicateur qui s'auto-absout.
     if ($new === 'wyslane') {
         $pdo->prepare("UPDATE wsm_orders SET shipped_at = CURRENT_TIMESTAMP
-                        WHERE id = ? AND (shipped_at IS NULL OR shipped_at = '')")
+                        WHERE id = ? AND " . wsm_sql_sans_date($pdo, 'shipped_at'))
             ->execute([$id]);
     }
     if ($paye) $out['note'] = 'zapłata odnotowana ręcznie';
