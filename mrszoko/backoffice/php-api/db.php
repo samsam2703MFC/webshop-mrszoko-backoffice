@@ -64,11 +64,51 @@ function wsm_journal(string $ou, string $quoi): void {
     $cle = md5($ou . $quoi);
     if (isset($vus[$cle]) || count($vus) > 20) return;     // pas d'avalanche dans une requête
     $vus[$cle] = true;
-    $f = __DIR__ . '/data/bledy.log';
+    $f = wsm_journal_plik();
     if (!is_dir(dirname($f))) @mkdir(dirname($f), 0775, true);
     if (@filesize($f) > 512 * 1024) @rename($f, $f . '.1');      // une génération de réserve
     $ligne = date('Y-m-d H:i:s') . ' | ' . $ou . ' | ' . preg_replace('/\s+/', ' ', $quoi);
     @file_put_contents($f, mb_substr($ligne, 0, 1500) . "\n", FILE_APPEND | LOCK_EX);
+}
+
+/** Le fichier du journal ; sa génération précédente est « .1 ». */
+function wsm_journal_plik(): string {
+    return __DIR__ . '/data/bledy.log';
+}
+
+/**
+ * Le journal LU, pour le Pulpit : les dernières entrées (la plus récente
+ * d'abord) et les comptes. Une ligne = « date | où | quoi ».
+ *
+ * « zapis » dit si le serveur PEUT écrire le journal : un journal vide parce
+ * que le dossier est en lecture seule mentirait en disant « rien à signaler ».
+ *
+ * @return array{wpisy: list<array{kiedy:string,gdzie:string,co:string}>, razem:int, tydzien:int, od:?string, zapis:bool}
+ */
+function wsm_journal_lire(int $n = 20): array {
+    $f = wsm_journal_plik();
+    $lignes = is_file($f) ? (@file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []) : [];
+    $semaine = date('Y-m-d H:i:s', time() - 7 * 86400);
+    $tydzien = 0;
+    foreach ($lignes as $l) if (substr($l, 0, 19) >= $semaine) $tydzien++;
+    $wpisy = [];
+    foreach (array_reverse(array_slice($lignes, -max(1, $n))) as $l) {
+        $p = explode(' | ', $l, 3);
+        $wpisy[] = ['kiedy' => (string) ($p[0] ?? ''), 'gdzie' => (string) ($p[1] ?? ''), 'co' => (string) ($p[2] ?? '')];
+    }
+    $zapis = is_file($f) ? is_writable($f) : is_writable(dirname($f));
+    return ['wpisy' => $wpisy, 'razem' => count($lignes), 'tydzien' => $tydzien, 'od' => $lignes ? substr($lignes[0], 0, 19) : null, 'zapis' => $zapis];
+}
+
+/**
+ * « Przejrzane » : les entrées lues passent en archive (« .1 », qui remplace
+ * l'archive précédente) et la liste repart de zéro — le Pulpit ne montre
+ * plus que ce qui est arrivé APRÈS. Rien n'est effacé tant qu'une nouvelle
+ * revue n'a pas eu lieu.
+ */
+function wsm_journal_archiwizuj(): bool {
+    $f = wsm_journal_plik();
+    return !is_file($f) || @rename($f, $f . '.1');
 }
 
 /** Où l'erreur est arrivée : la page demandée, ou le script. */
