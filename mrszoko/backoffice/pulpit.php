@@ -45,6 +45,23 @@ if (!wsm_tpay_enabled())   $missing[] = 'tpay (płatności online)';
 if (!wsm_inpost_enabled()) $missing[] = 'InPost ShipX (etykiety)';
 if (!wsm_mail_enabled())   $missing[] = 'poczta (wiadomości do klientów)';
 
+// LE JOURNAL DES ERREURS (api/data/bledy.log). Chaque requête refusée par la
+// base et chaque erreur imprévue d'une page y est écrite, avec la requête.
+// Il n'était lisible qu'au déploiement ; le voici pour qui gère les réglages
+// (mêmes droits qu'Integracje). « Przejrzane » archive ce qui a été lu, pour
+// que le panneau ne montre plus que ce qui arrive ensuite.
+$bledyWidac = console_ouvre($me, 'ustawienia.php');
+$bledyNota = '';
+if ($bledyWidac && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['bledy_przejrzane'])) {
+    if (console_csrf_ok() && wsm_journal_archiwizuj()) {
+        wsm_audit($pdo, (string) ($me['nom'] ?? ''), 'Przegląd', 'dziennik błędów (api/data/bledy.log)', 'Sieć');
+        header('Location: pulpit.php?bledy=przejrzane#bledy', true, 303);
+        exit;
+    }
+    $bledyNota = 'Nie udało się oznaczyć dziennika jako przejrzanego (odśwież stronę i spróbuj ponownie).';
+}
+$bledy = $bledyWidac ? wsm_journal_lire(15) : ['wpisy' => [], 'razem' => 0, 'tydzien' => 0, 'od' => null, 'zapis' => true];
+
 $statusLabel = ['nowe' => 'Nowe', 'oplacone' => 'Opłacone', 'w_realizacji' => 'W realizacji',
                 'wyslane' => 'Wysłane', 'dostarczone' => 'Dostarczone', 'anulowane' => 'Anulowane'];
 
@@ -52,6 +69,9 @@ console_head('Pulpit', $me, <<<'CSS'
   .lead { font-size: 14px; line-height: 1.6; color: var(--text-muted); max-width: 80ch; margin: 0 0 20px; }
   .kpi.hot b { color: var(--danger); }
   .quick { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .bledy td.co { font-family: var(--font-mono, monospace); font-size: 12.5px; line-height: 1.5; word-break: break-word; }
+  .bledy td.kiedy { white-space: nowrap; font-size: 13px; }
+  .bledy-ok { font-size: 13px; color: var(--text-muted); margin-top: 18px; }
   .quick a {
     display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px;
     border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 600;
@@ -97,6 +117,40 @@ CSS);
   <?= $lienUst !== '' ? 'Uzupełnij je w ' . $lienUst . ' — pola są wypełnione „xxxx”.'
                       : 'Uzupełnia je administrator w Ustawieniach — pola są wypełnione „xxxx”.' ?>
 </p>
+<?php endif; ?>
+
+<?php if ($bledyWidac && ($bledy['razem'] > 0 || $bledyNota !== '')): ?>
+<div class="panel bledy" id="bledy">
+  <h2>Dziennik błędów <span class="code"><?= (int) $bledy['razem'] ?></span></h2>
+  <p class="lead" style="margin-bottom:12px">
+    Każde zapytanie odrzucone przez bazę i każdy nieprzewidziany błąd strony — od <?= h((string) $bledy['od']) ?>,
+    w tym <b><?= (int) $bledy['tydzien'] ?></b> z ostatnich 7 dni. Jeśli coś się powtarza, prześlij te wiersze —
+    mówią, co i gdzie nie zadziałało.
+  </p>
+  <?php if ($bledyNota !== ''): ?><p class="warnbox"><?= h($bledyNota) ?></p><?php endif; ?>
+  <div class="tablewrap">
+  <table class="rwd">
+    <thead><tr><th>Kiedy</th><th>Gdzie</th><th>Co</th></tr></thead>
+    <tbody>
+    <?php foreach ($bledy['wpisy'] as $w): ?>
+      <tr>
+        <td data-l="Kiedy" class="kiedy"><?= h($w['kiedy']) ?></td>
+        <td data-l="Gdzie"><?= h($w['gdzie']) ?></td>
+        <td data-l="Co" class="co" title="<?= h($w['co']) ?>"><?= h(mb_strimwidth($w['co'], 0, 260, '…')) ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+  <?php if ($bledy['razem'] > count($bledy['wpisy'])): ?>
+  <p class="muted small">Pokazane ostatnie <?= count($bledy['wpisy']) ?> z <?= (int) $bledy['razem'] ?>; całość: api/data/bledy.log na serwerze.</p>
+  <?php endif; ?>
+  <form method="post" style="margin-top:12px">
+    <?= console_csrf_field() ?>
+    <button type="submit" name="bledy_przejrzane" value="1">Oznacz jako przejrzane</button>
+    <span class="muted small">— lista zacznie się od nowa; te wpisy zostają w archiwum (bledy.log.1).</span>
+  </form>
+</div>
 <?php endif; ?>
 
 <div class="kpis">
@@ -174,4 +228,11 @@ CSS);
     <?php endif; ?>
   </div>
 </div>
+<?php if ($bledyWidac && !$bledy['zapis']): ?>
+<p class="warnbox" id="bledy">Dziennik błędów: serwer <b>nie może zapisywać</b> do katalogu api/data —
+  błędy nie są notowane, więc pusty dziennik nic nie znaczy. Trzeba nadać serwerowi WWW prawo zapisu do api/data.</p>
+<?php elseif ($bledyWidac && $bledy['razem'] === 0): ?>
+<p class="bledy-ok" id="bledy">Dziennik błędów: pusty<?= ($_GET['bledy'] ?? '') === 'przejrzane' ? ' — oznaczony jako przejrzany' : '' ?>.
+  Każde odrzucone zapytanie albo błąd strony pojawi się tutaj.</p>
+<?php endif; ?>
 <?php console_foot();

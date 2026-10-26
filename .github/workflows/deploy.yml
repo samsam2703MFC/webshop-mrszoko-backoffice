@@ -2689,6 +2689,13 @@ jobs:
             echo "  dziennik bledow (api/data/bledy.log): $(wc -l < "$J") wpisow, ostatnie:"
             tail -5 "$J" | cut -c1-260 | sed 's/^/    /'
           else echo "  dziennik bledow (api/data/bledy.log): pusty"; fi
+          # Un journal vide ne vaut que si le serveur PEUT l'écrire. Le Pulpit
+          # le dit aussi, de l'intérieur (c'est PHP lui-même qui teste).
+          if sudo -n -u www-data test -w "$DIR_BO/api/data" 2>/dev/null; then echo "  api/data zapisywalny dla www-data: tak"
+          elif sudo -n true 2>/dev/null; then echo "  ^ ATTENTION : api/data niezapisywalny dla www-data — dziennik bledow pozostanie pusty"
+          else echo "  api/data: wlasciciel $(stat -c '%U:%G %a' "$DIR_BO/api/data" 2>/dev/null || echo '?') (bez sudo — sprawdz Pulpit)"; fi
+          grep -q 'wsm_journal_lire(15)' "$DIR_BO/pulpit.php" && echo "  panel Dziennik bledow na Pulpicie: obecny" \
+            || { echo "  ^ NOT OK : brak panelu dziennika na Pulpicie"; fail=1; }
           if [ "$fail" = "0" ]; then echo "ALL CMS CHECKS OK"; else echo "CMS CHECKS FAILED"; exit 1; fi
           REMOTE
 

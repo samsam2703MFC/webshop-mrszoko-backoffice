@@ -318,7 +318,7 @@ grep -q 'WSM_PRODUCT_ID_MAX   = 40' site/backoffice/api/shop.php && grep -q 'fun
   && grep -q 'MYSQL_ATTR_FOUND_ROWS' site/backoffice/api/db.php && grep -q 'class WsmPDO' site/backoffice/api/db.php \
   && grep -q '`lead`' site/backoffice/api/pages.php && grep -q '`lead`' site/backoffice/api/sections.php \
   && grep -q 'set_exception_handler' site/backoffice/console.php && grep -q 'set_exception_handler' site/shop/lib.php \
-  && grep -q 'WSM_BUYER_MAX' site/backoffice/api/shop.php \
+  && grep -q 'WSM_BUYER_MAX' site/backoffice/api/shop.php && grep -q 'wsm_journal_lire(15)' site/backoffice/pulpit.php \
   || { echo "  poprawki MySQL incompletes dans l'assemblage"; exit 1; }
 echo "  poprawki MySQL (id produktu, daty, lead, FOUND_ROWS, dziennik, strony bledu) : obecne"
 # LA CATEGORIE SE CREE DEPUIS LA FICHE PRODUIT. Le menage a eteint cinq
