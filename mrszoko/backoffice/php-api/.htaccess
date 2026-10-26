@@ -26,7 +26,7 @@
 </Files>
 
 # Don't expose the SQLite DB or its journal to the web.
-<FilesMatch "\.(sqlite|sqlite-journal)$">
+<FilesMatch "\.(sqlite|sqlite-journal|log|log\.1)$">
   Require all denied
 </FilesMatch>
 

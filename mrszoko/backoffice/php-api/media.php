@@ -138,6 +138,8 @@ function wsm_media_delete(string $url): bool {
 /** Une URL d'image acceptable en base : notre média, ou une adresse https. */
 function wsm_media_valid_url(string $url): bool {
     if ($url === '') return true;                       // vider le champ est permis
+    // Les colonnes d'image (produit, page, section) sont des VARCHAR(255).
+    if (strlen($url) > 255) return false;
     if (preg_match('#^media/[a-f0-9]{24}\.(webp|jpg|png)$#', $url)) return true;
     // Une image distante en http ferait basculer la page en contenu mixte et
     // le navigateur la bloquerait : https uniquement.

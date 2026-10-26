@@ -194,6 +194,16 @@ ok('DPD avec adresse complète → accepté', !isset($eD2['ship_street'], $eD2['
 [, $eL] = wsm_validate_buyer($saisie, 'inpost_locker', false, wsm_ship_kind($pdo, 'inpost_locker'));
 ok('Paczkomat sans code → refus sur le point', isset($eL['inpost_point']), $eL);
 ok('Paczkomat ne réclame PAS de rue', !isset($eL['ship_street']), $eL);
+// La longueur des colonnes : refusée SUR LE CHAMP, pas par la base. Un numéro
+// de 42 signes pour une colonne de 30 faisait tomber toute la commande sous
+// MySQL, et l'acheteur ne voyait aucun champ marqué.
+[, $eLong] = wsm_validate_buyer(['ship_building' => '12/4 lok. 5, klatka B, wejście od podwórza', 'ship_city' => str_repeat('a', 121)] + $avecAdr,
+                                  'dpd_courier', false, wsm_ship_kind($pdo, 'dpd_courier'));
+ok('un numéro trop long est refusé sur son champ, avec la suite à faire', str_starts_with($eLong['ship_building'] ?? '', 'maks. 30 znaków') && str_contains($eLong['ship_building'], 'uwagach'), $eLong);
+ok('… une ville trop longue aussi', ($eLong['ship_city'] ?? '') === 'maks. 120 znaków', $eLong);
+[, $eOk] = wsm_validate_buyer(['ship_building' => '12/4 lok. 5'] + $avecAdr, 'dpd_courier', false, wsm_ship_kind($pdo, 'dpd_courier'));
+ok('… un numéro normal passe', !isset($eOk['ship_building']), $eOk);
+ok('le formulaire de la caisse borne chaque champ à sa colonne', str_contains((string) @file_get_contents(dirname(__DIR__, 3) . '/shop/index.php'), "' maxlength=\"' . (int) WSM_BUYER_MAX[\$name]"));
 
 // ---- 8. Le suivi ----------------------------------------------------------
 echo "\n-- śledzenie --\n";

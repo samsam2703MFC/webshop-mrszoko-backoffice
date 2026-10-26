@@ -159,21 +159,27 @@ $c2 = wsm_ship_costs($pdo);
 ok('sans coût saisi, on prend le tarif de vente', ($c2['inpost_locker']['cost'] ?? 0) === 1000, $c2['inpost_locker'] ?? null);
 ok('et l\'écran est averti que ce n\'est pas un vrai coût',
     ($c2['inpost_locker']['known'] ?? true) === false);
-// Sans coût saisi, le rapport ne mesure plus que ce que le client a payé par
-// rapport au TARIF. Il ne peut donc jamais dépasser 100 % — et il descend
-// en dessous dès qu'une livraison a été offerte, ce qui est précisément le
-// chiffre utile : la franchise de port se paie sur la marge.
+// Sans coût saisi, le rapport compare ce que le client a payé au TARIF du
+// mode — pas à un coût inventé. (« Il ne peut jamais dépasser 100 % » était
+// faux : une commande payée avant une baisse de tarif le dépasse, et la
+// suite jouée sous MySQL l'a montré.) Le chiffre utile est ailleurs : une
+// livraison offerte le fait BAISSER, la franchise se paie sur la marge.
 $m2 = wsm_margin_series($pdo, 1)[0];
-ok('sans coût saisi, la couverture ne dépasse jamais 100 %', $m2['coverage_pct'] <= 100.0, $m2['coverage_pct']);
-
-$offert = (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders
-                              WHERE payment_status = 'oplacone' AND status <> 'anulowane'
-                                AND shipping_net = 0 AND created_at >= '" . date('Y-m') . "-01'")->fetchColumn();
-ok($offert > 0
-     ? 'une livraison offerte fait bien tomber la couverture sous 100 %'
-     : 'sans livraison offerte, la couverture reste à 100 %',
-   $offert > 0 ? $m2['coverage_pct'] < 100.0 : $m2['coverage_pct'] === 100.0,
-   [$offert, $m2['coverage_pct']]);
+$paye = 0; $tarif = 0;
+foreach ($pdo->query("SELECT delivery_method, shipping_net FROM wsm_orders
+                       WHERE status <> 'anulowane' AND payment_status = 'oplacone'")->fetchAll() as $o) {
+    // Le mois courant seulement — wsm_margin_series($pdo, 1) n'en voit pas d'autre.
+    $paye += (int) $o['shipping_net'];
+    $tarif += $c2[(string) $o['delivery_method']]['cost'] ?? (int) $o['shipping_net'];
+}
+$moisSeul = (int) $pdo->query("SELECT COUNT(*) FROM wsm_orders WHERE status <> 'anulowane' AND payment_status = 'oplacone'
+                                 AND created_at < '" . date('Y-m') . "-01'")->fetchColumn() === 0;
+ok('sans coût saisi, la couverture vaut payé / tarif', !$moisSeul || $m2['coverage_pct'] === ($tarif > 0 ? round($paye / $tarif * 100, 1) : 0.0),
+   [$m2['coverage_pct'], $paye, $tarif]);
+[$o4] = wsm_shop_create_order($pdo, $base + ['items' => [['id' => $avec, 'qty' => 1]]]);
+$pdo->prepare("UPDATE wsm_orders SET payment_status = 'oplacone', shipping_net = 0 WHERE id = ?")->execute([(int) $o4['id']]);
+$m3 = wsm_margin_series($pdo, 1)[0];
+ok('une livraison offerte fait baisser la couverture', $m3['coverage_pct'] < $m2['coverage_pct'], [$m2['coverage_pct'], $m3['coverage_pct']]);
 
 $pdo->prepare("UPDATE wsm_shipping_methods SET price_net = ?, cost_net = ?, free_from = ? WHERE id = ?")
     ->execute([$savePrix, (int) $saveCost, $saveFree, 'inpost_locker']);
@@ -282,7 +288,7 @@ foreach ([$avec, $sans] as $id) {
     $pdo->prepare("DELETE FROM wsm_stock_moves WHERE product_id = ?")->execute([$id]);
     $pdo->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$id]);
 }
-foreach ([$o1, $o2 ?? null, $o3 ?? null] as $o) {
+foreach ([$o1, $o2 ?? null, $o3 ?? null, $o4 ?? null] as $o) {
     if ($o) $pdo->prepare("DELETE FROM wsm_orders WHERE id = ?")->execute([(int) $o['id']]);
 }
 

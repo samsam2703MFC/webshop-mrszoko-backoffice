@@ -2664,6 +2664,31 @@ jobs:
           else echo "  ^ NOT OK : regulamin bez adresu do zwrotow (punkt 8 przepisany w Tresciach?)"; fail=1; fi
           NZ=$(sq "SELECT COUNT(*) FROM mrszoko.wsm_pages WHERE slug = 'zwroty'")
           [ "${NZ:-0}" = "0" ] || echo "  ^ ATTENTION : strona z Stron pod adresem /zwroty ($NZ) — zastapiona strona wbudowana"
+          echo "== Audyt MySQL (produkcja) =="
+          # Les tests tournent sous SQLite ; la production sous MySQL 8 strict.
+          # Trois défauts n'existaient QUE là : un identifiant de produit plus
+          # long que sa colonne (création refusée), une date comparée à ''
+          # (passage en « Wysłane » refusé), le mot réservé `lead` (Strony et
+          # Kreator refusés). Les pièces du correctif, puis la preuve.
+          grep -q 'WSM_PRODUCT_ID_MAX   = 40' "$DIR_BO/api/shop.php" && grep -q 'function wsm_sql_sans_date' "$DIR_BO/api/db.php" \
+            && grep -q 'MYSQL_ATTR_FOUND_ROWS' "$DIR_BO/api/db.php" && grep -q 'class WsmPDO' "$DIR_BO/api/db.php" \
+            && grep -q '`lead`' "$DIR_BO/api/pages.php" && grep -q '`lead`' "$DIR_BO/api/sections.php" \
+            && grep -q 'set_exception_handler' "$DIR_BO/console.php" && grep -q 'set_exception_handler' "$DIR_BO/../shop/lib.php" \
+            && grep -q 'WSM_BUYER_MAX' "$DIR_BO/api/shop.php" \
+            && echo "  poprawki MySQL (id produktu, daty, lead, FOUND_ROWS, dziennik, strony bledu): obecne" \
+            || { echo "  ^ NOT OK : poprawki MySQL niekompletne"; fail=1; }
+          echo "  MySQL: $(sq "SELECT CONCAT(VERSION(), ' / ', @@GLOBAL.sql_mode)")"
+          if sq "SELECT COUNT(*) FROM mrszoko.wsm_orders WHERE shipped_at = ''" >/dev/null; then
+            echo "  stary wzorzec (data = ''): przyjety przez te baze"
+          else echo "  stary wzorzec (data = ''): ODRZUCONY przez te baze — dlatego zmiana statusu na Wyslane padala; poprawione"; fi
+          NO=$(sq "SELECT COUNT(*) FROM mrszoko.wsm_pages p WHERE NOT EXISTS (SELECT 1 FROM mrszoko.wsm_page_i18n t WHERE t.page_id = p.id)")
+          [ "${NO:-0}" = "0" ] && echo "  strony bez tekstow: 0" \
+            || echo "  ^ ATTENTION : $NO stron(y) bez tekstow (zapis padal na lead) — do uzupelnienia albo usuniecia w Stronach"
+          J="$DIR_BO/api/data/bledy.log"
+          if [ -s "$J" ]; then
+            echo "  dziennik bledow (api/data/bledy.log): $(wc -l < "$J") wpisow, ostatnie:"
+            tail -5 "$J" | cut -c1-260 | sed 's/^/    /'
+          else echo "  dziennik bledow (api/data/bledy.log): pusty"; fi
           if [ "$fail" = "0" ]; then echo "ALL CMS CHECKS OK"; else echo "CMS CHECKS FAILED"; exit 1; fi
           REMOTE
 

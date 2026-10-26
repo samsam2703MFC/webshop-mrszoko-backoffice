@@ -102,13 +102,22 @@ ok('la voie SQL porte deux opérations gardées par le marqueur', count($lignesZ
 $pose = strpos($sql, 'INSERT IGNORE INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES (' . wsm_sql_txt('migracja.2026_10_adres_zwrotu'));
 ok('… et le marqueur se pose après elles', $pose !== false && $pose > strrpos($sql, $garde));
 
-$copie = function () use ($pdo): array {
+// Une COPIE de la base : sous SQLite, un fichier (VACUUM INTO) ; sous MySQL,
+// le moteur de production, la même base dans une transaction annulée à la
+// fin. Chaque voie se joue ainsi sur le moteur qui l'exécutera vraiment.
+$mysql = wsm_sql_mysql($pdo);
+$copie = function () use ($pdo, $mysql): array {
+    if ($mysql) { $pdo->beginTransaction(); return [$pdo, null]; }
     $f = sys_get_temp_dir() . '/wsm-zwroty-' . bin2hex(random_bytes(4)) . '.sqlite';
     $pdo->exec('VACUUM INTO ' . $pdo->quote($f));
     return [new PDO('sqlite:' . $f, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]), $f];
 };
+$jeter = function (PDO $c, ?string $f): void {
+    if ($f === null) { if ($c->inTransaction()) $c->rollBack(); return; }
+    @unlink($f);
+};
 $un = function (PDO $c, string $q, array $a = []) { $st = $c->prepare($q); $st->execute($a); return $st->fetchColumn(); };
-$scenario = function (string $voie, callable $jouer) use ($copie, $un, $reg): void {
+$scenario = function (string $voie, callable $jouer) use ($copie, $jeter, $un, $reg): void {
     [$c, $f] = $copie();
     $c->exec("DELETE FROM wsm_settings WHERE cle = 'migracja.2026_10_adres_zwrotu'");
     // La base de production : le texte d'avant (tirets déjà changés en
@@ -125,11 +134,10 @@ $scenario = function (string $voie, callable $jouer) use ($copie, $un, $reg): vo
     $c->exec("DELETE FROM wsm_settings WHERE cle = 'migracja.2026_10_adres_zwrotu'");      // même sans marqueur…
     $jouer($c);
     ok("$voie : rejouée, pas de doublon", substr_count($v('terms.s8.b'), '{adres_zwrotu}') === 1);
-    $c = null;
-    @unlink($f);
+    $jeter($c, $f);
 };
 $scenario('voie PHP', fn(PDO $c) => wsm_sync_content($c));
-$migSql = array_map(fn($l) => str_replace(['INSERT IGNORE INTO', 'NOW()'], ['INSERT OR IGNORE INTO', "datetime('now')"],
+$migSql = array_map(fn($l) => $mysql ? $l : str_replace(['INSERT IGNORE INTO', 'NOW()'], ['INSERT OR IGNORE INTO', "datetime('now')"],
     preg_replace('/_utf8mb4 0x([0-9a-f]+)/', 'CAST(X\'$1\' AS TEXT)', $l)),
     array_values(array_filter(explode("\n", $sql), fn($l) => str_contains($l, bin2hex('migracja.2026_10_adres_zwrotu')))));
 $scenario('voie SQL', function (PDO $c) use ($migSql) { foreach ($migSql as $q) $c->exec($q); });

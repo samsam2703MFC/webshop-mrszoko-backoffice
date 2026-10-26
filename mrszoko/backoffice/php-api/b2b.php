@@ -59,7 +59,7 @@ function wsm_b2b_poids(PDO $pdo, string $email, int $mois = WSM_B2B_MOIS): int {
     $depuis = date('Y-m-d H:i:s', strtotime("-$mois months"));
     $cols = wsm_table_columns($pdo, 'wsm_orders');
     $quand = in_array('paid_at', $cols, true)
-        ? "COALESCE(NULLIF(o.paid_at, ''), o.created_at)" : "o.created_at";
+        ? 'COALESCE(' . wsm_sql_date($pdo, 'o.paid_at') . ', o.created_at)' : "o.created_at";
     try {
         $st = $pdo->prepare("SELECT COALESCE(SUM(i.qty * COALESCE(p.weight_g, 0)), 0)
                                FROM wsm_order_items i
@@ -133,7 +133,7 @@ function wsm_b2b_candidats(PDO $pdo, int $mois = WSM_B2B_MOIS): array {
     $depuis = date('Y-m-d H:i:s', strtotime("-$mois months"));
     $cols = wsm_table_columns($pdo, 'wsm_orders');
     $quand = in_array('paid_at', $cols, true)
-        ? "COALESCE(NULLIF(o.paid_at, ''), o.created_at)" : "o.created_at";
+        ? 'COALESCE(' . wsm_sql_date($pdo, 'o.paid_at') . ', o.created_at)' : "o.created_at";
 
     try {
         $rows = $pdo->query("SELECT LOWER(o.email) AS em, MIN(o.email) AS email,

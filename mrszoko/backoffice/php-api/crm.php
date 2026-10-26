@@ -553,7 +553,7 @@ function wsm_crm_new_vs_returning(PDO $pdo, int $months = 12): array {
 
     $cols = wsm_table_columns($pdo, 'wsm_orders');
     $quand = in_array('paid_at', $cols, true)
-        ? "COALESCE(NULLIF(paid_at, ''), created_at)" : "created_at";
+        ? 'COALESCE(' . wsm_sql_date($pdo, 'paid_at') . ', created_at)' : "created_at";
     $rows = $pdo->query("SELECT LOWER(email) AS em, total_gross, $quand AS q
                            FROM wsm_orders
                           WHERE status <> 'anulowane' AND payment_status = 'oplacone'
