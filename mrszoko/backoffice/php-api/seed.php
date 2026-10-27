@@ -589,8 +589,7 @@ function wsm_content_jednorazowe(): array {
 
     // SZOKO SHOP (octobre 2026). Mister Szoko, puis Market Levano une
     // semaine, puis « Szoko Shop » avec le logo d'origine. Les deux anciens
-    // noms partent des textes, des messages, des noms de produit ; l'adresse
-    // de contact des tout débuts aussi.
+    // noms partent des textes, des messages, des noms de produit.
     $nom = [];
     foreach (['Market Levano', 'Mister Szoko'] as $ancien) {
         foreach ([['wsm_shop_i18n', 'v'], ['wsm_landing_i18n', 'v'], ['wsm_mail_templates', 'subject'],
@@ -598,9 +597,10 @@ function wsm_content_jednorazowe(): array {
             $nom[] = ["UPDATE $t SET $c = REPLACE($c, ?, ?) WHERE $c LIKE ?", [$ancien, 'Szoko Shop', '%' . $ancien . '%']];
         }
     }
-    foreach (['wsm_shop_i18n', 'wsm_landing_i18n'] as $t) {
-        $nom[] = ["UPDATE $t SET v = REPLACE(v, ?, ?) WHERE v LIKE ?", ['pro@misterszoko.com', 'MarketLevano@gmail.com', '%pro@misterszoko.com%']];
-    }
+    // (Cette migration passait aussi pro@misterszoko.com → MarketLevano@gmail.com.
+    // L'équipe a repris l'ancienne adresse fin octobre : l'opération est
+    // retirée — jouée sur une base neuve, elle aurait défait ce retour. En
+    // production elle a déjà eu lieu, et migracja.2026_10_email_pro la défait.)
     $ops['migracja.2026_10_szoko_shop'] = $nom;
 
     // DARMOWA DOSTAWA OD 700 ZŁ, WYSYŁKA DO 12:00 — la politique annoncée par
@@ -638,6 +638,22 @@ function wsm_content_jednorazowe(): array {
                  [$ancre, $neuf, 'pl', $k, '%{adres_zwrotu}%']];
     }
     $ops['migracja.2026_10_adres_zwrotu'] = $z;
+
+    // L'ANCIENNE ADRESSE ET LE NUMÉRO AVEC +48 (fin octobre 2026). L'équipe
+    // reprend pro@misterszoko.com partout où MarketLevano@gmail.com était
+    // écrit — textes de la boutique, de la page d'origine, messages aux
+    // clients —, sous toutes les casses qu'une main a pu taper. Le numéro
+    // passe à « +48 660 884 677 », seulement là où il est encore tel que livré.
+    $m = [];
+    foreach (['MarketLevano@gmail.com', 'marketlevano@gmail.com', 'Marketlevano@gmail.com', 'MARKETLEVANO@GMAIL.COM'] as $ancien) {
+        foreach ([['wsm_shop_i18n', 'v'], ['wsm_landing_i18n', 'v'], ['wsm_mail_templates', 'subject'], ['wsm_mail_templates', 'body']] as [$t, $c]) {
+            $m[] = ["UPDATE $t SET $c = REPLACE($c, ?, ?) WHERE $c LIKE ?", [$ancien, 'pro@misterszoko.com', '%' . $ancien . '%']];
+        }
+    }
+    foreach (['660 884 677', '660884677', '660-884-677'] as $ancien) {
+        $m[] = ['UPDATE wsm_shop_i18n SET v = ? WHERE k = ? AND v = ?', ['+48 660 884 677', 'footer.phone', $ancien]];
+    }
+    $ops['migracja.2026_10_email_pro'] = $m;
 
     return $ops;
 }

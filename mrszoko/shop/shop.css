@@ -768,6 +768,8 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
 .kontakt-poz b { font-size: var(--text-lg); overflow-wrap: anywhere; }
 .kontakt-poz--form b { font-size: var(--text-md); }
 @media (max-width: 760px) { .kontakt-karta { grid-template-columns: minmax(0, 1fr); padding: var(--space-5); } }
+/* Sur la page Kontakt : téléphone et e-mail côte à côte, au-dessus du formulaire. */
+.kontakt-dane--strona { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); max-width: 720px; margin: var(--space-4) 0 var(--space-6); }
 
 /* ---- Fiche produit : la référence, le rayon, puis trois blocs ------------- */
 .buy-meta { display: grid; gap: 4px; margin-top: var(--space-4); font-size: var(--text-sm); }

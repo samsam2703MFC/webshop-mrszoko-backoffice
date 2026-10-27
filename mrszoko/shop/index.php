@@ -838,6 +838,25 @@ if ($page === 'kontakt') {
   <h1><?= e($S['contact.title'] ?? '') ?></h1>
   <p class="lead"><?= e($S['contact.lead'] ?? '') ?></p>
 
+  <?php // LE TÉLÉPHONE ET L'E-MAIL, AU-DESSUS DU FORMULAIRE. Demandé par
+        // l'équipe : qui ouvre « Kontakt » cherche souvent à appeler, pas à
+        // écrire. Mêmes sources que l'accueil et le pied de page (Treści :
+        // footer.phone, footer.email) — un numéro, un seul endroit. ?>
+  <?php $kTel = trim((string) ($S['footer.phone'] ?? '')); $kTelHref = $kTel !== '' ? tel_href($kTel) : '';
+        $kMail = trim((string) ($S['footer.email'] ?? ''));
+        if ($kTelHref !== '' || $kMail !== ''): ?>
+  <div class="kontakt-dane kontakt-dane--strona">
+    <?php if ($kTelHref !== ''): ?>
+    <a class="kontakt-poz" href="<?= e($kTelHref) ?>"><?= function_exists('ikona_kontaktu') ? ikona_kontaktu('telefon') : '' ?>
+      <span><small><?= e($S['home.contact.phone'] ?? '') ?></small><b><?= e($kTel) ?></b></span></a>
+    <?php endif; ?>
+    <?php if ($kMail !== ''): ?>
+    <a class="kontakt-poz" href="<?= e('mailto:' . $kMail) ?>"><?= function_exists('ikona_kontaktu') ? ikona_kontaktu('email') : '' ?>
+      <span><small><?= e($S['home.contact.email'] ?? '') ?></small><b><?= e($kMail) ?></b></span></a>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
   <?php if ($envoye): ?>
     <?php notice('ok', $S['contact.sent'] ?? ''); ?>
     <p><a class="btn btn--brand" href="<?= e(u()) ?>"><?= e($S['cart.empty_cta'] ?? '') ?></a></p>

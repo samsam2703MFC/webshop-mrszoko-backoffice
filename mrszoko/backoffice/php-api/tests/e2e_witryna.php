@@ -73,12 +73,13 @@ foreach (['mrszoko/shop/content_seed.json', 'mrszoko/landing/content_seed.json']
     $doc = json_decode($lire($f), true);
     $txt = json_encode($doc['strings'] ?? [], JSON_UNESCAPED_UNICODE);
     ok("$f : plus un ancien nom dans les textes", str_contains($txt, 'Szoko Shop')
-       && !str_contains($txt, 'Market Levano') && !str_contains($txt, 'Mister Szoko') && !str_contains($txt, 'misterszoko'));
+       && !str_contains($txt, 'Market Levano') && !str_contains($txt, 'Mister Szoko'));     // pro@misterszoko.com est revenue exprès
 }
 $seedDoc = json_decode($lire('mrszoko/shop/content_seed.json'), true);
 $seed = $seedDoc['strings'];
 ok('la marque, dans les trois langues', ($seed['pl']['brand'] ?? '') === 'Szoko Shop' && ($seed['uk']['brand'] ?? '') === 'Szoko Shop' && ($seed['en']['brand'] ?? '') === 'Szoko Shop');
-ok('l\'adresse et le téléphone de contact', ($seed['pl']['footer.email'] ?? '') === 'MarketLevano@gmail.com' && ($seed['pl']['footer.phone'] ?? '') === '660 884 677');
+ok('l\'adresse d\'origine et le téléphone avec +48', ($seed['pl']['footer.email'] ?? '') === 'pro@misterszoko.com' && ($seed['pl']['footer.phone'] ?? '') === '+48 660 884 677');
+ok('… et plus un MarketLevano@gmail.com nulle part dans les fichiers', !str_contains(strtolower($lire('mrszoko/shop/content_seed.json') . $lire('mrszoko/landing/content_seed.json')), 'marketlevano@gmail.com'));
 $neufs = ['info.darmowa', 'home.contact.title', 'metody.ship', 'metody.pay', 'metoda.blik', 'product.props', 'product.nutrition', 'nutri.energy', 'nutri.salt', 'product.category'];
 ok('les nouveaux libellés existent en pl, uk et en', !array_filter($neufs, fn($k) => empty($seed['pl'][$k]) || empty($seed['uk'][$k]) || empty($seed['en'][$k])));
 ok('… sans tiret cadratin (le déploiement les changerait en virgules)', !array_filter($neufs, fn($k) => str_contains($seed['pl'][$k] . $seed['uk'][$k] . $seed['en'][$k], ' — ')));
@@ -146,6 +147,9 @@ $scenario = function (string $voie, callable $jouer) use ($copie, $jeter, $un, $
     $c->exec("DELETE FROM wsm_settings WHERE cle LIKE 'migracja.%'");
     $c->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES ('pl', ?, ?)")->execute(["test.witryna.$sfx", 'Napisz do Market Levano: pro@misterszoko.com, dziękujemy']);
     $c->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES ('en', ?, ?)")->execute(["test.witryna.$sfx", 'Mister Szoko, since 2019']);
+    // L'adresse Market Levano, sous deux casses, et le numéro d'avant le +48.
+    $c->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES ('uk', ?, ?)")->execute(["test.witryna.$sfx", 'Пишіть: MarketLevano@gmail.com або marketlevano@gmail.com']);
+    $c->exec("UPDATE wsm_shop_i18n SET v = '660 884 677' WHERE k = 'footer.phone'");
     $c->prepare("INSERT INTO wsm_mail_templates (code, lang, name, subject, body, event, active) VALUES (?, 'pl', 't', 'Zamówienie, Market Levano', ?, '', 0)")
       ->execute(["test-$sfx", "Dziękujemy.\nMister Szoko"]);
     $c->exec("UPDATE wsm_shipping_methods SET free_from = 20000 WHERE id = 'inpost_locker'");
@@ -158,7 +162,10 @@ $scenario = function (string $voie, callable $jouer) use ($copie, $jeter, $un, $
     $v = fn(string $l, string $k) => $un($c, "SELECT v FROM wsm_shop_i18n WHERE lang = ? AND k = ?", [$l, $k]);
     $seuil = fn(string $id) => (int) $un($c, "SELECT free_from FROM wsm_shipping_methods WHERE id = ?", [$id]);
     ok("$voie : l'ancien nom et l'ancienne adresse changent, le reste de la phrase reste",
-       $v('pl', "test.witryna.$sfx") === 'Napisz do Szoko Shop: MarketLevano@gmail.com, dziękujemy', $v('pl', "test.witryna.$sfx"));
+       $v('pl', "test.witryna.$sfx") === 'Napisz do Szoko Shop: pro@misterszoko.com, dziękujemy', $v('pl', "test.witryna.$sfx"));
+    ok("$voie : MarketLevano@gmail.com redevient pro@misterszoko.com, quelle que soit la casse",
+       $v('uk', "test.witryna.$sfx") === 'Пишіть: pro@misterszoko.com або pro@misterszoko.com', $v('uk', "test.witryna.$sfx"));
+    ok("$voie : le numéro livré prend le +48", $v('pl', 'footer.phone') === '+48 660 884 677' && $v('en', 'footer.phone') === '+48 660 884 677', $v('pl', 'footer.phone'));
     ok("$voie : … les deux anciens noms, jusque dans les messages aux clients", $v('en', "test.witryna.$sfx") === 'Szoko Shop, since 2019'
        // Deux lectures, pas « subject || body » : sous MySQL, || est un OU logique.
        && $un($c, "SELECT subject FROM wsm_mail_templates WHERE code = ?", ["test-$sfx"]) === 'Zamówienie, Szoko Shop'
@@ -292,7 +299,7 @@ if ($h === false) { echo "  (sklep na 8091 nie odpowiada — pominięte)\n"; }
 else {
     $brand = $val('brand') ?: 'Szoko Shop';
     ok('le nom à côté du logo d\'origine', str_contains($h, '<span class="head-nazwa">' . htmlspecialchars($brand) . '</span>') && str_contains($h, 'assets/logo.png') && !str_contains($h, 'logo.svg'));
-    ok('pas une trace des anciens noms, ni de l\'ancienne adresse', !str_contains($h, 'Market Levano') && !str_contains($h, 'Mister Szoko') && !str_contains($h, 'misterszoko'));
+    ok('pas une trace des anciens noms, ni de l\'adresse Market Levano', !str_contains($h, 'Market Levano') && !str_contains($h, 'Mister Szoko') && !str_contains(strtolower($h), 'marketlevano@'));
     ok('sans photo, l\'illustration', str_contains($h, '<section class="hero hero--art"'));
     // Le bandeau du haut : la livraison gratuite au seuil de la caisse, l'heure limite.
     $prog = (int) $pdo->query("SELECT MIN(free_from) FROM wsm_shipping_methods WHERE active = 1 AND free_from > 0")->fetchColumn();
@@ -332,8 +339,10 @@ else {
     if ($avantHome !== false) $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES ('layout.home', ?, 0, ?, 'test')")->execute([$avantHome, date('Y-m-d H:i:s')]);
     ok('caché dans Układ strony, le bandeau laisse son marqueur', !str_contains($h4, 'hero-strip--gora') && str_contains($h4, wsm_layout_marker('pasek')) && str_contains($h4, 'class="wrap hero-in"'));
     ok('le contact sur l\'accueil : un appel, un e-mail, le formulaire', str_contains($h, 'class="wrap block kontakt-dom"')
-       && str_contains($h, 'href="tel:+48660884677"') && str_contains($h, 'href="mailto:MarketLevano@gmail.com"') && preg_match('#kontakt-poz--form" href="[^"]*/kontakt"#', $h) === 1);
-    ok('le téléphone aussi en pied de page', preg_match('#<nav class="foot-links"[^>]*>.*href="tel:\+48660884677">660 884 677</a>#s', $h) === 1);
+       && str_contains($h, 'href="tel:+48660884677"') && str_contains($h, 'href="mailto:' . htmlspecialchars((string) $val('footer.email')) . '"') && preg_match('#kontakt-poz--form" href="[^"]*/kontakt"#', $h) === 1);
+    ok('le téléphone aussi en pied de page', preg_match('#<nav class="foot-links"[^>]*>.*href="tel:\+48660884677">' . preg_quote(htmlspecialchars((string) $val('footer.phone')), '#') . '</a>#s', $h) === 1);
+    $hK = (string) $get('/kontakt?lang=pl&t=' . microtime(true));
+    ok('la page Kontakt donne le téléphone et l\'e-mail au-dessus du formulaire', preg_match('#<div class="kontakt-dane kontakt-dane--strona">.*href="tel:\+48660884677".*href="mailto:[^"]+".*</div>.*<form method="post"#s', $hK) === 1);
     ok('les logos en pied de page, au-dessus des liens', str_contains($h, '<div class="foot-metody">') && strpos($h, 'foot-metody') < strpos($h, 'class="foot-links"'));
     ok('le pied de page n\'est plus en police mono', !preg_match('#<footer class="site-foot">.*class="[^"]*\bmono\b#s', $h));
     // Une fiche complète, sur un produit de la base.
