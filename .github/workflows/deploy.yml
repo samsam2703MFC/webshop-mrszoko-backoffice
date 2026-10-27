@@ -2736,16 +2736,16 @@ jobs:
             && echo "  slajdy, progi, koszyk, rysunki przewoznikow, tla: obecne" \
             || { echo "  ^ NOT OK : pliki makiet niekompletne"; fail=1; }
           for a in hero-piekarz.webp tlo-fale.svg tlo-krople.svg; do
-            c=$(curl -sk -o /dev/null -w '%{http_code}' "$SH/assets/$a"); [ "$c" = "200" ] || { echo "  ^ NOT OK : assets/$a odpowiada $c"; fail=1; }
+            c=$(curl -skL --max-time 20 -o /dev/null -w '%{http_code}' "$SH/assets/$a"); [ "$c" = "200" ] || { echo "  ^ NOT OK : assets/$a odpowiada $c"; fail=1; }
           done
           # La page d'accueil crée les tables au premier passage (wsm_bootstrap) :
           # elle est appelée AVANT de lire la base.
-          HH=$(curl -skL "$SH/")
+          HH=$(curl -skL --max-time 30 "$SH/")
           if printf '%s' "$HH" | grep -q 'hero hero--slajdy'; then
             NS=$(printf '%s' "$HH" | grep -o 'aria-roledescription="slide"' | wc -l)
             echo "  strona glowna: slajdy dzis $NS, pierwszy: $(printf '%s' "$HH" | grep -o '<h1 class="slajd-h">[^<]*' | txt)"
             F=$(printf '%s' "$HH" | grep -o 'class="slajd-foto" src="/[^"]*"' | head -1 | sed 's/.*src="//;s/"$//')
-            if [ -n "$F" ]; then c=$(curl -sk -o /dev/null -w '%{http_code}' "http://localhost$F")
+            if [ -n "$F" ]; then c=$(curl -skL --max-time 20 -o /dev/null -w '%{http_code}' "http://localhost$F")
               [ "$c" = "200" ] && echo "  zdjecie pierwszego slajdu: 200 ($F)" || { echo "  ^ NOT OK : zdjecie slajdu $F odpowiada $c"; fail=1; }; fi
             [ "$(printf '%s' "$HH" | grep -o '<h1' | wc -l)" = "1" ] || { echo "  ^ NOT OK : strona glowna bez jednego h1"; fail=1; }
           elif printf '%s' "$HH" | grep -q 'class="hero hero--'; then echo "  strona glowna: zaden slajd dzis — naglowek z Tresci"
@@ -2758,16 +2758,18 @@ jobs:
             || { echo "  ^ NOT OK : migracja tekstow naglowka nie przeszla"; fail=1; }
           PP=$(printf '%s' "$HH" | grep -o 'href="[^"]*/p/[^"]*"' | head -1 | sed 's/href="//;s/"$//')
           if [ -n "$PP" ]; then
-            PH=$(curl -skL "http://localhost$PP")
+            PH=$(curl -skL --max-time 30 "http://localhost$PP")
             printf '%s' "$PH" | grep -q 'class="tlo-cieple"' && echo "  karta produktu ($PP): cieple tlo" \
               || { echo "  ^ NOT OK : karta produktu bez nowego tla"; fail=1; }
             if printf '%s' "$PH" | grep -q 'data-prog '; then echo "  boks progow: $(printf '%s' "$PH" | grep -o '<p class="prog-zdanie"[^>]*>.*</p>' | head -1 | txt)"
             else echo "  boks progow: brak (brak progow w Rabatach albo produkt bez wagi)"; fi
+            # Pas de répétition bornée (« .\{0,2500\} ») dans un grep : sous la
+            # locale UTF-8 du serveur, GNU grep y passe des minutes et ssh tombe.
             ID=$(printf '%s' "$PH" | grep -o 'name="add" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"$//')
-            KH=$(curl -skL -b "ms_cart=$(printf '%%7B%%22%s%%22%%3A1%%7D' "$ID")" "$SH/koszyk")
+            KH=$(curl -skL --max-time 30 -b "ms_cart=$(printf '%%7B%%22%s%%22%%3A1%%7D' "$ID")" "$SH/koszyk")
             NR=$(printf '%s' "$KH" | grep -o 'class="dostawa-rys"' | wc -l)
             { printf '%s' "$KH" | grep -q 'data-koszyk>' && printf '%s' "$KH" | grep -q 'class="stepper-btn"' && [ "$NR" -ge 1 ]; } \
-              && echo "  koszyk: karty z -/+ i koszem, przewoznicy z rysunkiem: $NR; $(printf '%s' "$KH" | tr '\n' ' ' | grep -o 'class="darmowa[^"]*">.\{0,2500\}' | head -1 | grep -o '<p>.\{0,200\}</p>' | head -1 | txt)" \
+              && echo "  koszyk: karty z -/+ i koszem, przewoznicy z rysunkiem: $NR; $(printf '%s' "$KH" | sed -n '/class="darmowa/,/<\/p>/p' | grep -o '<p>.*</p>' | head -1 | txt)" \
               || { echo "  ^ NOT OK : koszyk bez nowego ukladu (produkt $ID)"; fail=1; }
           fi
           if [ "$fail" = "0" ]; then echo "ALL MOCKUP CHECKS OK"; else echo "MOCKUP CHECKS FAILED"; exit 1; fi
