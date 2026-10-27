@@ -208,12 +208,12 @@ else {
         't' => ['pl' => ['title' => "Nowy nagłówek $sfx", 'cta_label' => 'Do katalogu', 'cta_url' => '#katalog']]]);
     $h2 = $get('/');
     ok('nagłówek natif caché : son marqueur reste, celui du Kreator devient le h1',
-       $h2 !== null && str_contains($h2, 'hero: ukryte') && substr_count($h2, '<h1 class="sek-h1">') === 1 && !preg_match('/<section class="hero( hero--(foto|art))?"[ >]/', $h2) && str_contains($h2, "Nowy nagłówek $sfx"),
-       $h2 === null ? null : ['marker' => str_contains($h2, 'hero: ukryte'), 'h1' => substr_count($h2, '<h1 class="sek-h1">'), 'natif' => preg_match('/<section class="hero( hero--(foto|art))?"[ >]/', $h2), 'tytul' => str_contains($h2, "Nowy nagłówek $sfx")]);
+       $h2 !== null && str_contains($h2, 'hero: ukryte') && substr_count($h2, '<h1 class="sek-h1">') === 1 && !preg_match('/<section class="hero( hero--(foto|art|slajdy))?"[ >]/', $h2) && str_contains($h2, "Nowy nagłówek $sfx"),
+       $h2 === null ? null : ['marker' => str_contains($h2, 'hero: ukryte'), 'h1' => substr_count($h2, '<h1 class="sek-h1">'), 'natif' => preg_match('/<section class="hero( hero--(foto|art|slajdy))?"[ >]/', $h2), 'tytul' => str_contains($h2, "Nowy nagłówek $sfx")]);
     ok('… avec sa photo en fond, centré', preg_match('/sek--hero sek--srodek[^>]*style="--hero-foto:url\([^)]*bbbbbbbbbbbbbbbbbbbbbbbb\.webp\)"/', (string) $h2) === 1);
     wsm_layout_toggle($pdo, 'home', 'hero', 'test');
     $h3 = $get('/');
-    ok('nagłówek natif de retour : le Kreator repasse en h2', $h3 !== null && preg_match('/<section class="hero( hero--(foto|art))?"[ >]/', $h3) === 1 && !str_contains($h3, '<h1 class="sek-h1">') && str_contains($h3, '<h2 class="sek-h1">'));
+    ok('nagłówek natif de retour : le Kreator repasse en h2', $h3 !== null && preg_match('/<section class="hero( hero--(foto|art|slajdy))?"[ >]/', $h3) === 1 && !str_contains($h3, '<h1 class="sek-h1">') && str_contains($h3, '<h2 class="sek-h1">'));
 }
 
 // ---- 8. Suppression en cascade -----------------------------------------------------------------

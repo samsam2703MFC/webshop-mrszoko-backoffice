@@ -327,6 +327,104 @@ function z_progiem(string $t, ?int $prog): string {
     return str_replace('{prog}', kwota_krotka($prog), $t);
 }
 
+/**
+ * « 10 kg », « 5,85 kg », « 2,5 kg » : le poids d'un palier dit comme au
+ * comptoir. shop.js (kgTxt) écrit exactement la même chose quand la quantité
+ * change sur la fiche : deux écritures du même nombre ne doivent pas différer.
+ */
+function kg_txt(int $g): string {
+    return rtrim(rtrim(number_format(max(0, $g) / 1000, 2, ',', ''), '0'), ',') . "\u{00A0}kg";
+}
+
+/** « 5 », ou « 2,5 » quand le palier n'est pas un pourcentage rond. */
+function procent_txt(float $p): string {
+    return rtrim(rtrim(number_format($p, 1, ',', ''), '0'), ',');
+}
+
+/**
+ * Une phrase de palier : le texte de Treści échappé, {x} et {p} remplis, et
+ * ce qui est entre crochets en gras — « Dodaj kolejne [{x}], aby uzyskać
+ * [rabat {p} %] ». Les crochets laissent l'équipe choisir ce qui ressort sans
+ * écrire de HTML ; un texte sans crochets s'affiche simplement sans gras.
+ * shop.js applique la même règle, avec des nœuds de texte (pas d'innerHTML).
+ */
+function zdanie_html(string $tpl, array $vals): string {
+    $h = strtr(e($tpl), array_map('e', $vals));
+    return (string) preg_replace('/\[([^\[\]]+)\]/u', '<b>$1</b>', $h);
+}
+
+/**
+ * LES PALIERS DE REMISE AU POIDS, du plus léger au plus lourd :
+ * [['g' => 3000, 'p' => 5.0], …]. La table est celle de Rabaty — la même que
+ * la caisse lit (wsm_discount_tiers) : ce que la fiche promet est ce que le
+ * panier accorde.
+ */
+function progi_rabatu(PDO $pdo): array {
+    $out = [];
+    foreach (wsm_discount_tiers($pdo) as $t) {
+        if ((int) $t['min_weight_g'] > 0 && (float) $t['percent'] > 0) {
+            $out[] = ['g' => (int) $t['min_weight_g'], 'p' => (float) $t['percent']];
+        }
+    }
+    usort($out, fn($a, $b) => $a['g'] <=> $b['g']);
+    return $out;
+}
+
+/**
+ * Où en est un poids par rapport aux paliers : le rabat atteint, le palier
+ * suivant, ce qui manque, et le remplissage de la barre (vers le palier
+ * suivant, en pourcent). shop.js (stanProgu) fait le même calcul.
+ *
+ * @return array{have:float, next:?array, missing:int, pct:int}
+ */
+function stan_progu(array $progi, int $g): array {
+    $have = 0.0; $next = null;
+    foreach ($progi as $t) {
+        if ($g >= $t['g']) { if ($t['p'] > $have) $have = $t['p']; }
+        elseif ($next === null) { $next = $t; }
+    }
+    return [
+        'have'    => $have,
+        'next'    => $next,
+        'missing' => $next ? $next['g'] - $g : 0,
+        'pct'     => $next ? max(0, min(100, (int) floor($g * 100 / $next['g']))) : 100,
+    ];
+}
+
+/**
+ * Ce que pèse DÉJÀ le panier, en grammes. La fiche produit compte avec lui :
+ * « Dodaj kolejne 10 kg » doit parler du panier qu'on a, pas d'un panier
+ * vide. Seuls les produits vendables comptent — exactement ceux que la caisse
+ * pèse (wsm_shop_quote).
+ */
+function waga_koszyka(PDO $pdo, array $cart): int {
+    $ids = array_values(array_filter(array_map('strval', array_keys($cart)), fn($id) => $id !== ''));
+    if (!$ids) return 0;
+    try {
+        $st = $pdo->prepare("SELECT id, weight_g FROM wsm_products WHERE shop_visible = 1 AND active = 1 AND id IN ("
+                          . implode(',', array_fill(0, count($ids), '?')) . ")");
+        $st->execute($ids);
+        $g = 0;
+        foreach ($st->fetchAll() as $r) $g += (int) $r['weight_g'] * max(0, (int) ($cart[(string) $r['id']] ?? 0));
+        return $g;
+    } catch (Throwable $e) { return 0; }
+}
+
+/**
+ * L'adresse d'un lien de slajd : une ancre (#katalog), un chemin du site ou
+ * une adresse complète restent tels quels ; un chemin de la boutique
+ * (« p/czekolada », « kontakt ») passe par u() pour suivre la langue et la
+ * base du site. La console a déjà refusé tout schéma autre que http(s).
+ */
+function slajd_href(string $link): string {
+    $link = trim($link);
+    if ($link === '') return '';
+    if (str_starts_with($link, '//')) return '';
+    if ($link[0] === '#' || $link[0] === '/' || preg_match('~^https?://~i', $link)) return $link;
+    if (preg_match('~^[a-z][a-z0-9+.-]*:~i', $link)) return '';
+    return u($link);
+}
+
 /** Le nom à côté du logo ? Oui, sauf si Integracje → Sklep dit « 0 ». */
 function logo_nazwa_on(): bool {
     $v = wsm_config()['shop']['logo_nazwa'] ?? true;

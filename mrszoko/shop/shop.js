@@ -4,7 +4,9 @@
    `defer`). Tout ce qu'il fait, un formulaire POST le fait déjà sans lui :
      · ajouter au panier sans recharger la page ;
      · afficher les bons champs selon le mode de livraison et la facture ;
-     · appliquer une quantité modifiée sans cliquer sur « actualiser ».
+     · recalculer le panier sur place (« − », « + », corbeille, livraison) ;
+     · suivre la quantité dans la boîte des paliers de la fiche produit ;
+     · faire tourner les slajdy de la page d'accueil (sans lui : le premier).
    Si le script ne charge pas, la boutique reste utilisable de bout en bout.
    ============================================================================ */
 (function () {
@@ -65,33 +67,112 @@
     note.hidden = false;
   }
 
-  document.querySelectorAll('form[data-add]').forEach(function (form) {
-    form.addEventListener('submit', function (ev) {
-      if (!window.fetch) return;                       // navigateur ancien : POST classique
-      ev.preventDefault();
-      var btn = form.querySelector('button[type="submit"]');
-      var label = btn ? btn.textContent : '';
-      if (btn) { btn.disabled = true; }
-      fetch(form.action, {
-        method: 'POST',
-        body: new FormData(form),
-        credentials: 'same-origin',
-        headers: { 'X-Requested-With': 'fetch' },
-        redirect: 'follow'
-      }).then(function () {
-        paintCount();
-        if (btn) {
-          var done = document.body.getAttribute('data-added') || '✓';
-          btn.textContent = done;
-          setTimeout(function () { btn.textContent = label; btn.disabled = false; }, 1400);
-        }
-        confirmAdded(form);
-      }).catch(function () {
-        // Réseau indisponible : on laisse le formulaire partir normalement.
-        if (btn) btn.disabled = false;
-        form.submit();
-      });
+  // DÉLÉGUÉ AU DOCUMENT, pas posé formulaire par formulaire : les
+  // suggestions du panier sont redessinées après chaque « + » (plus bas), et
+  // un écouteur posé sur l'ancien formulaire partirait avec lui.
+  document.addEventListener('submit', function (ev) {
+    var form = ev.target;
+    if (!form.matches || !form.matches('form[data-add]')) return;
+    if (!window.fetch) return;                         // navigateur ancien : POST classique
+    ev.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    var label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; }
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' },
+      redirect: 'follow'
+    }).then(function () {
+      paintCount();
+      if (btn) {
+        var done = document.body.getAttribute('data-added') || '✓';
+        btn.textContent = done;
+        setTimeout(function () { btn.textContent = label; btn.disabled = false; }, 1400);
+      }
+      confirmAdded(form);
+      // Ce qui vient d'entrer compte pour les paliers : la boîte de la fiche
+      // repart du nouveau poids du panier, et le panier se redessine.
+      var q = form.querySelector('input[name="qty"]');
+      var box = document.querySelector('[data-prog]');
+      if (box && box._paint && q) {
+        var plus = (parseInt(q.value, 10) || 1) * (parseInt(box.getAttribute('data-waga'), 10) || 0);
+        box.setAttribute('data-koszyk', String((parseInt(box.getAttribute('data-koszyk'), 10) || 0) + plus));
+        box._paint();
+      }
+      if (koszyk) koszyk.odswiez();
+    }).catch(function () {
+      // Réseau indisponible : on laisse le formulaire partir normalement.
+      if (btn) btn.disabled = false;
+      form.submit();
     });
+  });
+
+  // ---- Les paliers de remise : même écriture que le serveur (lib.php) ------
+  function kgTxt(g) {
+    return (Math.max(0, g) / 1000).toFixed(2).replace(/\.?0+$/, '').replace('.', ',') + '\u00a0kg';
+  }
+  function procentTxt(p) {
+    return (Math.round(p * 10) / 10).toString().replace('.', ',');
+  }
+  function stanProgu(progi, g) {
+    var have = 0, next = null;
+    progi.forEach(function (t) {
+      if (g >= t.g) { if (t.p > have) have = t.p; }
+      else if (!next) { next = t; }
+    });
+    return { have: have, next: next, missing: next ? next.g - g : 0,
+             pct: next ? Math.max(0, Math.min(100, Math.floor(g * 100 / next.g))) : 100 };
+  }
+  // Le texte de Treści, ses accolades remplies, ce qui est entre crochets en
+  // gras — avec des nœuds de texte : rien de ce qui vient de la base n'est
+  // interprété comme du HTML.
+  function zdanie(el, tpl, vals) {
+    if (!el) return;
+    while (el.firstChild) el.removeChild(el.firstChild);
+    String(tpl || '').split(/\[([^\[\]]+)\]/).forEach(function (part, k) {
+      Object.keys(vals).forEach(function (key) { part = part.split(key).join(vals[key]); });
+      if (!part) return;
+      if (k % 2) { var b = document.createElement('b'); b.textContent = part; el.appendChild(b); }
+      else el.appendChild(document.createTextNode(part));
+    });
+  }
+
+  // ---- Fiche produit : la boîte des paliers suit la quantité -------------
+  // « Dodaj kolejne 10 kg, aby uzyskać rabat 5 % » : le serveur a écrit
+  // l'état pour une pièce ; on le recalcule à chaque chiffre tapé, avec le
+  // poids du panier déjà rempli (data-koszyk).
+  document.querySelectorAll('[data-prog]').forEach(function (box) {
+    var progi;
+    try { progi = JSON.parse(box.getAttribute('data-progi') || '[]'); } catch (e) { return; }
+    if (!progi.length) return;
+    var waga = parseInt(box.getAttribute('data-waga'), 10) || 0;
+    var form = box.parentNode && box.parentNode.querySelector('form[data-add]');
+    var qty = form && form.querySelector('input[name="qty"]');
+    var pasek = box.querySelector('[data-prog-pasek]');
+    var ma = box.querySelector('[data-prog-ma]');
+    var kosz = box.querySelector('[data-prog-kosz]');
+    function paint() {
+      var wKosz = parseInt(box.getAttribute('data-koszyk'), 10) || 0;
+      var max = qty ? (parseInt(qty.getAttribute('max'), 10) || 999) : 999;
+      var n = Math.max(1, Math.min(max, parseInt(qty && qty.value, 10) || 1));
+      var st = stanProgu(progi, wKosz + n * waga);
+      zdanie(box.querySelector('[data-prog-zdanie]'),
+             box.getAttribute(st.next ? 'data-t-next' : 'data-t-top'),
+             { '{x}': kgTxt(st.missing), '{p}': procentTxt(st.next ? st.next.p : st.have) });
+      if (pasek) pasek.style.width = st.pct + '%';
+      if (ma) {
+        ma.hidden = !(st.next && st.have > 0);
+        ma.textContent = (box.getAttribute('data-t-have') || '').split('{p}').join(procentTxt(st.have));
+      }
+      if (kosz) {
+        kosz.hidden = wKosz <= 0;
+        kosz.textContent = (box.getAttribute('data-t-cart') || '').split('{k}').join(kgTxt(wKosz));
+      }
+    }
+    if (qty) { qty.addEventListener('input', paint); qty.addEventListener('change', paint); }
+    box._paint = paint;
   });
 
   // ---- Caisse : n'afficher que les champs réellement exigés ----------------
@@ -215,13 +296,203 @@
     };
   }
 
-  // ---- Panier : appliquer une quantité dès qu'elle change ------------------
-  document.querySelectorAll('.cart-line input[type="number"]').forEach(function (input) {
-    var timer = null;
-    input.addEventListener('change', function () {
-      clearTimeout(timer);
-      timer = setTimeout(function () { input.form && input.form.submit(); }, 250);
+  // ---- Panier : tout se recalcule sur place ------------------------------
+  //
+  // « − », « + », une quantité tapée, la corbeille, le mode de livraison, le
+  // code : chaque geste part au serveur EN ARRIÈRE-PLAN, et la réponse — la
+  // même page, rendue par le même code — remplace le contenu de <main>. Le
+  // navigateur ne calcule rien : les prix, la remise et le port viennent du
+  // devis du serveur, comme sans JavaScript.
+  //
+  // Les clics rapprochés sur « + » sont regroupés (350 ms) et partent en UNE
+  // requête qui porte TOUTES les quantités affichées : le panier vit dans un
+  // cookie, et deux requêtes croisées pourraient sinon se marcher dessus.
+  var koszyk = null;
+  var zywy = document.querySelector('[data-koszyk]');
+  var main = zywy && zywy.closest('main');
+  if (main && window.fetch && window.DOMParser) {
+    var enCours = null, minuterie = null;
+
+    var cle = function (el) {
+      if (!el || !el.name || !main.contains(el)) return null;
+      var esc = window.CSS && CSS.escape ? CSS.escape : function (v) { return String(v).replace(/["\\]/g, '\\$&'); };
+      return el.tagName + '[name="' + esc(el.name) + '"]' + (el.type === 'number' || el.type === 'text' ? '' : '[value="' + esc(el.value) + '"]');
+    };
+
+    var remplace = function (url, init, repli) {
+      var z = main.querySelector('[data-koszyk]');
+      if (z) z.classList.add('is-busy');
+      var avant = {};
+      main.querySelectorAll('[data-pasek]').forEach(function (i) { avant[i.getAttribute('data-pasek')] = i.style.width; });
+      var focus = cle(document.activeElement);
+      if (enCours && enCours.abort) enCours.abort();
+      enCours = window.AbortController ? new AbortController() : null;
+      init = init || {};
+      init.credentials = 'same-origin';
+      init.headers = { 'X-Requested-With': 'fetch' };
+      if (enCours) init.signal = enCours.signal;
+      fetch(url, init).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text().then(function (html) { return { html: html, url: r.url }; });
+      }).then(function (o) {
+        var doc = new DOMParser().parseFromString(o.html, 'text/html');
+        var nowy = doc.querySelector('main');
+        if (!nowy) throw new Error('main');
+        main.innerHTML = nowy.innerHTML;
+        try { if (o.url && o.url !== location.href) history.replaceState(null, '', o.url); } catch (e) {}
+        // Les barres repartent de leur ancienne largeur : on VOIT le seuil
+        // se rapprocher, au lieu d'un saut.
+        main.querySelectorAll('[data-pasek]').forEach(function (i) {
+          var k = i.getAttribute('data-pasek');
+          if (avant[k] === undefined) return;
+          var w = i.style.width;
+          i.style.width = avant[k];
+          void i.offsetWidth;
+          i.style.width = w;
+        });
+        if (focus) {
+          var f = main.querySelector(focus);
+          if (f && !f.disabled) f.focus({ preventScroll: true });
+        }
+        paintCount();
+      }).catch(function (e) {
+        if (e && e.name === 'AbortError') return;
+        repli();
+      });
+    };
+
+    var envoie = function (form, submitter) {
+      var fd;
+      try { fd = submitter ? new FormData(form, submitter) : new FormData(form); }
+      catch (e) {
+        fd = new FormData(form);
+        if (submitter && submitter.name) fd.append(submitter.name, submitter.value);
+      }
+      var repli = function () {
+        if (submitter && submitter.name) {
+          var h = document.createElement('input');
+          h.type = 'hidden'; h.name = submitter.name; h.value = submitter.value;
+          form.appendChild(h);
+        }
+        form.submit();
+      };
+      if ((form.getAttribute('method') || 'get').toLowerCase() === 'post') {
+        remplace(form.action, { method: 'POST', body: fd }, repli);
+      } else {
+        var url = form.action + (form.action.indexOf('?') < 0 ? '?' : '&') + new URLSearchParams(fd).toString();
+        remplace(url, { method: 'GET' }, function () { location.href = url; });
+      }
+    };
+
+    main.addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('.stepper-btn');
+      if (!b || !main.contains(b)) return;
+      ev.preventDefault();
+      var input = b.parentNode.querySelector('input[type="number"]');
+      if (!input) return;
+      var max = parseInt(input.getAttribute('max'), 10) || 999;
+      var v = Math.max(0, Math.min(max, (parseInt(input.value, 10) || 0) + (b.value === '-1' ? -1 : 1)));
+      input.value = String(v);
+      clearTimeout(minuterie);
+      minuterie = setTimeout(function () { envoie(input.form, null); }, 350);
     });
+
+    main.addEventListener('change', function (ev) {
+      var t = ev.target;
+      if (t.matches('[data-od-razu]')) { envoie(t.form, null); return; }
+      if (t.matches('.cart-line input[type="number"]')) {
+        clearTimeout(minuterie);
+        minuterie = setTimeout(function () { envoie(t.form, null); }, 250);
+      }
+    });
+
+    main.addEventListener('submit', function (ev) {
+      var form = ev.target;
+      if (!form.matches('form[data-koszyk-form]')) return;
+      ev.preventDefault();
+      clearTimeout(minuterie);
+      envoie(form, ev.submitter || null);
+    });
+
+    koszyk = { odswiez: function () { remplace(location.href, { method: 'GET' }, function () { location.reload(); }); } };
+  }
+
+  // ---- Les slajdy du haut de la page d'accueil ----------------------------
+  //
+  // Le défilement automatique se règle dans la console (Slajdy) : marche ou
+  // arrêt, et le temps par slajd. Il s'arrête quand la souris ou le clavier
+  // est dessus (on lit), quand l'onglet est caché, et il ne démarre pas du
+  // tout pour qui a demandé moins d'animations à son système. Le bouton
+  // pause est là pour les autres : un contenu qui bouge seul doit pouvoir
+  // être arrêté.
+  document.querySelectorAll('[data-slajdy]').forEach(function (box) {
+    var slajdy = box.querySelectorAll('[data-slajd]');
+    if (slajdy.length < 2) return;
+    var tor = box.querySelector('.slajdy-tor');
+    var kropki = box.querySelectorAll('[data-slajdy-idz]');
+    var nav = box.querySelector('[data-slajdy-nav]');
+    var pauza = box.querySelector('[data-slajdy-pauza]');
+    var co = parseInt(box.getAttribute('data-co'), 10) || 5000;
+    var calme = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var auto = box.getAttribute('data-auto') === '1' && !calme;
+    var i = 0, minut = null, arret = false, dessus = false;
+
+    box.classList.add('is-zywe');
+    slajdy.forEach(function (s) { s.hidden = false; });
+    if (nav) nav.hidden = false;
+    if (pauza && !auto) pauza.hidden = true;
+
+    var stop = function () { clearTimeout(minut); minut = null; };
+    var start = function () {
+      stop();
+      if (tor) tor.setAttribute('aria-live', auto && !arret ? 'off' : 'polite');
+      if (auto && !arret && !dessus && !document.hidden) minut = setTimeout(function () { idz(i + 1); }, co);
+    };
+    var idz = function (n) {
+      i = (n + slajdy.length) % slajdy.length;
+      slajdy.forEach(function (s, k) { s.classList.toggle('is-on', k === i); });
+      kropki.forEach(function (d, k) {
+        if (k === i) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current');
+      });
+      start();
+    };
+
+    box.addEventListener('mouseenter', function () { dessus = true; stop(); });
+    box.addEventListener('mouseleave', function () { dessus = false; start(); });
+    box.addEventListener('focusin', function () { dessus = true; stop(); });
+    box.addEventListener('focusout', function (ev) {
+      if (!box.contains(ev.relatedTarget)) { dessus = false; start(); }
+    });
+    document.addEventListener('visibilitychange', start);
+
+    var wstecz = box.querySelector('[data-slajdy-wstecz]');
+    var dalej = box.querySelector('[data-slajdy-dalej]');
+    if (wstecz) wstecz.addEventListener('click', function () { idz(i - 1); });
+    if (dalej) dalej.addEventListener('click', function () { idz(i + 1); });
+    kropki.forEach(function (d) {
+      d.addEventListener('click', function () { idz(parseInt(d.getAttribute('data-slajdy-idz'), 10) || 0); });
+    });
+    if (pauza) {
+      pauza.setAttribute('aria-pressed', 'false');
+      pauza.addEventListener('click', function () {
+        arret = !arret;
+        pauza.setAttribute('aria-pressed', arret ? 'true' : 'false');
+        pauza.setAttribute('aria-label', pauza.getAttribute(arret ? 'data-t-graj' : 'data-t-pauza') || '');
+        start();
+      });
+    }
+
+    // Au doigt : un glissement horizontal change de slajd.
+    var x0 = null;
+    box.addEventListener('pointerdown', function (ev) { if (ev.pointerType !== 'mouse') x0 = ev.clientX; });
+    box.addEventListener('pointerup', function (ev) {
+      if (x0 === null) return;
+      var dx = ev.clientX - x0;
+      x0 = null;
+      if (Math.abs(dx) > 50) idz(i + (dx < 0 ? 1 : -1));
+    });
+
+    start();
   });
 
   paintCount();

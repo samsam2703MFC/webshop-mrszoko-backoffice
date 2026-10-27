@@ -655,6 +655,24 @@ function wsm_content_jednorazowe(): array {
     }
     $ops['migracja.2026_10_email_pro'] = $m;
 
+    // LE NOUVEAU HAUT DE PAGE (maquette de l'équipe, fin octobre 2026) :
+    // « Pewne składniki. Udane wypieki. » et le boulanger au pétrin. Le texte
+    // est REMPLACÉ quel qu'il soit : l'équipe a demandé ces mots-là, 1:1, et
+    // les pose une fois ; Treści les rechange ensuite comme avant. Les
+    // slajdy (slajdy.php) portent leurs propres textes ; ceux-ci restent ce
+    // que montre la page quand aucun slajd n'est en ligne.
+    $h = [];
+    foreach ([
+        'pl' => ['Manufaktura · małe partie', 'Pewne składniki. Udane wypieki.', 'Zaopatrz piekarnię lub cukiernię w produkty do codziennej pracy.', 'Zobacz produkty'],
+        'uk' => ['Мануфактура · малі партії', 'Надійні інгредієнти. Вдала випічка.', 'Забезпечте пекарню чи кондитерську продуктами для щоденної роботи.', 'Переглянути продукти'],
+        'en' => ['Small batch · workshop', 'Reliable ingredients. Successful bakes.', 'Stock your bakery or patisserie with products for everyday work.', 'See the products'],
+    ] as $l => [$eyebrow, $title, $lead, $cta]) {
+        foreach (['home.eyebrow' => $eyebrow, 'home.title' => $title, 'home.lead' => $lead, 'home.cta' => $cta] as $k => $v) {
+            $h[] = ['UPDATE wsm_shop_i18n SET v = ? WHERE k = ? AND lang = ?', [$v, $k, $l]];
+        }
+    }
+    $ops['migracja.2026_10_hero_piekarz'] = $h;
+
     return $ops;
 }
 

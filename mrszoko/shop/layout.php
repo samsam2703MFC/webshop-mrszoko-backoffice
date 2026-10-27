@@ -44,7 +44,10 @@ seo_head($page, $lang, $langs, $title, $desc, WSM_SHOP_DEFAULT_LANG, $image);
 <!-- La confirmation d'ajout est traduite en base (product.added) ; sans cet
      attribut, shop.js retombait sur un simple « ✓ » et la traduction ne
      servait à rien. -->
-<body data-added="<?= e($S['product.added'] ?? '') ?>">
+<?php // LE FOND CHAUD (vagues et gouttes caramel) sur la fiche produit et le
+      // panier, comme sur les maquettes de l'équipe ; les autres pages
+      // gardent le fond uni, plus calme pour lire. ?>
+<body data-added="<?= e($S['product.added'] ?? '') ?>"<?= in_array($page, ['p', 'koszyk'], true) ? ' class="tlo-cieple"' : '' ?>>
 <?php
 }
 

@@ -416,7 +416,8 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
               'wsm_claims', 'wsm_links', 'wsm_campaigns',
               'wsm_page_views', 'wsm_page_paths', 'wsm_order_lookups',
               'wsm_role_profiles', 'wsm_role_screens',
-              'wsm_pages', 'wsm_page_i18n', 'wsm_sections', 'wsm_section_i18n', 'wsm_media'] as $t) {
+              'wsm_pages', 'wsm_page_i18n', 'wsm_sections', 'wsm_section_i18n', 'wsm_media',
+              'wsm_slides', 'wsm_slide_i18n'] as $t) {
         if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
     }
     $links = __DIR__ . '/links.php';
@@ -433,6 +434,9 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
     // hier : sans cette reprise, la vitrine perdrait l'ukrainien et l'anglais.
     $i18n = __DIR__ . '/i18n.php';
     if (is_file($i18n)) { require_once $i18n; wsm_i18n_ensure($pdo); }
+    // Les slajdy de la page d'accueil, et leur premier slajd posé une fois.
+    $slajdy = __DIR__ . '/slajdy.php';
+    if (is_file($slajdy)) { require_once $slajdy; wsm_slajdy_ensure($pdo); }
 }
 
 function wsm_ensure_auth_columns(PDO $pdo): void {

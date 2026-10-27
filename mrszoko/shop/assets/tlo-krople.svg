@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">
+  <!-- Deux gouttes caramel en haut à droite, comme sur les maquettes. -->
+  <defs>
+    <linearGradient id="k" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F3C49B"/>
+      <stop offset="1" stop-color="#E4A06C"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 2C40 14 38 42 22 56C14 50 12 30 30 2Z" fill="url(#k)" opacity=".85"/>
+  <path d="M74 64C66 80 46 92 30 90C34 78 52 66 74 64Z" fill="url(#k)" opacity=".8"/>
+</svg>

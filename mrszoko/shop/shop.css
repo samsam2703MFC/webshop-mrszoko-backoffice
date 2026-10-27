@@ -210,6 +210,7 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
 .cart-line { display: grid; grid-template-columns: 88px 1fr auto auto auto; gap: var(--space-4); align-items: center;
              padding: var(--space-4) 0; border-bottom: 1px solid var(--border-subtle); }
 .thumb { width: 88px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--radius-md); }
+.cart-thumb .thumb { width: 72px; object-fit: contain; background: #fff; border: 1px solid #EFE4D8; border-radius: 12px; padding: 4px; }
 .cart-info h2 { font-size: var(--text-lg); }
 .cart-sum { font-size: var(--text-md); color: var(--text-strong); }
 .cart-actions { display: flex; gap: var(--space-3); margin-top: var(--space-5); flex-wrap: wrap; }
@@ -323,13 +324,13 @@ h3 { font-family: var(--font-display); font-size: var(--text-lg); color: var(--t
   .head-nav { display: none; }
   .cart-label { display: none; }
   .row { grid-template-columns: 1fr; }
-  .cart-line { grid-template-columns: 64px 1fr auto; grid-template-areas: "t i i" "t q s" "t r r"; }
+  .cart-line { grid-template-columns: 64px 1fr auto; grid-template-areas: "t i k" "t q s"; }
   .thumb { width: 64px; }
-  .cart-line .cart-thumb { grid-area: t; }
+  .cart-line .cart-thumb { grid-area: t; align-self: start; }
   .cart-line .cart-info { grid-area: i; }
-  .cart-line .qty { grid-area: q; }
+  .cart-line .stepper { grid-area: q; justify-self: start; }
   .cart-line .cart-sum { grid-area: s; text-align: right; }
-  .cart-line .linkbtn { grid-area: r; justify-self: start; }
+  .cart-line .cart-kosz { grid-area: k; align-self: start; }
   .wrap { padding-left: var(--space-4); padding-right: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -847,4 +848,187 @@ details.claim > *:not(summary) { margin-top: var(--space-3); }
   .head-in { flex-wrap: wrap; row-gap: 6px; }
   .head-nav { order: 3; flex: 1 0 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .head-nav::-webkit-scrollbar { display: none; }
+}
+
+
+/* ============================================================================
+   FICHE PRODUIT ET PANIER — les maquettes de l'équipe (octobre 2026), 1:1.
+   Le fond chaud, la boîte des paliers avec son cadeau, les lignes du panier
+   en cartes avec « − / + » et corbeille, la livraison gratuite en image et
+   les transporteurs dessinés. Les dessins sont dans znaki.php ; les deux
+   fonds dans assets/ (tlo-fale.svg, tlo-krople.svg).
+   ============================================================================ */
+body.tlo-cieple {
+  background:
+    url("assets/tlo-krople.svg") right max(16px, calc((100vw - var(--container)) / 2 - 96px)) top 96px / 64px auto no-repeat,
+    url("assets/tlo-fale.svg") left 0 top 300px / 100% 860px no-repeat,
+    linear-gradient(180deg, #FDF8F3 0%, #FBF1E7 42%, #F8E8DA 100%);
+}
+@media (max-width: 1180px) {
+  body.tlo-cieple { background:
+      url("assets/tlo-fale.svg") left 0 top 300px / 100% 860px no-repeat,
+      linear-gradient(180deg, #FDF8F3 0%, #FBF1E7 42%, #F8E8DA 100%); }
+}
+.tlo-cieple .site-head { background: color-mix(in srgb, #FDF8F3 88%, transparent); }
+
+/* La photo du produit dans sa carte blanche, comme sur la maquette. */
+.tlo-cieple .product-media { background: #fff; border-radius: 22px; padding: clamp(14px, 2.6vw, 30px);
+  border: 1px solid #F3E8DD; box-shadow: 0 18px 40px -30px rgba(90, 50, 20, .45); }
+.tlo-cieple .product-photo { border-radius: 12px; }
+
+/* ---- La boîte des paliers : phrase, barre, cadeau ------------------------- */
+.prog-rabat { display: flex; align-items: center; gap: 18px; margin: 18px 0 2px; padding: 14px 18px;
+  background: rgba(255, 255, 255, .78); border: 1px solid #F1E3D5; border-radius: 14px;
+  box-shadow: 0 10px 26px -22px rgba(90, 50, 20, .5); }
+.prog-tresc { flex: 1; min-width: 0; }
+.prog-zdanie { font-size: var(--text-md); line-height: 1.4; color: var(--text-strong); margin-bottom: 10px; }
+.prog-zdanie b { color: #D27A22; font-weight: 700; }
+.prog-pasek { height: 10px; border-radius: 999px; background: #EFE3D6; overflow: hidden; }
+.prog-pasek i { display: block; height: 100%; min-width: 10px; border-radius: inherit;
+  background: linear-gradient(90deg, #3A9E47, #63C063); transition: width .45s var(--ease-out); }
+.prog-rabat--koszyk .prog-pasek i, .prog-pasek--dostawa i { background: linear-gradient(90deg, #E2801F, #F6B65A); }
+.prog-dopisek { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; color: var(--text-muted); }
+.prog-dopisek:not(:has(span:not([hidden]))) { display: none; }
+.prog-ma { color: var(--success); font-weight: 600; }
+.prezent { flex: none; width: 40px; height: 40px; }
+.prog-rabat--koszyk { margin: 0 0 var(--space-5); padding: 12px 16px; }
+.prog-rabat--koszyk .prog-zdanie { font-size: var(--text-sm); }
+
+/* ---- Le panier -------------------------------------------------------------- */
+.tlo-cieple .cart { grid-template-columns: minmax(0, 1fr) 448px; gap: 26px; }
+.cart-lines { display: grid; gap: 14px; align-content: start; }
+.tlo-cieple .cart-line { background: #fff; border: 1px solid #F1E6DA; border-radius: 16px;
+  padding: 14px 20px 14px 14px; grid-template-columns: 74px minmax(0, 1fr) auto auto auto; gap: 18px;
+  box-shadow: 0 12px 30px -26px rgba(90, 50, 20, .55); }
+.cart-info h2 { font-family: var(--font-sans); font-size: var(--text-md); font-weight: 700; line-height: 1.35; margin-bottom: 6px; }
+.cart-info h2 a:hover { color: var(--brand); text-decoration: underline; }
+.cart-sum { font-weight: 700; white-space: nowrap; }
+
+.stepper { display: inline-flex; align-items: center; border: 1px solid #E6D6C6; border-radius: 12px;
+  background: #fff; padding: 3px; }
+.stepper .qty input { width: 44px; border: 0; padding: 8px 2px; background: transparent; border-radius: 6px;
+  font-weight: 700; -moz-appearance: textfield; appearance: textfield; }
+.stepper .qty input::-webkit-outer-spin-button, .stepper .qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 9px; background: transparent; color: var(--text-strong); cursor: pointer; }
+.stepper-btn:hover:not(:disabled) { background: var(--cream-100); }
+.stepper-btn:disabled { color: var(--border-default); cursor: default; }
+.cart-kosz { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 10px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.cart-kosz:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.btn--wstecz { gap: 10px; }
+.btn--wstecz .ui-ikona, .btn--kasa .ui-ikona { flex: none; }
+.btn--kasa { gap: 12px; }
+.tlo-cieple .cart-actions .btn--ghost { background: rgba(255, 255, 255, .6); border-color: #E3CDB8; }
+
+/* Le récapitulatif : la carte à droite. */
+.tlo-cieple .summary { border-radius: 20px; padding: 22px 22px 24px; border-color: #F1E3D5;
+  background: rgba(255, 255, 255, .86); box-shadow: 0 24px 50px -36px rgba(90, 50, 20, .55); }
+.tlo-cieple .summary h2 { font-family: var(--font-sans); font-weight: 700; font-size: var(--text-xl); margin-bottom: 14px; }
+
+/* La livraison gratuite : verte avec le colis, ou la barre de ce qui manque. */
+.darmowa { position: relative; display: flex; align-items: center; gap: 12px; min-height: 64px;
+  margin: 0 0 12px; padding: 10px 6px 10px 16px; border-radius: 12px;
+  background: #FBF4EC; border: 1px solid #F1E3D5; overflow: hidden; }
+.darmowa p { font-size: var(--text-sm); color: var(--text-strong); }
+.darmowa p b { color: #D27A22; }
+.darmowa .paczka { flex: none; width: 104px; height: auto; margin: -6px -4px -10px auto; }
+.darmowa-tresc { flex: 1; min-width: 0; }
+.darmowa-tresc p { margin-bottom: 8px; }
+.darmowa:not(.darmowa--ok) .paczka { width: 84px; opacity: .9; filter: saturate(.75); }
+.darmowa--ok { background: linear-gradient(90deg, #E5F3E1, #EEF7EB 55%, #F6FBF4); border-color: #CFE7C8; }
+.darmowa--ok p { flex: 1; font-weight: 600; color: #2F5A2C; }
+.darmowa-znak { flex: none; width: 30px; height: 30px; border-radius: 50%; background: #3E9B48; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; }
+.darmowa-znak .ui-ikona { width: 18px; height: 18px; stroke-width: 2.6; }
+
+/* Les modes de livraison : une carte par transporteur, son dessin, son prix. */
+.ship-pick fieldset { display: grid; gap: 10px; }
+.dostawa-opcja { display: grid; grid-template-columns: auto 82px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 10px 14px; border: 1px solid #EADBCB; border-radius: 12px; background: #fff; cursor: pointer;
+  transition: border-color var(--dur-base) var(--ease-out), background-color var(--dur-base) var(--ease-out); }
+.dostawa-opcja:hover { border-color: var(--border-strong); }
+.dostawa-opcja.is-on, .dostawa-opcja:has(input:checked) { border: 2px solid var(--accent); padding: 9px 13px; background: #FFFBF6; }
+.dostawa-opcja input { width: 19px; height: 19px; margin: 0; accent-color: var(--brand); }
+.dostawa-obraz .dostawa-rys { display: block; width: 82px; height: auto; }
+.dostawa-txt strong { display: block; font-size: var(--text-sm); color: var(--text-strong); }
+.dostawa-txt small { display: block; font-size: 12.5px; color: var(--text-muted); line-height: 1.35; margin-top: 2px; }
+.dostawa-cena { font-style: normal; font-weight: 700; font-size: var(--text-sm); color: var(--text-strong); white-space: nowrap; }
+.dostawa-cena.is-gratis { color: #3E9B48; }
+
+.tlo-cieple .totals .grand { font-family: var(--font-sans); font-size: var(--text-xl); }
+.tlo-cieple .summary .btn--kasa { border-radius: 16px; }
+
+/* Pendant que le serveur recalcule : le panier reste lisible, il dit juste
+   qu'il réfléchit. */
+.koszyk-zywy.is-busy .summary, .koszyk-zywy.is-busy .cart-lines { opacity: .62; transition: opacity .15s; }
+
+@media (max-width: 900px) {
+  .tlo-cieple .cart { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .tlo-cieple .cart-line { grid-template-columns: 64px 1fr auto; padding: 12px; gap: 10px 12px; }
+  .cart-thumb .thumb { width: 64px; }
+  .dostawa-opcja { grid-template-columns: auto 64px minmax(0, 1fr) auto; gap: 10px; padding: 9px 10px; }
+  .dostawa-opcja.is-on, .dostawa-opcja:has(input:checked) { padding: 8px 9px; }
+  .dostawa-obraz .dostawa-rys { width: 64px; }
+  .darmowa .paczka { width: 80px; }
+  .prog-rabat { padding: 12px 14px; gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prog-pasek i { transition: none; }
+}
+
+/* ============================================================================
+   LES SLAJDY DU HAUT DE LA PAGE D'ACCUEIL (console → Slajdy). Le premier est
+   la maquette de l'équipe : le chocolat à gauche, la photo du boulanger à
+   droite qui se fond dedans. Les slajdy s'empilent dans la même case de
+   grille (la hauteur est celle du plus haut) et passent en fondu. Sans
+   JavaScript, seul le premier est montré.
+   ============================================================================ */
+.hero--slajdy { background: #22130B; }
+.slajdy { position: relative; }
+.slajdy-tor { display: grid; }
+.slajd { grid-area: 1 / 1; position: relative; display: flex; align-items: center; overflow: hidden;
+  min-height: clamp(380px, 31vw, 470px);
+  background: radial-gradient(120% 150% at 0% 0%, #4A2C1D 0%, #2B180E 58%, #22130B 100%); }
+.slajd[hidden] { display: none; }
+.slajdy.is-zywe .slajd { visibility: hidden; opacity: 0; transition: opacity .8s ease, visibility 0s linear .8s; }
+.slajdy.is-zywe .slajd.is-on { visibility: visible; opacity: 1; transition: opacity .8s ease; }
+.slajd-foto { position: absolute; top: 0; right: 0; width: 62%; height: 100%; max-width: none;
+  object-fit: cover; object-position: 55% center;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, .55) 14%, #000 34%);
+          mask-image: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, .55) 14%, #000 34%); }
+.slajd .hero-in { position: relative; z-index: 1; width: 100%; padding-top: var(--space-9); padding-bottom: var(--space-10); }
+.slajd .slajd-h { color: var(--cream-50); font-size: clamp(2.1rem, 4.4vw, 3.5rem); line-height: 1.08;
+  max-width: 13.5ch; margin-bottom: var(--space-4); }
+.slajd .lead { max-width: 40ch; }
+.slajd--obraz .slajd-foto { width: 100%; -webkit-mask-image: none; mask-image: none; }
+.slajd--bez-zdjecia { background: radial-gradient(130% 120% at 15% 10%, var(--choco-600), var(--choco-900)); }
+.slajd-link { position: absolute; inset: 0; z-index: 1; }
+
+.slajdy-nav { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 2; display: flex; align-items: center; gap: 10px; }
+.slajdy-nav[hidden] { display: none; }
+.slajdy-btn { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255, 248, 240, .3); background: rgba(20, 10, 6, .35); color: var(--cream-50); cursor: pointer; padding: 0; }
+.slajdy-btn:hover { background: rgba(20, 10, 6, .65); }
+.slajdy-btn[hidden] { display: none; }
+.slajdy-btn .ui-ikona { width: 16px; height: 16px; }
+.slajdy-btn[data-slajdy-pauza] .ui-ikona:last-child,
+.slajdy-btn[data-slajdy-pauza][aria-pressed="true"] .ui-ikona:first-child { display: none; }
+.slajdy-btn[data-slajdy-pauza][aria-pressed="true"] .ui-ikona:last-child { display: block; }
+.slajdy-kropki { display: inline-flex; align-items: center; gap: 8px; }
+.slajdy-kropka { width: 9px; height: 9px; border-radius: 999px; border: 0; padding: 0; cursor: pointer;
+  background: rgba(255, 248, 240, .45); transition: width .3s ease, background-color .3s ease; }
+.slajdy-kropka[aria-current="true"] { width: 26px; background: var(--accent); }
+
+@media (max-width: 760px) {
+  .slajd { min-height: 460px; align-items: flex-end; }
+  .slajd-foto { width: 100%; -webkit-mask-image: none; mask-image: none; }
+  .slajd:not(.slajd--obraz)::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(34, 19, 11, .2) 0%, rgba(34, 19, 11, .78) 52%, rgba(34, 19, 11, .94) 100%); }
+  .slajd .hero-in { padding-top: var(--space-8); padding-bottom: 76px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slajdy.is-zywe .slajd, .slajdy.is-zywe .slajd.is-on, .slajdy-kropka { transition: none; }
 }

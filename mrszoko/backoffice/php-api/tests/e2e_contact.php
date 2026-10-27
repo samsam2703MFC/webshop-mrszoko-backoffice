@@ -163,7 +163,10 @@ ok('une langue sans modèle retombe sur le polonais, pas sur le silence',
 
 // ---- 7. Le plafond par IP ------------------------------------------------------------------------
 echo "\n-- limit na adres IP --\n";
-$_SERVER['REMOTE_ADDR'] = '203.0.113.' . random_int(2, 250);
+// Une adresse que rien d'autre dans ce test (ni un passage précédent sur la
+// même base) n'a pu prendre : tirée dans la plage IPv4 de documentation, elle
+// retombait une fois sur 250 sur $ipAutre, et ses deux messages comptaient.
+$_SERVER['REMOTE_ADDR'] = '2001:db8::' . dechex(random_int(1, 0xffff)) . ':' . dechex(random_int(1, 0xffff));
 $ipLim = $_SERVER['REMOTE_ADDR'];
 $posees = 0;
 for ($i = 0; $i < WSM_CONTACT_MAX_PAR_IP + 2; $i++) {

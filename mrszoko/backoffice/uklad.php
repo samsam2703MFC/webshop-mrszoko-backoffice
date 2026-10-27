@@ -103,6 +103,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Układ strony' => null]);
           <?php if ($it['type'] === 'sekcja'): ?> <a class="code" href="budowa.php?cel=home&amp;id=<?= (int) $it['id'] ?>">edytuj</a>
           <?php elseif ($it['type'] !== 'builtin'): ?> <a class="code" href="strony.php?id=<?= (int) $it['id'] ?>">edytuj</a><?php endif; ?>
           <?php if ($it['k'] === 'pasek'): ?><br><small class="muted">w nagłówku — nie przesuwa się osobno</small><?php endif; ?>
+          <?php if ($it['k'] === 'hero'): ?> <a class="code" href="slajdy.php">slajdy</a><?php endif; ?>
         </td>
         <td data-l="Stan">
           <?php if ($it['fixed']): ?><span class="bdg stale">stałe</span>

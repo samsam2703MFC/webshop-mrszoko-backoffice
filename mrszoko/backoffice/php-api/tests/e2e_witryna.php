@@ -300,7 +300,9 @@ else {
     $brand = $val('brand') ?: 'Szoko Shop';
     ok('le nom à côté du logo d\'origine', str_contains($h, '<span class="head-nazwa">' . htmlspecialchars($brand) . '</span>') && str_contains($h, 'assets/logo.png') && !str_contains($h, 'logo.svg'));
     ok('pas une trace des anciens noms, ni de l\'adresse Market Levano', !str_contains($h, 'Market Levano') && !str_contains($h, 'Mister Szoko') && !str_contains(strtolower($h), 'marketlevano@'));
-    ok('sans photo, l\'illustration', str_contains($h, '<section class="hero hero--art"'));
+    // Le haut de page est maintenant le premier slajd (le boulanger) ; sans
+    // slajd en ligne, l'illustration d'origine revient — voir e2e_slajdy.
+    ok('le haut de page : les slajdy, sinon l\'illustration', str_contains($h, '<section class="hero hero--slajdy"') || str_contains($h, '<section class="hero hero--art"'));
     // Le bandeau du haut : la livraison gratuite au seuil de la caisse, l'heure limite.
     $prog = (int) $pdo->query("SELECT MIN(free_from) FROM wsm_shipping_methods WHERE active = 1 AND free_from > 0")->fetchColumn();
     $kw = fn(int $g) => number_format(intdiv($g, 100), 0, ',', $nbsp) . $nbsp . 'zł';

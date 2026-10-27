@@ -222,6 +222,18 @@ grep -q "'promise_icon_1'" site/backoffice/api/settings.php \
   && grep -q 'promise-ikona' site/shop/shop.css \
   || { echo "  ikony obietnic incompletes dans l'assemblage"; exit 1; }
 echo "  ikony obietnic (pola + config + witryna + styl) : obecne"
+# LES MAQUETTES DE FIN OCTOBRE : les slajdy de la page d'accueil (ecran,
+# API, photo du boulanger, tables), la fiche produit et le panier (dessins des
+# transporteurs, paliers de remise, fonds chauds). Une piece oubliee laisse
+# une page qui appelle une fonction absente.
+[ -f site/backoffice/slajdy.php ] && [ -f site/backoffice/api/slajdy.php ] \
+  && [ -f site/shop/assets/hero-piekarz.webp ] && [ -f site/shop/assets/tlo-fale.svg ] && [ -f site/shop/assets/tlo-krople.svg ] \
+  && grep -q 'function ilustracja_dostawy' site/shop/znaki.php \
+  && grep -q 'function stan_progu' site/shop/lib.php \
+  && grep -q 'wsm_slajdy_ensure' site/backoffice/api/db.php \
+  && grep -q 'wsm_slide_i18n' site/backoffice/api/schema/webshop_mrszoko.mysql.sql \
+  || { echo "  slajdy / karta produktu / koszyk incomplets dans l'assemblage"; exit 1; }
+echo "  slajdy, progi rabatowe, koszyk z przewoznikami (pliki + schemat) : obecne"
 # LE WYGLAD : l'ecran, le moteur, la vitrine qui l'imprime, et les polices au
 # choix — on verifie les BINAIRES, pas la declaration : une famille declaree
 # sans fichiers donne un selecteur qui marche et une boutique en Georgia.

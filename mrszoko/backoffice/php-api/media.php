@@ -320,6 +320,13 @@ function wsm_media_usages(PDO $pdo): array {
             foreach (wsm_section_media_cites($pdo) as $url => $etiqs) foreach ($etiqs as $e) $add($url, $e);
         }
     } catch (Throwable $e) {}
+    // Les photos des slajdy de la page d'accueil.
+    try {
+        if (!function_exists('wsm_slajdy_media_cites')) { $f = __DIR__ . '/slajdy.php'; if (is_file($f)) require_once $f; }
+        if (function_exists('wsm_slajdy_media_cites')) {
+            foreach (wsm_slajdy_media_cites($pdo) as $url => $etiqs) foreach ($etiqs as $e) $add($url, $e);
+        }
+    } catch (Throwable $e) {}
     foreach ($u as &$liste) $liste = array_values(array_unique($liste));
     unset($liste);
     return $u;

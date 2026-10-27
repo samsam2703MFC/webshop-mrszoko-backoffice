@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="none">
+  <!-- Le fond chaud de la fiche produit et du panier (maquettes de l'équipe) :
+       trois vagues pêche, plus soutenues vers le bas à gauche, qui s'effacent
+       vers le bas du dessin — la page continue sans ligne de coupure, quelle
+       que soit sa longueur. -->
+  <defs>
+    <linearGradient id="f1" gradientUnits="userSpaceOnUse" x1="0" y1="250" x2="0" y2="900">
+      <stop offset="0" stop-color="#F5E3D2" stop-opacity=".6"/><stop offset="1" stop-color="#F5E3D2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="f2" gradientUnits="userSpaceOnUse" x1="0" y1="430" x2="0" y2="900">
+      <stop offset="0" stop-color="#F1D8C2" stop-opacity=".6"/><stop offset="1" stop-color="#F1D8C2" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="f3" gradientUnits="userSpaceOnUse" x1="0" y1="640" x2="0" y2="900">
+      <stop offset="0" stop-color="#EDCFB6" stop-opacity=".55"/><stop offset="1" stop-color="#EDCFB6" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M0 250C260 150 520 230 770 360C990 470 1250 540 1600 450V900H0Z" fill="url(#f1)"/>
+  <path d="M0 470C230 380 480 430 700 560C910 680 1190 730 1600 650V900H0Z" fill="url(#f2)"/>
+  <path d="M0 680C300 610 560 680 810 770C1020 845 1310 870 1600 820V900H0Z" fill="url(#f3)"/>
+</svg>

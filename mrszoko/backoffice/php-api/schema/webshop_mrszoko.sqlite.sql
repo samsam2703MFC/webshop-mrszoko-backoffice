@@ -1020,3 +1020,27 @@ CREATE TABLE IF NOT EXISTS wsm_media (
   created_at TEXT NOT NULL,
   updated_by TEXT NOT NULL DEFAULT ''
 );
+
+-- Les slajdy du haut de la page d'accueil (slajdy.php). Voir le schéma MySQL.
+CREATE TABLE IF NOT EXISTS wsm_slides (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  sort_order INTEGER NOT NULL DEFAULT 100,
+  active     INTEGER NOT NULL DEFAULT 1,
+  image_url  TEXT NOT NULL DEFAULT '',
+  link       TEXT NOT NULL DEFAULT '',
+  date_from  TEXT DEFAULT NULL,
+  date_to    TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS wsm_slide_i18n (
+  slide_id  INTEGER NOT NULL,
+  lang      TEXT NOT NULL,
+  eyebrow   TEXT NOT NULL DEFAULT '',
+  title     TEXT NOT NULL DEFAULT '',
+  tekst     TEXT NOT NULL DEFAULT '',
+  cta_label TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (slide_id, lang)
+);
