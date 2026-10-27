@@ -297,6 +297,7 @@ echo "  nazwy plikow w mediotece : obecne"
 [ -f site/shop/znaki.php ] && [ -f site/backoffice/api/metody.php ] \
   && [ -f site/shop/assets/logo.png ] && [ -f site/shop/assets/hero-art.svg ] && [ -f site/backoffice/img/logo.png ] \
   && grep -q 'function ikona_korzysci' site/shop/znaki.php && grep -q 'function prog_darmowej(PDO' site/shop/lib.php \
+  && grep -q 'kontakt-dane--strona' site/shop/index.php && grep -q 'migracja.2026_10_email_pro' site/backoffice/api/seed.php \
   && grep -q "u('assets/logo.png')" site/shop/lib.php \
   && grep -q 'function metody_html' site/shop/lib.php && grep -q 'metody_html(wsm_pdo()' site/shop/layout.php \
   && grep -q 'function wsm_nutrition_rows' site/backoffice/api/shop.php \

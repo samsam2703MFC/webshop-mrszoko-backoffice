@@ -2638,6 +2638,15 @@ jobs:
           { [ -n "$NB" ] && [ "$NB" != "Market Levano" ]; } || { echo "  ^ NOT OK : zmiana nazwy nie dotarla do bazy"; fail=1; }
           [ "${NN:-0}" = "1" ] && echo "  kolumna wsm_products.nutrition: obecna" \
             || { echo "  ^ NOT OK : brak kolumny nutrition, zapis karty produktu sie nie uda"; fail=1; }
+          # Le contact (fin octobre) : l'ancienne adresse pro@misterszoko.com
+          # revient partout, le numéro prend le +48, la page Kontakt donne
+          # le téléphone. LIKE est insensible à la casse sous MySQL.
+          NE=$(sq "SELECT (SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n WHERE v LIKE '%marketlevano@gmail.com%') + (SELECT COUNT(*) FROM mrszoko.wsm_landing_i18n WHERE v LIKE '%marketlevano@gmail.com%')")
+          echo "  kontakt w bazie: $(sq "SELECT CONCAT(MAX(CASE WHEN k='footer.email' THEN v END), ' / ', MAX(CASE WHEN k='footer.phone' THEN v END)) FROM mrszoko.wsm_shop_i18n WHERE lang='pl'")"
+          [ "${NE:-1}" = "0" ] && echo "  MarketLevano@gmail.com w tekstach: 0" \
+            || { echo "  ^ NOT OK : MarketLevano@gmail.com nadal w ${NE:-?} tekstach"; fail=1; }
+          curl -skL "$SH/kontakt" | grep -q 'kontakt-dane--strona' && echo "  strona Kontakt: telefon i e-mail nad formularzem" \
+            || { echo "  ^ NOT OK : strona Kontakt bez telefonu"; fail=1; }
           echo "== Zwroty (adres do zwrotow, wymaga tpay) =="
           # Trois endroits exigés par tpay : le règlement, le pied de page à
           # côté des données de la société, la page « Zwroty ». Les pièces,
