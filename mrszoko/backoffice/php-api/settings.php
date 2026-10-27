@@ -132,7 +132,7 @@ function wsm_settings_fields(): array {
         // trois lignes à expliquer. Elle se dépose ici, comme une photo de
         // produit — même stockage, mêmes contrôles, même limite de 8 Mo.
         'hero_image' => ['sklep', 'Zdjęcie na stronie głównej', ['shop', 'hero_image'], 'WSM_SHOP_HERO', 'image',
-                         'Szerokie zdjęcie w tle nagłówka. Najlepiej ciemne albo ze spokojnym miejscem po lewej — tam stoi tytuł. Puste = gradient jak dotąd.'],
+                         'Zapasowe tło nagłówka — widoczne tylko wtedy, gdy żaden slajd nie jest w danym dniu widoczny. Zdjęcia, które się zmieniają, ustawia się w Oferta → Slajdy.'],
 
         // LES ICÔNES DES TROIS PROMESSES (« Wysyłka 24h », « Paczkomat /
         // kurier », « Pakowanie termiczne »). Le texte vit dans Treści ; ici

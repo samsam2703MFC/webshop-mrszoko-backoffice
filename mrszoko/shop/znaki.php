@@ -169,3 +169,127 @@ function ikona_kontaktu(string $co): string {
     return '<svg class="kontakt-ikona" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" '
          . 'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $d . '</svg>';
 }
+
+/**
+ * Le cadeau des paliers de remise — à côté de « Dodaj kolejne 10 kg, aby
+ * uzyskać rabat 5 % », comme sur les maquettes de l'équipe (fiche produit et
+ * panier). Un dessin, pas un émoji : l'émoji change de forme d'un téléphone à
+ * l'autre, et sur certains il n'existe pas.
+ */
+function ikona_prezentu(): string {
+    return '<svg class="prezent" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true" focusable="false">'
+         . '<path d="M20 12.5c-2.6-5.6-9.6-8.3-10.8-4.6-.9 2.8 4.3 4.6 10.8 4.6Z" fill="#E5482F"/>'
+         . '<path d="M20 12.5c2.6-5.6 9.6-8.3 10.8-4.6.9 2.8-4.3 4.6-10.8 4.6Z" fill="#C7301D"/>'
+         . '<rect x="6.5" y="18" width="27" height="18" rx="2" fill="#F5A623"/>'
+         . '<rect x="20" y="18" width="13.5" height="18" rx="2" fill="#E8901A"/>'
+         . '<rect x="4.5" y="12.5" width="31" height="7" rx="1.8" fill="#FBBF3F"/>'
+         . '<rect x="17.5" y="12.5" width="5" height="23.5" fill="#E5482F"/>'
+         . '<rect x="20" y="12.5" width="2.5" height="23.5" fill="#C7301D"/>'
+         . '</svg>';
+}
+
+/**
+ * Le colis du bandeau « Dostawa gratis, próg osiągnięty » : un carton vu de
+ * trois quarts, le scotch, et trois traits verts — le seuil est atteint.
+ * Sans les traits (en attente du seuil), il reste là, en sourdine.
+ */
+function ilustracja_paczki(bool $ok = true): string {
+    return '<svg class="paczka" viewBox="0 0 120 72" width="120" height="72" aria-hidden="true" focusable="false">'
+         . '<ellipse cx="72" cy="65" rx="34" ry="4" fill="rgba(80,46,20,.14)"/>'
+         . '<path d="M40 22 78 11 106 23 68 35Z" fill="#E9B572"/>'
+         . '<path d="M40 22 68 35V64L40 51Z" fill="#CB8B46"/>'
+         . '<path d="M68 35 106 23V52L68 64Z" fill="#B7773A"/>'
+         . '<path d="M56 17.4 62 15.6 90 28.2 84 30.2Z" fill="#F6E0B5"/>'
+         . '<path d="M84 30.2 90 28.2V37.2L84 39.2Z" fill="#EBCB95"/>'
+         . '<path d="M45 35 58 41.2V49L45 42.8Z" fill="#F8EBD5"/>'
+         . '<path d="M47.5 39.5 55.5 43.3M47.5 42.5 53 45.1" stroke="#C9A77C" stroke-width="1.2" stroke-linecap="round"/>'
+         . ($ok ? '<path d="M104 12l4-6M109.5 18.5l7-3M98 9.5V3" stroke="#4FAE4A" stroke-width="3" stroke-linecap="round"/>'
+                : '')
+         . '</svg>';
+}
+
+/**
+ * LE TRANSPORTEUR EN IMAGE, sur chaque option de livraison du panier : la
+ * consigne jaune d'InPost, le fourgon blanc d'InPost, le fourgon rouge de
+ * DPD, la boutique Pickup de DPD. Ce qui décide est la LIGNE de la table
+ * (transporteur + type de service), pas le nom de la méthode : une méthode
+ * ajoutée demain dans Dostawa reçoit son dessin sans qu'on y touche. Un
+ * transporteur inconnu reçoit un camion neutre, jamais le logo d'un autre.
+ */
+function ilustracja_dostawy(string $carrier, string $kind): string {
+    $carrier = strtolower($carrier);
+    $kola = '<circle cx="21" cy="49" r="6.6" fill="#1F1F1F"/><circle cx="21" cy="49" r="2.8" fill="#C9C9C9"/>'
+          . '<circle cx="74" cy="49" r="6.6" fill="#1F1F1F"/><circle cx="74" cy="49" r="2.8" fill="#C9C9C9"/>';
+    $cien = '<ellipse cx="48" cy="56.5" rx="42" ry="3" fill="rgba(0,0,0,.13)"/>';
+    $van = function (string $kolor, string $obrys, string $logo) use ($kola, $cien): string {
+        return $cien
+             . '<path d="M6 12a4 4 0 0 1 4-4h53v39H6Z" fill="' . $kolor . '" stroke="' . $obrys . '" stroke-width=".8"/>'
+             . '<path d="M63 16h13.6a5 5 0 0 1 4.3 2.4L88.4 31a4 4 0 0 1 .6 2.1V47H63Z" fill="' . $kolor . '" stroke="' . $obrys . '" stroke-width=".8"/>'
+             . '<path d="M67 20h9a2.5 2.5 0 0 1 2.1 1.2L83.4 30H67Z" fill="#2E3D4F"/>'
+             . '<path d="M65 19v26" stroke="' . $obrys . '" stroke-width=".8"/>'
+             . '<rect x="85.5" y="35" width="3" height="3.4" rx=".8" fill="#FFE39A"/>'
+             . $logo
+             . '<rect x="3.5" y="45.5" width="87" height="4" rx="2" fill="#3A3A3A"/>'
+             . $kola;
+    };
+    if ($carrier === 'inpost' && $kind === 'punkt') {
+        $d = $cien
+           . '<rect x="8" y="5" width="80" height="50" rx="3" fill="#FFCD00" stroke="#D4A300"/>'
+           . '<path d="M8 8a3 3 0 0 1 3-3h74a3 3 0 0 1 3 3v6H8Z" fill="#3C3C3B"/>'
+           . '<text x="48" y="12.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6.2" font-weight="700" fill="#FFCD00">InPost</text>';
+        foreach ([11, 24.5, 61, 74.5] as $x) {
+            foreach ([17, 29.5, 42] as $y) {
+                $d .= '<rect x="' . $x . '" y="' . $y . '" width="11" height="10.5" rx="1" fill="#FFD84A" stroke="#D4A300" stroke-width=".7"/>'
+                    . '<rect x="' . ($x + 8.2) . '" y="' . ($y + 4.4) . '" width="1.3" height="2.6" rx=".5" fill="#A88300"/>';
+            }
+        }
+        $d .= '<rect x="38" y="17" width="20" height="35.5" rx="1.2" fill="#F2BC00" stroke="#D4A300" stroke-width=".7"/>'
+            . '<rect x="41" y="20" width="14" height="9" rx="1" fill="#2E3D4F"/>'
+            . '<path d="M42.5 33h3M47 33h3M51.5 33h3M42.5 36.4h3M47 36.4h3M51.5 36.4h3M42.5 39.8h3M47 39.8h3M51.5 39.8h3" stroke="#6B5A1A" stroke-width="1.6"/>'
+            . '<rect x="42" y="44" width="12" height="4" rx="1" fill="#3C3C3B"/>';
+    } elseif ($carrier === 'inpost') {
+        $d = $van('#FFFFFF', '#CFCFCF',
+              '<rect x="6.4" y="36" width="56.2" height="5" fill="#FFCD00"/>'
+            . '<circle cx="15.5" cy="24" r="4.6" fill="#FFCD00"/>'
+            . '<path d="M15.5 16.8v2.4M15.5 28.8v2.4M8.3 24h2.4M20.3 24h2.4M10.4 18.9l1.7 1.7M18.9 27.4l1.7 1.7M20.6 18.9l-1.7 1.7M12.1 27.4l-1.7 1.7" stroke="#FFCD00" stroke-width="1.5" stroke-linecap="round"/>'
+            . '<text x="42.5" y="27" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="8.6" font-weight="700" fill="#3C3C3B">InPost</text>');
+    } elseif ($carrier === 'dpd' && $kind === 'punkt') {
+        $d = $cien
+           . '<rect x="14" y="22" width="68" height="33" rx="1.5" fill="#F4EFE9" stroke="#CFC6BB"/>'
+           . '<path d="M10 16h76l-3 9H13Z" fill="#DC0032"/>'
+           . '<path d="M22 16l-2 9M34 16l-1 9M46 16v9M58 16l1 9M70 16l2 9" stroke="#FFFFFF" stroke-width="3.2"/>'
+           . '<rect x="27" y="5" width="42" height="10" rx="2" fill="#DC0032"/>'
+           . '<text x="48" y="12.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6.5" font-weight="700" fill="#FFFFFF">dpd Pickup</text>'
+           . '<rect x="20" y="31" width="16" height="13" rx="1" fill="#BFD6E6"/><rect x="60" y="31" width="16" height="13" rx="1" fill="#BFD6E6"/>'
+           . '<rect x="42" y="33" width="12" height="22" rx="1" fill="#8C6E52"/><circle cx="51.5" cy="44" r=".9" fill="#F4EFE9"/>';
+    } elseif ($carrier === 'dpd') {
+        [, $kostka] = WSM_ZNAK_PATHS['dpd'];
+        $d = $van('#DC0032', '#A8001F',
+              '<rect x="6.4" y="38" width="56.2" height="7" fill="#B8002A"/>'
+            . '<g transform="translate(15 16) scale(.62)"><path fill="#FFFFFF" d="' . $kostka . '"/></g>'
+            . '<text x="42" y="28" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="700" fill="#FFFFFF">dpd</text>');
+    } else {
+        $d = $van('#8A5A36', '#6E4528',
+              '<rect x="6.4" y="38" width="56.2" height="7" fill="#6E4528"/>'
+            . '<rect x="16" y="17" width="34" height="14" rx="2" fill="#C68A3C"/>');
+    }
+    return '<svg class="dostawa-rys" viewBox="0 0 96 60" width="96" height="60" aria-hidden="true" focusable="false">' . $d . '</svg>';
+}
+
+/** Les petits pictogrammes du panier : corbeille, moins, plus, flèches. */
+function ikona_ui(string $co): string {
+    $d = match ($co) {
+        'kosz'   => '<path d="M4.5 7h15M9.5 7V4.8a.8.8 0 0 1 .8-.8h3.4a.8.8 0 0 1 .8.8V7M6.5 7l.9 12.2A1.9 1.9 0 0 0 9.3 21h5.4a1.9 1.9 0 0 0 1.9-1.8L17.5 7M10.2 10.5v7M13.8 10.5v7"/>',
+        'minus'  => '<path d="M6 12h12"/>',
+        'plus'   => '<path d="M6 12h12M12 6v12"/>',
+        'dalej'  => '<path d="M5 12h14M13 6l6 6-6 6"/>',
+        'wstecz' => '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+        'pauza'  => '<path d="M9 6v12M15 6v12"/>',
+        'graj'   => '<path d="M8 5.5v13l10.5-6.5Z"/>',
+        'ok'     => '<path d="M6.5 12.5l3.6 3.6 7.4-8"/>',
+        default  => '',
+    };
+    if ($d === '') return '';
+    return '<svg class="ui-ikona" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" '
+         . 'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $d . '</svg>';
+}

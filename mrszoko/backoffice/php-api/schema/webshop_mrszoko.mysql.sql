@@ -1307,3 +1307,32 @@ CREATE TABLE IF NOT EXISTS `wsm_media` (
   `updated_by` VARCHAR(120) NOT NULL DEFAULT '',
   PRIMARY KEY (`url`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Les slajdy du haut de la page d'accueil (slajdy.php) : une photo, un lien,
+-- une période de mise en ligne facultative (« od 1 do 24 grudnia »), et
+-- leurs textes par langue. Les dates sont NULL quand il n'y en a pas — jamais
+-- '' : MySQL strict refuse une date vide.
+CREATE TABLE IF NOT EXISTS `wsm_slides` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `sort_order` INT NOT NULL DEFAULT 100,
+  `active`     TINYINT(1) NOT NULL DEFAULT 1,
+  `image_url`  VARCHAR(255) NOT NULL DEFAULT '',
+  `link`       VARCHAR(255) NOT NULL DEFAULT '',
+  `date_from`  DATE NULL DEFAULT NULL,
+  `date_to`    DATE NULL DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  `updated_by` VARCHAR(120) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `ix_wsm_slides_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_slide_i18n` (
+  `slide_id`  INT UNSIGNED NOT NULL,
+  `lang`      VARCHAR(5) NOT NULL,
+  `eyebrow`   VARCHAR(120) NOT NULL DEFAULT '',
+  `title`     VARCHAR(200) NOT NULL DEFAULT '',
+  `tekst`     VARCHAR(400) NOT NULL DEFAULT '',
+  `cta_label` VARCHAR(80) NOT NULL DEFAULT '',
+  PRIMARY KEY (`slide_id`, `lang`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
