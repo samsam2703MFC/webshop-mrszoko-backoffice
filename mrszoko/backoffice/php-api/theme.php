@@ -31,13 +31,13 @@ declare(strict_types=1);
 const WSM_THEME_PREFIX = 'theme.';
 
 /**
- * LA BASE n'est pas LE DÉFAUT. La base, c'est ce que tokens.css déclare
- * (Mulish) : ce que la page porte quand le thème n'imprime rien, et ce que
- * la console garde. Le défaut de la BOUTIQUE est autre chose — Lora pour le
- * texte, Playfair Display pour les titres, demandé par l'équipe en octobre
- * 2026 (« inny wygląd »). Un défaut différent de la base doit donc être
- * IMPRIMÉ pour s'appliquer ; « Przywróć domyślne » y ramène, et Mulish reste
- * dans la liste pour qui préfère l'ancien habit.
+ * LA BASE ET LE DÉFAUT. La base, c'est ce que tokens.css déclare (Mulish) :
+ * ce que la page porte quand le thème n'imprime rien, et ce que la console
+ * garde. Depuis l'habit « Apple » (fin octobre 2026), le défaut de la
+ * boutique EST la base : Mulish partout, titres en gras serré, papier blanc.
+ * Lora et Playfair Display — le défaut de début octobre — restent dans la
+ * liste pour qui préfère l'habit précédent ; « Przywróć domyślne » ramène
+ * à Mulish.
  */
 const WSM_THEME_FONT_BAZA = 'mulish';
 
@@ -49,38 +49,39 @@ const WSM_THEME_FONT_BAZA = 'mulish';
  */
 function wsm_theme_fonts(): array {
     return [
-        'mulish'   => ['Mulish',           "'Mulish', system-ui, sans-serif",    'Mulish — poprzednia: humanistyczna, neutralna (czcionka konsoli)'],
+        'mulish'   => ['Mulish',           "'Mulish', system-ui, sans-serif",    'Mulish — domyślna: czysta, nowoczesna (styl Apple)'],
         'nunito'   => ['Nunito',           "'Nunito', system-ui, sans-serif",    'Nunito — zaokrąglona, przyjazna'],
         'jost'     => ['Jost',             "'Jost', system-ui, sans-serif",      'Jost — geometryczna, nowoczesna'],
-        'lora'     => ['Lora',             "'Lora', Georgia, serif",             'Lora — szeryfowa, klasyczna (domyślna dla tekstu)'],
-        'playfair' => ['Playfair Display', "'Playfair Display', Georgia, serif", 'Playfair Display — szeryfowa, elegancka (domyślna dla nagłówków)'],
+        'lora'     => ['Lora',             "'Lora', Georgia, serif",             'Lora — szeryfowa, klasyczna (poprzedni tekst)'],
+        'playfair' => ['Playfair Display', "'Playfair Display', Georgia, serif", 'Playfair Display — szeryfowa, elegancka (poprzednie nagłówki)'],
     ];
 }
 
 /**
  * Les réglages : clé → [étiquette, type, défaut, options, aide].
- * Les défauts sont LES VALEURS DU DESIGN SYSTEM (colors.css, radius.css) :
- * un thème vide, c'est la boutique telle qu'elle est aujourd'hui.
+ * Les défauts sont ceux de l'habit en vigueur (couleurs du design system,
+ * Mulish, papier blanc) : un thème vide, c'est la boutique telle qu'elle
+ * est aujourd'hui.
  */
 function wsm_theme_fields(): array {
     $fonts = [];
     foreach (wsm_theme_fonts() as $k => $f) $fonts[$k] = $f[2];
     return [
-        'font_body'  => ['Czcionka tekstu', 'select', 'lora', $fonts,
+        'font_body'  => ['Czcionka tekstu', 'select', 'mulish', $fonts,
                          'Cały tekst sklepu: opisy, ceny, przyciski, stopka.'],
-        'font_head'  => ['Czcionka nagłówków', 'select', 'playfair', ['same' => 'Taka sama jak tekst'] + $fonts,
+        'font_head'  => ['Czcionka nagłówków', 'select', 'same', ['same' => 'Taka sama jak tekst (domyślnie)'] + $fonts,
                          'Druga rodzina tylko wtedy, gdy ma KONTRASTOWAĆ — dwie podobne wyglądają jak pomyłka, nie jak zamysł.'],
         'brand'      => ['Kolor marki', 'color', '#41281A', [],
                          'Nagłówek strony głównej, stopka, ceny. Z niego wyliczają się jaśniejsze i ciemniejsze odcienie. Musi być ciemny — niesie jasny tekst.'],
         'accent'     => ['Kolor akcentu', 'color', '#C68A3C', [],
-                         'Przyciski „Do koszyka” i „Zamawiam i płacę”, podkreślenia. Niesie biały napis — nie może być pastelowy.'],
-        'bg'         => ['Tło strony', 'color', '#FBF6EF', [],
-                         'Papier pod wszystkim. Musi być jasny — tekst zostaje ciemny.'],
+                         'Nadtytuły, paski postępu rabatu, odznaki — a w ciemniejszym odcieniu linki. Przyciski mają kolor marki. Nie może być pastelowy.'],
+        'bg'         => ['Tło strony', 'color', '#FFFFFF', [],
+                         'Papier pod wszystkim — domyślnie biały, jak w makiecie „styl Apple”. Pasy i panele biorą z niego lekko ciepły odcień. Musi być jasny — tekst zostaje ciemny.'],
         'radius'     => ['Kształt narożników', 'select', 'lagodne',
                          ['ostre' => 'Ostre', 'lagodne' => 'Łagodne (obecne)', 'okragle' => 'Okrągłe'],
                          'Karty, zdjęcia, pola i przyciski — jednym ruchem.'],
-        'hero_align' => ['Nagłówek strony głównej', 'select', 'lewo',
-                         ['lewo' => 'Tekst po lewej (obecnie)', 'srodek' => 'Tekst na środku'],
+        'hero_align' => ['Nagłówek strony głównej', 'select', 'srodek',
+                         ['srodek' => 'Tekst na środku (domyślnie)', 'lewo' => 'Tekst po lewej'],
                          'Układ tytułu i hasła nad katalogiem.'],
         // « Pokaż / ukryj » les sections ? Dans Układ strony (layout.php),
         // avec l'ordre : une seule vérité par section, pas deux écrans.
@@ -196,9 +197,9 @@ function wsm_theme_is_default(array $t): bool {
 /**
  * La feuille qui habille la boutique : des JETONS redéfinis sur :root, et
  * deux règles de mise en page. Vide quand tout est à la BASE du design
- * system (Mulish, couleurs de colors.css) — la feuille du design system fait
- * alors foi. Au défaut de la boutique elle porte au moins la paire de
- * polices, puisque ce défaut n'est pas la base.
+ * system (Mulish, couleurs de colors.css) — la feuille du design system et
+ * l'habit de shop.css font alors foi. C'est le cas au défaut de la boutique
+ * depuis l'habit « Apple ».
  *
  * Les nuances d'une couleur se calculent en CSS (color-mix), pas en PHP :
  * c'est le navigateur qui mélange, dans l'espace où il peint, et la formule
@@ -212,7 +213,7 @@ function wsm_theme_css(array $t): string {
     $rules = [];
 
     // Les polices se comparent à la BASE (ce que tokens.css déclare), pas au
-    // défaut du thème : le défaut est Lora/Playfair et doit être imprimé.
+    // défaut du thème : un défaut qui n'est pas la base doit être imprimé.
     $baza = $fonts[WSM_THEME_FONT_BAZA];
     $body = $fonts[$t['font_body']] ?? $baza;
     $head = $t['font_head'] === 'same' ? $body : ($fonts[$t['font_head']] ?? $body);
@@ -240,6 +241,9 @@ function wsm_theme_css(array $t): string {
     }
     if (strcasecmp($t['bg'], $d['bg']) !== 0) {
         $g = $t['bg'];
+        // Le papier de l'habit « Apple » (shop.css) et ses panneaux suivent.
+        $vars['--paper']      = $g;
+        $vars['--paper-soft'] = $mix($g, 'var(--choco-700)', 94);
         $vars['--cream-50']  = $g;
         $vars['--cream-100'] = $mix($g, 'var(--choco-700)', 95);
         $vars['--cream-200'] = $mix($g, 'var(--choco-700)', 90);
@@ -253,9 +257,11 @@ function wsm_theme_css(array $t): string {
         $vars += ['--radius-sm' => '12px', '--radius-md' => '18px', '--radius-lg' => '26px',
                   '--radius-xl' => '36px', '--radius-2xl' => '48px'];
     }
-    if ($t['hero_align'] === 'srodek') {
-        $rules[] = '.hero-in{text-align:center}.hero h1,.hero .lead{margin-left:auto;margin-right:auto}'
-                 . '.hero-strip-in{justify-content:center}';
+    // Le haut de page est centré par défaut (shop.css) ; « po lewej » le
+    // ramène au bord, titre, phrase et boutons compris.
+    if ($t['hero_align'] === 'lewo') {
+        $rules[] = '.hero:not(.sek) .hero-in{text-align:left}'
+                 . '.hero:not(.sek) h1,.hero:not(.sek) .slajd-h,.hero:not(.sek) .lead{margin-left:0;margin-right:0}';
     }
 
     $css = '';

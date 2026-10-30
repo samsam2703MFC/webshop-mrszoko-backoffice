@@ -86,11 +86,6 @@ function wsm_section_types(): array {
     ];
 }
 
-/** Les champs de texte possibles et leur étiquette dans le Kreator. */
-function wsm_section_text_fields(): array {
-    return ['title' => 'Tytuł', 'lead' => 'Zdanie pod tytułem / podpis', 'body' => 'Treść', 'cta_label' => 'Przycisk — napis', 'cta_url' => 'Przycisk — adres'];
-}
-
 /** Les jetons de style connus, tous types confondus, avec leur étiquette. */
 function wsm_section_style_labels(): array {
     return [

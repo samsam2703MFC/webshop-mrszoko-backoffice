@@ -49,38 +49,41 @@ $avant = $st->fetchAll() ?: [];
 wsm_theme_reset($pdo);
 
 // ---- 1. Au défaut ------------------------------------------------------------------------
-echo "-- domyślnie: para czcionek sklepu, nic więcej; znacznik jest --\n";
+echo "-- domyślnie: styl Apple — Mulish wszędzie, białe tło, nagłówek na środku --\n";
 $t = wsm_theme_get($pdo, true);
 ok('tout est au défaut', wsm_theme_is_default($t));
-ok('le défaut de la boutique est Lora pour le texte, Playfair Display pour les titres',
-   $t['font_body'] === 'lora' && $t['font_head'] === 'playfair', [$t['font_body'], $t['font_head']]);
-ok('au défaut, la feuille porte cette paire — et RIEN d\'autre',
-   wsm_theme_css($t) === ":root{--font-sans:'Lora', Georgia, serif;--font-display:'Playfair Display', Georgia, serif;}",
-   wsm_theme_css($t));
-ok('la balise est imprimée, pour qu\'un contrôle la trouve',
-   str_contains(wsm_theme_head($pdo), '<style id="motyw">'));
-ok('la BASE du design system reste Mulish — la console ne change pas d\'habit',
+ok('le défaut de la boutique est l\'habit « Apple » : Mulish partout, titres compris',
+   $t['font_body'] === 'mulish' && $t['font_head'] === 'same', [$t['font_body'], $t['font_head']]);
+ok('… un papier blanc et un haut de page centré', $t['bg'] === '#FFFFFF' && $t['hero_align'] === 'srodek', [$t['bg'], $t['hero_align']]);
+ok('au défaut, la feuille est VIDE : la base fait foi, aucun octet pour rien', wsm_theme_css($t) === '', wsm_theme_css($t));
+ok('la balise est imprimée, pour qu\'un contrôle la trouve — et elle dit le défaut',
+   str_contains(wsm_theme_head($pdo), '<style id="motyw">/* wygląd domyślny */</style>'));
+ok('la BASE du design system reste Mulish — la console porte le même habit',
    WSM_THEME_FONT_BAZA === 'mulish' && str_contains($lire('mrszoko/design-system/tokens/typography.css'), "'Mulish'"));
-wsm_theme_save($pdo, ['font_body' => 'mulish', 'font_head' => 'same'], 'test');
-ok('revenir à Mulish vide la feuille : la base fait alors foi, aucun octet pour rien',
-   wsm_theme_css(wsm_theme_get($pdo, true)) === '', wsm_theme_css(wsm_theme_get($pdo, true)));
-ok('… et la balise le dit', str_contains(wsm_theme_head($pdo), '/* wygląd domyślny */'));
+wsm_theme_save($pdo, ['font_body' => 'lora', 'font_head' => 'playfair'], 'test');
+ok('l\'ancien habit reste à un clic : Lora et Playfair Display — la feuille porte cette paire, et RIEN d\'autre',
+   wsm_theme_css(wsm_theme_get($pdo, true)) === ":root{--font-sans:'Lora', Georgia, serif;--font-display:'Playfair Display', Georgia, serif;}",
+   wsm_theme_css(wsm_theme_get($pdo, true)));
 wsm_theme_reset($pdo);
 $t = wsm_theme_get($pdo, true);
 $colors = $lire('mrszoko/design-system/tokens/colors.css');
-ok('les couleurs par défaut sont CELLES de colors.css — un thème vide est la boutique d\'aujourd\'hui',
-   str_contains($colors, $t['brand']) && str_contains($colors, $t['accent']) && str_contains($colors, $t['bg']),
-   [$t['brand'], $t['accent'], $t['bg']]);
+ok('la marque et l\'accent par défaut sont CEUX de colors.css — un thème vide est la boutique d\'aujourd\'hui',
+   str_contains($colors, $t['brand']) && str_contains($colors, $t['accent']), [$t['brand'], $t['accent']]);
+// Le papier, lui, n'est plus la crème du design system : la boutique le pose
+// en blanc (shop.css, --paper) et le défaut du thème le dit.
+ok('… et le papier par défaut est le blanc que shop.css pose', $t['bg'] === '#FFFFFF'
+   && str_contains($lire('mrszoko/shop/shop.css'), '--paper: #FFFFFF'));
 
 // ---- 2. Refus ----------------------------------------------------------------------------
 echo "\n-- zapis: poprawne wchodzi, nieczytelne odpada i jest nazwane --\n";
 $r = [];
 $zm = wsm_theme_save($pdo, ['accent' => '#1F5F8B', 'font_body' => 'nunito', 'font_head' => 'same', 'radius' => 'ostre',
-                            'hero_align' => 'srodek'], 'test', $r);
-ok('cinq réglages enregistrés d\'un coup', count($zm) === 5 && $r === [], [$zm, $r]);
+                            'hero_align' => 'lewo'], 'test', $r);
+// « same » est déjà le défaut des titres : quatre réglages CHANGENT, pas cinq.
+ok('quatre réglages changés d\'un coup — « same » était déjà le défaut', count($zm) === 4 && !in_array('font_head', $zm, true) && $r === [], [$zm, $r]);
 $t = wsm_theme_get($pdo, true);
 ok('relus tels quels', $t['accent'] === '#1F5F8B' && $t['font_body'] === 'nunito' && $t['font_head'] === 'same'
-   && $t['radius'] === 'ostre' && $t['hero_align'] === 'srodek', $t);
+   && $t['radius'] === 'ostre' && $t['hero_align'] === 'lewo', $t);
 ok('les interrupteurs de section ne sont plus ici — ils vivent dans Układ strony', !isset(wsm_theme_fields()['show_pro']) && !isset(wsm_theme_fields()['show_promises']));
 $rB = []; wsm_theme_save($pdo, ['brand' => '#FFFFFF'], 'test', $rB);
 ok('une marque blanche est refusée — elle porte du texte clair', isset($rB['brand']), $rB);
@@ -98,7 +101,7 @@ ok('une police inconnue est refusée', isset($rF['font_body']), $rF);
 $rN = []; wsm_theme_save($pdo, ['nonexistent' => '1'], 'test', $rN);
 ok('une clé inconnue est ignorée, pas enregistrée', $rN === [] && !$pdo->query("SELECT COUNT(*) FROM wsm_settings WHERE cle = 'theme.nonexistent'")->fetchColumn());
 $t = wsm_theme_get($pdo, true);
-ok('un refus ne touche à rien', $t['accent'] === '#1F5F8B' && $t['brand'] === '#41281A' && $t['bg'] === '#FBF6EF', $t);
+ok('un refus ne touche à rien', $t['accent'] === '#1F5F8B' && $t['brand'] === '#41281A' && $t['bg'] === '#FFFFFF', $t);
 $rOk = []; wsm_theme_save($pdo, ['accent' => '#b0402e'], 'test', $rOk);
 ok('un rouge franc passe, et se range en majuscules', $rOk === [] && wsm_theme_get($pdo, true)['accent'] === '#B0402E');
 wsm_theme_save($pdo, ['accent' => '#1F5F8B'], 'test');
@@ -117,7 +120,8 @@ ok('« taka sama jak tekst » : la police change le corps ET les titres',
    str_contains($css, "--font-sans:'Nunito', system-ui, sans-serif;")
    && str_contains($css, "--font-display:'Nunito', system-ui, sans-serif;"));
 ok('coins « ostre » : les boutons aussi', str_contains($css, '--radius-pill:6px') && str_contains($css, '--radius-lg:8px'));
-ok('hero centré : une règle, pas un jeton', str_contains($css, '.hero-in{text-align:center}'));
+ok('hero « po lewej » : une règle, pas un jeton — et jamais sur une section du kreatora',
+   str_contains($css, '.hero:not(.sek) .hero-in{text-align:left}'));
 ok('rien d\'autre que des jetons et des règles — jamais de balise', !str_contains($css, '<') && !str_contains($css, '>'));
 wsm_theme_save($pdo, ['font_head' => 'playfair'], 'test');
 $css = wsm_theme_css(wsm_theme_get($pdo, true));
@@ -160,8 +164,7 @@ $n = wsm_theme_reset($pdo);
 ok('les lignes disparaissent', $n >= 5, $n);
 $t = wsm_theme_get($pdo, true);
 ok('retour au défaut de la boutique', wsm_theme_is_default($t));
-ok('la feuille ne porte plus que la paire de polices', str_contains(wsm_theme_css($t), "--font-sans:'Lora'")
-   && str_contains(wsm_theme_css($t), "--font-display:'Playfair Display'") && !str_contains(wsm_theme_css($t), '--caramel'));
+ok('la feuille redevient vide', wsm_theme_css($t) === '', wsm_theme_css($t));
 ok('un second reset ne casse rien', wsm_theme_reset($pdo) === 0);
 
 // ---- 6. Vitrine et console ----------------------------------------------------------------
@@ -169,7 +172,7 @@ echo "\n-- witryna i konsola --\n";
 ok('layout.php imprime le thème après shop.css',
    preg_match('/shop\.css.*theme_head\(\)/s', $lire('mrszoko/shop/layout.php')) === 1);
 $lib = $lire('mrszoko/shop/lib.php');
-ok('lib.php charge theme.php sans tomber s\'il manque', str_contains($lib, "is_file(\$f)) require_once \$f") && str_contains($lib, "'hero_align' => 'lewo'"));
+ok('lib.php charge theme.php sans tomber s\'il manque', str_contains($lib, "is_file(\$f)) require_once \$f") && str_contains($lib, "'hero_align' => 'srodek'"));
 $vit = $lire('mrszoko/shop/index.php');
 ok('index.php lit l\'ordre et la visibilité dans Układ', str_contains($vit, 'wsm_layout_home($pdo)'));
 ok('… et DIT quand une section est cachée', str_contains($vit, 'wsm_layout_marker($typ)'));
@@ -189,8 +192,8 @@ if ($home === false || $home === '') {
     echo "  (pominięte: brak serwera sklepu pod $base)\n";
 } else {
     echo "\n-- strona główna nosi styl --\n";
-    ok('au défaut, la page porte Lora et Playfair Display',
-       str_contains($home, "--font-sans:'Lora'") && str_contains($home, "--font-display:'Playfair Display'"));
+    ok('au défaut, la page porte l\'habit « Apple » : aucune police imposée, la balise le dit',
+       !str_contains($home, "--font-sans:'Lora'") && str_contains($home, '<style id="motyw">/* wygląd domyślny */</style>'));
     ok('… et le bloc B2B est sur la page', str_contains($home, 'id="pro"'));
     wsm_theme_save($pdo, ['accent' => '#1F5F8B'], 'test');
     $ukladAvant = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'layout.home'")->fetchColumn();
@@ -206,7 +209,7 @@ if ($home === false || $home === '') {
     if ($ukladAvant) $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES ('layout.home', ?, 0, ?, 'test')")->execute([$ukladAvant, date('Y-m-d H:i:s')]);
     $h0 = (string) @file_get_contents($base . '/?t=' . (time() + 1), false, $ctx);
     ok('après Przywróć, tout revient', str_contains($h0, 'id="pro"') && preg_match('/class="promise[ "]/', $h0) === 1
-       && str_contains($h0, "--font-sans:'Lora'") && !str_contains($h0, '--caramel-500:#1F5F8B'));
+       && str_contains($h0, '/* wygląd domyślny */') && !str_contains($h0, '--caramel-500:#1F5F8B'));
 }
 
 // ---- Remise en place ----------------------------------------------------------------------

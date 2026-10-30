@@ -62,6 +62,23 @@ $u = wsm_media_usages($pdo);
 ok('l\'image de la page est vue comme utilisée par la page', in_array("strona: Test mediów $sfx", $u[$urlA] ?? [], true), $u[$urlA] ?? null);
 ok('l\'image citée dans le corps aussi', in_array("w treści: Test mediów $sfx", $u[$urlB] ?? [], true), $u[$urlB] ?? null);
 ok('… et par le réglage qui la porte', in_array('ustawienie: ikona obietnicy 3', $u[$urlB] ?? [], true), $u[$urlB] ?? null);
+// Une photo produit et le logo de la boutique : deux usages que la médiathèque
+// ne voyait pas (une colonne mal nommée, un réglage oublié) — et qu'elle
+// proposait donc d'effacer.
+$prod = $pdo->query("SELECT id, nom, image_url FROM wsm_products ORDER BY id LIMIT 1")->fetch() ?: null;
+$avantLogo = (string) ($pdo->query("SELECT val FROM wsm_settings WHERE cle = 'logo_image'")->fetchColumn() ?: '');
+if ($prod) $pdo->prepare("UPDATE wsm_products SET image_url = ? WHERE id = ?")->execute([$urlA, $prod['id']]);
+$pdo->prepare("DELETE FROM wsm_settings WHERE cle = 'logo_image'")->execute();
+$pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES (?,?,0,?,?)")
+    ->execute(['logo_image', $urlB, date('Y-m-d H:i:s'), 'test']);
+$u = wsm_media_usages($pdo);
+ok('la photo d\'un produit est vue comme utilisée, sous le nom du produit',
+   $prod && in_array('produkt: ' . $prod['nom'], $u[$urlA] ?? [], true), $u[$urlA] ?? null);
+ok('… et le logo de la boutique aussi', in_array('ustawienie: logo sklepu', $u[$urlB] ?? [], true), $u[$urlB] ?? null);
+if ($prod) $pdo->prepare("UPDATE wsm_products SET image_url = ? WHERE id = ?")->execute([(string) $prod['image_url'], $prod['id']]);
+$pdo->prepare("DELETE FROM wsm_settings WHERE cle = 'logo_image'")->execute();
+if ($avantLogo !== '') $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES (?,?,0,?,?)")
+    ->execute(['logo_image', $avantLogo, date('Y-m-d H:i:s'), 'test']);
 $pdo->prepare("DELETE FROM wsm_settings WHERE cle = 'promise_icon_3'")->execute();
 if ($avantIk !== '') $pdo->prepare("INSERT INTO wsm_settings (cle, val, secret, updated_at, updated_by) VALUES (?,?,0,?,?)")
     ->execute(["promise_icon_3", $avantIk, date('Y-m-d H:i:s'), 'test']);

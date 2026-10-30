@@ -616,24 +616,28 @@ $nPhoto   = count(array_filter($rows, fn($r) => (int) $r['shop_visible'] === 1 &
 
 console_head('Produkty i zdjęcia', $me, <<<'CSS'
   .hint { color: var(--text-muted); font-size: 13.5px; margin: 0 0 20px; max-width: 78ch; line-height: 1.55; }
-  .item { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 14px;
-          margin-bottom: 14px; box-shadow: var(--shadow-xs); overflow: hidden; }
+  .item { background: var(--surface-card); border: 0; border-radius: 18px;
+          margin-bottom: 12px; box-shadow: var(--shadow-xs); overflow: hidden; }
   .item > summary { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; list-style: none; }
   .item > summary::-webkit-details-marker { display: none; }
   .item[open] > summary { border-bottom: 1px solid var(--border-subtle); background: var(--surface-raised); }
-  .thumb { width: 56px; height: 56px; flex: none; border-radius: 10px; object-fit: cover; background: var(--cream-200); }
-  .thumb.empty { display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px;
+  /* Les photos produit ont un fond blanc : on les pose sur du blanc, entières
+     (contain), au lieu de les rogner sur un carré crème qui les encadrait. */
+  .thumb { width: 56px; height: 56px; flex: none; border-radius: 12px; object-fit: contain; background: #FFFFFF;
+           box-shadow: inset 0 0 0 1px var(--border-subtle); }
+  .thumb.empty { display: grid; place-items: center; font-family: var(--font-sans); font-size: 10px; background: var(--surface-sunken); box-shadow: none;
                  color: var(--text-muted); text-align: center; line-height: 1.25; padding: 4px; }
-  .sum-name { font-family: var(--font-display); font-size: 16px; color: var(--text-strong); font-weight: 600; }
-  .sum-meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+  .sum-name { font-family: var(--font-display); font-size: 16px; color: var(--text-strong); font-weight: 700; letter-spacing: -.01em; }
+  .sum-meta { font-family: var(--font-sans); font-size: 12.5px; color: var(--text-muted); margin-top: 3px; }
   .sum-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
   .tag.on  { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
   .tag.off { background: var(--cream-300); color: var(--text-muted); }
   .edit { padding: 18px 14px; display: grid; grid-template-columns: 1fr; gap: 20px; }
   @media (min-width: 820px) { .edit { grid-template-columns: 260px 1fr; gap: 24px; } }
-  .preview img, .preview .ph { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 12px;
-                               background: var(--cream-200); display: block; }
-  .preview .ph { display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+  .preview img, .preview .ph { width: 100%; aspect-ratio: 4/3; object-fit: contain; border-radius: 14px;
+                               background: #FFFFFF; box-shadow: inset 0 0 0 1px var(--border-subtle); display: block; }
+  .preview .ph { display: grid; place-items: center; font-family: var(--font-sans); font-size: 12px; color: var(--text-muted);
+                 background: var(--surface-sunken); box-shadow: none; }
   label.f { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600;
             color: var(--text-strong); margin-bottom: 12px; }
   label.f input { font-weight: 400; }

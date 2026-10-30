@@ -134,20 +134,20 @@ function ikona_obietnicy(int $i): string {
 }
 
 /**
- * Les icônes du bandeau en haut de la page d'accueil, sur fond chocolat :
- * le fourgon (darmowa dostawa) et l'horloge (wysyłka tego samego dnia).
- * Claires, pour se lire sur le sombre.
+ * Les icônes du bandeau en haut de la page d'accueil : le fourgon (darmowa
+ * dostawa) et l'horloge (wysyłka tego samego dnia). Depuis l'habit « Apple »
+ * le bandeau est clair : les dessins ont un contour brun pour s'y détacher.
  */
 function ikona_korzysci(string $co): string {
     $d = match ($co) {
-        'bus' => '<path d="M4 6h26l7.5 6.5h5A2.5 2.5 0 0 1 45 15v9H4Z" fill="#F4E3C8"/>'
+        'bus' => '<path d="M4 6h26l7.5 6.5h5A2.5 2.5 0 0 1 45 15v9H4Z" fill="#F6DDB8" stroke="#7A4E36" stroke-width="1.3" stroke-linejoin="round"/>'
                . '<path d="M31.4 8.6 36.4 13H31.4Z" fill="#7CC0EA"/>'
                . '<rect x="8" y="9" width="7" height="5" rx="1" fill="#7CC0EA"/><rect x="18" y="9" width="9" height="5" rx="1" fill="#7CC0EA"/>'
                . '<rect x="4" y="17" width="41" height="2.6" fill="#C68A3C"/>'
-               . '<circle cx="13" cy="24.5" r="3.9" fill="#1E120B" stroke="#F4E3C8" stroke-width="1.6"/>'
-               . '<circle cx="36" cy="24.5" r="3.9" fill="#1E120B" stroke="#F4E3C8" stroke-width="1.6"/>'
+               . '<circle cx="13" cy="24.5" r="3.9" fill="#1E120B" stroke="#FFFFFF" stroke-width="1.6"/>'
+               . '<circle cx="36" cy="24.5" r="3.9" fill="#1E120B" stroke="#FFFFFF" stroke-width="1.6"/>'
                . '<path d="M0 10h2.5M0 14h1.8" stroke="#C68A3C" stroke-width="1.6" stroke-linecap="round"/>',
-        'zegar' => '<circle cx="24" cy="15" r="12" fill="#FFF6E8" stroke="#C68A3C" stroke-width="2.6"/>'
+        'zegar' => '<circle cx="24" cy="15" r="12" fill="#FFFFFF" stroke="#C68A3C" stroke-width="2.6"/>'
                  . '<path d="M24 5.5v2M24 22.5v2M14.5 15h2M31.5 15h2" stroke="#7A5A3E" stroke-width="1.6" stroke-linecap="round"/>'
                  . '<path d="M24 9.5V15l4 2.6" fill="none" stroke="#2B1A12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
                  . '<circle cx="24" cy="15" r="1.4" fill="#2B1A12"/>',

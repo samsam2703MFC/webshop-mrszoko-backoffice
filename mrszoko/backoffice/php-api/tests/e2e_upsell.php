@@ -122,6 +122,10 @@ foreach ($sug as $x) {
         break;
     }
 }
+// Le repli lui-même, appelé seul : sur MySQL 8, sa première requête (AVG et
+// une colonne nue) tombait sous ONLY_FULL_GROUP_BY, le try l'avalait, et la
+// boutique n'en proposait plus aucun — sans qu'aucun test ne le voie.
+ok('le repli « même rayon » répond — MySQL compris', count(wsm_upsell_voisins($pdo, [$A], 3)) > 0);
 ok('la clé de libellé distingue les deux',
    wsm_upsell_cle('razem') !== wsm_upsell_cle('kategoria'));
 ok('et « razem » a bien sa propre clé', wsm_upsell_cle('razem') === 'upsell.together');
