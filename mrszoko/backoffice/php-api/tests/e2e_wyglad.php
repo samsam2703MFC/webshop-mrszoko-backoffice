@@ -176,6 +176,13 @@ ok('lib.php charge theme.php sans tomber s\'il manque', str_contains($lib, "is_f
 $vit = $lire('mrszoko/shop/index.php');
 ok('index.php lit l\'ordre et la visibilité dans Układ', str_contains($vit, 'wsm_layout_home($pdo)'));
 ok('… et DIT quand une section est cachée', str_contains($vit, 'wsm_layout_marker($typ)'));
+// La console : le même habit, et son plancher de taille (contrôle du
+// déploiement, « rozmiary poniżej 12 px ») — ici aussi, pour que le refus
+// arrive avant le serveur et pas après.
+$konsola = $lire('mrszoko/backoffice/console.css');
+ok('la console porte l\'habit « Apple »', str_contains($konsola, 'L\'HABIT « APPLE »') && str_contains($konsola, '--bo-fill'));
+ok('… sans aucun texte sous 12 px, même en raccourci « font: »',
+   !preg_match('/font-size: *(9|10|11)(\.[0-9])?px|font: *[0-9]+ +(9|10|11)(\.[0-9])?px/', $konsola));
 ok('wyglad.php existe', is_file("$racine/mrszoko/backoffice/wyglad.php"));
 ok('… dans le rail, à côté de Treści', preg_match("/'tresci\.php'.*'wyglad\.php'/s", $lire('mrszoko/backoffice/console.php')) === 1);
 $wyg = $lire('mrszoko/backoffice/wyglad.php');

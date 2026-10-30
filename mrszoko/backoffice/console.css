@@ -758,7 +758,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 /* --- La colonne : claire, comme une barre latérale de Mac ------------------ */
 .side { background: var(--bo-side); color: var(--text-strong); border-right: 1px solid var(--border-subtle); }
 .side .brand { color: var(--text-strong); border-bottom-color: var(--border-subtle); }
-.side .brand span { color: var(--text-muted); text-transform: none; letter-spacing: .01em; font-size: 11.5px; }
+.side .brand span { color: var(--text-muted); text-transform: none; letter-spacing: .01em; font-size: 12px; }
 .side .brand b { font-family: var(--font-sans); font-size: 15px; font-weight: 800; letter-spacing: -.01em;
                  color: var(--text-strong); }
 .side-close { background: var(--bo-fill); color: var(--text-strong); }
@@ -766,7 +766,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .menu a { color: var(--text-strong); font-weight: 500; border-radius: 8px; transition: background .12s; }
 .menu a:hover { background: var(--bo-hover); }
 .menu a.on { background: var(--bo-on); color: var(--text-strong); font-weight: 700; }
-.menu .sep { font: 700 11.5px/1 var(--font-sans); letter-spacing: 0; text-transform: none;
+.menu .sep { font: 700 12px/1 var(--font-sans); letter-spacing: 0; text-transform: none;
              color: var(--text-muted); padding: 18px 12px 6px; }
 .side-foot { background: var(--bo-side); border-top-color: var(--border-subtle); color: var(--text-muted); }
 .side-foot b { color: var(--text-strong); }
