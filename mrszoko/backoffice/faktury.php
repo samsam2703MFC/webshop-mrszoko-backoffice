@@ -130,6 +130,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 // de cet écran. La clé d'événement porte la date : une facture ne peut être
 // relancée qu'une fois par jour, quel que soit le nombre de rafraîchissements.
 $auto = wsm_invoice_reminders_run($pdo);
+// Même raison pour la caisse : quelques e-paragons relus à l'ouverture, au
+// cas où un webhook de Fakturownia se serait perdu (fiskal.php).
+if (wsm_invoice_kasa()) wsm_fiskal_run($pdo);
 
 $detail  = isset($_GET['id']) ? wsm_invoice_by_id($pdo, (int) $_GET['id']) : null;
 $kpis    = wsm_invoice_kpis($pdo);
@@ -175,7 +178,11 @@ console_crumbs($detail
     <?php if ($i['reverse_charge']): ?><span class="tag rc">odwrotne obciążenie</span><?php endif; ?>
     <?php if ($i['ksef_number'] !== ''): ?><span class="tag ok">KSeF <?= h($i['ksef_number']) ?></span>
     <?php elseif ($i['kind'] !== 'paragon'): ?><span class="tag wait">KSeF: nie wysłano</span><?php endif; ?>
+    <?php [$kc, $kt] = function_exists('wsm_fiskal_tag') ? wsm_fiskal_tag($i) : ['', ''];
+          if ($kt !== ''): ?><span class="tag <?= h($kc) ?>"><?= h($kt) ?></span><?php endif; ?>
+    <?php if (($i['fiskal_url'] ?? '') !== ''): ?><a class="tag ok" href="<?= h($i['fiskal_url']) ?>" target="_blank" rel="noopener">otwórz e-paragon</a><?php endif; ?>
   </h2>
+  <?php if (($i['fiskal_note'] ?? '') !== ''): ?><p class="warnbox">Kasa fiskalna: <?= h($i['fiskal_note']) ?> — ponowisz z ekranu Zamówienia.</p><?php endif; ?>
   <div class="cols">
     <dl class="kv">
       <dt>Nabywca</dt><dd><?= h($i['buyer_name']) ?><?= $i['buyer_nip'] !== '' ? '<br>NIP ' . h($i['buyer_nip']) : '' ?>
@@ -322,7 +329,7 @@ console_crumbs($detail
   </form>
   <div class="tablewrap">
   <table class="rwd">
-    <thead><tr><th>Numer</th><th>Rodzaj</th><th>Data</th><th>Nabywca</th><th class="num">Brutto</th><th>KSeF</th></tr></thead>
+    <thead><tr><th>Numer</th><th>Rodzaj</th><th>Data</th><th>Nabywca</th><th class="num">Brutto</th><th>KSeF / kasa</th></tr></thead>
     <tbody>
     <?php if (!$rows): ?><tr><td class="muted">Brak dokumentów.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
@@ -332,8 +339,11 @@ console_crumbs($detail
       <td data-l="Data" class="num"><?= h($r['issued_at']) ?></td>
       <td data-l="Nabywca"><?= h($r['buyer_name']) ?><?= $r['buyer_nip'] !== '' ? '<br><small class="muted">NIP ' . h($r['buyer_nip']) . '</small>' : '' ?></td>
       <td data-l="Brutto" class="num"><?= h(pln((int) $r['total_gross'])) ?></td>
-      <td data-l="KSeF"><?= $r['ksef_number'] !== '' ? '<span class="tag ok">' . h($r['ksef_number']) . '</span>'
-                          : ($r['kind'] === 'paragon' ? '<span class="muted">n/d</span>' : '<span class="tag wait">nie wysłano</span>') ?></td>
+      <?php [$kc, $kt] = function_exists('wsm_fiskal_tag') ? wsm_fiskal_tag($r) : ['', '']; ?>
+      <td data-l="KSeF / kasa"><?= $r['ksef_number'] !== '' ? '<span class="tag ok">' . h($r['ksef_number']) . '</span>'
+                          : ($r['kind'] === 'paragon'
+                              ? ($kt !== '' ? '<span class="tag ' . h($kc) . '">' . h($kt) . '</span>' : '<span class="muted">n/d</span>')
+                              : '<span class="tag wait">nie wysłano</span>') ?></td>
     </tr>
     <?php endforeach; ?>
     </tbody>

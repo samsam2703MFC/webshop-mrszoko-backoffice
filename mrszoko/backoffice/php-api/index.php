@@ -241,6 +241,16 @@ if ($sroute !== '') {
         exit;
     }
 
+    // Webhook Fakturownia (`invoice:update`) : il DÉSIGNE un reçu, que
+    // fiskal.php relit chez Fakturownia avec notre propre jeton — le corps
+    // n'est jamais cru. 200 aussi pour ce qui ne nous concerne pas : 25
+    // échecs de suite et Fakturownia coupe le webhook.
+    if ($method === 'POST' && $sroute === 'fakturownia/webhook') {
+        require_once __DIR__ . '/fiskal.php';
+        [$code, $res] = wsm_fiskal_webhook($pdo, file_get_contents('php://input') ?: '');
+        wsm_send($res, $code);
+    }
+
     wsm_fail('unknown_route: shop/' . $sroute, 404);
 }
 

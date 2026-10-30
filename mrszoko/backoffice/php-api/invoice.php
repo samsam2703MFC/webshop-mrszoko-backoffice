@@ -302,6 +302,17 @@ function wsm_invoice_issue(PDO $pdo, array $order, string $actor = ''): array {
 
     $pdo->beginTransaction();
     try {
+        // DEUX ÉMISSIONS SIMULTANÉES, UN SEUL DOCUMENT. Le paiement et un clic
+        // de la console peuvent arriver ensemble : la ligne de la commande est
+        // verrouillée, puis on regarde de nouveau. Le second attend le premier
+        // et rend son document au lieu d'en numéroter un autre — qui, pour un
+        // paragon, serait passé une seconde fois en caisse. (SQLite sérialise
+        // déjà les écritures ; FOR UPDATE n'y existe pas.)
+        if (wsm_config()['engine'] === 'mysql') {
+            $pdo->prepare("SELECT id FROM wsm_orders WHERE id = ? FOR UPDATE")->execute([(int) $order['id']]);
+            $deja = wsm_invoice_for_order($pdo, (int) $order['id']);
+            if ($deja) { $pdo->commit(); return [$deja, null]; }
+        }
         $series = wsm_invoice_series($c['number_format'], $date);
         $seq    = wsm_invoice_next_seq($pdo, $series, $kind);
         $number = wsm_invoice_format_number($c['number_format'], $seq, $date);
@@ -617,6 +628,16 @@ function wsm_invoice_kind_for(array $order): array {
 }
 
 /**
+ * La caisse fiscale est-elle branchée ? Charge fiskal.php à la demande, comme
+ * ksef.php : la facturation fonctionne sans elle.
+ */
+function wsm_invoice_kasa(): bool {
+    $f = __DIR__ . '/fiskal.php';
+    if (!function_exists('wsm_fiskal_enabled') && is_file($f)) require_once $f;
+    return function_exists('wsm_fiskal_enabled') && wsm_fiskal_enabled();
+}
+
+/**
  * LE DOCUMENT D'UNE COMMANDE, DE BOUT EN BOUT : émis, envoyé, déposé.
  *
  * Appelée quand la commande passe à « wysłane », et par le bouton de l'écran
@@ -631,24 +652,39 @@ function wsm_invoice_kind_for(array $order): array {
  * commande expédiée : faire échouer l'expédition parce que le SMTP est en
  * panne mettrait le colis en attente pour une raison sans rapport.
  *
- * @return array{doc:?array, kind:string, raison:string, mail:bool, ksef:string}
+ *   · la caisse : un paragon déjà parti chez Fakturownia n'y retourne pas.
+ *
+ * @return array{doc:?array, kind:string, raison:string, mail:bool, ksef:string, fiskal:string}
  */
 function wsm_order_document(PDO $pdo, array $order, string $actor = ''): array {
     $r = wsm_invoice_kind_for($order);
     $out = ['doc' => null, 'kind' => $r['kind'], 'raison' => $r['raison'],
-            'mail' => false, 'ksef' => ''];
+            'mail' => false, 'ksef' => '', 'fiskal' => ''];
 
     [$doc, $err] = wsm_invoice_issue($pdo, $order, $actor);
     if (!$doc) { $out['raison'] = (string) $err; return $out; }
     $out['doc']  = $doc;
     $out['kind'] = (string) $doc['kind'];
 
+    // --- La caisse fiscale ---------------------------------------------------
+    // Un paragon, quand une imprimante fiscale est branchée, part tout de
+    // suite chez Fakturownia. Le client reçoit alors l'e-paragon FISCAL (son
+    // lien arrive avec le webhook), pas notre paragon interne : deux
+    // « paragons » dans sa boîte, dont un seul vaut pour le fisc, c'est la
+    // question au service client garantie.
+    $fiskal = $out['kind'] === 'paragon' && wsm_invoice_kasa();
+    if ($fiskal) {
+        try {
+            [, $out['fiskal']] = wsm_fiskal_wyslij($pdo, $doc, $order, $actor);
+        } catch (Throwable $e) { $out['fiskal'] = 'błąd wysyłki na kasę'; }
+    }
+
     // --- Le courrier ---------------------------------------------------------
     // La clé d'événement porte le NUMÉRO du document, pas l'identifiant de la
     // commande : un avoir émis plus tard doit pouvoir partir à son tour.
     $reg  = wsm_orders_cfg();
     $mail = trim((string) ($order['email'] ?? ''));
-    if ($mail !== '' && $reg['doc_mail']) {
+    if ($mail !== '' && $reg['doc_mail'] && !$fiskal) {
         try {
             $lien = wsm_invoice_lien_public($pdo, $order, $doc);
             $est  = $out['kind'] === 'faktura' ? 'Faktura' : 'Paragon';
@@ -763,7 +799,7 @@ function wsm_order_etapy(PDO $pdo, array $o): array {
     // presque toutes les lignes — puisque la plupart des commandes sont
     // « nowe ». Le geste le plus visible de l'écran le plus utilisé de la
     // maison proposait donc, quarante fois par jour, quelque chose que
-    // personne ne devait faire : l'encaissement est écrit par tpay, pas au
+    // personne ne devait faire : l'encaissement est écrit par Stripe, pas au
     // doigt. Pire, il le faisait mal (voir wsm_order_status_set).
     //
     // Le chemin que conduit l'opérateur est celui du COLIS : on prépare, on
@@ -771,7 +807,7 @@ function wsm_order_etapy(PDO $pdo, array $o): array {
     // son propre bouton — « Oznacz opłacone », pour les virements.
     //
     // « Opłacone » reste un état où l'on PEUT être : la commande y est mise
-    // par tpay. On l'affiche alors comme état courant, à sa place dans le
+    // par Stripe. On l'affiche alors comme état courant, à sa place dans le
     // chemin, et l'étape suivante est « W realizacji ».
     $flux = ['nowe' => 'Nowe', 'w_realizacji' => 'W realizacji',
              'wyslane' => 'Wysłane', 'dostarczone' => 'Dostarczone'];
@@ -804,7 +840,14 @@ function wsm_order_etapy(PDO $pdo, array $o): array {
             $kind = wsm_invoice_kind_for($o);
             $quoi = ($kind['kind'] ?? '') === 'faktura' ? 'FAKTURĘ' : 'PARAGON';
             $ou   = [];
-            if ($reg['doc_mail']) $ou[] = 'mailem do klienta';
+            if (($kind['kind'] ?? '') === 'paragon' && wsm_invoice_kasa()) {
+                // Le papier se dit ICI, avant le clic : c'est l'opérateur qui
+                // doit le glisser dans le colis.
+                $ou[] = wsm_fiskal_forma($o) === 'e' ? 'na kasę fiskalną jako e-paragon'
+                                                     : 'na kasę fiskalną — PAPIEROWY, włóż go do paczki';
+            } elseif ($reg['doc_mail']) {
+                $ou[] = 'mailem do klienta';
+            }
             if ($reg['doc_ksef'] && ($kind['kind'] ?? '') === 'faktura') $ou[] = 'do KSeF';
             $pyt = $code . ' → ' . $flux[$c] . '. Wystawi to ' . $quoi
                  . ($ou ? ' i wyśle ' . implode(' oraz ', $ou) : '') . '. Kontynuować?';
@@ -935,6 +978,14 @@ function wsm_order_preflight(PDO $pdo, array $o): array {
         }
     } else {
         $l[] = ['co' => 'KSeF', 'etat' => 'brak', 'val' => 'paragon nie idzie do rejestru — tak ma być'];
+        // 6. La caisse fiscale : ce qui part sur l'imprimante, et sous quelle
+        //    forme — l'e-paragon, ou le papier qu'il faut glisser dans le colis.
+        wsm_invoice_kasa();                  // charge fiskal.php ; la ligne dit aussi « niepodłączona »
+        if (function_exists('wsm_fiskal_linia')) {
+            $kasa = wsm_fiskal_linia($o, $doc && (string) $doc['kind'] === 'paragon' ? $doc : null,
+                                     $doc ? (string) $doc['kind'] : (string) ($kind['kind'] ?? ''));
+            if ($kasa) $l[] = $kasa;
+        }
     }
 
     return ['lignes' => $l, 'kind' => (string) ($kind['kind'] ?? 'paragon'),
@@ -981,9 +1032,18 @@ function wsm_order_voyants(PDO $pdo, array $o): array {
               'agir' => ''];
     } elseif ((string) $doc['kind'] !== 'faktura') {
         // Un e-paragon n'a rien à faire au registre national : ce n'est pas un
-        // manque, c'est le bon état. Vert.
+        // manque, c'est le bon état. Vert — sauf si la caisse fiscale, elle,
+        // attend quelque chose.
         $d = ['etat' => 'ok', 'txt' => 'Paragon ' . (string) $doc['number'],
               'quoi' => 'Paragon nie idzie do KSeF — tak ma być', 'agir' => ''];
+        if (wsm_invoice_kasa()) {
+            $kasa = wsm_fiskal_linia($o, $doc, (string) $doc['kind']);
+            if ($kasa) {
+                $d = ['etat' => ['ok' => 'ok', 'wa' => 'wait', 'no' => 'no'][$kasa['etat']] ?? '',
+                      'txt' => 'Kasa ' . ($kasa['etat'] === 'ok' ? '✓' : ($kasa['etat'] === 'no' ? '✗' : '…')),
+                      'quoi' => $kasa['val'], 'agir' => (string) ($kasa['agir'] ?? '')];
+            }
+        }
     } else {
         $ks = trim((string) ($doc['ksef_number'] ?? ''));
         $d = $ks !== ''
@@ -1028,8 +1088,13 @@ function wsm_status_triggers(PDO $pdo): array {
                                : 'szablon wyłączony — nic nie wychodzi';
     };
 
+    $kasa = wsm_invoice_kasa();
     $doc = ['Wystawia FAKTURĘ albo PARAGON (reguła VIES/NIP)',
-            'Wysyła dokument mailem do klienta'];
+            $kasa ? 'Wysyła fakturę mailem; e-paragon idzie do klienta sam, gdy drukarka go wystawi'
+                  : 'Wysyła dokument mailem do klienta'];
+    $doc[] = $kasa
+        ? 'Paragon idzie na kasę fiskalną (Fakturownia): e-paragon za zgodą klienta, inaczej papierowy do paczki'
+        : 'Kasa fiskalna niepodłączona — paragon zostaje dokumentem wewnętrznym';
     $doc[] = $ksefOuvert
         ? 'Zgłasza fakturę do KSeF (paragon nigdy)'
         : 'KSeF: kanał zamknięty — faktura czeka w kolejce';
@@ -1041,18 +1106,22 @@ function wsm_status_triggers(PDO $pdo): array {
     }
     $doc[] = 'Sprawdza VIES na nowo, tuż przed wystawieniem';
 
-    return [
+    // LE DOCUMENT SUIT LE RÉGLAGE. Cette table l'accrochait toujours à
+    // « wysłane », même quand le Superadmin l'avait mis à « opłacone » : elle
+    // décrivait alors une règle qui n'était plus celle de la maison.
+    $docSt = wsm_orders_cfg()['doc_status'];
+    $rows = [
         ['statut' => 'nowe', 'kto' => 'Złożenie zamówienia w sklepie',
          'wyzwala' => ['Rezerwuje stan magazynowy', 'Potwierdzenie do klienta'],
          'mail' => $mail('zamowienie')],
-        ['statut' => 'oplacone', 'kto' => 'Powiadomienie tpay albo ręcznie',
+        ['statut' => 'oplacone', 'kto' => 'Płatność potwierdzona przez Stripe albo ręcznie',
          'wyzwala' => ['Zamówienie wchodzi do kolejki wysyłki'],
          'mail' => $mail('platnosc')],
         ['statut' => 'w_realizacji', 'kto' => 'Przycisk „Do wysyłki" albo lista rozwijana',
          'wyzwala' => ['Nic poza powiadomieniem — to stan przygotowania'],
          'mail' => $mail('w_realizacji')],
         ['statut' => 'wyslane', 'kto' => 'Przycisk „Wysłane", lista rozwijana, albo nadanie u przewoźnika',
-         'wyzwala' => $doc, 'mail' => $mail('wyslane')],
+         'wyzwala' => [], 'mail' => $mail('wyslane')],
         ['statut' => 'dostarczone', 'kto' => 'Ręcznie',
          'wyzwala' => ['Otwiera bieg terminu na reklamację'],
          'mail' => $mail('dostarczone')],
@@ -1060,6 +1129,12 @@ function wsm_status_triggers(PDO $pdo): array {
          'wyzwala' => ['Zamyka zamówienie — nie da się go już wysłać'],
          'mail' => $mail('anulowane')],
     ];
+    foreach ($rows as &$r) {
+        if ($r['statut'] === $docSt) $r['wyzwala'] = array_merge($r['wyzwala'], $doc);
+        if ($r['wyzwala'] === []) $r['wyzwala'] = ['Nic poza powiadomieniem'];
+    }
+    unset($r);
+    return $rows;
 }
 
 /**

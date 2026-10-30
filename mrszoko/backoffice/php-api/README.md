@@ -170,6 +170,33 @@ platform keys and the shop's connected account, no session is created: the
 order still exists and waits. The platform keys are written only by the
 superadmin (*Płatności*), never from *Integracje*.
 
+## Fiscal receipts — Fakturownia + Paragony.pl
+
+The shop's own *paragon* (`PAR/…`, `invoice.php`) is an internal document. A
+sale to a private buyer only exists for the tax office once it went through a
+cash register, and a software-only register (*kasa wirtualna*) is reserved to
+transport, hotels, catering and coal (MF regulation of 29 May 2020). A shop
+selling goods needs a physical **online fiscal printer**.
+
+`fiskal.php` drives one through Fakturownia's public API: it creates a
+`receipt` from the **frozen** paragon (every line, VAT 23/8/5/0 %, sum checked
+to the grosz) and asks for `fiscal_print` — `mode=e-receipt` when the buyer
+ticked the e-paragon consent at checkout (`wsm_orders.paragon_forma = 'e'`),
+`mode=print` otherwise, so the paper slip goes in the parcel. The e-paragon
+link (`e_receipt_view_url`) arrives later, when the printer issues it: the
+`invoice:update` webhook only **points** at a receipt, which is re-read from
+Fakturownia with our own token, then the buyer gets the link by mail, once.
+
+Our paragon number travels as `oid` with `oid_unique: yes`, so a lost response
+is recovered by **finding** the receipt, never by creating a second one. A
+failed creation retries on its own; a failed print is retried only by hand
+(*Zamówienia*), because printing twice records the sale twice.
+
+Needed at the company: a Fakturownia account with the Paragony.pl module, an
+online fiscal printer that supports e-receipts (Posnet / Novitus / Elzab
+*Online*), and a computer running the Paragony.pl program next to it. In
+Fakturownia, leave **automatic fiscalisation after API** off: the shop orders it.
+
 InPost is the same shape: `inpost.php` builds the exact ShipX payload and shows
 it in the console *before* the integration is switched on, so missing data is
 visible immediately. Without a ShipX token nothing is sent — the parcel is
@@ -275,6 +302,7 @@ list, written out.
 | **Stripe** | `WSM_STRIPE_SECRET_KEY`, `WSM_STRIPE_PUBLISHABLE_KEY`, `WSM_STRIPE_WEBHOOK_SECRET` (platform keys) + `WSM_STRIPE_ACCOUNT` (the shop's `acct_…`, created from *Płatności*) | The shop takes orders nobody can pay for. |
 | **Outgoing mail** | `WSM_MAIL_TRANSPORT=smtp`, `WSM_MAIL_FROM`, `WSM_MAIL_SMTP_HOST`, `WSM_MAIL_SMTP_PORT`, `WSM_MAIL_SMTP_USER`, `WSM_MAIL_SMTP_PASS`, `WSM_MAIL_SMTP_SECURE` | Order confirmations sit in the queue and nobody receives them. |
 | **InPost ShipX** | `WSM_INPOST_TOKEN`, `WSM_INPOST_ORG_ID`, `WSM_INPOST_GEOWIDGET_TOKEN` | Parcels are booked by hand. The *Wysyłka* screen shows which ones. |
+| **Fiscal printer** | `WSM_FAKTUROWNIA_DOMENA`, `WSM_FAKTUROWNIA_TOKEN`, `WSM_FAKTUROWNIA_DRUKARKA`, `WSM_FAKTUROWNIA_WEBHOOK_TOKEN` | Paragons stay internal documents: no sale reaches a cash register. Only needed if the accountant confirms the shop is not exempt. |
 | **KSeF** | `WSM_KSEF_TOKEN`, `WSM_KSEF_PUBLIC_KEY`, `WSM_KSEF_ENV` | Invoices are not filed automatically. The *KSeF* screen still builds the FA(2) XML for manual filing. `WSM_KSEF_PUBLIC_KEY` is a **path on the server** to the Ministry of Finance public key — without it the token cannot be encrypted, so no session opens. |
 | **Allegro** | `WSM_ALLEGRO_CLIENT_ID`, `WSM_ALLEGRO_CLIENT_SECRET`, `WSM_ALLEGRO_REFRESH_TOKEN`, `WSM_ALLEGRO_SELLER_ID` | The second sales channel stays shut. The *Allegro* screen still shows which listings would go out and which are blocked. |
 | **Superadmin** | `WSM_SUPERADMIN_EMAILS` | The platform-owner module is invisible and its page answers 404. Deliberately not a database role: an account that could grant itself the role could rewrite its own invoice. |
@@ -320,6 +348,7 @@ from the console.
 | POST | `/shop/order` | creates the order, decrements stock, returns the shop's *Zapłać* URL (embedded Stripe Checkout) |
 | GET | `/shop/order/{code}?t=…` | order status; the token is compared with `hash_equals` |
 | POST | `/shop/stripe/webhook` | signed Stripe webhook (connected accounts), idempotent |
+| POST | `/shop/fakturownia/webhook` | Fakturownia `invoice:update`: names a receipt, which is re-read with our token |
 | **Boutique côté console (protégé)** | | |
 | GET | `/franchisor/orders` | order list |
 | GET | `/franchisor/orders/{id}` | one order + events + the ShipX payload it would send |

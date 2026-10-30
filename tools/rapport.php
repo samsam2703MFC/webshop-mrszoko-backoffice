@@ -102,6 +102,21 @@ if (is_file($API . '/ksef.php')) {
     }
 } else { saute('KSeF', 'brak pliku ksef.php'); }
 
+// La caisse fiscale : gênante, pas bloquante, et peut-être inutile — si le
+// comptable confirme la dispense (vente en ligne payée par un intermédiaire),
+// il n'y a rien à brancher. On dit donc où en sont les paragons, sans rouge.
+if (is_file($API . '/fiskal.php')) {
+    require_once $API . '/fiskal.php';
+    if (wsm_fiskal_enabled()) {
+        $bl = (int) $pdo->query("SELECT COUNT(*) FROM wsm_invoices WHERE kind = 'paragon' AND fiskal_status = 'blad'")->fetchColumn();
+        $bl > 0 ? gene("Kasa fiskalna: $bl paragon(ów) z błędem", 'ekran Zamówienia — przycisk przy linii „Kasa”')
+                : bien('Kasa fiskalna podłączona — paragony idą przez drukarkę fiskalną');
+    } else {
+        gene('Kasa fiskalna niepodłączona — paragony są dokumentami wewnętrznymi',
+             'Integracje → E-paragon fiskalny (Fakturownia), jeśli księgowa potwierdzi, że kasa jest wymagana');
+    }
+} else { saute('Kasa fiskalna', 'brak pliku fiskal.php'); }
+
 // La poste : sans elle, aucun message ne sort de la file.
 if (is_file($API . '/mail.php')) {
     require_once $API . '/mail.php';

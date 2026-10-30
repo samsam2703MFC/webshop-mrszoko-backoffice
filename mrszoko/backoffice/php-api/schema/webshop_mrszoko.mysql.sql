@@ -482,6 +482,7 @@ CREATE TABLE IF NOT EXISTS `wsm_orders` (
   `nip`             VARCHAR(15)  NOT NULL DEFAULT '',
   `vat_eu`          VARCHAR(20)  NOT NULL DEFAULT '',
   `invoice`         TINYINT(1)   NOT NULL DEFAULT 0,
+  `paragon_forma`   VARCHAR(8)   NOT NULL DEFAULT '',  -- 'e' accord e-paragon · 'papier' · '' pas demandé
   `bill_street`     VARCHAR(200) NOT NULL DEFAULT '',
   `bill_building`   VARCHAR(30)  NOT NULL DEFAULT '',
   `bill_postcode`   VARCHAR(10)  NOT NULL DEFAULT '',
@@ -782,6 +783,14 @@ CREATE TABLE IF NOT EXISTS `wsm_invoices` (
   `ksef_number`    VARCHAR(64)  NOT NULL DEFAULT '',
   `ksef_status`    VARCHAR(20)  NOT NULL DEFAULT '',
   `ksef_at`        DATETIME NULL DEFAULT NULL,
+  -- La caisse fiscale (fiskal.php) : le reçu Fakturownia et son e-paragon.
+  `fiskal_status`  VARCHAR(16)  NOT NULL DEFAULT '',
+  `fiskal_forma`   VARCHAR(8)   NOT NULL DEFAULT '',
+  `fiskal_id`      VARCHAR(32)  NOT NULL DEFAULT '',
+  `fiskal_url`     VARCHAR(250) NOT NULL DEFAULT '',
+  `fiskal_note`    VARCHAR(250) NOT NULL DEFAULT '',
+  `fiskal_proby`   INT NOT NULL DEFAULT 0,
+  `fiskal_at`      DATETIME NULL DEFAULT NULL,
   `created_by`     VARCHAR(120) NOT NULL DEFAULT '',
   `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

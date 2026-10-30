@@ -641,6 +641,18 @@ function wsm_ensure_invoices(PDO $pdo): void {
     if (!wsm_table_exists($pdo, 'wsm_invoices') || !wsm_table_exists($pdo, 'wsm_invoice_items')) {
         wsm_apply_schema($pdo);
     }
+    // La caisse fiscale (fiskal.php) : où en est le reçu de CE paragon chez
+    // Fakturownia, et le lien de l'e-paragon quand l'imprimante l'a émis.
+    $txt = fn(int $n) => ["VARCHAR($n) NOT NULL DEFAULT ''", "TEXT NOT NULL DEFAULT ''"];
+    wsm_ensure_columns($pdo, 'wsm_invoices', [
+        'fiskal_status' => $txt(16),
+        'fiskal_forma'  => $txt(8),
+        'fiskal_id'     => $txt(32),
+        'fiskal_url'    => $txt(250),
+        'fiskal_note'   => $txt(250),
+        'fiskal_proby'  => ['INT NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
+        'fiskal_at'     => ['DATETIME NULL DEFAULT NULL', 'TEXT DEFAULT NULL'],
+    ]);
 }
 
 /** Journal des mouvements de stock. Idempotent. */
@@ -700,6 +712,9 @@ function wsm_ensure_shop(PDO $pdo): void {
     wsm_ensure_columns($pdo, 'wsm_payments', [
         'app_fee' => ['INT NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
     ]);
+    // L'accord du client pour un e-paragon (fiskal.php, règle 3) : 'e',
+    // 'papier', ou '' quand la caisse ne le demandait pas encore.
+    wsm_ensure_columns($pdo, 'wsm_orders', ['paragon_forma' => $txt(8)]);
 
     // Contenu de la boutique : modes de livraison + libellés traduits.
     try {

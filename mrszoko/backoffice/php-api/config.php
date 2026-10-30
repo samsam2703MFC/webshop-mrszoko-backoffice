@@ -212,6 +212,20 @@ $cfg = [
         'env'        => getenv('WSM_KSEF_ENV') ?: '',
     ],
 
+    // ---- Caisse fiscale : Fakturownia + Paragony.pl (fiskal.php) -----------
+    //  FERMÉ TANT QUE LE DOMAINE ET LE JETON SONT VIDES. `domena` = le compte
+    //  (szoko.fakturownia.pl), `api_token` = Ustawienia → Integracja → Kod
+    //  autoryzacyjny API, `drukarka` = le nom de l'imprimante (vide = celle
+    //  par défaut), `webhook_token` = un mot inventé, recopié dans le webhook
+    //  côté Fakturownia. Le jeton émet des documents fiscaux au nom de la
+    //  société : jamais dans ce dépôt, qui est public.
+    'fakturownia' => [
+        'domena'        => getenv('WSM_FAKTUROWNIA_DOMENA') ?: '',
+        'api_token'     => getenv('WSM_FAKTUROWNIA_TOKEN') ?: '',
+        'drukarka'      => getenv('WSM_FAKTUROWNIA_DRUKARKA') ?: '',
+        'webhook_token' => getenv('WSM_FAKTUROWNIA_WEBHOOK_TOKEN') ?: '',
+    ],
+
     // ---- Superadmin : le propriétaire de la plateforme ---------------------
     // Ce module calcule ce que la boutique DOIT au propriétaire (location +
     // commission). Il ne peut donc pas être ouvert par un rôle attribuable

@@ -1372,6 +1372,11 @@ function wsm_shop_create_order(PDO $pdo, array $body): array {
             'first_name' => $buyer['first_name'], 'last_name' => $buyer['last_name'],
             'company' => $buyer['company'], 'nip' => $buyer['nip'], 'vat_eu' => $buyer['vat_eu'],
             'invoice' => $buyer['invoice'],
+            // L'accord pour un e-paragon (fiskal.php, règle 3). La case n'est
+            // proposée que lorsqu'une caisse fiscale est branchée : absente,
+            // on n'écrit rien plutôt qu'un « oui » qu'on n'a pas demandé.
+            'paragon_forma' => !array_key_exists('e_paragon', $body) || $body['e_paragon'] === null ? ''
+                             : (!empty($body['e_paragon']) ? 'e' : 'papier'),
             'bill_street' => $buyer['bill_street'], 'bill_building' => $buyer['bill_building'],
             'bill_postcode' => $buyer['bill_postcode'], 'bill_city' => $buyer['bill_city'],
             'bill_country' => $buyer['bill_country'],
@@ -1653,6 +1658,7 @@ function wsm_order_hydrate(PDO $pdo, array $o): array {
         'email' => (string) $o['email'], 'phone' => (string) $o['phone'],
         'first_name' => (string) $o['first_name'], 'last_name' => (string) $o['last_name'],
         'company' => (string) $o['company'], 'nip' => (string) $o['nip'], 'invoice' => (int) $o['invoice'],
+        'paragon_forma' => (string) ($o['paragon_forma'] ?? ''),
         'vat_eu' => (string) ($o['vat_eu'] ?? ''),
         'vat' => ['status' => (string) ($o['vat_status'] ?? ''), 'checked_at' => $o['vat_checked_at'] ?? null,
                   'name' => (string) ($o['vat_name'] ?? ''), 'consultation' => (string) ($o['vat_consultation'] ?? '')],
@@ -1687,23 +1693,27 @@ function wsm_order_hydrate(PDO $pdo, array $o): array {
 }
 
 /** Marque une commande payée. Idempotent : rejouer la notification ne fait rien. */
-function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bool {
-    $st = $pdo->prepare("SELECT payment_status FROM wsm_orders WHERE id = ?");
-    $st->execute([$orderId]);
-    $cur = (string) $st->fetchColumn();
-    if ($cur === 'oplacone') return false;                    // déjà encaissée
+function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'stripe'): bool {
     // LE COLIS NE RECULE PAS. Cette ligne écrivait status='oplacone' sans
     // condition. Tant que l'argent arrivait avant la préparation — le cas de
     // tpay — ça ne se voyait pas. Mais un virement encaissé pendant que la
     // commande est « W realizacji », et le colis retournait en arrière : la
     // personne qui l'a préparé le voit réapparaître dans sa file, et le
     // prépare une seconde fois.
-    $pdo->prepare("UPDATE wsm_orders
+    //
+    // UNE SEULE ÉCRITURE GAGNE. Le webhook de Stripe et la page de retour du
+    // client arrivent souvent ensemble. Un « SELECT puis UPDATE » les laissait
+    // passer tous les deux — sans gravité tant qu'il ne s'agissait que d'un
+    // statut, mais chacun émet maintenant un document : deux paragons, deux
+    // numéros, deux passages en caisse. La condition est donc DANS l'UPDATE,
+    // et seul celui qui a vraiment changé la ligne continue.
+    $u = $pdo->prepare("UPDATE wsm_orders
                       SET payment_status = 'oplacone',
                           status  = CASE WHEN status = 'nowe' THEN 'oplacone' ELSE status END,
                           paid_at = CURRENT_TIMESTAMP
-                    WHERE id = ?")
-        ->execute([$orderId]);
+                    WHERE id = ? AND payment_status <> 'oplacone'");
+    $u->execute([$orderId]);
+    if ($u->rowCount() === 0) return false;                  // déjà encaissée (ou inconnue)
     // Les tentatives Stripe ne passent PAS en bloc à « opłacone » : seule la
     // session réellement payée l'est (wsm_stripe_apply_session). Une page
     // « Zapłać » rechargée trois fois ouvre trois sessions ; les marquer
@@ -1712,6 +1722,32 @@ function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bo
     wsm_order_event($pdo, $orderId, 'oplacone', '', $actor);
     $paid = wsm_order_by_id($pdo, $orderId);
     if ($paid) wsm_mail_auto($pdo, 'platnosc', $paid);
+
+    // LE DOCUMENT « À LA PAYE ». Le Superadmin propose d'émettre le document
+    // quand la commande devient « opłacone » — mais seul wsm_order_status_set()
+    // savait le faire, et le paiement ne passe pas par lui. Réglée ainsi, une
+    // commande payée par Stripe n'avait JAMAIS de document, ni de paragon
+    // fiscal : or c'est à la paye que la caisse doit enregistrer une vente
+    // payée d'avance. wsm_order_document() est idempotente : passer ensuite
+    // par wsm_order_status_set() ne refait rien.
+    $inv = __DIR__ . '/invoice.php';
+    if ($paid && is_file($inv)) {
+        require_once $inv;
+        $reg = wsm_orders_cfg();
+        // Une commande ANNULÉE qu'un vieux lien de paiement fait encaisser
+        // ne reçoit pas de document : c'est un remboursement à faire, pas
+        // une vente à enregistrer.
+        if ($reg['doc_status'] === 'oplacone' && (string) $paid['status'] !== 'anulowane') {
+            try {
+                // VIES seulement s'il y a un numéro à relire : appelé depuis le
+                // webhook de Stripe, on n'ajoute pas un aller-retour inutile.
+                if ($reg['vies_recheck'] && trim((string) ($paid['vat_eu'] ?? '')) !== '') {
+                    $paid = wsm_order_vies_refresh($pdo, $paid);
+                }
+                wsm_order_document($pdo, $paid, $actor);
+            } catch (Throwable $e) { /* le paiement reste écrit ; le document se refait à la main */ }
+        }
+    }
     return true;
 }
 
@@ -1804,6 +1840,9 @@ function wsm_orders_list(PDO $pdo, int $limit = 200, array $statuts = [], array 
             // se passer, sans la moindre erreur nulle part.
             'company' => $o['company'] ?? '',
             'vat_eu' => $o['vat_eu'] ?? '', 'vat_status' => $o['vat_status'] ?? '',
+            // Même leçon pour la caisse : sans lui, la ligne « Kasa » annonçait
+            // un paragon papier à quelqu'un qui avait demandé l'e-paragon.
+            'paragon_forma' => (string) ($o['paragon_forma'] ?? ''),
             'paid_at' => $o['paid_at'] ?? null,
             'backorder' => (int) ($o['backorder'] ?? 0) === 1,
             'discount_percent' => (float) ($o['discount_percent'] ?? 0),
