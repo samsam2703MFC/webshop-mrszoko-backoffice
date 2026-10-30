@@ -815,7 +815,9 @@ th { background: transparent; text-transform: none; letter-spacing: 0; font-size
 
 /* --- Les formulaires ------------------------------------------------------- */
 input, select, textarea { border-color: var(--border-default); transition: border-color .15s, box-shadow .15s; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--brand);
+/* Les cases et boutons radio gardent le contour du système : Safari ne peint
+   pas d'ombre sur une case native, il ne leur resterait aucun repère. */
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus { outline: none; border-color: var(--brand);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
 /* Les boutons : des pastilles. Le bouton ordinaire est gris clair et sans
    cadre ; « primary » prend la couleur de la marque. Les étapes d'une

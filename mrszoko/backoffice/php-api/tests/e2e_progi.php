@@ -107,9 +107,16 @@ else {
     // la barre d'achat qui suit le défilement.
     ok('la fiche dans l\'habit « Apple »', str_contains($h, '<body data-added="') && str_contains($h, 'class="strona-p"')
        && str_contains($h, '<form class="buy-form" id="kup-form"') && str_contains($h, 'data-kup-pasek'));
-    ok('… les cartes de quantité : une par palier, plus « inna ilość »', substr_count($h, 'class="ile-opcja') >= 2
-       && str_contains($h, 'ile-opcja--inna') && str_contains($h, 'name="ile"'));
-    ok('la boîte des paliers, avec le poids du produit et celui du panier', (bool) preg_match('#<div class="prog-rabat" data-prog data-waga="' . (int) $A['weight_g'] . '" data-koszyk="' . (int) $B['weight_g'] . '"#', $h));
+    // La carte « 1 », AU MOINS une carte de palier, et « inna ilość » : sans
+    // carte de palier, trois cartes ne se compteraient pas.
+    ok('… les cartes de quantité : « 1 », au moins un palier, « inna ilość »',
+       preg_match_all('/<label class="ile-opcja" data-n="(\d+)">/', $h, $mN) >= 2 && max(array_map('intval', $mN[1])) > 1
+       && str_contains($h, 'ile-opcja--inna') && str_contains($h, '<input type="radio" name="ile" value="inna">'), $mN[1] ?? null);
+    ok('… le champ « inna ilość » porte son propre nom', (bool) preg_match('/name="qty"[^>]*aria-label="[^"]+"/s', $h));
+    ok('la boîte des paliers, avec le poids du produit et celui du panier', (bool) preg_match('#<div class="prog-rabat" data-prog data-waga="' . (int) $A['weight_g'] . '" data-w-koszyku="' . (int) $B['weight_g'] . '"#', $h));
+    // Le nom data-koszyk est RÉSERVÉ au panier vivant : porté par la fiche, il
+    // la faisait remplacer après chaque ajout (shop.js), écouteurs perdus.
+    ok('… et la fiche ne porte aucun marqueur du panier vivant', !preg_match('/data-koszyk[ >=]/', $h));
     ok('… les paliers de Rabaty pour le calcul du navigateur', str_contains($h, 'data-progi="' . htmlspecialchars(json_encode($progi)) . '"'));
     $st = stan_progu($progi, (int) $B['weight_g'] + (int) $A['weight_g']);
     $attendu = $st['next']

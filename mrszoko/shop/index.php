@@ -241,9 +241,14 @@ if ($method === 'POST') {
             $id  = (string) $_POST['add'];
             // La carte de quantité cochée sur la fiche (« ile » = 1, 11, 25…),
             // sinon le champ « Inna ilość » — et partout ailleurs le seul
-            // champ « qty » des cartes du catalogue.
-            $ile = (string) ($_POST['ile'] ?? '');
-            $qty = max(1, min(WSM_SHOP_MAX_QTY, ctype_digit($ile) ? (int) $ile : (int) ($_POST['qty'] ?? 1)));
+            // champ « qty » des cartes du catalogue. Le champ l'emporte dès
+            // qu'il dit autre chose que 1 : sans JavaScript, cliquer dedans ne
+            // coche pas sa carte, la carte « 1 » resterait cochée et l'on
+            // ajouterait 1 au lieu des 30 tapés. Avec JavaScript, choisir une
+            // carte remet le champ à 1 (shop.js).
+            $ile  = (string) ($_POST['ile'] ?? '');
+            $wpis = (int) ($_POST['qty'] ?? 1);
+            $qty  = max(1, min(WSM_SHOP_MAX_QTY, (ctype_digit($ile) && $wpis <= 1) ? (int) $ile : $wpis));
             $cart[$id] = min(WSM_SHOP_MAX_QTY, ($cart[$id] ?? 0) + $qty);
             cart_write($cart);
             redirect(u('koszyk'));
@@ -794,23 +799,33 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
           <input type="hidden" name="add" value="<?= e($p['id']) ?>">
           <?php if ($progi): ?>
           <h2 class="kup-tytul"><?= e($S['product.qty_title'] ?? '') ?> <span><?= e($S['product.qty_sub'] ?? '') ?></span></h2>
-          <div class="ile-opcje" role="radiogroup" aria-label="<?= e($S['product.qty'] ?? '') ?>">
+          <div class="ile-opcje" role="radiogroup" aria-label="<?= e($S['product.qty'] ?? '') ?>"
+               data-t-badge="<?= e($S['product.discount_badge'] ?? 'rabat {p} %') ?>">
             <?php foreach ($opcje as $i => $n): $r = $rabatDla($wKosz + $n * $waga); ?>
-            <label class="ile-opcja">
+            <label class="ile-opcja" data-n="<?= $n ?>">
               <input type="radio" name="ile" value="<?= $n ?>"<?= $i === 0 ? ' checked' : '' ?>>
               <span class="ile-txt"><b><?= e(kg_txt($n * $waga)) ?></b><small><?= $n ?> × <?= e($p['unit'] !== '' ? $p['unit'] : kg_txt($waga)) ?></small></span>
-              <span class="ile-cena"><span><?= e(zl((int) round($p['price'] * $n * (1 - $r / 100)))) ?></span><?php if ($r > 0): ?><em><?= e(str_replace('{p}', procent_txt($r), $S['product.discount_badge'] ?? 'rabat {p} %')) ?></em><?php endif; ?></span>
+              <?php // Le prix et l'insigne se redessinent après un ajout sur place
+                    // (shop.js) : le panier pèse alors plus, la remise change. ?>
+              <span class="ile-cena"><span data-ile-cena><?= e(zl((int) round($p['price'] * $n * (1 - $r / 100)))) ?></span><em data-ile-rabat<?= $r > 0 ? '' : ' hidden' ?>><?= $r > 0 ? e(str_replace('{p}', procent_txt($r), $S['product.discount_badge'] ?? 'rabat {p} %')) : '' ?></em></span>
             </label>
             <?php endforeach; ?>
             <label class="ile-opcja ile-opcja--inna">
               <input type="radio" name="ile" value="inna">
               <span class="ile-txt"><b><?= e($S['product.qty_other'] ?? '') ?></b><small><?= e(str_replace('{max}', (string) $maxQ, $S['product.qty_other_sub'] ?? '')) ?></small></span>
-              <span class="qty qty--inna"><span class="sr-only"><?= e($S['product.qty'] ?? '') ?></span><input type="number" name="qty" value="1" min="1" max="<?= $maxQ ?>" inputmode="numeric"></span>
+              <?php // Le champ est DANS l'étiquette de la carte, dont le contrôle est
+                    // le bouton radio : il porte donc son propre nom (aria-label). ?>
+              <span class="qty qty--inna"><input type="number" name="qty" value="1" min="1" max="<?= $maxQ ?>" inputmode="numeric"
+                     aria-label="<?= e($S['product.qty_other'] ?? ($S['product.qty'] ?? '')) ?>"></span>
             </label>
           </div>
 
           <?php $stP = stan_progu($progi, $wKosz + $waga); ?>
-          <div class="prog-rabat" data-prog data-waga="<?= $waga ?>" data-koszyk="<?= (int) $wKosz ?>"
+          <?php // data-w-koszyku, et SURTOUT pas data-koszyk : ce nom-là marque le
+                // panier vivant (shop.js). Porté ici, il faisait prendre la fiche
+                // pour un panier — elle était remplacée après chaque ajout et
+                // perdait ses écouteurs (total figé, barre d'achat disparue). ?>
+          <div class="prog-rabat" data-prog data-waga="<?= $waga ?>" data-w-koszyku="<?= (int) $wKosz ?>"
                data-progi="<?= e((string) json_encode($progi)) ?>"
                data-t-next="<?= e($S['product.tier_next'] ?? '') ?>" data-t-top="<?= e($S['product.tier_top'] ?? '') ?>"
                data-t-have="<?= e($S['product.tier_have'] ?? '') ?>" data-t-cart="<?= e($S['product.tier_cart'] ?? '') ?>">
@@ -837,7 +852,10 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
           <?php // LA LIVRAISON, avant de payer : l'heure limite, les transporteurs
                 // et leur prix (Dostawa), le seuil de gratuité et l'emballage
                 // isotherme — les mêmes phrases que les promesses de l'accueil. ?>
-          <?php $metodyD = wsm_shipping_methods($pdo, $lang, WSM_SHOP_HOME_COUNTRY);
+          <?php // Le poids d'UNE pièce : un transporteur qui ne la prend pas
+                // (Paczkomat au-delà de 25 kg, un minimum de palette) n'est pas
+                // annoncé ici — le panier fait le même tri. ?>
+          <?php $metodyD = wsm_shipping_methods($pdo, $lang, WSM_SHOP_HOME_COUNTRY, max(0, (int) $p['weight_g']));
                 $darmD = z_progiem((string) ($S['info.darmowa'] ?? ''), prog_darmowej($pdo)); ?>
           <h2 class="kup-tytul"><?= e($S['product.ship_title'] ?? '') ?> <span><?= e($S['product.ship_sub'] ?? '') ?></span></h2>
           <ul class="dostawa-info">
@@ -940,7 +958,7 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
         // envoie le formulaire du haut (form="kup-form") : la quantité
         // choisie part avec, même sans JavaScript. shop.js la cache tant que
         // le vrai bouton est à l'écran et y recopie le total. ?>
-  <div class="kup-pasek" data-kup-pasek>
+  <div class="kup-pasek is-ukryty" data-kup-pasek>
     <div class="kup-pasek-in">
       <span class="kup-pasek-txt"><b><?= e($p['name']) ?></b><span data-kup-pasek-razem><?= e(zl((int) $p['price'])) ?></span></span>
       <button class="btn btn--accent" type="submit" form="kup-form"><?= e($S['product.add'] ?? '') ?></button>

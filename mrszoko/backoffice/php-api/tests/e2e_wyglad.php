@@ -67,9 +67,12 @@ ok('l\'ancien habit reste à un clic : Lora et Playfair Display — la feuille p
 wsm_theme_reset($pdo);
 $t = wsm_theme_get($pdo, true);
 $colors = $lire('mrszoko/design-system/tokens/colors.css');
-ok('les couleurs par défaut sont CELLES de colors.css — un thème vide est la boutique d\'aujourd\'hui',
-   str_contains($colors, $t['brand']) && str_contains($colors, $t['accent']) && str_contains($colors, $t['bg']),
-   [$t['brand'], $t['accent'], $t['bg']]);
+ok('la marque et l\'accent par défaut sont CEUX de colors.css — un thème vide est la boutique d\'aujourd\'hui',
+   str_contains($colors, $t['brand']) && str_contains($colors, $t['accent']), [$t['brand'], $t['accent']]);
+// Le papier, lui, n'est plus la crème du design system : la boutique le pose
+// en blanc (shop.css, --paper) et le défaut du thème le dit.
+ok('… et le papier par défaut est le blanc que shop.css pose', $t['bg'] === '#FFFFFF'
+   && str_contains($lire('mrszoko/shop/shop.css'), '--paper: #FFFFFF'));
 
 // ---- 2. Refus ----------------------------------------------------------------------------
 echo "\n-- zapis: poprawne wchodzi, nieczytelne odpada i jest nazwane --\n";

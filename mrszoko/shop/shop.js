@@ -84,9 +84,13 @@
     if (!form.matches || !form.matches('form[data-add]')) return;
     if (!window.fetch) return;                         // navigateur ancien : POST classique
     ev.preventDefault();
-    var btn = form.querySelector('button[type="submit"]');
-    var label = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; }
+    // Le bouton du formulaire ET ceux qui le visent de l'extérieur (la barre
+    // d'achat du bas, form="kup-form") : tous se figent pendant l'envoi —
+    // sinon deux pressions sur la barre ajoutent deux fois la quantité.
+    var btns = Array.prototype.slice.call(form.querySelectorAll('button[type="submit"]'));
+    if (form.id) btns = btns.concat(Array.prototype.slice.call(document.querySelectorAll('button[form="' + form.id + '"]')));
+    var labels = btns.map(function (b) { return b.textContent; });
+    btns.forEach(function (b) { b.disabled = true; });
     fetch(form.action, {
       method: 'POST',
       body: new FormData(form),
@@ -95,24 +99,25 @@
       redirect: 'follow'
     }).then(function () {
       paintCount();
-      if (btn) {
-        var done = document.body.getAttribute('data-added') || '✓';
-        btn.textContent = done;
-        setTimeout(function () { btn.textContent = label; btn.disabled = false; }, 1400);
-      }
+      var done = document.body.getAttribute('data-added') || '✓';
+      btns.forEach(function (b) { b.textContent = done; });
+      setTimeout(function () {
+        btns.forEach(function (b, k) { b.textContent = labels[k]; b.disabled = false; });
+      }, 1400);
       confirmAdded(form);
-      // Ce qui vient d'entrer compte pour les paliers : la boîte de la fiche
-      // repart du nouveau poids du panier, et le panier se redessine.
-      var box = document.querySelector('[data-prog]');
-      if (box && box._paint && form.id === 'kup-form') {
+      // Ce qui vient d'entrer compte pour les paliers : la fiche repart du
+      // nouveau poids du panier (boîte, cartes, total), et le panier se
+      // redessine.
+      var box = form.querySelector('[data-prog]');
+      if (box) {
         var plus = ileFormularza(form) * (parseInt(box.getAttribute('data-waga'), 10) || 0);
-        box.setAttribute('data-koszyk', String((parseInt(box.getAttribute('data-koszyk'), 10) || 0) + plus));
-        box._paint();
+        box.setAttribute('data-w-koszyku', String((parseInt(box.getAttribute('data-w-koszyku'), 10) || 0) + plus));
       }
+      if (form._paint) form._paint();
       if (koszyk) koszyk.odswiez();
     }).catch(function () {
       // Réseau indisponible : on laisse le formulaire partir normalement.
-      if (btn) btn.disabled = false;
+      btns.forEach(function (b) { b.disabled = false; });
       form.submit();
     });
   });
@@ -152,40 +157,57 @@
     });
   }
 
-  // ---- Fiche produit : la boîte des paliers suit la quantité -------------
-  // « Dodaj kolejne 10 kg, aby uzyskać rabat 5 % » : le serveur a écrit
-  // l'état pour une pièce ; on le recalcule à chaque chiffre tapé, avec le
-  // poids du panier déjà rempli (data-koszyk).
-  document.querySelectorAll('[data-prog]').forEach(function (box) {
-    var progi;
-    try { progi = JSON.parse(box.getAttribute('data-progi') || '[]'); } catch (e) { return; }
-    if (!progi.length) return;
-    var waga = parseInt(box.getAttribute('data-waga'), 10) || 0;
-    var form = box.closest('form[data-add]');
-    var qty = form && form.querySelector('input[name="qty"]');
-    var cena = form ? (parseInt(form.getAttribute('data-cena'), 10) || 0) : 0;
+  // ---- Fiche produit : le bloc d'achat suit la quantité --------------------
+  // Le total (et celui de la barre du bas) pour TOUT produit ; pour un produit
+  // pesé avec des paliers dans Rabaty, aussi la boîte « Dodaj kolejne 10 kg,
+  // aby uzyskać rabat 5 % » et le prix de chaque carte. Le serveur a écrit
+  // l'état pour une pièce ; on le recalcule à chaque choix, avec le poids du
+  // panier déjà rempli (data-w-koszyku).
+  var kupForm = document.getElementById('kup-form');
+  if (kupForm) (function (form) {
+    var box = form.querySelector('[data-prog]');
+    var progi = [];
+    if (box) { try { progi = JSON.parse(box.getAttribute('data-progi') || '[]') || []; } catch (e) { progi = []; } }
+    var waga = box ? (parseInt(box.getAttribute('data-waga'), 10) || 0) : 0;
+    var qty = form.querySelector('input[name="qty"]');
+    var cena = parseInt(form.getAttribute('data-cena'), 10) || 0;
     var razem = document.querySelector('[data-kup-razem]');
     var razemPasek = document.querySelector('[data-kup-pasek-razem]');
     var oszcz = document.querySelector('[data-kup-oszczednosc]');
-    var pasek = box.querySelector('[data-prog-pasek]');
-    var ma = box.querySelector('[data-prog-ma]');
-    var kosz = box.querySelector('[data-prog-kosz]');
+    var opcje = form.querySelector('.ile-opcje');
+    var pasek = box && box.querySelector('[data-prog-pasek]');
+    var ma = box && box.querySelector('[data-prog-ma]');
+    var kosz = box && box.querySelector('[data-prog-kosz]');
+    // Le même calcul que le serveur (cartes et panier) : arrondi au grosz.
+    function poRabacie(n, wKosz) {
+      var p = stanProgu(progi, wKosz + n * waga).have;
+      return { gr: Math.round(cena * n * (1 - p / 100)), p: p };
+    }
     function paint() {
-      var wKosz = parseInt(box.getAttribute('data-koszyk'), 10) || 0;
+      var wKosz = box ? (parseInt(box.getAttribute('data-w-koszyku'), 10) || 0) : 0;
       var max = qty ? (parseInt(qty.getAttribute('max'), 10) || 999) : 999;
-      var n = Math.max(1, Math.min(max, form ? ileFormularza(form) : 1));
-      var st = stanProgu(progi, wKosz + n * waga);
-      // Le total de CE produit, remise du palier atteint comprise — le même
-      // calcul que les cartes écrites par le serveur.
+      var n = Math.max(1, Math.min(max, ileFormularza(form)));
       if (cena) {
-        var pelna = cena * n, poRabacie = Math.round(pelna * (1 - st.have / 100));
-        if (razem) razem.textContent = zl(poRabacie);
-        if (razemPasek) razemPasek.textContent = zl(poRabacie);
+        var pelna = cena * n, teraz = poRabacie(n, wKosz).gr;
+        if (razem) razem.textContent = zl(teraz);
+        if (razemPasek) razemPasek.textContent = zl(teraz);
         if (oszcz) {
-          oszcz.hidden = poRabacie >= pelna;
-          oszcz.textContent = (oszcz.getAttribute('data-t') || '').split('{x}').join(zl(pelna - poRabacie));
+          oszcz.hidden = teraz >= pelna;
+          oszcz.textContent = (oszcz.getAttribute('data-t') || '').split('{x}').join(zl(pelna - teraz));
         }
+        // Les cartes : leur prix et leur insigne suivent le poids du panier.
+        form.querySelectorAll('.ile-opcja[data-n]').forEach(function (karta) {
+          var k = parseInt(karta.getAttribute('data-n'), 10) || 1, r = poRabacie(k, wKosz);
+          var c = karta.querySelector('[data-ile-cena]'), em = karta.querySelector('[data-ile-rabat]');
+          if (c) c.textContent = zl(r.gr);
+          if (em) {
+            em.hidden = r.p <= 0;
+            em.textContent = r.p > 0 ? ((opcje && opcje.getAttribute('data-t-badge')) || 'rabat {p} %').split('{p}').join(procentTxt(r.p)) : '';
+          }
+        });
       }
+      if (!box || !progi.length) return;
+      var st = stanProgu(progi, wKosz + n * waga);
       zdanie(box.querySelector('[data-prog-zdanie]'),
              box.getAttribute(st.next ? 'data-t-next' : 'data-t-top'),
              { '{x}': kgTxt(st.missing), '{p}': procentTxt(st.next ? st.next.p : st.have) });
@@ -207,10 +229,17 @@
         if (inna && !inna.checked) { inna.checked = true; paint(); }
       });
     }
-    if (form) form.querySelectorAll('input[name="ile"]').forEach(function (r) { r.addEventListener('change', paint); });
-    box._paint = paint;
+    form.querySelectorAll('input[name="ile"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        // Une carte choisie remet « Inna ilość » à 1 : le serveur donne la
+        // priorité au champ dès qu'il dit autre chose (pour le cas sans JS).
+        if (/^\d+$/.test(r.value) && qty) qty.value = '1';
+        paint();
+      });
+    });
+    form._paint = paint;
     paint();
-  });
+  })(kupForm);
 
   // ---- Caisse : n'afficher que les champs réellement exigés ----------------
   //
@@ -334,16 +363,24 @@
   }
 
   // ---- Fiche produit : la barre d'achat du bas -----------------------------
-  // Cachée tant que le vrai bouton « Dodaj do koszyka » est à l'écran : deux
-  // boutons identiques côte à côte font hésiter. Sans IntersectionObserver
-  // (navigateur ancien), elle reste simplement visible.
+  // Elle n'apparaît qu'une fois le vrai bouton « Dodaj do koszyka » passé
+  // au-dessus de l'écran : tant qu'il est visible, deux boutons identiques
+  // font hésiter ; tant qu'il est plus bas, on n'a encore rien choisi.
+  // Calculé au défilement et pas par IntersectionObserver : un saut (ancre,
+  // retour sur la page) va de « sous l'écran » à « au-dessus » sans jamais le
+  // croiser, et l'observateur ne se déclenchait pas — la barre restait cachée.
   var pasekKup = document.querySelector('[data-kup-pasek]');
   var glowny = document.querySelector('#kup-form button[type="submit"]');
-  if (pasekKup && glowny && 'IntersectionObserver' in window) {
-    new IntersectionObserver(function (wpisy) {
-      var widac = wpisy[0].isIntersecting || wpisy[0].boundingClientRect.top > window.innerHeight;
-      pasekKup.classList.toggle('is-ukryty', widac);
-    }).observe(glowny);
+  if (pasekKup && glowny) {
+    var czeka = false;
+    var ustaw = function () {
+      czeka = false;
+      pasekKup.classList.toggle('is-ukryty', glowny.getBoundingClientRect().bottom > 0);
+    };
+    var zaplanuj = function () { if (!czeka) { czeka = true; window.requestAnimationFrame(ustaw); } };
+    window.addEventListener('scroll', zaplanuj, { passive: true });
+    window.addEventListener('resize', zaplanuj);
+    ustaw();
   }
 
   // ---- Le menu sur téléphone -------------------------------------------------
