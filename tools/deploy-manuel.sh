@@ -244,7 +244,7 @@ echo "  ikony obietnic (pola + config + witryna + styl) : obecne"
 # transporteurs, paliers de remise, fonds chauds). Une piece oubliee laisse
 # une page qui appelle une fonction absente.
 [ -f site/backoffice/slajdy.php ] && [ -f site/backoffice/api/slajdy.php ] \
-  && [ -f site/shop/assets/hero-piekarz.webp ] && [ -f site/shop/assets/tlo-fale.svg ] && [ -f site/shop/assets/tlo-krople.svg ] \
+  && [ -f site/shop/assets/hero-piekarz.webp ] \
   && grep -q 'function ilustracja_dostawy' site/shop/znaki.php \
   && grep -q 'function stan_progu' site/shop/lib.php \
   && grep -q 'wsm_slajdy_ensure' site/backoffice/api/db.php \

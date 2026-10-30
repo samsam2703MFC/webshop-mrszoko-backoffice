@@ -276,8 +276,10 @@ function wsm_media_usages(PDO $pdo): array {
         $u[$url][] = $quoi;
     };
     try {
-        foreach ($pdo->query("SELECT image_url, name FROM wsm_products WHERE image_url <> ''")->fetchAll() ?: [] as $r) {
-            $add((string) $r['image_url'], 'produkt: ' . (string) $r['name']);
+        // La colonne s'appelle `nom`. Écrite `name`, la requête tombait sans
+        // bruit (le try) et la médiathèque proposait d'effacer une photo en vente.
+        foreach ($pdo->query("SELECT image_url, nom FROM wsm_products WHERE image_url <> ''")->fetchAll() ?: [] as $r) {
+            $add((string) $r['image_url'], 'produkt: ' . (string) $r['nom']);
         }
     } catch (Throwable $e) {}
     try {
@@ -287,8 +289,9 @@ function wsm_media_usages(PDO $pdo): array {
     } catch (Throwable $e) {}
     try {
         $noms = ['hero_image' => 'zdjęcie na stronie głównej', 'promise_icon_1' => 'ikona obietnicy 1',
-                 'promise_icon_2' => 'ikona obietnicy 2', 'promise_icon_3' => 'ikona obietnicy 3'];
-        foreach ($pdo->query("SELECT cle, val FROM wsm_settings WHERE cle IN ('hero_image','promise_icon_1','promise_icon_2','promise_icon_3')")->fetchAll() ?: [] as $r) {
+                 'promise_icon_2' => 'ikona obietnicy 2', 'promise_icon_3' => 'ikona obietnicy 3',
+                 'logo_image' => 'logo sklepu'];
+        foreach ($pdo->query("SELECT cle, val FROM wsm_settings WHERE cle IN ('hero_image','promise_icon_1','promise_icon_2','promise_icon_3','logo_image')")->fetchAll() ?: [] as $r) {
             $add((string) $r['val'], 'ustawienie: ' . ($noms[(string) $r['cle']] ?? (string) $r['cle']));
         }
     } catch (Throwable $e) {}

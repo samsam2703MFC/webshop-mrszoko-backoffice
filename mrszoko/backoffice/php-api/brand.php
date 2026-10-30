@@ -76,12 +76,6 @@ function wsm_brand(PDO $pdo, int $id): ?array {
     return $st->fetch() ?: null;
 }
 
-function wsm_brand_by_slug(PDO $pdo, string $slug): ?array {
-    $st = $pdo->prepare("SELECT * FROM wsm_brands WHERE slug = ?");
-    $st->execute([$slug]);
-    return $st->fetch() ?: null;
-}
-
 /** Combien de produits portent chaque marque — pour la console, et pour savoir
  *  si une suppression est encore permise. */
 function wsm_brand_counts(PDO $pdo): array {
@@ -190,25 +184,4 @@ function wsm_brand_delete(PDO $pdo, int $id): array {
     $pdo->prepare("DELETE FROM wsm_brands WHERE id = ?")->execute([$id]);
     if (($b['logo_url'] ?? '') !== '') wsm_media_delete((string) $b['logo_url']);
     return [true, 'usunięto markę ' . $b['name']];
-}
-
-/**
- * La marque telle que la boutique l'affiche : nom, logo, adresse. Renvoie null
- * quand le produit n'en a pas — la vitrine n'affiche alors rien du tout, plutôt
- * qu'un cadre vide.
- */
-function wsm_brand_public(PDO $pdo, $brandId): ?array {
-    $id = (int) $brandId;
-    if ($id <= 0) return null;
-    static $cache = [];
-    if (array_key_exists($id, $cache)) return $cache[$id];
-    $b = wsm_brand($pdo, $id);
-    $cache[$id] = ($b && (int) $b['active'] === 1) ? [
-        'id'   => (int) $b['id'],
-        'name' => (string) $b['name'],
-        'slug' => (string) $b['slug'],
-        'logo' => (string) $b['logo_url'],
-        'site' => (string) $b['site_url'],
-    ] : null;
-    return $cache[$id];
 }

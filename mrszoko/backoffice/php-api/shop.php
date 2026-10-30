@@ -642,11 +642,6 @@ function wsm_ship_carrier(PDO $pdo, string $methodId): string {
     return $cache[$methodId] = strtolower($c);
 }
 
-function wsm_shipping_method(PDO $pdo, string $id, string $lang): ?array {
-    foreach (wsm_shipping_methods($pdo, $lang) as $m) if ($m['id'] === $id) return $m;
-    return null;
-}
-
 /**
  * Chiffre un panier. `$items` = [['id' => 'p-…', 'qty' => 2], …] — rien d'autre
  * n'est lu : un « price » envoyé par le client est purement et simplement ignoré.

@@ -278,7 +278,7 @@ function theme_values(): array {
     $f = (string) $WSM_API_DIR . '/theme.php';
     if (!function_exists('wsm_theme_get') && is_file($f)) require_once $f;
     if (function_exists('wsm_theme_get')) return $t = wsm_theme_get(wsm_pdo());
-    return $t = ['hero_align' => 'lewo'];
+    return $t = ['hero_align' => 'srodek'];
 }
 
 /**

@@ -84,8 +84,10 @@ function wsm_upsell_voisins(PDO $pdo, array $ids, int $combien): array {
     if ($combien <= 0 || !$ids) return [];
     $in = implode(',', array_fill(0, count($ids), '?'));
     try {
-        // Le prix de référence : celui du panier, par article.
-        $st = $pdo->prepare("SELECT category_id, AVG(prix) AS p FROM wsm_products WHERE id IN ($in)");
+        // Le prix de référence : celui du panier, par article. MIN() et non la
+        // colonne nue : MySQL 8 (ONLY_FULL_GROUP_BY) refuse une colonne non
+        // agrégée à côté d'AVG() — la requête tombait, et le repli avec elle.
+        $st = $pdo->prepare("SELECT MIN(category_id) AS category_id, AVG(prix) AS p FROM wsm_products WHERE id IN ($in)");
         $st->execute($ids);
         $ref = $st->fetch() ?: null;
         if (!$ref) return [];

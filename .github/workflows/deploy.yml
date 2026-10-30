@@ -666,7 +666,8 @@ jobs:
           fi
           # La police que la page porte VRAIMENT — une information, pas un
           # verdict : l'équipe peut en choisir une autre depuis Wygląd, et ce
-          # serait voulu. Le défaut de la boutique est Lora (theme.php).
+          # serait voulu. Le défaut de la boutique est Mulish, l'habit « Apple »
+          # (theme.php) ; Lora et Playfair Display restent proposées dans Wygląd.
           CZ=$(printf '%s' "$HOME_HTML" | grep -o "font-sans:'[^']*'" | head -1 | cut -d"'" -f2)
           echo "  czcionka tekstu na stronie: ${CZ:-Mulish (baza design systemu)}"
           # Fiche produit : on suit un vrai lien du catalogue.
@@ -2727,15 +2728,15 @@ jobs:
           # Les pièces (rsync sans --delete : une pièce oubliée laisse une page
           # qui appelle une fonction absente), puis l'EFFET sur les pages servies.
           [ -f "$DIR_BO/api/slajdy.php" ] && [ -f "$DIR_BO/slajdy.php" ] && grep -q "'slajdy.php'" "$DIR_BO/console.php" \
-            && [ -f "$SHOP/assets/hero-piekarz.webp" ] && [ -f "$SHOP/assets/tlo-fale.svg" ] && [ -f "$SHOP/assets/tlo-krople.svg" ] \
+            && [ -f "$SHOP/assets/hero-piekarz.webp" ] \
             && grep -q 'function ilustracja_dostawy' "$SHOP/znaki.php" && grep -q 'function ikona_prezentu' "$SHOP/znaki.php" \
             && grep -q 'function stan_progu' "$SHOP/lib.php" && grep -q 'function slajd_href' "$SHOP/lib.php" \
             && grep -q 'wsm_slajdy_ensure' "$DIR_BO/api/db.php" && grep -q 'data-koszyk-form' "$SHOP/shop.js" \
             && grep -q "querySelectorAll('\[data-slajdy\]')" "$SHOP/shop.js" \
-            && grep -q 'body.tlo-cieple' "$SHOP/shop.css" && grep -q '\.slajdy.is-zywe' "$SHOP/shop.css" \
-            && echo "  slajdy, progi, koszyk, rysunki przewoznikow, tla: obecne" \
+            && grep -q '\.kup-pasek' "$SHOP/shop.css" && grep -q '\.torba-glowa' "$SHOP/shop.css" && grep -q '\.slajdy.is-zywe' "$SHOP/shop.css" \
+            && echo "  slajdy, progi, koszyk, rysunki przewoznikow: obecne" \
             || { echo "  ^ NOT OK : pliki makiet niekompletne"; fail=1; }
-          for a in hero-piekarz.webp tlo-fale.svg tlo-krople.svg; do
+          for a in hero-piekarz.webp; do
             c=$(curl -skL --max-time 20 -o /dev/null -w '%{http_code}' "$SH/assets/$a"); [ "$c" = "200" ] || { echo "  ^ NOT OK : assets/$a odpowiada $c"; fail=1; }
           done
           # La page d'accueil crée les tables au premier passage (wsm_bootstrap) :
@@ -2759,8 +2760,12 @@ jobs:
           PP=$(printf '%s' "$HH" | grep -o 'href="[^"]*/p/[^"]*"' | head -1 | sed 's/href="//;s/"$//')
           if [ -n "$PP" ]; then
             PH=$(curl -skL --max-time 30 "http://localhost$PP")
-            printf '%s' "$PH" | grep -q 'class="tlo-cieple"' && echo "  karta produktu ($PP): cieple tlo" \
-              || { echo "  ^ NOT OK : karta produktu bez nowego tla"; fail=1; }
+            # L'habit « Apple » : la page porte sa classe, le bloc d'achat ses
+            # cartes de quantité (quand il y a des paliers) et la barre d'achat.
+            NI=$(printf '%s' "$PH" | grep -o 'class="ile-opcja' | wc -l)
+            { printf '%s' "$PH" | grep -q 'class="strona-p"' && printf '%s' "$PH" | grep -q 'id="kup-form"' && printf '%s' "$PH" | grep -q 'data-kup-pasek'; } \
+              && echo "  karta produktu ($PP): styl Apple, karty ilosci: $NI, pasek zakupu: jest" \
+              || { echo "  ^ NOT OK : karta produktu bez nowego ukladu (strona-p / kup-form / pasek)"; fail=1; }
             if printf '%s' "$PH" | grep -q 'data-prog '; then echo "  boks progow: $(printf '%s' "$PH" | grep -o '<p class="prog-zdanie"[^>]*>.*</p>' | head -1 | txt)"
             else echo "  boks progow: brak (brak progow w Rabatach albo produkt bez wagi)"; fi
             # Pas de répétition bornée (« .\{0,2500\} ») dans un grep : sous la
@@ -2768,7 +2773,7 @@ jobs:
             ID=$(printf '%s' "$PH" | grep -o 'name="add" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"$//')
             KH=$(curl -skL --max-time 30 -b "ms_cart=$(printf '%%7B%%22%s%%22%%3A1%%7D' "$ID")" "$SH/koszyk")
             NR=$(printf '%s' "$KH" | grep -o 'class="dostawa-rys"' | wc -l)
-            { printf '%s' "$KH" | grep -q 'data-koszyk>' && printf '%s' "$KH" | grep -q 'class="stepper-btn"' && [ "$NR" -ge 1 ]; } \
+            { printf '%s' "$KH" | grep -q 'data-koszyk>' && printf '%s' "$KH" | grep -q 'class="stepper-btn"' && printf '%s' "$KH" | grep -q 'class="torba-glowa"' && [ "$NR" -ge 1 ]; } \
               && echo "  koszyk: karty z -/+ i koszem, przewoznicy z rysunkiem: $NR; $(printf '%s' "$KH" | sed -n '/class="darmowa/,/<\/p>/p' | grep -o '<p>.*</p>' | head -1 | txt)" \
               || { echo "  ^ NOT OK : koszyk bez nowego ukladu (produkt $ID)"; fail=1; }
           fi

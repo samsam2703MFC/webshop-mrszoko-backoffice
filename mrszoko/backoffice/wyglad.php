@@ -105,7 +105,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Wygląd sklepu' => null]);
   <div class="panel">
     <h2>Czcionka</h2>
     <p class="why">Próbki poniżej są pisane prawdziwymi czcionkami — tak będzie wyglądał sklep.
-      Domyślnie: Lora w tekście i Playfair Display w nagłówkach. Druga rodzina do nagłówków ma sens
+      Domyślnie (styl Apple): Mulish wszędzie, nagłówki pogrubione. Lora i Playfair Display to poprzedni wygląd. Druga rodzina do nagłówków ma sens
       tylko wtedy, gdy wyraźnie kontrastuje z tekstem.</p>
 
     <label class="field"><span><?= h($pola['font_body'][0]) ?></span></label>

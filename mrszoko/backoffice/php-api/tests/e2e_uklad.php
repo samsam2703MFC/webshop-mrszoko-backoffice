@@ -177,10 +177,10 @@ if ($home === false || $home === '') {
     echo "\n-- strona serwowana --\n";
     $get = fn() => (string) @file_get_contents($base . '/?t=' . microtime(true), false, $ctx);
     $h = $get();
-    $sekwencja = fn(string $html) => array_map(fn($m) => $m[1] !== '' ? $m[1] : 'promises',
-        (function () use ($html) { preg_match_all('/id="(blok-\d+|katalog|pro)"|class="wrap (promises)"/', $html, $m, PREG_SET_ORDER); return $m; })());
+    $sekwencja = fn(string $html) => array_map(fn($m) => $m[1] !== '' ? $m[1] : 'obietnice',
+        (function () use ($html) { preg_match_all('/id="(blok-\d+|katalog|pro)"|class="(obietnice)-pas"/', $html, $m, PREG_SET_ORDER); return $m; })());
     ok('l\'ordre d\'origine : promesses, bloc, catalogue, B2B',
-       preg_match('/class="wrap promises".*id="blok-' . (int) $idB . '".*id="katalog".*id="pro"/s', $h) === 1, [$sekwencja($h), array_column(wsm_layout_get($pdo, 'home'), 'k')]);
+       preg_match('/class="obietnice-pas".*id="blok-' . (int) $idB . '".*id="katalog".*id="pro"/s', $h) === 1, [$sekwencja($h), array_column(wsm_layout_get($pdo, 'home'), 'k')]);
     ok('le pasek est dans le hero', str_contains($h, 'hero-strip'));
     wsm_layout_move($pdo, 'home', 'pro', 'up'); wsm_layout_move($pdo, 'home', 'pro', 'up');
     $h = $get();
@@ -188,7 +188,7 @@ if ($home === false || $home === '') {
     wsm_layout_toggle($pdo, 'home', 'obietnice'); wsm_layout_toggle($pdo, 'home', 'pasek'); wsm_layout_toggle($pdo, 'home', 'pro');
     $h = $get();
     ok('cachés, les promesses, le pasek et le B2B laissent leurs marqueurs',
-       !str_contains($h, 'class="wrap promises"') && str_contains($h, 'obietnice: ukryte')
+       !str_contains($h, 'class="obietnice-pas"') && str_contains($h, 'obietnice: ukryte')
        && !str_contains($h, 'hero-strip') && str_contains($h, 'pasek: ukryty')
        && !str_contains($h, 'id="pro"') && str_contains($h, 'sekcja pro: ukryta'));
     ok('le catalogue, lui, est toujours là', str_contains($h, 'id="katalog"'));

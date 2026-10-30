@@ -102,7 +102,13 @@ $r = $req('GET', '/p/' . $A['slug'], [$B['id'] => 1]);
 $h = (string) $r['body'];
 if ($r['body'] === null) { echo "  (sklep na 8091 nie odpowiada — pominięte)\n"; }
 else {
-    ok('le fond chaud de la maquette', str_contains($h, '<body data-added="') && str_contains($h, 'class="tlo-cieple"'));
+    // L'habit « Apple » : la page porte sa classe, le bloc d'achat ses cartes
+    // de quantité (une par palier encore à atteindre, plus « inna ilość ») et
+    // la barre d'achat qui suit le défilement.
+    ok('la fiche dans l\'habit « Apple »', str_contains($h, '<body data-added="') && str_contains($h, 'class="strona-p"')
+       && str_contains($h, '<form class="buy-form" id="kup-form"') && str_contains($h, 'data-kup-pasek'));
+    ok('… les cartes de quantité : une par palier, plus « inna ilość »', substr_count($h, 'class="ile-opcja') >= 2
+       && str_contains($h, 'ile-opcja--inna') && str_contains($h, 'name="ile"'));
     ok('la boîte des paliers, avec le poids du produit et celui du panier', (bool) preg_match('#<div class="prog-rabat" data-prog data-waga="' . (int) $A['weight_g'] . '" data-koszyk="' . (int) $B['weight_g'] . '"#', $h));
     ok('… les paliers de Rabaty pour le calcul du navigateur', str_contains($h, 'data-progi="' . htmlspecialchars(json_encode($progi)) . '"'));
     $st = stan_progu($progi, (int) $B['weight_g'] + (int) $A['weight_g']);

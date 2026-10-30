@@ -311,7 +311,7 @@ else {
     ok('… la livraison gratuite au seuil de la caisse, avec le bus', $prog > 0 && str_contains($pasek, htmlspecialchars(str_replace('{prog}', $kw($prog), (string) $val('info.darmowa'))))
        && preg_match('#<span class="korzysc"><svg class="korzysc-ikona"[^>]*>.*?</svg><span>' . preg_quote(htmlspecialchars(str_replace('{prog}', $kw($prog), (string) $val('info.darmowa'))), '#') . '</span></span>#s', $pasek) === 1, $pasek);
     ok('… l\'heure limite, la phrase même de la promesse, avec l\'horloge', str_contains($pasek, '<span>' . htmlspecialchars((string) $val('promise.1.d')) . '</span>')
-       && substr_count($pasek, 'class="korzysc-ikona"') === 2 && str_contains($pasek, '#FFF6E8'));
+       && substr_count($pasek, 'class="korzysc-ikona"') === 2 && str_contains($pasek, '<circle cx="24" cy="15" r="12" fill="#FFFFFF"'));
     ok('plus de bandeau du bas : ni ses slogans, ni un {prog} brut', substr_count($h, 'class="hero-strip') === 1
        && !str_contains($h, 'tańszy kilogram') && !str_contains($h, 'Faktury netto') && !str_contains($h, '{prog}'));
     ok('la promesse « Paczkomat lub kurier » donne le même seuil', str_contains($h, '<p>' . htmlspecialchars(str_replace('{prog}', $kw($prog), (string) $val('promise.2.d'))) . '</p>'));

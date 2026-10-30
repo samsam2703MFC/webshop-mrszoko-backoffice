@@ -103,31 +103,35 @@ $titre = 'Logowanie — Konsola ' . wsm_brand_name();
      feuille de la console manque, parce que c'est la seule page depuis
      laquelle on ne peut pas se rabattre ailleurs. */
   body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
-         background: var(--surface-page, #f6f3ef); padding: 24px;
+         background: #F5F3F0; padding: 24px; -webkit-font-smoothing: antialiased;
          font-family: var(--font-sans, system-ui, sans-serif); color: var(--text-default, #241a14); }
   .box { width: 100%; max-width: 380px; }
-  .mark { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
-  .mark img { width: 44px; height: 44px; border-radius: 10px; }
-  .mark b { font-size: 17px; color: var(--text-strong, #241a14); display: block; line-height: 1.3; }
-  .mark span { font-size: 12.5px; color: var(--text-muted, #7a6a5f); }
-  form { background: var(--surface-card, #fff); border: 1px solid var(--border-subtle, #e7ded6);
-         border-radius: var(--radius-lg, 14px); padding: 22px; }
+  /* Le même habit que la boutique et la console : la marque au centre, une
+     carte blanche sans cadre, des champs arrondis, un bouton en pastille. */
+  .mark { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; margin-bottom: 26px; }
+  .mark img { width: 56px; height: 56px; border-radius: 14px; }
+  .mark b { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--text-strong, #241a14); display: block; line-height: 1.25; }
+  .mark span { font-size: 14px; color: var(--text-muted, #7a6a5f); }
+  form { background: var(--surface-card, #fff); border: 0;
+         box-shadow: 0 1px 2px rgba(46, 22, 12, .04), 0 8px 30px rgba(46, 22, 12, .07);
+         border-radius: 20px; padding: 26px; }
   label { display: block; margin-bottom: 14px; }
   label span { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;
                color: var(--text-strong, #241a14); }
   input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; font-size: 15px;
-          border: 1px solid var(--border-default, #d8ccc1); border-radius: var(--radius-md, 10px);
+          border: 1px solid #D9CFC3; border-radius: 10px;
           background: var(--surface-page, #fff); color: inherit; font-family: inherit; }
-  input:focus { outline: 2px solid var(--brand, #7a4a2b); outline-offset: 1px; }
-  button { width: 100%; min-height: 44px; font-size: 15px; font-weight: 600; cursor: pointer;
-           border: 0; border-radius: var(--radius-md, 10px); margin-top: 4px;
+  input:focus { outline: none; border-color: var(--brand, #41281A);
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand, #41281A) 16%, transparent); }
+  button { width: 100%; min-height: 48px; font-size: 16px; font-weight: 600; cursor: pointer;
+           border: 0; border-radius: 999px; margin-top: 6px;
            background: var(--brand, #7a4a2b); color: #fff; font-family: inherit; }
   button:hover { filter: brightness(1.08); }
   .err { border: 1px solid color-mix(in srgb, var(--danger, #b3261e) 45%, transparent);
          color: var(--danger, #b3261e); background: color-mix(in srgb, var(--danger, #b3261e) 7%, transparent);
          border-radius: var(--radius-md, 10px); padding: 11px 13px; font-size: 13.5px;
          margin-bottom: 16px; line-height: 1.5; }
-  .foot { margin-top: 16px; font-size: 12.5px; color: var(--text-muted, #7a6a5f); line-height: 1.6; }
+  .foot { margin-top: 18px; font-size: 12.5px; color: var(--text-muted, #7a6a5f); line-height: 1.6; text-align: center; }
   .foot a { color: inherit; }
 </style>
 </head>

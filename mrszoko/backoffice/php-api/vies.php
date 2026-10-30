@@ -48,8 +48,6 @@ function wsm_vies_cfg(): array {
     ];
 }
 
-function wsm_vies_enabled(): bool { return wsm_vies_cfg()['enabled']; }
-
 /** Le numéro de consultation n'est délivré que si l'on s'identifie. */
 function wsm_vies_can_prove(): bool { return wsm_vies_cfg()['requester'] !== ''; }
 

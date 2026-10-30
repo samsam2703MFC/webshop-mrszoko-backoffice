@@ -67,6 +67,15 @@
     note.hidden = false;
   }
 
+  // La quantité qu'un formulaire d'achat envoie : la carte cochée sur la
+  // fiche produit (« ile » = 1, 11, 25…), sinon le champ « qty ».
+  function ileFormularza(form) {
+    var r = form.querySelector('input[name="ile"]:checked');
+    if (r && /^\d+$/.test(r.value)) return parseInt(r.value, 10);
+    var q = form.querySelector('input[name="qty"]');
+    return Math.max(1, parseInt(q && q.value, 10) || 1);
+  }
+
   // DÉLÉGUÉ AU DOCUMENT, pas posé formulaire par formulaire : les
   // suggestions du panier sont redessinées après chaque « + » (plus bas), et
   // un écouteur posé sur l'ancien formulaire partirait avec lui.
@@ -94,10 +103,9 @@
       confirmAdded(form);
       // Ce qui vient d'entrer compte pour les paliers : la boîte de la fiche
       // repart du nouveau poids du panier, et le panier se redessine.
-      var q = form.querySelector('input[name="qty"]');
       var box = document.querySelector('[data-prog]');
-      if (box && box._paint && q) {
-        var plus = (parseInt(q.value, 10) || 1) * (parseInt(box.getAttribute('data-waga'), 10) || 0);
+      if (box && box._paint && form.id === 'kup-form') {
+        var plus = ileFormularza(form) * (parseInt(box.getAttribute('data-waga'), 10) || 0);
         box.setAttribute('data-koszyk', String((parseInt(box.getAttribute('data-koszyk'), 10) || 0) + plus));
         box._paint();
       }
@@ -110,6 +118,11 @@
   });
 
   // ---- Les paliers de remise : même écriture que le serveur (lib.php) ------
+  // « 1 093,35 zł » : espaces fines insécables entre les milliers, comme zl().
+  function zl(gr) {
+    var t = (Math.max(0, gr) / 100).toFixed(2).split('.');
+    return t[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f') + ',' + t[1] + '\u202fzł';
+  }
   function kgTxt(g) {
     return (Math.max(0, g) / 1000).toFixed(2).replace(/\.?0+$/, '').replace('.', ',') + '\u00a0kg';
   }
@@ -148,16 +161,31 @@
     try { progi = JSON.parse(box.getAttribute('data-progi') || '[]'); } catch (e) { return; }
     if (!progi.length) return;
     var waga = parseInt(box.getAttribute('data-waga'), 10) || 0;
-    var form = box.parentNode && box.parentNode.querySelector('form[data-add]');
+    var form = box.closest('form[data-add]');
     var qty = form && form.querySelector('input[name="qty"]');
+    var cena = form ? (parseInt(form.getAttribute('data-cena'), 10) || 0) : 0;
+    var razem = document.querySelector('[data-kup-razem]');
+    var razemPasek = document.querySelector('[data-kup-pasek-razem]');
+    var oszcz = document.querySelector('[data-kup-oszczednosc]');
     var pasek = box.querySelector('[data-prog-pasek]');
     var ma = box.querySelector('[data-prog-ma]');
     var kosz = box.querySelector('[data-prog-kosz]');
     function paint() {
       var wKosz = parseInt(box.getAttribute('data-koszyk'), 10) || 0;
       var max = qty ? (parseInt(qty.getAttribute('max'), 10) || 999) : 999;
-      var n = Math.max(1, Math.min(max, parseInt(qty && qty.value, 10) || 1));
+      var n = Math.max(1, Math.min(max, form ? ileFormularza(form) : 1));
       var st = stanProgu(progi, wKosz + n * waga);
+      // Le total de CE produit, remise du palier atteint comprise — le même
+      // calcul que les cartes écrites par le serveur.
+      if (cena) {
+        var pelna = cena * n, poRabacie = Math.round(pelna * (1 - st.have / 100));
+        if (razem) razem.textContent = zl(poRabacie);
+        if (razemPasek) razemPasek.textContent = zl(poRabacie);
+        if (oszcz) {
+          oszcz.hidden = poRabacie >= pelna;
+          oszcz.textContent = (oszcz.getAttribute('data-t') || '').split('{x}').join(zl(pelna - poRabacie));
+        }
+      }
       zdanie(box.querySelector('[data-prog-zdanie]'),
              box.getAttribute(st.next ? 'data-t-next' : 'data-t-top'),
              { '{x}': kgTxt(st.missing), '{p}': procentTxt(st.next ? st.next.p : st.have) });
@@ -171,8 +199,17 @@
         kosz.textContent = (box.getAttribute('data-t-cart') || '').split('{k}').join(kgTxt(wKosz));
       }
     }
-    if (qty) { qty.addEventListener('input', paint); qty.addEventListener('change', paint); }
+    if (qty) {
+      qty.addEventListener('input', paint); qty.addEventListener('change', paint);
+      // Taper une quantité, c'est choisir « Inna ilość ».
+      qty.addEventListener('focus', function () {
+        var inna = form.querySelector('input[name="ile"][value="inna"]');
+        if (inna && !inna.checked) { inna.checked = true; paint(); }
+      });
+    }
+    if (form) form.querySelectorAll('input[name="ile"]').forEach(function (r) { r.addEventListener('change', paint); });
     box._paint = paint;
+    paint();
   });
 
   // ---- Caisse : n'afficher que les champs réellement exigés ----------------
@@ -294,6 +331,35 @@
       // comment s'en passer n'a plus d'objet.
       if (aide) aide.hidden = true;
     };
+  }
+
+  // ---- Fiche produit : la barre d'achat du bas -----------------------------
+  // Cachée tant que le vrai bouton « Dodaj do koszyka » est à l'écran : deux
+  // boutons identiques côte à côte font hésiter. Sans IntersectionObserver
+  // (navigateur ancien), elle reste simplement visible.
+  var pasekKup = document.querySelector('[data-kup-pasek]');
+  var glowny = document.querySelector('#kup-form button[type="submit"]');
+  if (pasekKup && glowny && 'IntersectionObserver' in window) {
+    new IntersectionObserver(function (wpisy) {
+      var widac = wpisy[0].isIntersecting || wpisy[0].boundingClientRect.top > window.innerHeight;
+      pasekKup.classList.toggle('is-ukryty', widac);
+    }).observe(glowny);
+  }
+
+  // ---- Le menu sur téléphone -------------------------------------------------
+  var menuBtn = document.querySelector('.head-menu');
+  var head = document.querySelector('.site-head');
+  if (menuBtn && head) {
+    menuBtn.hidden = false;
+    menuBtn.addEventListener('click', function () {
+      var otwarte = head.classList.toggle('is-open');
+      menuBtn.setAttribute('aria-expanded', otwarte ? 'true' : 'false');
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && head.classList.contains('is-open')) {
+        head.classList.remove('is-open'); menuBtn.setAttribute('aria-expanded', 'false'); menuBtn.focus();
+      }
+    });
   }
 
   // ---- Panier : tout se recalcule sur place ------------------------------

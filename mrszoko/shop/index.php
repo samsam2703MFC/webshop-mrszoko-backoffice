@@ -169,7 +169,7 @@ function upsell_block(PDO $pdo, array $ids, string $lang, array $S): void {
     $sug = wsm_upsell_for($pdo, $ids, $lang);
     if (!$sug) return;                       // rien d'honnête à proposer : rien
     ?>
-  <section class="wrap block upsell" style="padding-top:0">
+  <section class="upsell">
     <h2><?= e($S['upsell.title'] ?? '') ?></h2>
     <div class="grid">
       <?php foreach ($sug as $x): $p = $x['product']; ?>
@@ -239,7 +239,11 @@ if ($method === 'POST') {
         $wrot = preg_match('/^[a-z0-9_]{1,40}$/', $dost) ? u('koszyk', ['dostawa' => $dost]) : u('koszyk');
         if (isset($_POST['add'])) {
             $id  = (string) $_POST['add'];
-            $qty = max(1, min(WSM_SHOP_MAX_QTY, (int) ($_POST['qty'] ?? 1)));
+            // La carte de quantité cochée sur la fiche (« ile » = 1, 11, 25…),
+            // sinon le champ « Inna ilość » — et partout ailleurs le seul
+            // champ « qty » des cartes du catalogue.
+            $ile = (string) ($_POST['ile'] ?? '');
+            $qty = max(1, min(WSM_SHOP_MAX_QTY, ctype_digit($ile) ? (int) $ile : (int) ($_POST['qty'] ?? 1)));
             $cart[$id] = min(WSM_SHOP_MAX_QTY, ($cart[$id] ?? 0) + $qty);
             cart_write($cart);
             redirect(u('koszyk'));
@@ -540,7 +544,12 @@ if ($page === '') {
     <?php endif; ?>
   </section>
   <?php elseif ($typ === 'obietnice'): ?>
-  <section class="wrap promises">
+  <?php // « Dlaczego Szoko Shop. » : la bande grise des pages Apple, les trois
+        // promesses en cartes blanches dessous. ?>
+  <section class="obietnice-pas" aria-labelledby="obietnice-h">
+  <div class="wrap">
+  <h2 class="tytul-2" id="obietnice-h"><?= e($S['promise.title'] ?? '') ?> <span><?= e($S['promise.sub'] ?? '') ?></span></h2>
+  <div class="promises">
     <?php // L'ICÔNE D'UNE PROMESSE, si elle est déposée dans Ustawienia → Sklep.
           // Même règle que la photo du hero : absente, le bloc reste du texte.
           // La page ne dépend pas d'un fichier qui peut manquer, et « xxxx »
@@ -564,6 +573,8 @@ if ($page === '') {
       </div>
     </div>
     <?php endfor; ?>
+  </div>
+  </div>
   </section>
   <?php elseif ($typ === 'katalog'): ?>
   <section class="wrap block" id="katalog">
@@ -755,47 +766,97 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
         · VAT <?= e(wsm_vat_percent((float) $p['vat_rate'])) ?> %
         · <?= e($S['product.' . ($p['stock'] <= 0 ? 'stock_out' : 'stock_in')] ?? '') ?></p>
 
-      <?php // LES PALIERS DE REMISE, LÀ OÙ L'ON CHOISIT LA QUANTITÉ — pas au bout
-            // du parcours, demandait l'équipe (maquette 1:1) : « Dodaj kolejne
-            // 10 kg, aby uzyskać rabat 5 % ». Le calcul compte le panier DÉJÀ
-            // rempli plus la quantité tapée ici, et shop.js le refait à chaque
-            // changement de quantité. Les paliers sont ceux de Rabaty, que la
-            // caisse applique : la fiche ne promet que ce que le panier donne.
-            // Un produit sans poids ne fait pas avancer la remise : pas de
-            // boîte, plutôt qu'une promesse que ce produit ne tiendra pas.
-            $progi = (int) $p['weight_g'] > 0 ? progi_rabatu($pdo) : [];
-            if ($progi):
-              $wKosz = waga_koszyka($pdo, $cart);
-              $stP = stan_progu($progi, $wKosz + (int) $p['weight_g']); ?>
-      <div class="prog-rabat" data-prog data-waga="<?= (int) $p['weight_g'] ?>" data-koszyk="<?= (int) $wKosz ?>"
-           data-progi="<?= e((string) json_encode($progi)) ?>"
-           data-t-next="<?= e($S['product.tier_next'] ?? '') ?>" data-t-top="<?= e($S['product.tier_top'] ?? '') ?>"
-           data-t-have="<?= e($S['product.tier_have'] ?? '') ?>" data-t-cart="<?= e($S['product.tier_cart'] ?? '') ?>">
-        <div class="prog-tresc">
-          <p class="prog-zdanie" data-prog-zdanie aria-live="polite"><?= $stP['next']
-              ? zdanie_html($S['product.tier_next'] ?? '', ['{x}' => kg_txt($stP['missing']), '{p}' => procent_txt($stP['next']['p'])])
-              : zdanie_html($S['product.tier_top'] ?? '', ['{p}' => procent_txt($stP['have'])]) ?></p>
-          <div class="prog-pasek" aria-hidden="true"><i data-prog-pasek style="width:<?= (int) $stP['pct'] ?>%"></i></div>
-          <p class="prog-dopisek mono">
-            <span class="prog-ma" data-prog-ma<?= $stP['next'] && $stP['have'] > 0 ? '' : ' hidden' ?>><?= e(str_replace('{p}', procent_txt($stP['have']), $S['product.tier_have'] ?? '')) ?></span>
-            <span class="prog-kosz" data-prog-kosz<?= $wKosz > 0 ? '' : ' hidden' ?>><?= e(str_replace('{k}', kg_txt($wKosz), $S['product.tier_cart'] ?? '')) ?></span>
-          </p>
-        </div>
-        <?= ikona_prezentu() ?>
-      </div>
-      <?php endif; ?>
+      <?php // L'ACHAT, COMME CHEZ APPLE (maquette « UX style Apple ») : on choisit
+            // une QUANTITÉ dans des cartes, et chaque carte dit déjà son prix et
+            // sa remise. Les cartes au-delà de « 1 » sont exactement les
+            // quantités qui font franchir un palier de Rabaty, panier compris :
+            // « Kup 15 kg, aby otrzymać rabat 10 % », écrit en cartes qu'on
+            // touche. shop.js recalcule la boîte des paliers et le total ;
+            // sans lui, les cartes sont de vrais boutons radio et le formulaire
+            // part tel quel. Un produit sans poids ne fait pas avancer la
+            // remise : il garde le simple champ de quantité.
+            $waga  = (int) $p['weight_g'];
+            $progi = $waga > 0 ? progi_rabatu($pdo) : [];
+            $wKosz = $progi ? waga_koszyka($pdo, $cart) : 0;
+            $rabatDla = function (int $g) use ($progi): float {
+                $r = 0.0; foreach ($progi as $t) if ($g >= $t['g'] && $t['p'] > $r) $r = $t['p'];
+                return $r;
+            };
+            $opcje = [1];
+            foreach ($progi as $t) {
+                $n = (int) ceil(($t['g'] - $wKosz) / max(1, $waga));
+                if ($n > 1 && $n <= WSM_SHOP_MAX_QTY && !in_array($n, $opcje, true) && count($opcje) < 4) $opcje[] = $n;
+            }
+            $maxQ = (int) WSM_SHOP_MAX_QTY; ?>
+      <div class="kup" id="kup">
+        <form class="buy-form" id="kup-form" method="post" action="<?= e(u('koszyk')) ?>" data-add data-cena="<?= (int) $p['price'] ?>">
+          <?= csrf_field() ?>
+          <input type="hidden" name="add" value="<?= e($p['id']) ?>">
+          <?php if ($progi): ?>
+          <h2 class="kup-tytul"><?= e($S['product.qty_title'] ?? '') ?> <span><?= e($S['product.qty_sub'] ?? '') ?></span></h2>
+          <div class="ile-opcje" role="radiogroup" aria-label="<?= e($S['product.qty'] ?? '') ?>">
+            <?php foreach ($opcje as $i => $n): $r = $rabatDla($wKosz + $n * $waga); ?>
+            <label class="ile-opcja">
+              <input type="radio" name="ile" value="<?= $n ?>"<?= $i === 0 ? ' checked' : '' ?>>
+              <span class="ile-txt"><b><?= e(kg_txt($n * $waga)) ?></b><small><?= $n ?> × <?= e($p['unit'] !== '' ? $p['unit'] : kg_txt($waga)) ?></small></span>
+              <span class="ile-cena"><span><?= e(zl((int) round($p['price'] * $n * (1 - $r / 100)))) ?></span><?php if ($r > 0): ?><em><?= e(str_replace('{p}', procent_txt($r), $S['product.discount_badge'] ?? 'rabat {p} %')) ?></em><?php endif; ?></span>
+            </label>
+            <?php endforeach; ?>
+            <label class="ile-opcja ile-opcja--inna">
+              <input type="radio" name="ile" value="inna">
+              <span class="ile-txt"><b><?= e($S['product.qty_other'] ?? '') ?></b><small><?= e(str_replace('{max}', (string) $maxQ, $S['product.qty_other_sub'] ?? '')) ?></small></span>
+              <span class="qty qty--inna"><span class="sr-only"><?= e($S['product.qty'] ?? '') ?></span><input type="number" name="qty" value="1" min="1" max="<?= $maxQ ?>" inputmode="numeric"></span>
+            </label>
+          </div>
 
-      <?php if ($p['stock'] <= 0) notice('warn', $S['product.on_demand_note'] ?? ''); ?>
-      <form class="buy-form" method="post" action="<?= e(u('koszyk')) ?>" data-add>
-        <?= csrf_field() ?>
-        <input type="hidden" name="add" value="<?= e($p['id']) ?>">
-        <label class="qty">
-          <span class="sr-only"><?= e($S['product.qty'] ?? '') ?></span>
-          <input type="number" name="qty" value="1" min="1" max="<?= (int) WSM_SHOP_MAX_QTY ?>" inputmode="numeric">
-        </label>
-        <button class="btn btn--accent btn--lg" type="submit"><?= e($S['product.add'] ?? '') ?></button>
-      </form>
-      <p class="mono muted stock"><?= e($stockLabel) ?></p>
+          <?php $stP = stan_progu($progi, $wKosz + $waga); ?>
+          <div class="prog-rabat" data-prog data-waga="<?= $waga ?>" data-koszyk="<?= (int) $wKosz ?>"
+               data-progi="<?= e((string) json_encode($progi)) ?>"
+               data-t-next="<?= e($S['product.tier_next'] ?? '') ?>" data-t-top="<?= e($S['product.tier_top'] ?? '') ?>"
+               data-t-have="<?= e($S['product.tier_have'] ?? '') ?>" data-t-cart="<?= e($S['product.tier_cart'] ?? '') ?>">
+            <?= ikona_prezentu() ?>
+            <div class="prog-tresc">
+              <p class="prog-zdanie" data-prog-zdanie aria-live="polite"><?= $stP['next']
+                  ? zdanie_html($S['product.tier_next'] ?? '', ['{x}' => kg_txt($stP['missing']), '{p}' => procent_txt($stP['next']['p'])])
+                  : zdanie_html($S['product.tier_top'] ?? '', ['{p}' => procent_txt($stP['have'])]) ?></p>
+              <div class="prog-pasek" aria-hidden="true"><i data-prog-pasek style="width:<?= (int) $stP['pct'] ?>%"></i></div>
+              <p class="prog-dopisek">
+                <span class="prog-ma" data-prog-ma<?= $stP['next'] && $stP['have'] > 0 ? '' : ' hidden' ?>><?= e(str_replace('{p}', procent_txt($stP['have']), $S['product.tier_have'] ?? '')) ?></span>
+                <span class="prog-kosz" data-prog-kosz<?= $wKosz > 0 ? '' : ' hidden' ?>><?= e(str_replace('{k}', kg_txt($wKosz), $S['product.tier_cart'] ?? '')) ?></span>
+                <span class="prog-lista"><?= e(str_replace('{lista}', implode(' · ', array_map(fn($t) => strtr($S['product.tier_item'] ?? '{p} % / {kg}', ['{p}' => procent_txt($t['p']), '{kg}' => kg_txt($t['g'])]), $progi)), $S['product.tiers_list'] ?? '')) ?></span>
+              </p>
+            </div>
+          </div>
+          <?php else: ?>
+          <label class="qty qty--sama">
+            <span class="sr-only"><?= e($S['product.qty'] ?? '') ?></span>
+            <input type="number" name="qty" value="1" min="1" max="<?= $maxQ ?>" inputmode="numeric">
+          </label>
+          <?php endif; ?>
+
+          <?php // LA LIVRAISON, avant de payer : l'heure limite, les transporteurs
+                // et leur prix (Dostawa), le seuil de gratuité et l'emballage
+                // isotherme — les mêmes phrases que les promesses de l'accueil. ?>
+          <?php $metodyD = wsm_shipping_methods($pdo, $lang, WSM_SHOP_HOME_COUNTRY);
+                $darmD = z_progiem((string) ($S['info.darmowa'] ?? ''), prog_darmowej($pdo)); ?>
+          <h2 class="kup-tytul"><?= e($S['product.ship_title'] ?? '') ?> <span><?= e($S['product.ship_sub'] ?? '') ?></span></h2>
+          <ul class="dostawa-info">
+            <li><?= ikona_obietnicy(1) ?><span><b><?= e((string) ($S['promise.1.d'] ?? '')) ?></b>
+              <?php if ($metodyD): ?><small><?= e(implode(' · ', array_map(fn($m) => $m['label'] . ' ' . zl($m['price']), $metodyD))) ?></small><?php endif; ?></span></li>
+            <?php if ($darmD !== ''): ?><li><?= ikona_obietnicy(2) ?><span><b><?= e($darmD) ?></b></span></li><?php endif; ?>
+            <?php if (($S['promise.3.t'] ?? '') !== ''): ?><li><?= ikona_obietnicy(3) ?><span><b><?= e((string) $S['promise.3.t']) ?></b><small><?= e((string) ($S['promise.3.d'] ?? '')) ?></small></span></li><?php endif; ?>
+          </ul>
+
+          <div class="kup-razem">
+            <p><span><?= e($S['product.total'] ?? '') ?></span> <b data-kup-razem><?= e(zl((int) $p['price'])) ?></b>
+              <em data-kup-oszczednosc data-t="<?= e($S['product.save'] ?? '') ?>" hidden></em></p>
+            <small><?= e($S['product.total_note'] ?? '') ?></small>
+          </div>
+          <button class="btn btn--accent btn--lg btn--block" type="submit"><?= e($S['product.add'] ?? '') ?></button>
+        </form>
+        <?php if ($p['stock'] <= 0) notice('warn', $S['product.on_demand_note'] ?? ''); ?>
+        <p class="stock"><?= e($stockLabel) ?></p>
+      </div>
 
       <?php // CE QUE LE CLIENT CHERCHE AVANT DE PAYER, en clair et dans l'ordre
             // de la maquette de l'équipe : la référence, le rayon, puis comment
@@ -806,6 +867,9 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
         <div><dt><?= e($S['product.category'] ?? '') ?></dt><dd><a href="<?= e(u('', ['k' => $p['category_id']]) . '#katalog') ?>"><?= e($p['category']) ?></a></dd></div>
         <?php endif; ?>
       </dl>
+      <?php $telP = trim((string) ($S['footer.phone'] ?? '')); if (tel_href($telP) !== ''): ?>
+      <p class="kup-pomoc"><?= ikona_kontaktu('telefon') ?><span><?= e($S['product.help'] ?? '') ?> <a href="<?= e(tel_href($telP)) ?>"><?= e($telP) ?></a></span></p>
+      <?php endif; ?>
       <?= metody_html($pdo, $S, 'metody--karta') ?>
     </div>
   </div>
@@ -870,6 +934,18 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
     </div>
   </section>
   <?php endif; ?>
+
+  <?php // LA BARRE D'ACHAT, collée en bas de l'écran pendant qu'on lit la
+        // description et les tableaux — comme sur les pages Apple. Son bouton
+        // envoie le formulaire du haut (form="kup-form") : la quantité
+        // choisie part avec, même sans JavaScript. shop.js la cache tant que
+        // le vrai bouton est à l'écran et y recopie le total. ?>
+  <div class="kup-pasek" data-kup-pasek>
+    <div class="kup-pasek-in">
+      <span class="kup-pasek-txt"><b><?= e($p['name']) ?></b><span data-kup-pasek-razem><?= e(zl((int) $p['price'])) ?></span></span>
+      <button class="btn btn--accent" type="submit" form="kup-form"><?= e($S['product.add'] ?? '') ?></button>
+    </div>
+  </div>
 </main>
 <?php
     layout_footer($S);
@@ -1038,8 +1114,8 @@ if ($page === 'koszyk') {
       ($S['nav.shop'] ?? 'Sklep') => u(),
       ($S['cart.title'] ?? 'Koszyk') => null,
   ]); ?>
-  <h1><?= e($S['cart.title'] ?? '') ?></h1>
   <?php if (!$q['lines']): ?>
+    <h1><?= e($S['cart.title'] ?? '') ?></h1>
     <p class="muted"><?= e($S['cart.empty'] ?? '') ?></p>
     <p><a class="btn btn--brand" href="<?= e(u()) ?>"><?= e($S['cart.empty_cta'] ?? '') ?></a></p>
   <?php else: ?>
@@ -1050,8 +1126,62 @@ if ($page === 'koszyk') {
         // dans le navigateur. Sans JavaScript, chaque bouton est un vrai
         // envoi de formulaire et la page se recharge : rien ne manque. ?>
   <div class="koszyk-zywy" data-koszyk>
+  <?php $m = $q['method'] ?? null; $dostId = (string) ($m['id'] ?? ''); $kasaHref = u('kasa', ['dostawa' => $m['id'] ?? 'inpost_locker']); ?>
+  <?php // LE SAC, COMME CHEZ APPLE : le montant dans le titre, le bouton de la
+        // caisse tout de suite — on n'a pas à descendre pour payer. ?>
+  <header class="torba-glowa">
+    <h1><?= e(str_replace('{x}', zl($q['total_gross']), $S['cart.title_sum'] ?? '{x}')) ?></h1>
+    <?php if (($S['promise.1.d'] ?? '') !== ''): ?><p><?= e((string) $S['promise.1.d']) ?></p><?php endif; ?>
+    <a class="btn btn--accent btn--lg" href="<?= e($kasaHref) ?>"><?= e($S['cart.checkout'] ?? '') ?></a>
+  </header>
   <?php if (!empty($q['backorder'])) notice('warn', $S['cart.backorder'] ?? ''); ?>
-  <?php $m = $q['method'] ?? null; $dostId = (string) ($m['id'] ?? ''); ?>
+
+  <div class="torba-info">
+    <?php // LA LIVRAISON GRATUITE EN IMAGE : verte avec le colis quand le seuil
+          // est atteint, une barre et le montant qui manque sinon. Le seuil
+          // est celui du mode choisi — celui que la caisse appliquera. Un
+          // bon « darmowa wysyłka » le dit en ses propres mots : écrire
+          // « próg osiągnięty » sous un panier de 40 zł serait faux.
+          $prog = $m ? (int) $m['free_from'] : 0; ?>
+    <?php if ($q['shipping_free']): ?>
+    <div class="darmowa darmowa--ok">
+      <span class="darmowa-znak"><?= ikona_ui('ok') ?></span>
+      <p><?= e(($prog > 0 && $q['items_gross'] >= $prog) || empty($q['voucher']['free_shipping'])
+               ? ($S['cart.free_ok'] ?? '') : ($S['cart.voucher_ship'] ?? '')) ?></p>
+      <?= ilustracja_paczki(true) ?>
+    </div>
+    <?php elseif ($prog > 0): ?>
+    <div class="darmowa">
+      <div class="darmowa-tresc">
+        <p><?= zdanie_html(str_contains($S['cart.free_left'] ?? '', '[') ? ($S['cart.free_left'] ?? '') : str_replace('{x}', '[{x}]', $S['cart.free_left'] ?? ''),
+                           ['{x}' => zl(max(0, $prog - $q['items_gross']))]) ?></p>
+        <div class="prog-pasek prog-pasek--dostawa" aria-hidden="true"><i data-pasek="dostawa" style="width:<?= max(0, min(100, (int) floor($q['items_gross'] * 100 / $prog))) ?>%"></i></div>
+      </div>
+      <?= ilustracja_paczki(false) ?>
+    </div>
+    <?php endif; ?>
+
+    <?php // LE PALIER SUIVANT, avec ce qui manque EN KILOS — la même boîte que
+          // sur la fiche produit. Elle se tait quand un code ou un compte
+          // professionnel donne déjà plus que ce palier : promettre 5 % à
+          // qui a 10 % ferait croire qu'il perd quelque chose.
+          $progi = progi_rabatu($pdo);
+          $stK = stan_progu($progi, (int) $q['weight_g']);
+          $maTeraz = (float) ($q['discount_percent'] ?? 0);
+          if ($progi && ($stK['next'] ? $stK['next']['p'] > $maTeraz
+                                      : ($stK['have'] > 0 && ($q['discount_source'] ?? 'waga') === 'waga'))): ?>
+    <div class="prog-rabat prog-rabat--koszyk">
+      <?= ikona_prezentu() ?>
+      <div class="prog-tresc">
+        <p class="prog-zdanie"><?= $stK['next']
+            ? zdanie_html($S['cart.tier_next'] ?? '', ['{x}' => kg_txt($stK['missing']), '{p}' => procent_txt($stK['next']['p'])])
+            : zdanie_html($S['product.tier_top'] ?? '', ['{p}' => procent_txt($stK['have'])]) ?></p>
+        <div class="prog-pasek" aria-hidden="true"><i data-pasek="rabat" style="width:<?= (int) $stK['pct'] ?>%"></i></div>
+      </div>
+    </div>
+    <?php endif; ?>
+  </div>
+
   <div class="cart">
     <form class="cart-lines" method="post" action="<?= e(u('koszyk')) ?>" data-koszyk-form>
       <?= csrf_field() ?>
@@ -1067,7 +1197,7 @@ if ($page === 'koszyk') {
         </a>
         <div class="cart-info">
           <h2><a href="<?= e(u('p/' . $l['slug'])) ?>"><?= e($l['name']) ?></a></h2>
-          <p class="mono muted"><?= e($l['unit']) ?> · <?= e(zl($l['unit_gross'])) ?> <?= e($S['price.vat_incl'] ?? '') ?></p>
+          <p class="muted"><?php if ((string) $l['unit'] !== ''): ?><?= e($l['unit']) ?> · <?php endif; ?><?= e(zl($l['unit_gross'])) ?> <?= e($S['price.vat_incl'] ?? '') ?></p>
         </div>
         <div class="stepper">
           <button class="stepper-btn" type="submit" name="krok[<?= e($l['id']) ?>]" value="-1"
@@ -1079,9 +1209,11 @@ if ($page === 'koszyk') {
           <button class="stepper-btn" type="submit" name="krok[<?= e($l['id']) ?>]" value="1"
                   aria-label="<?= e(($S['cart.plus'] ?? '+') . ': ' . $l['name']) ?>"<?= (int) $l['qty'] >= WSM_SHOP_MAX_QTY ? ' disabled' : '' ?>><?= ikona_ui('plus') ?></button>
         </div>
-        <span class="cart-sum mono"><?= e(zl($l['line_gross'])) ?></span>
-        <button class="cart-kosz" type="submit" name="remove" value="<?= e($l['id']) ?>"
-                aria-label="<?= e(($S['cart.remove'] ?? '') . ': ' . $l['name']) ?>" title="<?= e($S['cart.remove'] ?? '') ?>"><?= ikona_ui('kosz') ?></button>
+        <div class="cart-kwota">
+          <span class="cart-sum"><?= e(zl($l['line_gross'])) ?></span>
+          <button class="cart-kosz" type="submit" name="remove" value="<?= e($l['id']) ?>"
+                  aria-label="<?= e(($S['cart.remove'] ?? '') . ': ' . $l['name']) ?>"><?= ikona_ui('kosz') ?><span><?= e($S['cart.remove'] ?? '') ?></span></button>
+        </div>
       </div>
       <?php endforeach; ?>
       <div class="cart-actions">
@@ -1092,133 +1224,104 @@ if ($page === 'koszyk') {
       </div>
     </form>
 
-    <aside class="summary">
-      <h2><?= e($S['checkout.summary'] ?? '') ?></h2>
-      <?php // LA LIVRAISON GRATUITE EN IMAGE : verte avec le colis quand le seuil
-            // est atteint, une barre et le montant qui manque sinon. Le seuil
-            // est celui du mode choisi — celui que la caisse appliquera. Un
-            // bon « darmowa wysyłka » le dit en ses propres mots : écrire
-            // « próg osiągnięty » sous un panier de 40 zł serait faux.
-            $prog = $m ? (int) $m['free_from'] : 0; ?>
-      <?php if ($q['shipping_free']): ?>
-      <div class="darmowa darmowa--ok">
-        <span class="darmowa-znak"><?= ikona_ui('ok') ?></span>
-        <p><?= e(($prog > 0 && $q['items_gross'] >= $prog) || empty($q['voucher']['free_shipping'])
-                 ? ($S['cart.free_ok'] ?? '') : ($S['cart.voucher_ship'] ?? '')) ?></p>
-        <?= ilustracja_paczki(true) ?>
-      </div>
-      <?php elseif ($prog > 0): ?>
-      <div class="darmowa">
-        <div class="darmowa-tresc">
-          <p><?= zdanie_html(str_contains($S['cart.free_left'] ?? '', '[') ? ($S['cart.free_left'] ?? '') : str_replace('{x}', '[{x}]', $S['cart.free_left'] ?? ''),
-                             ['{x}' => zl(max(0, $prog - $q['items_gross']))]) ?></p>
-          <div class="prog-pasek prog-pasek--dostawa" aria-hidden="true"><i data-pasek="dostawa" style="width:<?= max(0, min(100, (int) floor($q['items_gross'] * 100 / $prog))) ?>%"></i></div>
-        </div>
-        <?= ilustracja_paczki(false) ?>
-      </div>
-      <?php endif; ?>
-
-      <?php // LE PALIER SUIVANT, avec ce qui manque EN KILOS — la même boîte que
-            // sur la fiche produit. Elle se tait quand un code ou un compte
-            // professionnel donne déjà plus que ce palier : promettre 5 % à
-            // qui a 10 % ferait croire qu'il perd quelque chose.
-            $progi = progi_rabatu($pdo);
-            $stK = stan_progu($progi, (int) $q['weight_g']);
-            $maTeraz = (float) ($q['discount_percent'] ?? 0);
-            if ($progi && ($stK['next'] ? $stK['next']['p'] > $maTeraz
-                                        : ($stK['have'] > 0 && ($q['discount_source'] ?? 'waga') === 'waga'))): ?>
-      <div class="prog-rabat prog-rabat--koszyk">
-        <div class="prog-tresc">
-          <p class="prog-zdanie"><?= $stK['next']
-              ? zdanie_html($S['cart.tier_next'] ?? '', ['{x}' => kg_txt($stK['missing']), '{p}' => procent_txt($stK['next']['p'])])
-              : zdanie_html($S['product.tier_top'] ?? '', ['{p}' => procent_txt($stK['have'])]) ?></p>
-          <div class="prog-pasek" aria-hidden="true"><i data-pasek="rabat" style="width:<?= (int) $stK['pct'] ?>%"></i></div>
-        </div>
-        <?= ikona_prezentu() ?>
-      </div>
-      <?php endif; ?>
-
-      <?php // Le code de réduction. Un code refusé affiche POURQUOI, en toutes
-            // lettres et à côté du champ : « nie znamy tego kodu » et « kod
-            // działa od 200,00 zakupów » appellent deux gestes différents, et
-            // un message unique les confondrait. ?>
-      <form class="voucher" method="post" action="<?= e(u('koszyk')) ?>" data-koszyk-form>
-        <?= csrf_field() ?>
-        <input type="hidden" name="dostawa" value="<?= e($dostId) ?>">
-        <?php $kodCourant = voucher_read(); ?>
-        <?php if (($q['voucher']['applied'] ?? false)): ?>
-        <p class="voucher-on mono">
-          <strong><?= e($q['voucher']['code']) ?></strong>
-          <span><?= e($q['voucher']['kind'] === 'wysylka'
-                     ? ($S['cart.voucher_ship'] ?? '') : $q['voucher']['label']) ?></span>
-          <button class="linkbtn" type="submit" name="kod_drop" value="1"><?= e($S['cart.voucher_drop'] ?? '') ?></button>
-        </p>
-        <?php else: ?>
-        <p class="field<?= ($q['voucher_error'] ?? '') !== '' ? ' has-error' : '' ?>">
-          <label for="f-kod"><?= e($S['cart.voucher'] ?? '') ?></label>
-          <span class="voucher-row">
-            <input id="f-kod" name="kod" type="text" value="<?= e($kodCourant) ?>"
-                   placeholder="<?= e($S['cart.voucher_ph'] ?? '') ?>"
-                   autocomplete="off" spellcheck="false" maxlength="40"
-                   <?= ($q['voucher_error'] ?? '') !== '' ? ' aria-invalid="true" aria-describedby="f-kod-e"' : '' ?>>
-            <button class="btn btn--ghost btn--sm" type="submit" name="kod_set" value="1"><?= e($S['cart.voucher_apply'] ?? '') ?></button>
-          </span>
-          <?php if (($q['voucher_error'] ?? '') !== ''): ?>
-          <small class="err" id="f-kod-e"><?= e($q['voucher_error']) ?></small>
-          <?php endif; ?>
-        </p>
-        <?php endif; ?>
-      </form>
-
+    <div class="torba-dol">
       <?php // LES TRANSPORTEURS EN IMAGE : la consigne InPost, le fourgon InPost,
             // le fourgon DPD (znaki.php, ilustracja_dostawy). « Gratis » est
             // écrit sur CHAQUE mode que le panier rend gratuit, pas seulement
             // sur celui qui est coché : le client compare, il doit voir juste. ?>
-      <form class="ship-pick" method="get" action="<?= e(u('koszyk')) ?>" data-koszyk-form>
-        <fieldset>
-          <legend class="sr-only"><?= e($S['cart.shipping'] ?? '') ?></legend>
-          <?php foreach ($q['methods'] as $sm):
-            $wybrana = $m && $sm['id'] === $m['id'];
-            $gratis = $wybrana ? (bool) $q['shipping_free']
-                    : (!empty($q['voucher']['free_shipping']) || ($sm['free_from'] > 0 && $q['items_gross'] >= $sm['free_from'])); ?>
-          <label class="dostawa-opcja<?= $wybrana ? ' is-on' : '' ?>">
-            <input type="radio" name="dostawa" value="<?= e($sm['id']) ?>"<?= $wybrana ? ' checked' : '' ?> data-od-razu>
-            <span class="dostawa-obraz"><?= ilustracja_dostawy((string) $sm['carrier'], (string) $sm['kind']) ?></span>
-            <span class="dostawa-txt"><strong><?= e($sm['label']) ?></strong><?php if ($sm['note'] !== ''): ?><small><?= e($sm['note']) ?></small><?php endif; ?></span>
-            <em class="dostawa-cena<?= $gratis ? ' is-gratis' : '' ?>"><?= $gratis ? e($S['cart.free'] ?? '') : e(zl($sm['price'])) ?></em>
-          </label>
-          <?php endforeach; ?>
-        </fieldset>
-        <noscript><button class="btn btn--ghost btn--sm" type="submit">↻</button></noscript>
-      </form>
+      <section class="torba-dostawa" aria-labelledby="dostawa-h">
+        <h2 class="kup-tytul" id="dostawa-h"><?= e($S['cart.ship_title'] ?? '') ?> <span><?= e($S['cart.ship_sub'] ?? '') ?></span></h2>
+        <form class="ship-pick" method="get" action="<?= e(u('koszyk')) ?>" data-koszyk-form>
+          <fieldset>
+            <legend class="sr-only"><?= e($S['cart.shipping'] ?? '') ?></legend>
+            <?php foreach ($q['methods'] as $sm):
+              $wybrana = $m && $sm['id'] === $m['id'];
+              $gratis = $wybrana ? (bool) $q['shipping_free']
+                      : (!empty($q['voucher']['free_shipping']) || ($sm['free_from'] > 0 && $q['items_gross'] >= $sm['free_from'])); ?>
+            <label class="dostawa-opcja<?= $wybrana ? ' is-on' : '' ?>">
+              <input type="radio" name="dostawa" value="<?= e($sm['id']) ?>"<?= $wybrana ? ' checked' : '' ?> data-od-razu>
+              <span class="dostawa-obraz"><?= ilustracja_dostawy((string) $sm['carrier'], (string) $sm['kind']) ?></span>
+              <span class="dostawa-txt"><strong><?= e($sm['label']) ?></strong><?php if ($sm['note'] !== ''): ?><small><?= e($sm['note']) ?></small><?php endif; ?></span>
+              <em class="dostawa-cena<?= $gratis ? ' is-gratis' : '' ?>"><?= $gratis ? e($S['cart.free'] ?? '') : e(zl($sm['price'])) ?></em>
+            </label>
+            <?php endforeach; ?>
+          </fieldset>
+          <noscript><button class="btn btn--ghost btn--sm" type="submit">↻</button></noscript>
+        </form>
+      </section>
 
-      <dl class="totals mono">
-        <dt><?= e($S['cart.subtotal'] ?? '') ?></dt><dd><?= e(zl($q['items_gross'])) ?></dd>
-        <?php if (($q['discount_percent'] ?? 0) > 0): ?>
-        <?php // Le libellé dit D'OÙ vient la remise. « Rabat ilościowy » sur une
-              // remise venue d'un code nommait la mauvaise raison : celui qui
-              // retire son code ne comprenait pas que le montant ne bouge pas. ?>
-        <dt class="disc"><?= e(($q['discount_source'] ?? 'waga') === 'waga'
-              ? ($S['cart.discount'] ?? '')
-              : (string) ($q['discount_label'] ?? ($S['cart.discount'] ?? ''))) ?> −<?= e(procent_txt((float) $q['discount_percent'])) ?> %</dt>
-        <dd class="disc">−<?= e(zl($q['discount_amount'])) ?></dd>
-        <?php endif; ?>
-        <?php // Le bon en MONTANT a sa propre ligne : additionné à la remise
-              // au poids il deviendrait illisible, et l'acheteur ne saurait
-              // plus lequel des deux il perd s'il retire son code. ?>
-        <?php if ((int) ($q['voucher']['amount'] ?? 0) > 0): ?>
-        <dt class="disc"><?= e($S['cart.voucher_line'] ?? '') ?> <?= e($q['voucher']['code']) ?></dt>
-        <dd class="disc">−<?= e(zl((int) $q['voucher']['amount'])) ?></dd>
-        <?php endif; ?>
-        <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
-        <dd<?= $q['shipping_gross'] === 0 ? ' class="disc"' : '' ?>><?= $q['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($q['shipping_gross'])) ?></dd>
-        <dt class="grand"><?= e($S['cart.total'] ?? '') ?></dt><dd class="grand"><?= e(zl($q['total_gross'])) ?></dd>
-        <dt class="small"><?= e($S['cart.vat_of'] ?? '') ?></dt><dd class="small"><?= e(zl($q['total_vat'])) ?></dd>
-        <dt class="small"><?= e($S['cart.weight'] ?? '') ?></dt><dd class="small"><?= e(number_format($q['weight_g'] / 1000, 2, ',', ' ')) ?> kg</dd>
-      </dl>
-      <?php if (isset($qErr['weight_g'])) notice('warn', $qErr['weight_g']); ?>
-      <a class="btn btn--accent btn--lg btn--block btn--kasa" href="<?= e(u('kasa', ['dostawa' => $m['id'] ?? 'inpost_locker'])) ?>"><?= e($S['cart.checkout'] ?? '') ?><?= ikona_ui('dalej') ?></a>
-    </aside>
+      <aside class="summary" aria-label="<?= e($S['checkout.summary'] ?? '') ?>">
+        <?php // Le code de réduction, replié comme chez Apple (« Masz kod
+              // rabatowy? »). Ouvert d'office quand un code est posé ou refusé :
+              // le motif du refus doit se voir sans chercher. ?>
+        <?php $kodCourant = voucher_read(); $kodOtwarty = ($q['voucher']['applied'] ?? false) || ($q['voucher_error'] ?? '') !== '' || $kodCourant !== ''; ?>
+        <details class="voucher-zw"<?= $kodOtwarty ? ' open' : '' ?>>
+          <summary><?= e($S['cart.voucher_q'] ?? ($S['cart.voucher'] ?? '')) ?></summary>
+          <form class="voucher" method="post" action="<?= e(u('koszyk')) ?>" data-koszyk-form>
+            <?= csrf_field() ?>
+            <input type="hidden" name="dostawa" value="<?= e($dostId) ?>">
+            <?php if (($q['voucher']['applied'] ?? false)): ?>
+            <p class="voucher-on">
+              <strong><?= e($q['voucher']['code']) ?></strong>
+              <span><?= e($q['voucher']['kind'] === 'wysylka'
+                         ? ($S['cart.voucher_ship'] ?? '') : $q['voucher']['label']) ?></span>
+              <button class="linkbtn" type="submit" name="kod_drop" value="1"><?= e($S['cart.voucher_drop'] ?? '') ?></button>
+            </p>
+            <?php else: ?>
+            <p class="field<?= ($q['voucher_error'] ?? '') !== '' ? ' has-error' : '' ?>">
+              <label for="f-kod" class="sr-only"><?= e($S['cart.voucher'] ?? '') ?></label>
+              <span class="voucher-row">
+                <input id="f-kod" name="kod" type="text" value="<?= e($kodCourant) ?>"
+                       placeholder="<?= e($S['cart.voucher_ph'] ?? '') ?>"
+                       autocomplete="off" spellcheck="false" maxlength="40"
+                       <?= ($q['voucher_error'] ?? '') !== '' ? ' aria-invalid="true" aria-describedby="f-kod-e"' : '' ?>>
+                <button class="btn btn--ghost btn--sm" type="submit" name="kod_set" value="1"><?= e($S['cart.voucher_apply'] ?? '') ?></button>
+              </span>
+              <?php if (($q['voucher_error'] ?? '') !== ''): ?>
+              <small class="err" id="f-kod-e"><?= e($q['voucher_error']) ?></small>
+              <?php endif; ?>
+            </p>
+            <?php endif; ?>
+          </form>
+        </details>
+
+        <dl class="totals">
+          <dt><?= e($S['cart.subtotal'] ?? '') ?></dt><dd><?= e(zl($q['items_gross'])) ?></dd>
+          <?php if (($q['discount_percent'] ?? 0) > 0): ?>
+          <?php // Le libellé dit D'OÙ vient la remise. « Rabat ilościowy » sur une
+                // remise venue d'un code nommait la mauvaise raison : celui qui
+                // retire son code ne comprenait pas que le montant ne bouge pas. ?>
+          <dt class="disc"><?= e(($q['discount_source'] ?? 'waga') === 'waga'
+                ? ($S['cart.discount'] ?? '')
+                : (string) ($q['discount_label'] ?? ($S['cart.discount'] ?? ''))) ?> −<?= e(procent_txt((float) $q['discount_percent'])) ?> %</dt>
+          <dd class="disc">−<?= e(zl($q['discount_amount'])) ?></dd>
+          <?php endif; ?>
+          <?php // Le bon en MONTANT a sa propre ligne : additionné à la remise
+                // au poids il deviendrait illisible, et l'acheteur ne saurait
+                // plus lequel des deux il perd s'il retire son code. ?>
+          <?php if ((int) ($q['voucher']['amount'] ?? 0) > 0): ?>
+          <dt class="disc"><?= e($S['cart.voucher_line'] ?? '') ?> <?= e($q['voucher']['code']) ?></dt>
+          <dd class="disc">−<?= e(zl((int) $q['voucher']['amount'])) ?></dd>
+          <?php endif; ?>
+          <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
+          <dd<?= $q['shipping_gross'] === 0 ? ' class="disc"' : '' ?>><?= $q['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($q['shipping_gross'])) ?></dd>
+          <dt class="grand"><?= e($S['cart.total'] ?? '') ?></dt><dd class="grand"><?= e(zl($q['total_gross'])) ?></dd>
+          <dt class="small"><?= e($S['cart.vat_of'] ?? '') ?></dt><dd class="small"><?= e(zl($q['total_vat'])) ?></dd>
+          <dt class="small"><?= e($S['cart.weight'] ?? '') ?></dt><dd class="small"><?= e(kg_txt((int) $q['weight_g'])) ?></dd>
+        </dl>
+        <?php if (isset($qErr['weight_g'])) notice('warn', $qErr['weight_g']); ?>
+        <a class="btn btn--accent btn--lg btn--block btn--kasa" href="<?= e($kasaHref) ?>"><?= e($S['cart.checkout'] ?? '') ?><?= ikona_ui('dalej') ?></a>
+      </aside>
+    </div>
+
+    <?php // L'AIDE, sous le récapitulatif : le téléphone, les retours. ?>
+    <?php $telK = trim((string) ($S['footer.phone'] ?? '')); ?>
+    <div class="torba-pomoc">
+      <?php if (tel_href($telK) !== ''): ?>
+      <p><b><?= e($S['cart.help_title'] ?? '') ?></b><?= e($S['cart.help_text'] ?? '') ?> <a href="<?= e(tel_href($telK)) ?>"><?= e($telK) ?></a></p>
+      <?php endif; ?>
+      <p><b><?= e($S['cart.returns_title'] ?? '') ?></b><?= e($S['cart.returns_text'] ?? '') ?> <a href="<?= e(u('zwroty')) ?>"><?= e($S['returns.footer_link'] ?? '') ?> ›</a></p>
+    </div>
   </div>
   <?php // Les suggestions vivent ICI et pas sur la fiche produit, qui a déjà
         // sa rangée « podobne ». Deux blocs de propositions sur la même page

@@ -44,10 +44,10 @@ seo_head($page, $lang, $langs, $title, $desc, WSM_SHOP_DEFAULT_LANG, $image);
 <!-- La confirmation d'ajout est traduite en base (product.added) ; sans cet
      attribut, shop.js retombait sur un simple « ✓ » et la traduction ne
      servait à rien. -->
-<?php // LE FOND CHAUD (vagues et gouttes caramel) sur la fiche produit et le
-      // panier, comme sur les maquettes de l'équipe ; les autres pages
-      // gardent le fond uni, plus calme pour lire. ?>
-<body data-added="<?= e($S['product.added'] ?? '') ?>"<?= in_array($page, ['p', 'koszyk'], true) ? ' class="tlo-cieple"' : '' ?>>
+<?php // Une classe par page (strona-start, strona-p, strona-koszyk…) : l'habit
+      // « Apple » règle quelques détails page par page (la barre du haut de
+      // la fiche produit ne colle pas, sa barre d'achat oui). ?>
+<body data-added="<?= e($S['product.added'] ?? '') ?>" class="strona-<?= e($page !== '' ? $page : 'start') ?>">
 <?php
 }
 
@@ -98,7 +98,7 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
       <img src="<?= e(logo_src()) ?>" alt="<?= e(logo_nazwa_on() ? '' : ($S['brand'] ?? 'Szoko Shop')) ?>" height="44">
       <?php if (logo_nazwa_on()): ?><span class="head-nazwa"><?= e($S['brand'] ?? 'Szoko Shop') ?></span><?php endif; ?>
     </a>
-    <nav class="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
+    <nav class="head-nav" id="head-nav" aria-label="<?= e($S['a11y.nav'] ?? '') ?>">
       <?php // L'ORDRE ET LA PRÉSENCE DES LIENS VIENNENT D'UKŁAD STRONY : Sklep,
             // B2B, Moje zamówienie, Kontakt et les pages cochées « w menu ».
             // Le suivi de commande avant Kontakt par défaut : neuf visiteurs
@@ -113,6 +113,11 @@ function layout_header(array $S, string $lang, array $langs, int $cartCount): vo
         <a href="<?= e($self . '?lang=' . $l) ?>" lang="<?= e($l) ?>"<?= $l === $lang ? ' aria-current="true"' : '' ?>><?= e($codeLabel[$l] ?? strtoupper($l)) ?></a>
         <?php endforeach; ?>
       </div>
+      <?php // Le menu sur téléphone : caché tant que shop.js n'est pas là pour
+            // l'ouvrir. Sans script, les mêmes liens sont dans le pied de page. ?>
+      <button class="head-menu" type="button" aria-expanded="false" aria-controls="head-nav" aria-label="<?= e($S['a11y.nav'] ?? 'Menu') ?>" hidden>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 9h16M4 15h16"/></svg>
+      </button>
       <a class="cart-btn" href="<?= e(u('koszyk')) ?>" aria-label="<?= e($S['a11y.cart'] ?? '') ?>">
         <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l-1 13H7L6 7Z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/></svg>
         <span class="cart-label"><?= e($S['nav.cart'] ?? '') ?></span>
