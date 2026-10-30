@@ -395,11 +395,33 @@ $shop = $lire('mrszoko/shop/index.php');
 ok('la caisse propose l\'accord e-paragon (avec son champ témoin)',
    str_contains($shop, 'name="e_paragon_pole"') && str_contains($shop, 'name="e_paragon"') && str_contains($shop, 'kasa_fiskalna()'));
 ok('la page de commande affiche le paragon', str_contains($shop, 'wsm_fiskal_dla_klienta('));
+ok('la case e-paragon est DÉCOCHÉE d\'office : un accord se donne, il ne se présume pas',
+   str_contains($shop, "<?= !empty(\$v['e_paragon']) ? ' checked' : '' ?>") && !str_contains($shop, "!isset(\$v['e_paragon_pole']) ||"));
 $seed = json_decode($lire('mrszoko/shop/content_seed.json'), true);
 $cles = ['checkout.ereceipt', 'checkout.ereceipt_hint', 'order.receipt', 'order.receipt_open', 'order.receipt_wait', 'order.receipt_paper'];
 $manque = [];
 foreach (['pl', 'uk', 'en'] as $lg) foreach ($cles as $k) if (trim((string) ($seed['strings'][$lg][$k] ?? '')) === '') $manque[] = "$lg:$k";
 ok('les textes existent en polonais, ukrainien et anglais', $manque === [], $manque);
+// Le texte d'aide déjà en base (« décochez si… ») est remplacé une fois,
+// sauf s'il a été réécrit dans Treści. Joué pour de vrai sur des lignes de test.
+require_once dirname(__DIR__) . '/seed.php';
+$zg = wsm_content_jednorazowe()['migracja.2026_10_eparagon_zgoda'] ?? [];
+ok('la migration de l\'aide existe, pour les trois langues', count($zg) === 3);
+$pdo->exec("DELETE FROM wsm_shop_i18n WHERE k IN ('e2e.fk.hint', 'e2e.fk.hint2')");
+$pdo->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES ('pl', 'e2e.fk.hint', ?), ('pl', 'e2e.fk.hint2', ?)")
+    ->execute([$zg[0][1][3] ?? '', 'Tekst przepisany ręcznie']);
+foreach ($zg as [$sql, $args]) {
+    foreach (['e2e.fk.hint', 'e2e.fk.hint2'] as $kk) { $a = $args; $a[1] = $kk; $pdo->prepare($sql)->execute($a); }
+}
+$lit = fn(string $k) => (string) $pdo->query("SELECT v FROM wsm_shop_i18n WHERE lang = 'pl' AND k = " . $pdo->quote($k))->fetchColumn();
+ok('… l\'ancienne aide devient la nouvelle', $lit('e2e.fk.hint') === ($seed['strings']['pl']['checkout.ereceipt_hint'] ?? '?'), $lit('e2e.fk.hint'));
+ok('… un texte réécrit à la main n\'est pas touché', $lit('e2e.fk.hint2') === 'Tekst przepisany ręcznie');
+$pdo->exec("DELETE FROM wsm_shop_i18n WHERE k IN ('e2e.fk.hint', 'e2e.fk.hint2')");
+$cible = [];
+foreach ($zg as [, $args]) $cible[$args[2]] = $args[0];
+ok('le fichier de contenu porte le même texte que la migration (pl, uk, en)',
+   $cible !== [] && array_reduce(array_keys($cible), fn($c, $lg) => $c && ($seed['strings'][$lg]['checkout.ereceipt_hint'] ?? '') === $cible[$lg], true));
+ok('l\'aide ne dit plus « décochez »', !str_contains($seed['strings']['pl']['checkout.ereceipt_hint'] ?? '', 'Odznacz'));
 ok('aucun vrai jeton dans le dépôt (config lit l\'environnement)',
    str_contains($lire('mrszoko/backoffice/php-api/config.php'), "getenv('WSM_FAKTUROWNIA_TOKEN')"));
 

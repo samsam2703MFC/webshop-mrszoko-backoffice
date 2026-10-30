@@ -712,6 +712,19 @@ function wsm_content_jednorazowe(): array {
     }
     $ops['migracja.2026_10_stripe_przecinek'] = $s2;
 
+    // L'E-PARAGON SE DEMANDE, IL NE SE PRÉSUME PAS. La case de la caisse est
+    // désormais décochée d'office ; l'aide disait « décochez si vous préférez
+    // le papier ». Remplacée seulement si personne ne l'a réécrite dans Treści.
+    $e = [];
+    foreach ([
+        ['pl', 'Zgoda na paragon fiskalny w postaci elektronicznej. Odznacz, jeśli wolisz papierowy w paczce. Przy fakturze nie dotyczy.', 'Zgoda na paragon fiskalny w postaci elektronicznej, wysłany na Twój e-mail. Bez zaznaczenia dołączymy paragon papierowy do paczki. Przy fakturze nie dotyczy.'],
+        ['uk', 'Згода на фіскальний чек в електронній формі. Зніміть позначку, якщо хочете паперовий чек у посилці. Не стосується фактури.', 'Згода на фіскальний чек в електронній формі на вашу електронну пошту. Без позначки додамо паперовий чек до посилки. Не стосується фактури.'],
+        ['en', 'Consent to an electronic fiscal receipt. Untick it if you prefer a paper receipt in the parcel. Does not apply to invoices.', 'Consent to an electronic fiscal receipt sent to your e-mail. If left unticked, a paper receipt will be packed with your parcel. Does not apply to invoices.'],
+    ] as [$l, $de, $vers]) {
+        $e[] = ['UPDATE wsm_shop_i18n SET v = ? WHERE k = ? AND lang = ? AND v = ?', [$vers, 'checkout.ereceipt_hint', $l, $de]];
+    }
+    $ops['migracja.2026_10_eparagon_zgoda'] = $e;
+
     return $ops;
 }
 

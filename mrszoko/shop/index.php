@@ -1571,13 +1571,14 @@ if ($page === 'kasa') {
         </label>
         <?php // L'ACCORD POUR L'E-PARAGON (art. 111 ust. 3a ustawy o VAT) :
               // proposé seulement quand une caisse fiscale est branchée, et
-              // coché d'office à la première ouverture — décocher donne le
-              // paragon papier, glissé dans le colis. Après une erreur de
-              // formulaire, on garde ce que le client avait choisi. ?>
+              // DÉCOCHÉ d'office — un accord se donne, il ne se présume pas.
+              // Sans la case, c'est le paragon papier, glissé dans le colis.
+              // Après une erreur de formulaire, on garde ce que le client
+              // avait choisi. ?>
         <?php if (kasa_fiskalna()): ?>
         <input type="hidden" name="e_paragon_pole" value="1">
         <label class="check">
-          <input type="checkbox" name="e_paragon" value="1"<?= (!isset($v['e_paragon_pole']) || !empty($v['e_paragon'])) ? ' checked' : '' ?>>
+          <input type="checkbox" name="e_paragon" value="1"<?= !empty($v['e_paragon']) ? ' checked' : '' ?>>
           <span><?= e($S['checkout.ereceipt'] ?? '') ?><small><?= e($S['checkout.ereceipt_hint'] ?? '') ?></small></span>
         </label>
         <?php endif; ?>
