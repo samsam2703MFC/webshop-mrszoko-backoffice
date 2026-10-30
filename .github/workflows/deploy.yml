@@ -3070,6 +3070,12 @@ jobs:
                  -H 'Content-Type: application/json' -d '{"id":"0"}')
           echo "  POST /shop/fakturownia/webhook -> $WC (zamknieta: 503, otwarta: 200/403)"
           case "$WC" in 200|403|503) ;; *) echo "  ^ NOT OK : webhook kasy odpowiada $WC"; fail=1;; esac
+          # La case e-paragon est décochée d'office ; l'aide en base ne doit
+          # plus dire « décochez » (migracja.2026_10_eparagon_zgoda).
+          NH=$(mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e \
+            "SELECT COUNT(*) FROM wsm_shop_i18n WHERE k='checkout.ereceipt_hint' AND v LIKE '%Odznacz%';" 2>/dev/null || echo "?")
+          [ "${NH:-?}" = "0" ] && echo "  zgoda na e-paragon: pole odznaczone, tekst pomocy aktualny" \
+            || echo "  ^ UWAGA : tekst pomocy e-paragonu wciaz mowi 'Odznacz' (${NH}) — popraw w Tresciach"
 
           if [ "$fail" = "0" ]; then echo "ALL KSEF CHECKS OK"; else echo "KSEF CHECK FAILED"; exit 1; fi
           REMOTE
