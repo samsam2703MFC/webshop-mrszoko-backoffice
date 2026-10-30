@@ -402,6 +402,10 @@ if ($method === 'POST') {
         $body['lang']  = $lang;
         $body['invoice'] = !empty($_POST['invoice']);
         $body['consent_terms'] = !empty($_POST['consent_terms']);
+        // L'accord e-paragon n'existe que si la case a été MONTRÉE (champ
+        // témoin) : une case décochée n'envoie rien, et rien ne doit valoir
+        // « pas demandé » quand c'est un « non ».
+        $body['e_paragon'] = isset($_POST['e_paragon_pole']) ? !empty($_POST['e_paragon']) : null;
         // Le code vient du cookie, jamais d'un champ caché : un champ caché
         // est modifiable dans le navigateur, et le cookie est de toute façon
         // revalidé en base à la création de la commande.
@@ -1565,6 +1569,18 @@ if ($page === 'kasa') {
           <input type="checkbox" name="invoice" value="1"<?= !empty($v['invoice']) ? ' checked' : '' ?> data-invoice>
           <span><?= e($S['checkout.want_invoice'] ?? '') ?><small><?= e($S['checkout.invoice_hint'] ?? '') ?></small></span>
         </label>
+        <?php // L'ACCORD POUR L'E-PARAGON (art. 111 ust. 3a ustawy o VAT) :
+              // proposé seulement quand une caisse fiscale est branchée, et
+              // coché d'office à la première ouverture — décocher donne le
+              // paragon papier, glissé dans le colis. Après une erreur de
+              // formulaire, on garde ce que le client avait choisi. ?>
+        <?php if (kasa_fiskalna()): ?>
+        <input type="hidden" name="e_paragon_pole" value="1">
+        <label class="check">
+          <input type="checkbox" name="e_paragon" value="1"<?= (!isset($v['e_paragon_pole']) || !empty($v['e_paragon'])) ? ' checked' : '' ?>>
+          <span><?= e($S['checkout.ereceipt'] ?? '') ?><small><?= e($S['checkout.ereceipt_hint'] ?? '') ?></small></span>
+        </label>
+        <?php endif; ?>
         <div class="invoice-fields"<?= !empty($v['invoice']) ? '' : ' hidden' ?> data-invoice-fields>
           <div class="row">
             <?php $field('company', $S['checkout.company'] ?? '', ['required' => false]); ?>
@@ -1952,6 +1968,9 @@ if ($page === 'zamowienie') {
     // une commande pas encore payée, tant que Stripe est prêt.
     $payUrl = (wsm_stripe_ready() && in_array($o['payment_status'], ['oczekuje', 'nieudane'], true) && $o['status'] !== 'anulowane')
         ? u('zaplac/' . rawurlencode($o['code']), ['t' => $o['access_token']]) : '';
+    // Le paragon fiscal : son lien quand l'imprimante l'a émis, sinon ce qui
+    // va se passer. Rien du tout sans caisse branchée, ni pour une facture.
+    $paragon = kasa_fiskalna() ? wsm_fiskal_dla_klienta($pdo, $o) : ['stan' => '', 'url' => ''];
     ?>
 <main class="wrap block">
   <?php layout_crumbs([
@@ -1990,6 +2009,16 @@ if ($page === 'zamowienie') {
           <?php if ($o['inpost_point'] !== ''): ?><br><span class="mono"><?= e($o['inpost_point']) ?></span><?php endif; ?>
           <?php if (($o['shipment']['tracking_number'] ?? '') !== ''): ?><br><span class="mono"><?= e($o['shipment']['tracking_number']) ?></span><?php endif; ?>
         </dd>
+        <?php if ($paragon['stan'] !== '' && $o['status'] !== 'anulowane'): ?>
+        <dt><?= e($S['order.receipt'] ?? '') ?></dt>
+        <dd><?php if ($paragon['stan'] === 'gotowy'): ?>
+          <a href="<?= e($paragon['url']) ?>" target="_blank" rel="noopener"><?= e($S['order.receipt_open'] ?? '') ?></a>
+        <?php elseif ($paragon['stan'] === 'e'): ?>
+          <?= e(str_replace('{email}', $o['email'], $S['order.receipt_wait'] ?? '')) ?>
+        <?php else: ?>
+          <?= e($S['order.receipt_paper'] ?? '') ?>
+        <?php endif; ?></dd>
+        <?php endif; ?>
       </dl>
       <?php if ($payUrl !== ''): ?>
         <a class="btn btn--accent btn--lg btn--block" href="<?= e($payUrl) ?>"><?= e($S['order.pay_now'] ?? '') ?></a>

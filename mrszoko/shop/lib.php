@@ -37,6 +37,18 @@ if (is_file($WSM_API_DIR . '/metody.php')) require_once $WSM_API_DIR . '/metody.
 if (is_file(__DIR__ . '/znaki.php')) require_once __DIR__ . '/znaki.php';
 require_once $WSM_API_DIR . '/stripe.php';
 
+/**
+ * La caisse fiscale est-elle branchée ? Charge fiskal.php à la demande : la
+ * case « e-paragon » de la caisse et la ligne « Paragon » de la commande n'ont
+ * de sens que si une imprimante fiscale enregistre vraiment la vente.
+ */
+function kasa_fiskalna(): bool {
+    global $WSM_API_DIR;
+    $f = $WSM_API_DIR . '/fiskal.php';
+    if (!function_exists('wsm_fiskal_enabled') && is_file($f)) require_once $f;
+    return function_exists('wsm_fiskal_enabled') && wsm_fiskal_enabled();
+}
+
 // UNE ERREUR IMPRÉVUE NE DONNE PAS UNE PAGE BLANCHE AU CLIENT. Rien de
 // technique ne s'affiche (ni requête, ni chemin) : une excuse, un lien vers
 // l'accueil et le contact. Le détail part dans le journal du serveur.

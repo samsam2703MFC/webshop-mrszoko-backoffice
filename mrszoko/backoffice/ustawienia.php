@@ -27,6 +27,7 @@ require_once $API . '/mail.php';
 require_once $API . '/shop.php';
 require_once $API . '/invoice.php';
 require_once $API . '/ksef.php';   // wsm_ksef_enabled() : la tuile « KSeF gotowy »
+require_once $API . '/fiskal.php'; // la caisse fiscale : état, test, adresse du webhook
 
 $flash = ''; $flashKind = 'ok';
 
@@ -43,7 +44,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // marche » sur des identifiants que la boutique n'a pas — et l'inverse
         // est pire encore. On enregistre d'abord, on teste ensuite.
         $quoi = (string) $_POST['test_polaczenia'];
-        $fn = ['stripe' => 'wsm_stripe_diag', 'inpost' => 'wsm_inpost_diag'][$quoi] ?? '';
+        $fn = ['stripe' => 'wsm_stripe_diag', 'inpost' => 'wsm_inpost_diag', 'paragon' => 'wsm_fiskal_diag'][$quoi] ?? '';
         if ($fn === '' || !function_exists($fn)) {
             $flash = 'Nie ma takiego testu.'; $flashKind = 'err';
         } else {
@@ -106,6 +107,7 @@ $groups = [
     'inpost' => ['InPost ShipX — wysyłka', 'Token serwerowy służy do tworzenia etykiet. Token Geowidget trafia do strony sklepu — to token przeglądarkowy.'],
     'dpd'    => ['DPD Polska — wysyłka pod adres', 'Login, hasło i numer klienta (FID) z panelu DPD. Adres nadawcy jest drukowany na etykiecie: bez niego paczka odrzucona w doręczeniu nie ma dokąd wrócić. API DPD to SOAP — serwer musi mieć rozszerzenie php-soap.'],
     'mail'   => ['Poczta — wiadomości do klientów', 'Bez adresu nadawcy wiadomości czekają w kolejce w zakładce Poczta i nic nie ginie.'],
+    'paragon' => ['E-paragon fiskalny — Fakturownia + Paragony.pl', 'Paragon sklepu staje się paragonem FISKALNYM: sklep tworzy go w Fakturowni, a drukarka fiskalna online firmy go rejestruje. Potrzebne: konto Fakturowni z modułem Paragony.pl, drukarka fiskalna online i włączony komputer z programem Paragony.pl. Klient, który zaznaczy zgodę w kasie, dostaje e-paragon mailem; pozostali — paragon papierowy do paczki. W Fakturowni NIE włączaj „automatycznej fiskalizacji po API”: zleca ją sklep, a dwa zlecenia to dwa paragony. W Superadminie ustaw wystawianie dokumentu przy „Opłacone”: kasa rejestruje przedpłatę w chwili wpłaty, a papierowy paragon zdążysz włożyć do paczki.'],
     'ksef'   => ['KSeF — krajowy rejestr faktur', 'NIP bierze się z sekcji Faktury — nie powtarzamy go tutaj. Paragony nie idą do rejestru i tak ma być: zgłoszenie paragonu wpisałoby do rejestru dokument, który dla urzędu nie istnieje.'],
     'faktura' => ['Faktury', 'Te dane trafiają na każdy wystawiony dokument. Zmiana nie przepisuje faktur już wystawionych — każda z nich trzyma własną kopię.'],
     'sklep'  => ['Sklep', ''],
@@ -118,6 +120,7 @@ $state = [
     'mail'    => wsm_mail_enabled(),
     'faktura' => wsm_invoice_blockers() === [],
     'ksef'    => function_exists('wsm_ksef_enabled') && wsm_ksef_enabled(),
+    'paragon' => wsm_fiskal_enabled(),
 ];
 
 console_head('Integracje', $me, <<<CSS
@@ -134,6 +137,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Integracje' => null]);
   <div class="kpi"><b><?= $state['inpost'] ? 'TAK' : 'NIE' ?></b><span>InPost gotowy</span></div>
   <div class="kpi"><b><?= $state['mail'] ? 'TAK' : 'NIE' ?></b><span>Poczta gotowa</span></div>
   <div class="kpi"><b><?= $state['ksef'] ? 'TAK' : 'NIE' ?></b><span>KSeF gotowy</span></div>
+  <div class="kpi"><b><?= $state['paragon'] ? 'TAK' : 'NIE' ?></b><span>Kasa fiskalna</span></div>
   <div class="kpi"><b><?= $state['faktura'] ? 'TAK' : 'NIE' ?></b><span>Faktury gotowe</span></div>
 </div>
 
@@ -228,12 +232,18 @@ if ($orphelins): ?>
           //
           // Il marche CANAL FERMÉ, volontairement : c'est précisément quand
           // rien ne fonctionne qu'on a besoin de savoir pourquoi.
-          $diag = ['inpost' => 'wsm_inpost_diag'];
+          $diag = ['inpost' => 'wsm_inpost_diag', 'paragon' => 'wsm_fiskal_diag'];
           if (isset($diag[$g]) && function_exists($diag[$g])): ?>
       <p class="actions" style="margin:0 0 14px">
         <button type="submit" name="test_polaczenia" value="<?= h($g) ?>" formnovalidate>Sprawdź połączenie</button>
       </p>
       <?php endif; ?>
+    <?php // L'adresse à coller chez Fakturownia : sans le webhook, le lien de
+          // l'e-paragon n'arrive qu'à l'ouverture de la console. ?>
+    <?php if ($g === 'paragon'): ?>
+      <p class="muted small" style="margin:0 0 14px">Webhook w Fakturowni (Ustawienia konta → Integracja → Webhooki, zdarzenie
+        <b>invoice:update</b>): <code><?= h(wsm_fiskal_webhook_url()) ?></code></p>
+    <?php endif; ?>
 
     <div class="grid2">
     <?php foreach ($fields as $key => $f): $multi = str_starts_with($f['type'], 'multi:'); ?>

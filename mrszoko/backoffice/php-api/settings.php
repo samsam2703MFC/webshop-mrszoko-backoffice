@@ -84,6 +84,17 @@ function wsm_settings_fields(): array {
         'ksef.env'        => ['ksef', 'Środowisko', ['ksef', 'env'], 'WSM_KSEF_ENV', 'select:test|demo|prod',
                               'test = piaskownica, demo = przedprodukcyjne, prod = prawdziwy rejestr.'],
 
+        // La caisse fiscale : Fakturownia + module Paragony.pl + imprimante
+        // fiscale online chez la société (fiskal.php).
+        'fakturownia.domena'        => ['paragon', 'Adres konta Fakturowni', ['fakturownia', 'domena'], 'WSM_FAKTUROWNIA_DOMENA', 'text',
+                                        'Np. szoko.fakturownia.pl (albo samo „szoko”).'],
+        'fakturownia.api_token'     => ['paragon', 'Kod autoryzacyjny API', ['fakturownia', 'api_token'], 'WSM_FAKTUROWNIA_TOKEN', 'secret',
+                                        'Fakturownia → Ustawienia → Ustawienia konta → Integracja. Wystawia dokumenty fiskalne w imieniu firmy — nigdy nie opuszcza serwera.'],
+        'fakturownia.drukarka'      => ['paragon', 'Drukarka fiskalna', ['fakturownia', 'drukarka'], 'WSM_FAKTUROWNIA_DRUKARKA', 'text',
+                                        'Nazwa z przycisku „Sprawdź połączenie”. Puste = drukarka domyślna w Fakturowni.'],
+        'fakturownia.webhook_token' => ['paragon', 'Token webhooka', ['fakturownia', 'webhook_token'], 'WSM_FAKTUROWNIA_WEBHOOK_TOKEN', 'secret',
+                                        'Wymyśl dowolny ciąg, wpisz go tutaj i w polu „API token” webhooka w Fakturowni (to NIE jest kod API).'],
+
         'inpost.token'           => ['inpost', 'Token ShipX (serwerowy)',  ['inpost', 'token'],           'WSM_INPOST_TOKEN',           'secret', 'Nigdy nie opuszcza serwera.'],
         'inpost.organization_id' => ['inpost', 'ID organizacji',           ['inpost', 'organization_id'], 'WSM_INPOST_ORG_ID',          'text',   'Numer organizacji w ShipX.'],
         'inpost.geowidget_token' => ['inpost', 'Token Geowidget (publiczny)', ['inpost', 'geowidget_token'], 'WSM_INPOST_GEOWIDGET_TOKEN', 'text', 'Trafia do strony — to token przeglądarkowy.'],

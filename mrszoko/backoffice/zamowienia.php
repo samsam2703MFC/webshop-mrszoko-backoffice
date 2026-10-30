@@ -128,6 +128,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $flashKind = $num ? 'ok' : 'err';
             }
 
+        } elseif (isset($_POST['fiskal'])) {
+            // LA CAISSE À LA MAIN : un paragon qui n'est pas passé (canal
+            // branché après coup, Fakturownia muette, impression refusée).
+            // C'est le seul endroit qui relance une IMPRESSION — la ligne
+            // « Kasa » a demandé de vérifier l'imprimante avant ce clic.
+            $doc = wsm_invoice_for_order($pdo, $id);
+            if (!$doc || (string) $doc['kind'] !== 'paragon') { $flash = 'Nie ma paragonu do wysłania.'; $flashKind = 'err'; }
+            else {
+                require_once $API . '/fiskal.php';
+                [$etat, $phrase] = wsm_fiskal_wyslij($pdo, $doc, $order, (string) ($me['nom'] ?? ''), true);
+                $flash = $order['code'] . ' · kasa: ' . $phrase;
+                $flashKind = $etat === 'blad' || $etat === '' ? 'err' : 'ok';
+            }
+
         } elseif (isset($_POST['status'])) {
             // UNE SEULE PORTE. « do_wysylki » et « wyslane » étaient deux
             // branches de plus, ajoutées pour les deux boutons d'expédition de
