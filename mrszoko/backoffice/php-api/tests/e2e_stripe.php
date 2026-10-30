@@ -254,6 +254,17 @@ ok('une migration ponctuelle change les textes qui nommaient tpay, phrase par ph
    count($mig) >= 10 && !array_filter($mig, fn($op) => !str_contains($op[0], 'REPLACE(v, ?, ?)')));
 ok('… le règlement nomme Stripe, et plus Tpay', (bool) array_filter($mig, fn($op) => $op[1][3] === 'terms.s6.b'
    && str_contains($op[1][0], 'Tpay') && str_contains($op[1][1], 'Stripe Payments Europe')));
+$przec = wsm_content_jednorazowe()['migracja.2026_10_stripe_przecinek'] ?? [];
+ok('… et la politique, même après la virgule qui remplace le tiret à chaque déploiement',
+   (bool) array_filter($przec, fn($op) => str_contains($op[1][0], '**operator płatności**, Krajowy Integrator')));
+// Joué pour de vrai sur une ligne de test : la graphie « virgule » de la base.
+$pdo->prepare("DELETE FROM wsm_shop_i18n WHERE lang = 'pl' AND k = 'e2e.stripe.priv'")->execute();
+$pdo->prepare("INSERT INTO wsm_shop_i18n (lang, k, v) VALUES ('pl', 'e2e.stripe.priv', ?)")
+    ->execute(["x\n- **operator płatności**, Krajowy Integrator Płatności S.A. (Tpay), w zakresie niezbędnym do rozliczenia transakcji,\ny"]);
+foreach ($przec as [$sql, $args]) { $args[3] = 'e2e.stripe.priv'; $pdo->prepare($sql)->execute($args); }
+$v = (string) $pdo->query("SELECT v FROM wsm_shop_i18n WHERE lang = 'pl' AND k = 'e2e.stripe.priv'")->fetchColumn();
+ok('… la ligne en base nomme Stripe, et plus Tpay', str_contains($v, 'Stripe Payments Europe') && stripos($v, 'tpay') === false, $v);
+$pdo->prepare("DELETE FROM wsm_shop_i18n WHERE lang = 'pl' AND k = 'e2e.stripe.priv'")->execute();
 $seedTxt = $lire('mrszoko/shop/content_seed.json');
 ok('le fichier de contenu ne nomme plus tpay', stripos($seedTxt, 'tpay') === false);
 ok('tpay.php a quitté le dépôt', !is_file($racine . '/mrszoko/backoffice/php-api/tpay.php'));

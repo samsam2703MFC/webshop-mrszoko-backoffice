@@ -2620,7 +2620,7 @@ jobs:
             || { echo "  ^ NOT OK : MarketLevano@gmail.com nadal w ${NE:-?} tekstach"; fail=1; }
           curl -skL "$SH/kontakt" | grep -q 'kontakt-dane--strona' && echo "  strona Kontakt: telefon i e-mail nad formularzem" \
             || { echo "  ^ NOT OK : strona Kontakt bez telefonu"; fail=1; }
-          echo "== Zwroty (adres do zwrotow, wymaga tpay) =="
+          echo "== Zwroty (adres do zwrotow, wymog operatorow platnosci) =="
           # Trois endroits exigés par tpay : le règlement, le pied de page à
           # côté des données de la société, la page « Zwroty ». Les pièces,
           # puis l'EFFET sur les pages servies — l'adresse est dite dans le
