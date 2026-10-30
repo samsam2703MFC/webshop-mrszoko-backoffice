@@ -8,14 +8,14 @@
 declare(strict_types=1);
 
 // require_once et pas require : ces modules se requièrent aussi entre eux
-// (shop.php charge vies.php, tpay.php charge shop.php…). Un simple require
+// (shop.php charge vies.php, stripe.php charge shop.php…). Un simple require
 // rechargerait le fichier et PHP refuserait de redéclarer ses fonctions.
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/delivery.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/commerce.php';
 require_once __DIR__ . '/shop.php';
-require_once __DIR__ . '/tpay.php';
+require_once __DIR__ . '/stripe.php';
 require_once __DIR__ . '/inpost.php';
 require_once __DIR__ . '/vies.php';
 
@@ -150,7 +150,7 @@ if ($method === 'GET' && $lroute === 'content') {
 // La boutique est le site public : catalogue, devis, commande et suivi sont
 // ouverts. Ce qui est verrouillé, c'est ce qui coûte de l'argent — les prix
 // sont recalculés en base à chaque étape et la notification de paiement est
-// signée. Voir shop.php et tpay.php.
+// signée. Voir shop.php et stripe.php.
 if ($sroute !== '') {
     $lang = wsm_shop_lang($pdo, $_GET['lang'] ?? ($_SERVER['HTTP_X_LANG'] ?? null));
 
@@ -207,18 +207,18 @@ if ($sroute !== '') {
         [$order, $errors] = wsm_shop_create_order($pdo, $b);
         if ($errors) wsm_send(['error' => 'validation', 'fields' => $errors], 422);
 
-        // Ouverture de la transaction tpay. Si le paiement n'est pas encore
-        // configuré, la commande existe quand même et attend un virement.
+        // Le paiement se fait dans la page « Zapłać » de la boutique, où le
+        // formulaire Stripe est intégré : on rend son adresse. La session
+        // Stripe s'ouvre là-bas, à l'affichage — pas ici, où personne ne
+        // paierait dans la minute.
         $base = wsm_shop_base_url();
-        $pay = wsm_tpay_start($pdo, $order,
-            $base . '/zamowienie/' . rawurlencode($order['code']) . '?t=' . $order['access_token'],
-            wsm_api_base_url() . '/shop/tpay/notify');
-
+        $q = '?t=' . $order['access_token'];
         wsm_send([
             'ok' => true, 'code' => $order['code'], 'token' => $order['access_token'],
             'total_gross' => $order['total_gross'],
-            'url' => $base . '/zamowienie/' . rawurlencode($order['code']) . '?t=' . $order['access_token'],
-            'payment' => $pay,
+            'url' => $base . '/zamowienie/' . rawurlencode($order['code']) . $q,
+            'payment' => ['provider' => 'stripe', 'ready' => wsm_stripe_ready(),
+                          'pay_url' => $base . '/zaplac/' . rawurlencode($order['code']) . $q],
         ], 201);
     }
 
@@ -229,10 +229,12 @@ if ($sroute !== '') {
         wsm_send($o);
     }
 
-    // Notification serveur-à-serveur de tpay (form-encoded). Réponse en texte
-    // brut : tpay attend littéralement « TRUE » pour cesser de réémettre.
-    if ($method === 'POST' && $sroute === 'tpay/notify') {
-        [$bodyTxt, $code] = wsm_tpay_notification($pdo, $_POST, file_get_contents('php://input') ?: '');
+    // Webhook Stripe (événements des comptes connectés). Le corps BRUT est
+    // signé : il se lit tel quel, avant tout décodage. Stripe réémet tant
+    // qu'il ne reçoit pas 2xx.
+    if ($method === 'POST' && $sroute === 'stripe/webhook') {
+        [$bodyTxt, $code] = wsm_stripe_webhook($pdo, file_get_contents('php://input') ?: '',
+            (string) ($_SERVER['HTTP_STRIPE_SIGNATURE'] ?? ''));
         http_response_code($code);
         header('Content-Type: text/plain; charset=utf-8');
         echo $bodyTxt;
@@ -349,10 +351,10 @@ if ($method === 'GET') {
         case 'shop-kpis':  wsm_send(wsm_shop_kpis($pdo));
         case 'shop-config':
             // Aucun secret ici : uniquement l'état des intégrations, pour que
-            // la console dise « tpay non configuré » au lieu de rester muette.
+            // la console dise « Stripe non configuré » au lieu de rester muette.
             wsm_send([
-                'tpay'    => ['enabled' => wsm_tpay_enabled(), 'can_verify' => wsm_tpay_can_verify(),
-                              'sandbox' => wsm_tpay_cfg()['sandbox']],
+                'stripe'  => ['enabled' => wsm_stripe_enabled(), 'can_verify' => wsm_stripe_can_verify(),
+                              'ready' => wsm_stripe_ready(), 'test' => wsm_stripe_cfg()['test']],
                 'inpost'  => ['enabled' => wsm_inpost_enabled(), 'sandbox' => wsm_inpost_cfg()['sandbox'],
                               'geowidget' => wsm_inpost_geowidget_token() !== ''],
                 'shop_url' => wsm_shop_base_url(),
@@ -420,7 +422,7 @@ if ($method === 'POST') {
             wsm_send($r);
         }
 
-        // ---- client B2B : payeur tpay + destinataire InPost -----------------
+        // ---- client B2B : payeur + destinataire InPost -----------------
         case 'client': {
             if (!empty($body['delete'])) {
                 $pdo->prepare("DELETE FROM wsm_clients WHERE id=?")->execute([(int) $body['delete']]);
@@ -507,7 +509,7 @@ if ($method === 'POST') {
             wsm_send(['ok' => true, 'id' => $id]);
         }
 
-        // ---- produit : gouvernance + logistique InPost + TVA tpay -----------
+        // ---- produit : gouvernance + logistique InPost + TVA -----------
         case 'product': {
             if (empty($body['id'])) wsm_fail_fields(['id' => 'wymagany']);
             $id = (string) $body['id'];
@@ -734,7 +736,7 @@ function wsm_catalog(PDO $pdo): array {
             'id' => $p['id'], 'nom' => $p['nom'], 'prix' => (float) $p['prix'], 'statut' => $p['statut'],
             'bw' => (bool) $p['brand_whitelist'], 'bm' => (bool) $p['brand_mandatory'],
             'ad' => (int) $p['adoption'], 'saison' => $p['saison'],
-            // Logistique InPost + TVA tpay (voir commerce.php)
+            // Logistique InPost + TVA (voir commerce.php)
             'sku' => $p['sku'] ?? '', 'ean' => $p['ean'] ?? '',
             'vat_rate' => isset($p['vat_rate']) ? (float) $p['vat_rate'] : 0.23,
             'weight_g' => (int) ($p['weight_g'] ?? 0),

@@ -58,11 +58,15 @@ function wsm_setting_alpha(string $type): bool {
  */
 function wsm_settings_fields(): array {
     return [
-        'tpay.merchant_id'   => ['tpay', 'ID sprzedawcy (merchant ID)', ['tpay', 'merchant_id'],   'WSM_TPAY_MERCHANT_ID',   'text',   'Numer ID z panelu tpay.'],
-        'tpay.client_id'     => ['tpay', 'Client ID (Open API)',        ['tpay', 'client_id'],     'WSM_TPAY_CLIENT_ID',     'text',   'Z zakładki Integracja → Open API.'],
-        'tpay.client_secret' => ['tpay', 'Client secret',               ['tpay', 'client_secret'], 'WSM_TPAY_CLIENT_SECRET', 'secret', 'Pokazywany w panelu tylko raz.'],
-        'tpay.security_code' => ['tpay', 'Kod bezpieczeństwa (powiadomienia)', ['tpay', 'security_code'], 'WSM_TPAY_SECURITY_CODE', 'secret', 'Bez niego żadne powiadomienie o płatności nie zostanie przyjęte.'],
-        'tpay.sandbox'       => ['tpay', 'Środowisko', ['tpay', 'sandbox'], 'WSM_TPAY_SANDBOX', 'select:1|0', '1 = sandbox (testy), 0 = produkcja (prawdziwe pieniądze).'],
+        // STRIPE : les clés de la PLATEFORME. Groupe à part, que l'écran
+        // Integracje ne montre ni n'enregistre (voir le filtre $groupes de
+        // wsm_settings_save) : seule la page Płatności, et seulement pour le
+        // superadmin, les écrit. Une boutique ne détient pas la clé qui ouvre
+        // tous les comptes connectés de la plateforme.
+        'stripe.secret_key'      => ['stripe', 'Klucz tajny platformy (sk_…)',     ['stripe', 'secret_key'],      'WSM_STRIPE_SECRET_KEY',      'secret', 'Dashboard Stripe platformy → Developers → API keys. Pokazywany tylko raz.'],
+        'stripe.publishable_key' => ['stripe', 'Klucz publiczny platformy (pk_…)', ['stripe', 'publishable_key'], 'WSM_STRIPE_PUBLISHABLE_KEY', 'text',   'Ten sam tryb co klucz tajny (test albo produkcja).'],
+        'stripe.webhook_secret'  => ['stripe', 'Sekret webhooka (whsec_…)',        ['stripe', 'webhook_secret'],  'WSM_STRIPE_WEBHOOK_SECRET',  'secret', 'Webhook dla „Connected accounts”, zdarzenia checkout.session.*. Bez niego żadne potwierdzenie płatności nie zostanie przyjęte.'],
+        'stripe.account'         => ['stripe', 'Konto Stripe sklepu (acct_…)',     ['stripe', 'account'],         'WSM_STRIPE_ACCOUNT',         'text',   'Zakładane przyciskiem na ekranie Płatności.'],
 
         // KSeF ÉTAIT LA SEULE INTÉGRATION SANS ÉCRAN. tpay, InPost, DPD, la
         // poste et la facturation se règlent depuis la console ; le registre
@@ -154,11 +158,11 @@ function wsm_settings_fields(): array {
         'logo_nazwa'     => ['sklep', 'Nazwa sklepu obok logo', ['shop', 'logo_nazwa'], 'WSM_SHOP_LOGO_NAZWA', 'select:1|0',
                              '1 = obok logo stoi nazwa sklepu (Treści → brand). 0 = samo logo — gdy wgrane logo zawiera już nazwę.'],
         // LES LOGOS DE LIVRAISON ET DE PAIEMENT (pied de page, fiche produit).
-        // Rien de coché jamais enregistré = la réalité : modes actifs, tpay.
+        // Rien de coché jamais enregistré = la réalité : modes actifs, Stripe.
         'metody_wysylki'   => ['sklep', 'Sposoby wysyłki — logotypy dla klienta', ['shop', 'metody_wysylki'], 'WSM_SHOP_METODY_WYSYLKI', wsm_metody_typ('wysylka'),
                                'Pokazywane w stopce każdej strony i przy przycisku „Dodaj do koszyka”. Zaznacz tylko to, co kasa naprawdę oferuje — DPD Pickup dopiero wtedy, gdy będzie w kasie.'],
         'metody_platnosci' => ['sklep', 'Formy płatności — logotypy dla klienta', ['shop', 'metody_platnosci'], 'WSM_SHOP_METODY_PLATNOSCI', wsm_metody_typ('platnosc'),
-                               'Jak wyżej. Bez skonfigurowanego tpay domyślnie tylko przelew tradycyjny — zaznacz resztę, gdy tpay ruszy.'],
+                               'Jak wyżej. Dopóki Stripe nie przyjmuje płatności, domyślnie nic — po uruchomieniu Stripe: BLIK, karty, portfele i Przelewy24.'],
 
         // L'ADRESSE DES RETOURS, exigée par tpay : règlement, pied de page,
         // page « Zwroty ». Les trois champs ou rien : une adresse à moitié
@@ -167,11 +171,11 @@ function wsm_settings_fields(): array {
         'zwrot_odbiorca' => ['sklep', 'Zwroty — odbiorca', ['shop', 'zwrot_odbiorca'], 'WSM_SHOP_ZWROT_ODBIORCA', 'text',
                              'Nazwa na paczce zwrotnej, np. nazwa firmy albo „Szoko Shop — zwroty”. Puste = sprzedawca z Treści (seller.name).'],
         'zwrot_ulica'    => ['sklep', 'Zwroty — ulica i numer', ['shop', 'zwrot_ulica'], 'WSM_SHOP_ZWROT_ULICA', 'text',
-                             'Adres, na który klient odsyła towar: w regulaminie, w stopce i na stronie „Zwroty” (wymaga tego tpay). Ulica, kod i miasto razem — dopóki któregoś brakuje, pokazujemy adres siedziby z Treści (seller.address).'],
+                             'Adres, na który klient odsyła towar: w regulaminie, w stopce i na stronie „Zwroty” (wymóg operatorów płatności). Ulica, kod i miasto razem — dopóki któregoś brakuje, pokazujemy adres siedziby z Treści (seller.address).'],
         'zwrot_kod'      => ['sklep', 'Zwroty — kod pocztowy', ['shop', 'zwrot_kod'], 'WSM_SHOP_ZWROT_KOD', 'text', 'Np. 50-078.'],
         'zwrot_miasto'   => ['sklep', 'Zwroty — miasto', ['shop', 'zwrot_miasto'], 'WSM_SHOP_ZWROT_MIASTO', 'text', ''],
 
-        'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z tpay.'],
+        'shop_url' => ['sklep', 'Publiczny adres sklepu', ['shop_url'], 'WSM_SHOP_URL', 'text', 'Używany w linkach wysyłanych klientom i w powrocie z płatności Stripe.'],
 
         // ---- Faktury : ce qui figure sur le document ----------------------
         // Rien n'est en dur dans le code. Le vendeur change d'adresse ou de
@@ -183,7 +187,7 @@ function wsm_settings_fields(): array {
         'invoice.place'          => ['faktura', 'Miejsce wystawienia',    ['invoice', 'place'],          'WSM_INV_PLACE',          'text',   'Zwykle siedziba firmy.'],
         'invoice.iban'           => ['faktura', 'Numer rachunku (IBAN)',  ['invoice', 'iban'],           'WSM_INV_IBAN',           'text',   'Trafia na każdą fakturę z przelewem.'],
         'invoice.bank'           => ['faktura', 'Nazwa banku',            ['invoice', 'bank'],           'WSM_INV_BANK',           'text',   'Obok numeru rachunku.'],
-        'invoice.payment_days'   => ['faktura', 'Termin płatności (dni)', ['invoice', 'payment_days'],   'WSM_INV_PAYMENT_DAYS',   'text',   '0 = płatne przy zamówieniu (tpay pobiera od razu).'],
+        'invoice.payment_days'   => ['faktura', 'Termin płatności (dni)', ['invoice', 'payment_days'],   'WSM_INV_PAYMENT_DAYS',   'text',   '0 = płatne przy zamówieniu (Stripe pobiera od razu).'],
         'invoice.reminder_days'  => ['faktura', 'Przypomnienie po (dni)', ['invoice', 'reminder_days'], 'WSM_INV_REMINDER_DAYS', 'text', 'Ile dni po terminie wysłać przypomnienie. Puste lub 0 = nie przypominaj.'],
         'invoice.number_format'  => ['faktura', 'Format numeru',          ['invoice', 'number_format'],  'WSM_INV_NUMBER_FORMAT',  'text',   'xxx = kolejny numer, mm = miesiąc, yy = rok. Numeracja zeruje się wraz z tym, co jest w formacie.'],
     ];
@@ -232,7 +236,7 @@ function wsm_settings_apply(PDO $pdo): void {
         if ($key === 'mail.smtp_port') $v = (int) $v;
         if ($key === 'mail.smtp_secure' && $v === 'brak') $v = '';
 
-        // Reconstitue le chemin : ['tpay','client_id'] => ['tpay' => ['client_id' => v]]
+        // Reconstitue le chemin : ['stripe','account'] => ['stripe' => ['account' => v]]
         $node = $v;
         foreach (array_reverse($path) as $k) $node = [$k => $node];
         $patch = array_replace_recursive($patch, $node);
@@ -282,9 +286,13 @@ function wsm_setting_pem_store(string $pem): array {
  * rien : c'est la façon de modifier un réglage sans retaper les secrets.
  * Renvoie la liste des clés modifiées — les VALEURS ne sont jamais renvoyées.
  */
-function wsm_settings_save(PDO $pdo, array $post, string $actor = '', array &$refus = []): array {
+function wsm_settings_save(PDO $pdo, array $post, string $actor = '', array &$refus = [], ?array $groupes = null): array {
     $refus = [];
     $fields = wsm_settings_fields();
+    // UN ÉCRAN N'ÉCRIT QUE SES GROUPES. Sans ce filtre, un formulaire forgé
+    // sur Integracje pouvait écrire n'importe quel réglage — y compris la clé
+    // Stripe de la plateforme, qui n'appartient pas à la boutique.
+    if ($groupes !== null) $fields = array_filter($fields, fn($f) => in_array($f[0], $groupes, true));
     $now = date('Y-m-d H:i:s');
     $changed = [];
     $up = $pdo->prepare("UPDATE wsm_settings SET val = ?, secret = ?, updated_at = ?, updated_by = ? WHERE cle = ?");

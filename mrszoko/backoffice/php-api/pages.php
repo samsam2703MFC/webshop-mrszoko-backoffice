@@ -58,7 +58,7 @@ const WSM_PAGE_RESERVED = [
     'p', 'koszyk', 'kasa', 'zamowienie', 'kontakt', 'regulamin', 'prywatnosc', 'zwroty',
     'moje-zamowienie', 'catalog', 'robots.txt', 'sitemap.xml', 'assets', 'media',
     'fonts', 'img', 'api', 'backoffice', 'shop', 'landing', 'index.php', 'strona',
-    'strony', 'blok', 'bloki', 'admin', 'login', 'logout', 'tpay', 'inpost',
+    'strony', 'blok', 'bloki', 'admin', 'login', 'logout', 'tpay', 'stripe', 'zaplac', 'inpost',
 ];
 
 function wsm_pages_ensure(PDO $pdo): void {

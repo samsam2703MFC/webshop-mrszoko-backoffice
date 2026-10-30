@@ -1704,7 +1704,11 @@ function wsm_order_mark_paid(PDO $pdo, int $orderId, string $actor = 'tpay'): bo
                           paid_at = CURRENT_TIMESTAMP
                     WHERE id = ?")
         ->execute([$orderId]);
-    $pdo->prepare("UPDATE wsm_payments SET status='oplacone' WHERE order_id=?")->execute([$orderId]);
+    // Les tentatives Stripe ne passent PAS en bloc à « opłacone » : seule la
+    // session réellement payée l'est (wsm_stripe_apply_session). Une page
+    // « Zapłać » rechargée trois fois ouvre trois sessions ; les marquer
+    // toutes compterait trois fois la commission déjà prélevée (Platforma).
+    $pdo->prepare("UPDATE wsm_payments SET status='oplacone' WHERE order_id=? AND provider <> 'stripe'")->execute([$orderId]);
     wsm_order_event($pdo, $orderId, 'oplacone', '', $actor);
     $paid = wsm_order_by_id($pdo, $orderId);
     if ($paid) wsm_mail_auto($pdo, 'platnosc', $paid);

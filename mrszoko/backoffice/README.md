@@ -94,7 +94,8 @@ same session, the same roles and the same `wsm_` tables:
 | `kontrahenci.php` | business customers: NIP / EU VAT checked against VIES |
 | `kraje.php` | countries served and the 0 % reverse-charge rule |
 | `rabaty.php` | volume discount tiers, by basket **weight** |
-| `ustawienia.php` | tpay / InPost / mail credentials — placeholder `xxxx` until filled |
+| `ustawienia.php` | InPost / DPD / mail / KSeF credentials — placeholder `xxxx` until filled; Stripe status |
+| `platnosci.php` | Stripe Connect: shop account onboarding, payments, payouts (embedded components); platform keys (superadmin) |
 
 They share `console.php` (boot, session, navigation) and `console.css`
 (**mobile-first**: tables fold into cards under 760 px, 44 px touch targets,

@@ -366,7 +366,30 @@ function wsm_platform_volume(PDO $pdo, string $ym): array {
         $out['shipping_gross'] += (int) $r['shipping_gross'];
         $out['net']            += (int) $r['total_net'];
     }
+    $out['fees_collected'] = wsm_platform_fees_collected($pdo, $ym);
     return $out;
+}
+
+/**
+ * LA COMMISSION DÉJÀ ENCAISSÉE PAR STRIPE (application fee) sur les mêmes
+ * commandes que le volume du mois. Le décompte la montre et la déduit de ce
+ * qui reste à payer : sans cela, la boutique paierait deux fois la même
+ * commission — une fois à chaque paiement, une fois en fin de mois.
+ */
+function wsm_platform_fees_collected(PDO $pdo, string $ym): int {
+    $cols = wsm_table_columns($pdo, 'wsm_orders');
+    $quand = in_array('paid_at', $cols, true)
+        ? 'COALESCE(' . wsm_sql_date($pdo, 'o.paid_at') . ', o.created_at)'
+        : 'o.created_at';
+    try {
+        $st = $pdo->prepare("SELECT COALESCE(SUM(p.app_fee), 0) FROM wsm_payments p
+                               JOIN wsm_orders o ON o.id = p.order_id
+                              WHERE p.provider = 'stripe' AND p.status = 'oplacone'
+                                AND o.status <> 'anulowane' AND o.payment_status = 'oplacone'
+                                AND SUBSTR($quand, 1, 7) = ?");
+        $st->execute([$ym]);
+        return (int) $st->fetchColumn();
+    } catch (Throwable $e) { return 0; }   // base d'avant app_fee : rien n'a été prélevé
 }
 
 /**
@@ -397,6 +420,10 @@ function wsm_platform_period(PDO $pdo, string $ym): array {
             'total_vat' => (int) $fige['total_vat'], 'total_gross' => (int) $fige['total_gross'],
             'issued_at' => (string) ($fige['issued_at'] ?? ''), 'paid_at' => (string) ($fige['paid_at'] ?? ''),
             'id' => (int) $fige['id'], 'note' => (string) ($fige['note'] ?? ''),
+            // Lu en direct, même sur un mois figé : ce que Stripe a déjà versé
+            // à la plateforme ne change pas après l'émission du décompte.
+            'fees_collected' => ($fc = wsm_platform_fees_collected($pdo, $ym)),
+            'to_pay_gross' => max(0, (int) $fige['total_gross'] - $fc),
         ];
     }
 
@@ -427,8 +454,10 @@ function wsm_platform_compute(string $ym, array $volume, array $terms): array {
     $totalNet   = $commission + $rent;
     $vat        = (int) round($totalNet * $vatR);
 
+    $pobrane = (int) ($volume['fees_collected'] ?? 0);
     return [
         'ym' => $ym,
+        'fees_collected' => $pobrane, 'to_pay_gross' => max(0, $totalNet + $vat - $pobrane),
         'gross' => (int) $volume['gross'], 'goods_gross' => (int) $volume['goods_gross'],
         'shipping_gross' => (int) $volume['shipping_gross'], 'orders' => (int) $volume['orders'],
         'basis' => $basis, 'rate' => $rate, 'base_amount' => $base,

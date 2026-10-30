@@ -389,14 +389,17 @@ grep -q "page === 'regulamin'" site/shop/index.php \
   && grep -q 'checkout.terms_l2' site/shop/index.php \
   || { echo "  regulamin i polityka: niekompletne"; exit 1; }
 echo "  regulamin i polityka (dwie strony + stopka + kasa) : obecne"
-# LE CANAL TPAY. Deux voies, deux pannes differentes : les identifiants
-# ouvrent la transaction, le code de securite valide la NOTIFICATION. Sans
-# le second, le client paie et la commande reste impayee.
-grep -q 'function wsm_tpay_diag' site/backoffice/api/tpay.php \
-  && grep -q 'function wsm_tpay_notify_url' site/backoffice/api/tpay.php \
-  && grep -q "POST\['test_polaczenia'\]" site/backoffice/ustawienia.php \
-  || { echo "  kanal tpay: niekompletny"; exit 1; }
-echo "  kanal tpay (test + adres powiadomien) : obecny"
+# STRIPE CONNECT, TOUS LES PAIEMENTS. Trois pannes differentes : les cles
+# de la plateforme ouvrent la session, le compte de la boutique encaisse, le
+# secret du webhook valide la CONFIRMATION. Sans le dernier, le client paie
+# et la commande reste impayee.
+grep -q 'function wsm_stripe_diag' site/backoffice/api/stripe.php \
+  && grep -q 'function wsm_stripe_webhook_url' site/backoffice/api/stripe.php \
+  && grep -q 'embedded_page' site/backoffice/api/stripe.php \
+  && [ -f site/backoffice/platnosci.php ] \
+  && grep -q 'data-stripe-checkout' site/shop/index.php \
+  || { echo "  platnosci Stripe: niekompletne"; exit 1; }
+echo "  platnosci Stripe (modul + ekran Platnosci + strona Zaplac) : obecne"
 
 
 

@@ -9,9 +9,10 @@
 //  UN LOGO EST UNE PROMESSE. Montrer « DPD Pickup » quand la caisse ne le
 //  propose pas, c'est faire chercher au client une option qui n'existe pas. Par
 //  défaut, la liste suit donc la réalité : les modes de livraison ACTIFS
-//  (Dostawa), et pour le paiement, ce que tpay encaisse s'il est configuré —
-//  sinon le virement, le seul moyen qui marche alors. Integracje → Sklep permet
-//  de choisir à la main ; ce choix-là fait foi, y compris « rien ».
+//  (Dostawa), et pour le paiement, ce que Stripe encaisse quand la boutique
+//  peut encaisser — sinon rien : sans Stripe prêt, aucun moyen ne marche, et
+//  il n'y a plus de virement (tout passe par Stripe). Integracje → Sklep
+//  permet de choisir à la main ; ce choix-là fait foi, y compris « rien ».
 // ============================================================================
 declare(strict_types=1);
 
@@ -28,8 +29,7 @@ const WSM_METODY_PLATNOSCI = [
     'mastercard'     => 'Mastercard',
     'applepay'       => 'Apple Pay',
     'googlepay'      => 'Google Pay',
-    'przelew_online' => 'Szybki przelew',
-    'przelew'        => 'Przelew tradycyjny',
+    'przelew_online' => 'Przelewy24',
 ];
 
 /** Le mode de livraison de la base → le logo qui le représente. */
@@ -55,7 +55,7 @@ function wsm_metody_typ(string $co): string {
 /**
  * Ce qui s'affiche, par défaut, quand personne n'a choisi.
  *  · livraison : les modes actifs de la base, dans leur ordre ;
- *  · paiement  : tpay configuré → ses moyens courants ; sinon le virement.
+ *  · paiement  : Stripe prêt → ses moyens courants en Pologne ; sinon rien.
  */
 function wsm_metody_auto(PDO $pdo, string $co): array {
     if ($co === 'wysylka') {
@@ -68,10 +68,9 @@ function wsm_metody_auto(PDO $pdo, string $co): array {
         } catch (Throwable $e) {}
         return $out;
     }
-    $t = wsm_config()['tpay'] ?? [];
-    $tpay = trim((string) ($t['client_id'] ?? '')) !== '' && trim((string) ($t['client_secret'] ?? '')) !== ''
-         && !preg_match('/^x{2,}$/i', (string) ($t['client_id'] ?? ''));
-    return $tpay ? ['blik', 'visa', 'mastercard', 'googlepay', 'applepay', 'przelew_online'] : ['przelew'];
+    if (!function_exists('wsm_stripe_ready')) { $f = __DIR__ . '/stripe.php'; if (is_file($f)) require_once $f; }
+    $stripe = function_exists('wsm_stripe_ready') && wsm_stripe_ready();
+    return $stripe ? ['blik', 'visa', 'mastercard', 'googlepay', 'applepay', 'przelew_online'] : [];
 }
 
 /**

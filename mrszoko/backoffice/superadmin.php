@@ -657,6 +657,18 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Superadmin' => null]);
         <td data-l="Kwota" class="num"><b><?= h(pln((int) $courant['total_gross'])) ?></b></td>
         <td data-l="Skąd">netto + VAT <?= h(pct((float) $courant['vat_rate'], 0)) ?></td>
       </tr>
+      <?php if ((int) ($courant['fees_collected'] ?? 0) > 0): ?>
+      <tr>
+        <td data-l="Pozycja">Pobrane już przez Stripe</td>
+        <td data-l="Kwota" class="num">−<?= h(pln((int) $courant['fees_collected'])) ?></td>
+        <td data-l="Skąd">prowizja potrącona przy każdej płatności (application fee)</td>
+      </tr>
+      <tr>
+        <td data-l="Pozycja"><b>Pozostaje do zapłaty</b></td>
+        <td data-l="Kwota" class="num"><b><?= h(pln((int) $courant['to_pay_gross'])) ?></b></td>
+        <td data-l="Skąd">razem brutto − pobrane przez Stripe</td>
+      </tr>
+      <?php endif; ?>
     </tbody>
   </table>
 

@@ -84,12 +84,17 @@ $cfg = [
     // sans security_code, aucune notification n'est acceptée (fail-closed).
     // Ces valeurs vivent dans config.local.php sur le serveur, jamais ici :
     // ce dépôt est public.
-    'tpay' => [
-        'merchant_id'   => getenv('WSM_TPAY_MERCHANT_ID') ?: '',
-        'client_id'     => getenv('WSM_TPAY_CLIENT_ID') ?: '',
-        'client_secret' => getenv('WSM_TPAY_CLIENT_SECRET') ?: '',
-        'security_code' => getenv('WSM_TPAY_SECURITY_CODE') ?: '',
-        'sandbox'       => (getenv('WSM_TPAY_SANDBOX') ?: '1') !== '0',
+    // ---- Stripe Connect : TOUS les paiements -----------------------------
+    // Les clés sont celles de la PLATEFORME (le propriétaire de l'outil) : la
+    // clé secrète ouvre tous les comptes connectés, elle ne se saisit donc que
+    // dans l'écran Płatności réservé au superadmin, ou ici par l'environnement
+    // (secrets GitHub WSM_STRIPE_*). `account` est le compte connecté de la
+    // boutique (acct_…), créé depuis l'écran Płatności.
+    'stripe' => [
+        'secret_key'      => getenv('WSM_STRIPE_SECRET_KEY') ?: '',
+        'publishable_key' => getenv('WSM_STRIPE_PUBLISHABLE_KEY') ?: '',
+        'webhook_secret'  => getenv('WSM_STRIPE_WEBHOOK_SECRET') ?: '',
+        'account'         => getenv('WSM_STRIPE_ACCOUNT') ?: '',
     ],
 
     // ---- VIES : vérification des numéros de TVA intracommunautaire ---------

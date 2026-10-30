@@ -737,11 +737,12 @@ jobs:
                  | sed 's/.*"items_gross":\([0-9]*\).*/\1/')
           echo "  prix catalogue $REF gr · prix imposé par le client 1 gr · facturé $GOT gr"
           [ "$GOT" = "$REF" ] || { echo "  ^ NOT OK : le client a pu influencer le montant"; fail=1; }
-          # Notification de paiement : fermée tant que tpay n'est pas configuré.
-          c=$(curl -skL -o /dev/null -w '%{http_code}' -X POST "$BO/api/shop/tpay/notify" \
-               -d 'tr_id=X&tr_status=TRUE&md5sum=00000000000000000000000000000000')
-          echo "  $c  POST /shop/tpay/notify  (non signée — attendu 400/503, jamais 200)"
-          case "$c" in 400|503) ;; *) echo "  ^ NOT OK : une notification non signée est acceptée"; fail=1;; esac
+          # Webhook de paiement : un événement non signé n'est JAMAIS accepté.
+          c=$(curl -skL -o /dev/null -w '%{http_code}' -X POST "$BO/api/shop/stripe/webhook" \
+               -H 'Content-Type: application/json' -H 'Stripe-Signature: t=1,v1=00' \
+               -d '{"id":"evt_x","type":"checkout.session.completed","data":{"object":{}}}')
+          echo "  $c  POST /shop/stripe/webhook  (non signé — attendu 400/503, jamais 200)"
+          case "$c" in 400|503) ;; *) echo "  ^ NOT OK : un webhook non signé est accepté"; fail=1;; esac
           echo "== authentification (preuve de cloisonnement) =="
           API="$BO/api"
           TOK=$(php -r '$c=@include "'"$DIR_API"'/config.local.php"; echo is_array($c)?($c["admin_token"]??""):"";' 2>/dev/null || echo "")
@@ -1662,7 +1663,7 @@ jobs:
             $ecart = WSM_RELANCE_ODSTEP_H >= 48;
             $abandon = WSM_RELANCE_ABANDON_JOURS <= 60;
             $ferme = !wsm_relance_possible();
-            $dit = str_contains(wsm_relance_blocage(), "tpay");
+            $dit = str_contains(wsm_relance_blocage(), "Stripe");
             echo ($deux ? "dwa-etapy-ok" : "dwa-etapy-ZLE"), " ",
                  ($ecart ? "odstep-ok" : "odstep-ZLE"), " ",
                  ($abandon ? "porzucenie-ok" : "porzucenie-ZLE"), " ",
@@ -2398,35 +2399,6 @@ jobs:
             && grep -q 'checkout.terms_l2' "$DIR_BO/../shop/index.php" \
             && echo "  dwie strony + stopka (stala, na stronie) + kasa: obecne" \
             || { echo "  ^ NOT OK : regulamin albo polityka niekompletne"; fail=1; }
-          # ── LE CANAL TPAY, ET SURTOUT SON ADRESSE DE NOTIFICATION ──────────
-          # L'adresse envoyee a tpay a chaque transaction DOIT designer l'API.
-          # Elle designait la boutique — qui ne connait pas cette route : le
-          # client payait, tpay recevait un 404, et la commande restait
-          # « oczekuje na płatność » sur de l'argent encaisse. Jamais vu, parce
-          # que tpay n'avait jamais ete branche.
-          echo "== kanal tpay =="
-          grep -q 'function wsm_tpay_diag' "$DIR_BO/api/tpay.php" \
-            && grep -q "POST\['test_polaczenia'\]" "$DIR_BO/ustawienia.php" \
-            && echo "  test polaczenia: obecny" \
-            || { echo "  ^ NOT OK : brak testu polaczenia tpay"; fail=1; }
-          # L'ADRESSE SE CALCULE, ON LA VERIFIE. Depuis la caisse, depuis la
-          # console : la meme, et elle doit contenir /backoffice/api.
-          TN=$(php -r '
-            require_once "'"$DIR_BO"'/api/db.php";
-            require_once "'"$DIR_BO"'/api/shop.php";
-            $_SERVER["HTTP_HOST"] = "example.com";
-            $vues = [];
-            foreach (["/mrszoko/shop/kasa", "/mrszoko/backoffice/ustawienia.php"] as $u) {
-              $_SERVER["REQUEST_URI"] = $u;
-              $vues[] = wsm_api_base_url() . "/shop/tpay/notify";
-            }
-            echo count(array_unique($vues)) === 1
-              && str_contains($vues[0], "/backoffice/api/shop/tpay/notify") ? "adres-ok" : "adres-ZLE :: " . implode(" | ", $vues);
-          ' 2>&1); [ $? -eq 0 ] || TN="php-ZLE :: $TN"
-          echo "  $TN"
-          case "$TN" in
-            *ZLE*|*Error*|*error*) echo "  ^ NOT OK : adres powiadomien tpay nie wskazuje API"; fail=1;;
-          esac
           echo "== statusy jako przyciski =="
           ETP=$(php -r 'require_once "'"$DIR_BO"'/api/invoice.php"; echo function_exists("wsm_order_etapy") ? "jest" : "brak";' 2>&1)
           case "$ETP" in
@@ -2711,7 +2683,7 @@ jobs:
 
       # LES MAQUETTES DE FIN OCTOBRE, dans une étape à elles : l'étape CMS
       # approche la limite de taille d'une expression GitHub (21 000).
-      - name: Verify shop mockups (product tiers, cart, home slides)
+      - name: Verify shop mockups and Stripe payments (tiers, cart, slides, Zapłać)
         env:
           SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: |
@@ -2777,6 +2749,50 @@ jobs:
               && echo "  koszyk: karty z -/+ i koszem, przewoznicy z rysunkiem: $NR; $(printf '%s' "$KH" | sed -n '/class="darmowa/,/<\/p>/p' | grep -o '<p>.*</p>' | head -1 | txt)" \
               || { echo "  ^ NOT OK : koszyk bez nowego ukladu (produkt $ID)"; fail=1; }
           fi
+          # ── STRIPE CONNECT : TOUS LES PAIEMENTS, INTÉGRÉS ─────────────────
+          # Le module, l'écran Płatności (composants intégrés), la page
+          # « Zapłać » (Checkout intégré) — et l'adresse du webhook, qui DOIT
+          # désigner l'API : collée de travers dans Stripe, le client paie et la
+          # commande reste « oczekuje na płatność » sur de l'argent encaissé.
+          echo "== platnosci Stripe =="
+          { grep -q 'function wsm_stripe_diag' "$DIR_BO/api/stripe.php" && grep -q 'function wsm_stripe_webhook' "$DIR_BO/api/stripe.php" \
+            && grep -q 'embedded_page' "$DIR_BO/api/stripe.php" && grep -q "'stripe/webhook'" "$DIR_BO/api/index.php" \
+            && [ -f "$DIR_BO/platnosci.php" ] && grep -q "'platnosci.php'" "$DIR_BO/console.php" \
+            && grep -q 'data-stripe-checkout' "$DIR_BO/../shop/index.php" && grep -q 'createEmbeddedCheckoutPage' "$DIR_BO/../shop/shop.js"; } \
+            && echo "  modul, ekran Platnosci, strona Zaplac: obecne" \
+            || { echo "  ^ NOT OK : integracja Stripe niekompletna"; fail=1; }
+          [ ! -e "$DIR_BO/api/tpay.php" ] || echo "  (tpay.php zostal na serwerze — rsync bez --delete; nic go juz nie laduje)"
+          TN=$(php -r '
+            require_once "'"$DIR_BO"'/api/db.php";
+            require_once "'"$DIR_BO"'/api/stripe.php";
+            $_SERVER["HTTP_HOST"] = "example.com";
+            $vues = [];
+            foreach (["/mrszoko/shop/kasa", "/mrszoko/backoffice/platnosci.php"] as $u) {
+              $_SERVER["REQUEST_URI"] = $u;
+              $vues[] = wsm_stripe_webhook_url();
+            }
+            echo count(array_unique($vues)) === 1
+              && str_contains($vues[0], "/backoffice/api/shop/stripe/webhook") ? "adres-ok" : "adres-ZLE :: " . implode(" | ", $vues);
+          ' 2>&1); [ $? -eq 0 ] || TN="php-ZLE :: $TN"
+          echo "  $TN"
+          case "$TN" in
+            *ZLE*|*Error*|*error*) echo "  ^ NOT OK : adres webhooka Stripe nie wskazuje API"; fail=1;;
+          esac
+          # L'ÉTAT, en clair, sans jamais afficher une clé : la phrase du
+          # diagnostic suffit à savoir quoi faire (clés, compte, webhook).
+          SD=$(php -r '
+            require_once "'"$DIR_BO"'/api/db.php";
+            require_once "'"$DIR_BO"'/api/stripe.php";
+            wsm_bootstrap();
+            [$k, $m] = wsm_stripe_diag(); echo $k . " — " . $m;
+          ' 2>&1 | head -c 400)
+          echo "  stan: $SD"
+          # Les textes publics qui nommaient tpay (caisse, règlement, politique) :
+          # la migration 2026_10_stripe les change phrase par phrase ; un texte
+          # réécrit à la main dans Treści reste tel quel — on le DIT ici.
+          NTP=$(sq "SELECT COUNT(*) FROM mrszoko.wsm_shop_i18n WHERE LOWER(v) LIKE '%tpay%'")
+          [ "${NTP:-0}" = "0" ] && echo "  teksty sklepu: zaden nie wspomina tpay" \
+            || echo "  ^ UWAGA : ${NTP} tekst(y) w Tresciach wciaz wspominaja tpay — popraw recznie (Tresci)"
           if [ "$fail" = "0" ]; then echo "ALL MOCKUP CHECKS OK"; else echo "MOCKUP CHECKS FAILED"; exit 1; fi
           REMOTE
 

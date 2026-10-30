@@ -1260,6 +1260,19 @@ h3 { font-weight: var(--weight-bold); }
 .torba-pomoc b { display: block; color: var(--text-strong); margin-bottom: 2px; }
 .torba-pomoc a { color: var(--link); }
 .koszyk-zywy.is-busy .summary, .koszyk-zywy.is-busy .cart-lines { opacity: .62; transition: opacity .15s; }
+/* ---- Zapłać : le formulaire Stripe intégré, le récapitulatif à côté ------- */
+.zaplac-glowa { text-align: center; max-width: 720px; margin: 8px auto clamp(24px, 4vw, 40px); }
+.zaplac-glowa h1 { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 8px; }
+.zaplac-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: clamp(24px, 4vw, 48px);
+               max-width: 1060px; margin: 0 auto; align-items: start; }
+.stripe-checkout { min-height: 420px; background: #fff; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--hairline);
+                   padding: clamp(8px, 2vw, 20px); }
+.zaplac-laduje { padding: 24px; text-align: center; }
+.zaplac-bezp { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 14px;
+               font-size: 13px; color: var(--text-muted); }
+.zaplac-bezp .ui-ikona { width: 16px; height: 16px; flex: none; }
+@media (max-width: 900px) { .zaplac-grid { grid-template-columns: 1fr; } .zaplac-podsumowanie { order: -1; } }
+
 /* Les suggestions, sous le sac, à la même largeur que lui. */
 .upsell { max-width: 980px; margin: 0 auto; padding-top: clamp(56px, 7vw, 88px); }
 .upsell h2 { font-size: clamp(24px, 2.6vw, 30px); margin-bottom: 20px; }

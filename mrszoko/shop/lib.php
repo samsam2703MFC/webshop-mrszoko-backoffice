@@ -35,7 +35,7 @@ if (is_file($WSM_API_DIR . '/sections.php')) require_once $WSM_API_DIR . '/secti
 // déploiement le dit.
 if (is_file($WSM_API_DIR . '/metody.php')) require_once $WSM_API_DIR . '/metody.php';
 if (is_file(__DIR__ . '/znaki.php')) require_once __DIR__ . '/znaki.php';
-require_once $WSM_API_DIR . '/tpay.php';
+require_once $WSM_API_DIR . '/stripe.php';
 
 // UNE ERREUR IMPRÉVUE NE DONNE PAS UNE PAGE BLANCHE AU CLIENT. Rien de
 // technique ne s'affiche (ni requête, ni chemin) : une excuse, un lien vers

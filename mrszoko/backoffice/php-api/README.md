@@ -109,7 +109,7 @@ VAT is the *remainder*, so `net + VAT == gross` always holds, line by line.
 | --- | --- |
 | `wsm_orders` | one order: buyer snapshot, delivery target, all totals |
 | `wsm_order_items` | frozen lines — an invoice must not move when a price does |
-| `wsm_payments` | tpay attempts (transaction id, amount, status) |
+| `wsm_payments` | Stripe Checkout sessions (session id, amount, status, `app_fee`) |
 | `wsm_payment_events` | every notification received; `event_key` **UNIQUE** = no double capture |
 | `wsm_shipments` | InPost parcel: service, locker code, template, tracking |
 | `wsm_order_events` | audit trail per order |
@@ -138,23 +138,37 @@ from the largest single item — two 6 cm bags each fit an 8 cm locker, together
 they do not. It stays an estimate (a real packing solver would be needed); the
 console labels it as such and the packer can override.
 
-## tpay — what makes the money real
+## Stripe Connect — what makes the money real
 
-`POST /shop/tpay/notify` is the only thing that marks an order paid. The browser
-return URL never does: it is under the buyer's control. Three guards, all tested:
+All payments go through **Stripe Connect**. The platform owner holds the Stripe
+platform account and its keys; the shop is a **connected account** (direct
+charges: the shop is the merchant of record). On every payment Stripe pays the
+platform its commission (`application_fee_amount` = Platforma rate × base,
+platform VAT included); the monthly Platforma statement shows it as already
+collected and deducts it. Both halves are **embedded**: the payment form
+(Checkout, `ui_mode=embedded_page`) inside the shop's *Zapłać* page, and the
+shop's account onboarding, payments and payouts (Connect embedded components)
+inside the console's *Płatności* screen. API version pinned to
+`2026-09-30.endive`, Stripe.js `endive`.
 
-1. **Signature first.** `md5(id + tr_id + tr_amount + tr_crc + security_code)`,
-   compared with `hash_equals`. A rejected notification is archived under a
-   throwaway key — if it took the real idempotency key, knowing a `tr_id` would
-   be enough to stop a legitimate payment from ever being booked.
-2. **Amount recheck.** An authentic notification for the wrong amount is refused.
-3. **Idempotency in the database.** `wsm_payment_events.event_key UNIQUE`. tpay
-   resends until it reads `TRUE`; the unique index — not application logic — is
-   what stops a second capture, because two concurrent retries would race.
+An order becomes *opłacone* only from (1) a webhook whose HMAC signature is
+verified, or (2) a Checkout Session read back **from Stripe** with the secret
+key on the return page. Never from the browser alone. Guards, all tested
+(`e2e_stripe.php`, `e2e_shop.php`):
 
-Without `security_code` configured, **every** notification is refused (`503`).
-Without `client_id`/`client_secret`, no transaction is created: the order still
-exists and waits. Nothing has a default value.
+1. **Signature first.** `Stripe-Signature: t=…,v1=…`, HMAC-SHA256 of
+   `t.payload`, compared with `hash_equals`, at most 5 minutes old. A rejected
+   event is archived under a throwaway key — if it took the real idempotency
+   key, knowing an `evt_…` would be enough to stop a legitimate payment.
+2. **Recheck everything.** Order (`client_reference_id`), connected account,
+   currency and amount must all match.
+3. **Idempotency in the database.** `wsm_payment_events.event_key UNIQUE`.
+   Stripe resends until it gets a 2xx; the unique index stops a second capture.
+
+Without the webhook secret, **every** webhook is refused (`503`). Without the
+platform keys and the shop's connected account, no session is created: the
+order still exists and waits. The platform keys are written only by the
+superadmin (*Płatności*), never from *Integracje*.
 
 InPost is the same shape: `inpost.php` builds the exact ShipX payload and shows
 it in the console *before* the integration is switched on, so missing data is
@@ -258,7 +272,7 @@ list, written out.
 | Setting | Env var | Without it |
 | --- | --- | --- |
 | **Bank account** | `WSM_INV_IBAN` | **No invoice can be issued at all.** The most expensive gap in the list, because it only shows itself at the moment of issuing. |
-| **tpay** | `WSM_TPAY_CLIENT_ID`, `WSM_TPAY_CLIENT_SECRET`, `WSM_TPAY_SECURITY_CODE` | The shop takes orders nobody can pay for. |
+| **Stripe** | `WSM_STRIPE_SECRET_KEY`, `WSM_STRIPE_PUBLISHABLE_KEY`, `WSM_STRIPE_WEBHOOK_SECRET` (platform keys) + `WSM_STRIPE_ACCOUNT` (the shop's `acct_…`, created from *Płatności*) | The shop takes orders nobody can pay for. |
 | **Outgoing mail** | `WSM_MAIL_TRANSPORT=smtp`, `WSM_MAIL_FROM`, `WSM_MAIL_SMTP_HOST`, `WSM_MAIL_SMTP_PORT`, `WSM_MAIL_SMTP_USER`, `WSM_MAIL_SMTP_PASS`, `WSM_MAIL_SMTP_SECURE` | Order confirmations sit in the queue and nobody receives them. |
 | **InPost ShipX** | `WSM_INPOST_TOKEN`, `WSM_INPOST_ORG_ID`, `WSM_INPOST_GEOWIDGET_TOKEN` | Parcels are booked by hand. The *Wysyłka* screen shows which ones. |
 | **KSeF** | `WSM_KSEF_TOKEN`, `WSM_KSEF_PUBLIC_KEY`, `WSM_KSEF_ENV` | Invoices are not filed automatically. The *KSeF* screen still builds the FA(2) XML for manual filing. `WSM_KSEF_PUBLIC_KEY` is a **path on the server** to the Ministry of Finance public key — without it the token cannot be encrypted, so no session opens. |
@@ -271,8 +285,8 @@ unconfigured — it is what a demo field holds, and taking it for a credential
 would open an integration on nothing. A half-wired integration is worse than
 an absent one, because you believe you are selling.
 
-tpay, InPost and Allegro default to **sandbox**; KSeF defaults to the **test**
-environment. Set `WSM_TPAY_SANDBOX=0` / `WSM_INPOST_SANDBOX=0` /
+Stripe's mode follows its keys (`sk_test_…` / `sk_live_…`). InPost and Allegro default to **sandbox**; KSeF defaults to the **test**
+environment. Set `WSM_INPOST_SANDBOX=0` /
 `WSM_ALLEGRO_SANDBOX=0` / `WSM_KSEF_ENV=prod` to go live.
 
 VIES needs no credentials (it is a public service), but set
@@ -303,9 +317,9 @@ from the console.
 | GET | `/shop/catalog?lang=pl\|uk\|en` | `wsm_products` · `wsm_shop_i18n` · `wsm_shipping_methods` |
 | GET | `/shop/product/{slug}` | one product, texts resolved server-side |
 | POST | `/shop/quote` | prices the basket — **ids and quantities only**, prices ignored |
-| POST | `/shop/order` | creates the order, decrements stock, opens the tpay transaction |
+| POST | `/shop/order` | creates the order, decrements stock, returns the shop's *Zapłać* URL (embedded Stripe Checkout) |
 | GET | `/shop/order/{code}?t=…` | order status; the token is compared with `hash_equals` |
-| POST | `/shop/tpay/notify` | signed payment notification, idempotent (replies `TRUE`) |
+| POST | `/shop/stripe/webhook` | signed Stripe webhook (connected accounts), idempotent |
 | **Boutique côté console (protégé)** | | |
 | GET | `/franchisor/orders` | order list |
 | GET | `/franchisor/orders/{id}` | one order + events + the ShipX payload it would send |

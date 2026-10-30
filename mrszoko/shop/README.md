@@ -108,8 +108,9 @@ déployé.
 - **Les photos réelles.** Les vignettes restent des dégradés aux couleurs de
   chaque chocolat tant qu'aucune photo n'a été envoyée. Elles s'envoient depuis
   la console : `/mrszoko/backoffice/produkty.php`.
-- **L'appel réel à tpay et InPost** attend des identifiants. Le code est écrit
+- **Le paiement Stripe et InPost** attendent des identifiants. Le code est écrit
   et testé ; sans identifiants il est fermé, pas approximatif : aucune
-  transaction créée, aucune notification acceptée.
+  session de paiement créée, aucun webhook accepté. Le paiement s'affiche
+  intégré dans la page « Zapłać » (Stripe Checkout, mode embedded_page).
 - **Le sélecteur de Paczkomat sur carte** (Geowidget InPost) : le code du point
   se saisit pour l'instant à la main, avec vérification du format.

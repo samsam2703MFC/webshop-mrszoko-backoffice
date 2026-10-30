@@ -422,13 +422,14 @@ CREATE TABLE IF NOT EXISTS wsm_order_items (
 CREATE TABLE IF NOT EXISTS wsm_payments (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id     INTEGER NOT NULL REFERENCES wsm_orders(id) ON DELETE CASCADE,
-  provider     TEXT NOT NULL DEFAULT 'tpay',
+  provider     TEXT NOT NULL DEFAULT 'stripe',
   tr_id        TEXT NOT NULL DEFAULT '',
   tr_title     TEXT NOT NULL DEFAULT '',
   amount       INTEGER NOT NULL DEFAULT 0,
   currency     TEXT NOT NULL DEFAULT 'PLN',
   status       TEXT NOT NULL DEFAULT 'oczekuje',
   redirect_url TEXT NOT NULL DEFAULT '',
+  app_fee      INTEGER NOT NULL DEFAULT 0,
   created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -436,7 +437,7 @@ CREATE TABLE IF NOT EXISTS wsm_payments (
 CREATE TABLE IF NOT EXISTS wsm_payment_events (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id     INTEGER REFERENCES wsm_orders(id) ON DELETE SET NULL,
-  provider     TEXT NOT NULL DEFAULT 'tpay',
+  provider     TEXT NOT NULL DEFAULT 'stripe',
   event_key    TEXT NOT NULL UNIQUE,
   status       TEXT NOT NULL DEFAULT '',
   amount       INTEGER NOT NULL DEFAULT 0,

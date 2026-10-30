@@ -69,12 +69,12 @@ if ($iban === '' || strtolower($iban) === 'xxxx') {
     bien('IBAN uzupełniony');
 }
 
-// tpay : sans lui la boutique prend des commandes que personne ne paie.
-if (is_file($API . '/tpay.php')) {
-    require_once $API . '/tpay.php';
-    if (function_exists('wsm_tpay_enabled') && wsm_tpay_enabled()) bien('tpay skonfigurowany — klient może zapłacić');
-    else bloque('tpay nieskonfigurowany', 'Ustawienia › płatności — sklep przyjmuje zamówienia, których nikt nie opłaci');
-} else { saute('tpay', 'brak pliku tpay.php'); }
+// Stripe : sans lui la boutique prend des commandes que personne ne paie.
+if (is_file($API . '/stripe.php')) {
+    require_once $API . '/stripe.php';
+    if (function_exists('wsm_stripe_ready') && wsm_stripe_ready()) bien('Stripe gotowy — klient może zapłacić');
+    else bloque('Stripe nie przyjmuje płatności', 'Płatności — klucze platformy i konto Stripe sklepu; sklep przyjmuje zamówienia, których nikt nie opłaci');
+} else { saute('Stripe', 'brak pliku stripe.php'); }
 
 // InPost : sans lui les colis partent à la main. Gênant, pas bloquant.
 if (is_file($API . '/inpost.php')) {
