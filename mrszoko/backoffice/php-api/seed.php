@@ -673,6 +673,31 @@ function wsm_content_jednorazowe(): array {
     }
     $ops['migracja.2026_10_hero_piekarz'] = $h;
 
+    // STRIPE (octobre 2026) : tous les paiements passent par Stripe Connect,
+    // intégrés dans la boutique ; tpay et le virement partent. Les textes qui
+    // nommaient tpay changent PHRASE PAR PHRASE (REPLACE) : un paragraphe déjà
+    // réécrit dans Treści garde ses mots, et le contrôle de déploiement dit
+    // alors qu'il nomme encore tpay. Le règlement et la politique : à faire
+    // relire — l'opérateur change, donc le destinataire des données aussi.
+    $s = [];
+    foreach ([
+        ['pl', 'checkout.pay_info', 'Płatność obsługuje tpay.com. Po złożeniu zamówienia przeniesiemy Cię na stronę płatności.', 'Płatność obsługuje Stripe. Po złożeniu zamówienia zapłacisz na następnej stronie sklepu — BLIK, Przelewy24, kartą, Apple Pay lub Google Pay.'],
+        ['uk', 'checkout.pay_info', 'Оплату обслуговує tpay.com. Після оформлення ми перенаправимо вас на сторінку оплати.', 'Оплату обслуговує Stripe. Після оформлення замовлення ви оплатите на наступній сторінці магазину — BLIK, Przelewy24, карткою, Apple Pay або Google Pay.'],
+        ['en', 'checkout.pay_info', 'Payments are handled by tpay.com. You\'ll be taken to the payment page after placing the order.', 'Payments are handled by Stripe. After placing the order you\'ll pay on the next page of the shop — BLIK, Przelewy24, card, Apple Pay or Google Pay.'],
+        ['pl', 'order.pay_unavailable', 'Płatność online nie jest jeszcze uruchomiona, skontaktujemy się z Tobą e-mailem w sprawie przelewu.', 'Płatność online nie jest jeszcze uruchomiona. Zamówienie jest zapisane — skontaktujemy się z Tobą e-mailem.'],
+        ['uk', 'order.pay_unavailable', 'Онлайн-оплату ще не запущено, ми напишемо вам щодо переказу.', 'Онлайн-оплату ще не запущено. Замовлення збережено — ми напишемо вам електронною поштою.'],
+        ['en', 'order.pay_unavailable', 'Online payment isn\'t live yet, we\'ll e-mail you about the bank transfer.', 'Online payment isn\'t live yet. Your order is saved — we\'ll get in touch by e-mail.'],
+        ['pl', 'metoda.przelew_online', 'Szybki przelew', 'Przelewy24'],
+        ['uk', 'metoda.przelew_online', 'Швидкий переказ', 'Przelewy24'],
+        ['en', 'metoda.przelew_online', 'Instant bank transfer', 'Przelewy24'],
+        ['pl', 'terms.s6.b', '**Tpay** (Krajowy Integrator Płatności S.A. z siedzibą w Poznaniu). Dostępne metody obejmują szybki przelew, BLIK oraz kartę płatniczą.', '**Stripe** (Stripe Payments Europe, Limited z siedzibą w Dublinie, Irlandia). Dostępne metody obejmują BLIK, Przelewy24, kartę płatniczą oraz Apple Pay i Google Pay.'],
+        ['pl', 'privacy.s4.b', '- **operator płatności** — Krajowy Integrator Płatności S.A. (Tpay), w zakresie niezbędnym do rozliczenia transakcji,', '- **operator płatności** — Stripe Payments Europe, Limited (Irlandia), w zakresie niezbędnym do rozliczenia transakcji,'],
+        ['pl', 'privacy.s4.b', 'Nie przekazujemy danych poza Europejski Obszar Gospodarczy.', 'Operator płatności może przetwarzać dane także poza Europejskim Obszarem Gospodarczym — wyłącznie na podstawie standardowych klauzul umownych zatwierdzonych przez Komisję Europejską.'],
+    ] as [$l, $k, $de, $vers]) {
+        $s[] = ['UPDATE wsm_shop_i18n SET v = REPLACE(v, ?, ?) WHERE lang = ? AND k = ?', [$de, $vers, $l, $k]];
+    }
+    $ops['migracja.2026_10_stripe'] = $s;
+
     return $ops;
 }
 

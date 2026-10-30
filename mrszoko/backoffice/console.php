@@ -332,6 +332,7 @@ function console_sections(?array $me = null): array {
         // réglages : on y lit la marge, le résultat après port et la
         // prévision — c'est de l'argent, pas de la configuration.
         'Pieniądze' => [
+            'platnosci.php' => 'Płatności',
             'faktury.php' => 'Faktury',
             'ksef.php'    => 'KSeF',
             'audyt.php'   => 'Audyt',

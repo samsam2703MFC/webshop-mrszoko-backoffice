@@ -20,7 +20,7 @@ require_once __DIR__ . '/console.php';
 [$pdo, $me, $isAdmin] = console_boot();
 $API = console_api_dir();
 require_once $API . '/settings.php';
-require_once $API . '/tpay.php';
+require_once $API . '/stripe.php';
 require_once $API . '/inpost.php';
 require_once $API . '/dpd.php';
 require_once $API . '/mail.php';
@@ -43,7 +43,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // marche » sur des identifiants que la boutique n'a pas — et l'inverse
         // est pire encore. On enregistre d'abord, on teste ensuite.
         $quoi = (string) $_POST['test_polaczenia'];
-        $fn = ['tpay' => 'wsm_tpay_diag', 'inpost' => 'wsm_inpost_diag'][$quoi] ?? '';
+        $fn = ['stripe' => 'wsm_stripe_diag', 'inpost' => 'wsm_inpost_diag'][$quoi] ?? '';
         if ($fn === '' || !function_exists($fn)) {
             $flash = 'Nie ma takiego testu.'; $flashKind = 'err';
         } else {
@@ -71,7 +71,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
     } else {
         $refus = [];
-        $changed = wsm_settings_save($pdo, $_POST, (string) ($me['nom'] ?? ''), $refus);
+        // Tous les groupes de l'écran — SAUF « stripe » : les clés de la
+        // plateforme ne s'écrivent que depuis Płatności, par le superadmin.
+        $grupyEkranu = array_values(array_diff(array_unique(array_column(wsm_settings_fields(), 0)), ['stripe']));
+        $changed = wsm_settings_save($pdo, $_POST, (string) ($me['nom'] ?? ''), $refus, $grupyEkranu);
         // UN REFUS SE DIT, ET IL PASSE AVANT LE SUCCÈS. Une clé PEM mal collée
         // enregistrée « en partie » laisserait croire KSeF configuré, et la
         // session échouerait beaucoup plus tard, sur une facture réelle.
@@ -100,7 +103,6 @@ if (isset($_GET['ok'])) $flash = (string) $_GET['ok'];
 
 $view = wsm_settings_view($pdo);
 $groups = [
-    'tpay'   => ['tpay.com — płatności', 'Bez client_id i client_secret nie powstanie żadna transakcja; bez kodu bezpieczeństwa żadne powiadomienie o płatności nie zostanie przyjęte.'],
     'inpost' => ['InPost ShipX — wysyłka', 'Token serwerowy służy do tworzenia etykiet. Token Geowidget trafia do strony sklepu — to token przeglądarkowy.'],
     'dpd'    => ['DPD Polska — wysyłka pod adres', 'Login, hasło i numer klienta (FID) z panelu DPD. Adres nadawcy jest drukowany na etykiecie: bez niego paczka odrzucona w doręczeniu nie ma dokąd wrócić. API DPD to SOAP — serwer musi mieć rozszerzenie php-soap.'],
     'mail'   => ['Poczta — wiadomości do klientów', 'Bez adresu nadawcy wiadomości czekają w kolejce w zakładce Poczta i nic nie ginie.'],
@@ -110,7 +112,7 @@ $groups = [
 ];
 
 $state = [
-    'tpay'    => wsm_tpay_enabled(),
+    'stripe'  => wsm_stripe_ready(),
     'inpost'  => wsm_inpost_enabled(),
     'dpd'     => function_exists('wsm_dpd_enabled') && wsm_dpd_enabled(),
     'mail'    => wsm_mail_enabled(),
@@ -128,7 +130,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Integracje' => null]);
 ?>
 
 <div class="kpis">
-  <div class="kpi"><b><?= $state['tpay'] ? 'TAK' : 'NIE' ?></b><span>tpay gotowy</span></div>
+  <div class="kpi"><b><?= $state['stripe'] ? 'TAK' : 'NIE' ?></b><span>Stripe gotowy</span></div>
   <div class="kpi"><b><?= $state['inpost'] ? 'TAK' : 'NIE' ?></b><span>InPost gotowy</span></div>
   <div class="kpi"><b><?= $state['mail'] ? 'TAK' : 'NIE' ?></b><span>Poczta gotowa</span></div>
   <div class="kpi"><b><?= $state['ksef'] ? 'TAK' : 'NIE' ?></b><span>KSeF gotowy</span></div>
@@ -159,7 +161,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Integracje' => null]);
 // tableau qui explique chaque interrupteur : ces cases décident de ce qui part
 // au fisc, elles n'ont pas leur place à côté d'un mot de passe SMTP. On le
 // déclare ici pour que la garde continue d'attraper les VRAIS orphelins.
-$ailleurs = ['zamowienia' => 'Superadmin → Statusy i wyzwalacze'];
+$ailleurs = ['zamowienia' => 'Superadmin → Statusy i wyzwalacze', 'stripe' => 'Płatności (superadmin)'];
 $orphelins = [];
 foreach ($view as $k => $f) {
     if (!isset($groups[$f['group']]) && !isset($ailleurs[$f['group']])) $orphelins[$f['group']] = true;
@@ -172,6 +174,22 @@ if ($orphelins): ?>
   Dopisz grupę w <code>ustawienia.php</code>.
 </p>
 <?php endif; ?>
+
+<?php // LES PAIEMENTS NE SE RÈGLENT PLUS ICI. Stripe Connect a son écran :
+      // l'ouverture du compte de la boutique, ses paiements et ses virements
+      // s'y affichent intégrés, et les clés de la plateforme n'y sont
+      // modifiables que par le superadmin. Ici, l'état et le test. ?>
+<form method="post" class="panel">
+  <?= console_csrf_field() ?>
+  <h2>Stripe — płatności
+    <span class="tag <?= $state['stripe'] ? 'ok' : 'bad' ?>"><?= $state['stripe'] ? 'działa' : 'wyłączone' ?></span></h2>
+  <p class="muted small">Wszystkie płatności (BLIK, Przelewy24, karta, Apple Pay, Google Pay) przyjmuje Stripe, w formularzu
+    osadzonym w kasie sklepu. Konto sklepu, jego płatności i wypłaty — na ekranie <a href="platnosci.php">Płatności</a>.</p>
+  <p class="actions" style="margin:0">
+    <button type="submit" name="test_polaczenia" value="stripe" formnovalidate>Sprawdź połączenie</button>
+    <a class="btn" href="platnosci.php">Otwórz Płatności</a>
+  </p>
+</form>
 
 <form method="post" enctype="multipart/form-data">
       <?= console_csrf_field() ?>
@@ -210,14 +228,10 @@ if ($orphelins): ?>
           //
           // Il marche CANAL FERMÉ, volontairement : c'est précisément quand
           // rien ne fonctionne qu'on a besoin de savoir pourquoi.
-          $diag = ['tpay' => 'wsm_tpay_diag', 'inpost' => 'wsm_inpost_diag'];
+          $diag = ['inpost' => 'wsm_inpost_diag'];
           if (isset($diag[$g]) && function_exists($diag[$g])): ?>
       <p class="actions" style="margin:0 0 14px">
         <button type="submit" name="test_polaczenia" value="<?= h($g) ?>" formnovalidate>Sprawdź połączenie</button>
-        <?php if ($g === 'tpay' && function_exists('wsm_tpay_notify_url')): ?>
-        <span class="muted small">Adres powiadomień do wklejenia w panelu tpay:
-          <code><?= h(wsm_tpay_notify_url()) ?></code></span>
-        <?php endif; ?>
       </p>
       <?php endif; ?>
 

@@ -694,6 +694,12 @@ function wsm_ensure_shop(PDO $pdo): void {
         // WSM_NUTRITION_FIELDS). Vide = la fiche n'affiche pas le tableau.
         'nutrition'    => ['TEXT', 'TEXT'],
     ]);
+    // La commission de la plateforme prélevée par Stripe sur CE paiement
+    // (application fee, en grosze) : le décompte mensuel de Platforma la
+    // reprend comme « déjà payée ».
+    wsm_ensure_columns($pdo, 'wsm_payments', [
+        'app_fee' => ['INT NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0'],
+    ]);
 
     // Contenu de la boutique : modes de livraison + libellés traduits.
     try {

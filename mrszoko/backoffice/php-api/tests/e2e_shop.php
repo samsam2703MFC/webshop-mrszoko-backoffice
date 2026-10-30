@@ -238,21 +238,26 @@ $r = http('POST', "$BASE/shop/order", array_merge($buyer,
 ok('zamówienie ponad stan → 422', badField($r, 'stock') || $r[0] === 422, $r);
 
 // ---- 4. Paiement : fermé par défaut ----------------------------------------
-echo "-- tpay --\n";
-[$cw, $bw] = http('POST', "$BASE/shop/tpay/notify",
-    ['id' => '1', 'tr_id' => 'TR-FAKE', 'tr_amount' => '1.00', 'tr_crc' => $code, 'tr_paid' => '1.00',
-     'tr_status' => 'TRUE', 'md5sum' => str_repeat('a', 32)], null, true);
-ok('bez skonfigurowanego kodu bezpieczeństwa notyfikacja jest odrzucana', $cw === 503, [$cw, $bw]);
+echo "-- stripe --\n";
+[$cw, $bw] = http('POST', "$BASE/shop/stripe/webhook", ['id' => 'evt_fake', 'type' => 'checkout.session.completed'], null, true);
+ok('bez sekretu webhooka zdarzenie jest odrzucane', $cw === 503, [$cw, $bw]);
 [, $stillUnpaid] = http('GET', "$BASE/shop/order/" . rawurlencode($code) . "?t=" . $tok);
 ok('zamówienie NIE zostało oznaczone jako opłacone', ($stillUnpaid['payment_status'] ?? '') !== 'oplacone',
     $stillUnpaid['payment_status'] ?? null);
+ok('API kieruje do strony „Zapłać” w sklepie, nie do operatora',
+    ($order['payment']['provider'] ?? '') === 'stripe'
+    && str_contains((string) ($order['payment']['pay_url'] ?? ''), '/zaplac/' . rawurlencode($code) . '?t=' . $tok),
+    $order['payment'] ?? null);
 
-// Signature + idempotence : testées en direct, avec un code de sécurité connu.
-putenv('WSM_TPAY_SECURITY_CODE=e2e-secret-code');
-putenv('WSM_TPAY_CLIENT_ID=');
+// Signature + idempotence : testées en direct, avec un secret connu. Le dépôt
+// est PUBLIC : ce ne sont pas de vraies clés, juste des chaînes de test.
 require_once dirname(__DIR__) . '/db.php';
-require_once dirname(__DIR__) . '/tpay.php';
+require_once dirname(__DIR__) . '/stripe.php';
 $pdo = wsm_bootstrap();
+// La surcouche, APRÈS le démarrage : c'est elle qui fait foi en mémoire (une
+// variable d'environnement posée après la lecture de config.php serait ignorée).
+wsm_config_overlay(['stripe' => ['webhook_secret' => 'whsec_e2e_test', 'secret_key' => 'sk_test_e2e',
+                                 'publishable_key' => 'pk_test_e2e', 'account' => 'acct_e2eSKLEP']]);
 
 // Une requête SELECT laissée ouverte garde un verrou partagé SQLite et bloque
 // le serveur HTTP au premier write suivant : on lit et on referme aussitôt.
@@ -264,43 +269,47 @@ $readOrder = function (string $code) use ($pdo): array {
     return $rows[0] ?? [];
 };
 $row = $readOrder($code);
-$amount = number_format(((int) $row['total_gross']) / 100, 2, '.', '');
-$sign = fn(array $p) => md5(($p['id'] ?? '') . ($p['tr_id'] ?? '') . ($p['tr_amount'] ?? '') . ($p['tr_crc'] ?? '') . 'e2e-secret-code');
+$evt = fn(string $type, array $obj, string $acct = 'acct_e2eSKLEP') => json_encode(
+    ['id' => 'evt_' . bin2hex(random_bytes(8)), 'type' => $type, 'account' => $acct, 'data' => ['object' => $obj]]);
+$sig = fn(string $raw, ?int $t = null) => 't=' . ($t ?? time()) . ',v1=' . hash_hmac('sha256', ($t ?? time()) . '.' . $raw, 'whsec_e2e_test');
+$sesja = ['id' => 'cs_test_' . bin2hex(random_bytes(6)), 'object' => 'checkout.session', 'client_reference_id' => $code,
+          'amount_total' => (int) $row['total_gross'], 'currency' => 'pln', 'payment_status' => 'paid',
+          'status' => 'complete', 'payment_intent' => 'pi_test_e2e'];
 
-$note = ['id' => '77', 'tr_id' => 'TR-' . bin2hex(random_bytes(3)), 'tr_amount' => $amount,
-         'tr_crc' => $code, 'tr_paid' => $amount, 'tr_status' => 'TRUE'];
+$raw = $evt('checkout.session.completed', $sesja);
+[$b1, $c1] = wsm_stripe_webhook($pdo, $raw, 't=' . time() . ',v1=' . str_repeat('b', 64));
+ok('zła sygnatura → 400', $c1 === 400, [$c1, $b1]);
+ok('po złej sygnaturze zamówienie wciąż nieopłacone', $readOrder($code)['payment_status'] !== 'oplacone');
 
-$badSig = $note; $badSig['md5sum'] = str_repeat('b', 32);
-[$b1] = wsm_tpay_notification($pdo, $badSig, '');
-ok('zła sygnatura → odmowa', str_starts_with($b1, 'FALSE'), $b1);
-ok('po złej sygnaturze zamówienie wciąż nieopłacone',
-    $readOrder($code)['payment_status'] !== 'oplacone');
+$stary = time() - 900;
+[$b0, $c0] = wsm_stripe_webhook($pdo, $raw, $sig($raw, $stary));
+ok('poprawna sygnatura sprzed 15 minut (powtórka) → 400', $c0 === 400, [$c0, $b0]);
+
+$obce = $evt('checkout.session.completed', $sesja, 'acct_innySklep');
+[$bx, $cx] = wsm_stripe_webhook($pdo, $obce, $sig($obce));
+ok('zdarzenie z obcego konta → odmowa', $cx === 409 && $bx === 'obce_konto', [$cx, $bx]);
 
 // Montant qui ne correspond pas : signature valable, encaissement refusé.
-$wrongAmt = ['id' => '77', 'tr_id' => 'TR-' . bin2hex(random_bytes(3)), 'tr_amount' => '1.00',
-             'tr_crc' => $code, 'tr_paid' => '1.00', 'tr_status' => 'TRUE'];
-$wrongAmt['md5sum'] = $sign($wrongAmt);
-[$b2] = wsm_tpay_notification($pdo, $wrongAmt, '');
-ok('poprawna sygnatura, ale zła kwota → odmowa', str_starts_with($b2, 'FALSE'), $b2);
-ok('częściowa wpłata nie zwalnia zamówienia',
-    $readOrder($code)['payment_status'] !== 'oplacone');
+$zla = $sesja; $zla['amount_total'] = 100;
+$rawZla = $evt('checkout.session.completed', $zla);
+[$b2, $c2] = wsm_stripe_webhook($pdo, $rawZla, $sig($rawZla));
+ok('poprawna sygnatura, ale zła kwota → odmowa', $c2 === 409 && $b2 === 'kwota', [$c2, $b2]);
+ok('częściowa wpłata nie zwalnia zamówienia', $readOrder($code)['payment_status'] !== 'oplacone');
 
-$note['md5sum'] = $sign($note);
-[$b3] = wsm_tpay_notification($pdo, $note, '');
-ok('poprawna notyfikacja → TRUE', $b3 === 'TRUE', $b3);
+[$b3, $c3] = wsm_stripe_webhook($pdo, $raw, $sig($raw));
+ok('poprawne zdarzenie → 200', $c3 === 200 && $b3 === 'oplacone', [$c3, $b3]);
 $paidRow = $readOrder($code);
 ok('zamówienie oznaczone jako opłacone',
     $paidRow['payment_status'] === 'oplacone' && $paidRow['paid_at'] !== null, $paidRow['payment_status']);
-
 // La tentative non signée ne doit PAS avoir confisqué la clé d'idempotence :
-// sinon connaître un tr_id suffirait à empêcher l'encaissement d'une commande.
-ok('odrzucona notyfikacja nie blokuje tej prawdziwej', $paidRow['payment_status'] === 'oplacone');
+// sinon connaître un evt_… suffirait à empêcher l'encaissement d'une commande.
+ok('odrzucone zdarzenie nie blokuje tego prawdziwego', $paidRow['payment_status'] === 'oplacone');
 
 $eventsBefore = (int) $pdo->query("SELECT COUNT(*) FROM wsm_order_events WHERE event = 'oplacone'")->fetchColumn();
-[$b4] = wsm_tpay_notification($pdo, $note, '');
+[$b4, $c4] = wsm_stripe_webhook($pdo, $raw, $sig($raw));
 $eventsAfter = (int) $pdo->query("SELECT COUNT(*) FROM wsm_order_events WHERE event = 'oplacone'")->fetchColumn();
-ok('powtórzona notyfikacja → TRUE (bez błędu)', $b4 === 'TRUE', $b4);
-ok('powtórzona notyfikacja NIE księguje drugi raz', $eventsAfter === $eventsBefore, [$eventsBefore, $eventsAfter]);
+ok('powtórzone zdarzenie → 200 (bez błędu)', $c4 === 200, [$c4, $b4]);
+ok('powtórzone zdarzenie NIE księguje drugi raz', $eventsAfter === $eventsBefore, [$eventsBefore, $eventsAfter]);
 
 // ---- 5. Cloisonnement ------------------------------------------------------
 echo "-- protekcja --\n";
@@ -311,8 +320,8 @@ ok('zamówienie widoczne w konsoli', (bool) array_filter($list ?: [], fn($o) => 
 ok('KPI sklepu dostępne dla konsoli', http('GET', "$BASE/franchisor/shop-kpis", null, $TOKEN)[0] === 200);
 [, $scfg] = http('GET', "$BASE/franchisor/shop-config", null, $TOKEN);
 ok('konfiguracja nie ujawnia sekretów',
-    isset($scfg['tpay']['enabled']) && !isset($scfg['tpay']['client_secret']) && !isset($scfg['inpost']['token']),
-    array_keys($scfg['tpay'] ?? []));
+    isset($scfg['stripe']['enabled']) && !isset($scfg['stripe']['secret_key']) && !isset($scfg['stripe']['webhook_secret'])
+    && !isset($scfg['inpost']['token']), array_keys($scfg['stripe'] ?? []));
 
 // Garde-fou anti-boucle sur la même adresse.
 $spamMail = 'spam-' . bin2hex(random_bytes(4)) . '@example.pl';

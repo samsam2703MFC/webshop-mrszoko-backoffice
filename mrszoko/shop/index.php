@@ -231,6 +231,31 @@ if (isset($_GET['stop']) && $method === 'GET') {
 if ($method === 'POST') {
     if (!csrf_ok()) { http_response_code(400); exit('Bad request.'); }
 
+    // ---- La session de paiement intégrée (demandée par la page Zapłać) ----
+    // Le navigateur ne reçoit qu'un secret de session à usage unique ; la
+    // commande, son montant et le compte connecté sont fixés ICI. Une
+    // commande payée, annulée ou inconnue n'ouvre rien.
+    if ($page === 'zaplac' && ($seg[2] ?? '') === 'sesja') {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $oZ = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
+        if (!$oZ || $oZ['payment_status'] === 'oplacone' || $oZ['status'] === 'anulowane' || !wsm_stripe_ready()) {
+            http_response_code(409);
+            echo json_encode(['error' => 'unavailable']);
+            exit;
+        }
+        $powrot = wsm_shop_base_url() . '/zamowienie/' . rawurlencode($oZ['code'])
+                . '?t=' . rawurlencode((string) $oZ['access_token']) . '&session_id={CHECKOUT_SESSION_ID}';
+        $rZ = wsm_stripe_checkout($pdo, $oZ, $powrot);
+        if ($rZ['client_secret'] === '') {
+            http_response_code(502);
+            echo json_encode(['error' => 'stripe']);
+            exit;
+        }
+        echo json_encode(['clientSecret' => $rZ['client_secret']]);
+        exit;
+    }
+
     if ($page === 'koszyk' || $page === '' || $page === 'p') {
         // LE MODE DE LIVRAISON CHOISI SURVIT À UN CHANGEMENT DE QUANTITÉ. Le
         // panier revenait sur « Paczkomat » après chaque « + » : le client qui
@@ -396,14 +421,14 @@ if ($method === 'POST') {
             // laisser traîner le ferait re-tenter — puis refuser — sur la
             // commande suivante, ce qui ressemblerait à une panne.
             voucher_write('');
-            $base = wsm_shop_base_url();
-            $pay = wsm_tpay_start($pdo, $order,
-                $base . '/zamowienie/' . rawurlencode($order['code']) . '?t=' . $order['access_token'],
-                wsm_api_base_url() . '/shop/tpay/notify');
-            // Si tpay a rendu une URL de paiement, on y envoie l'acheteur
-            // directement — sinon il atterrit sur sa confirmation.
-            if (($pay['redirect_url'] ?? '') !== '') redirect($pay['redirect_url']);
-            redirect(u('zamowienie/' . rawurlencode($order['code']), ['t' => $order['access_token']]));
+            // LE PAIEMENT SE FAIT CHEZ NOUS : la page « Zapłać » porte le
+            // formulaire Stripe intégré — pas de redirection vers un site tiers.
+            // Sans Stripe prêt, la commande existe quand même ; la tentative
+            // est tracée « niedostepne » et sa page le dit.
+            $qZ = ['t' => $order['access_token']];
+            if (wsm_stripe_ready()) redirect(u('zaplac/' . rawurlencode($order['code']), $qZ));
+            wsm_stripe_checkout($pdo, $order, '');
+            redirect(u('zamowienie/' . rawurlencode($order['code']), $qZ));
         }
     }
 }
@@ -1836,8 +1861,83 @@ if ($page === 'moje-zamowienie') {
 }
 
 // ------------------------------------------------------------- CONFIRMATION -
+// ------------------------------------------------------------------ ZAPŁAĆ -
+// Le paiement, DANS la boutique : le formulaire Stripe (BLIK, Przelewy24,
+// carte, Apple Pay, Google Pay) est monté ici par shop.js. Stripe renvoie
+// ensuite sur la page de la commande, qui relit la session chez Stripe.
+if ($page === 'zaplac' && count($seg) === 2) {
+    $o = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
+    if ($o && ($o['payment_status'] === 'oplacone' || $o['status'] === 'anulowane' || !wsm_stripe_ready())) {
+        redirect(u('zamowienie/' . rawurlencode($o['code']), ['t' => $o['access_token']]));
+    }
+    layout_head($S, $lang, $langs, $S['pay.title'] ?? '', '', 'zaplac');
+    layout_header($S, $lang, $langs, $cartCount);
+    if (!$o) {
+        http_response_code(404);
+        echo '<main class="wrap block"><h1>' . e($S['order.title'] ?? '') . '</h1>'
+           . '<p class="muted">' . e($S['order.not_found'] ?? '') . '</p></main>';
+        layout_footer($S);
+        exit;
+    }
+    $qZ = ['t' => $o['access_token']];
+    ?>
+<main class="wrap block zaplac">
+  <?php layout_crumbs([
+      ($S['nav.shop'] ?? 'Sklep') => u(),
+      ($S['order.title'] ?? 'Zamówienie') . ' ' . $o['code'] => u('zamowienie/' . rawurlencode($o['code']), $qZ),
+      ($S['pay.title'] ?? 'Zapłać') => null,
+  ]); ?>
+  <header class="zaplac-glowa">
+    <h1><?= e(str_replace('{x}', zl((int) $o['total_gross']), $S['pay.heading'] ?? '{x}')) ?></h1>
+    <p class="muted"><?= e($S['order.number'] ?? '') ?> <b><?= e($o['code']) ?></b> · <?= e($S['pay.lead'] ?? '') ?></p>
+  </header>
+  <div class="zaplac-grid">
+    <section class="zaplac-forma">
+      <?php // Le formulaire Stripe se monte ICI (shop.js). La clé publiée et le
+            // compte connecté ne sont pas des secrets : ce sont les deux
+            // choses que Stripe.js doit connaître pour parler au bon compte. ?>
+      <div id="stripe-checkout" class="stripe-checkout" data-stripe-checkout
+           data-pk="<?= e(wsm_stripe_cfg()['publishable_key']) ?>"
+           data-konto="<?= e(wsm_stripe_account()) ?>"
+           data-sesja="<?= e(u('zaplac/' . rawurlencode($o['code']) . '/sesja', $qZ)) ?>"
+           data-t="<?= e(csrf_token()) ?>"
+           data-blad="<?= e($S['pay.error'] ?? '') ?>">
+        <p class="muted zaplac-laduje"><?= e($S['pay.loading'] ?? '') ?></p>
+      </div>
+      <noscript><?php notice('warn', $S['pay.noscript'] ?? ''); ?></noscript>
+      <p class="zaplac-bezp"><?= ikona_ui('klodka') ?><span><?= e($S['pay.secure'] ?? '') ?></span></p>
+    </section>
+    <aside class="summary zaplac-podsumowanie">
+      <h2><?= e($S['order.items'] ?? '') ?></h2>
+      <ul class="sum-lines">
+        <?php foreach ($o['items'] as $l): ?>
+        <li><span><?= e($l['name']) ?> <em>×<?= (int) $l['qty'] ?></em></span><span><?= e(zl($l['line_gross'])) ?></span></li>
+        <?php endforeach; ?>
+      </ul>
+      <dl class="totals">
+        <dt><?= e($S['cart.shipping'] ?? '') ?></dt>
+        <dd><?= (int) $o['shipping_gross'] === 0 ? e($S['cart.free'] ?? '') : e(zl($o['shipping_gross'])) ?></dd>
+        <dt class="grand"><?= e($S['order.total'] ?? '') ?></dt><dd class="grand"><?= e(zl($o['total_gross'])) ?></dd>
+      </dl>
+    </aside>
+  </div>
+</main>
+<script src="<?= e(WSM_STRIPE_JS) ?>" defer></script>
+<?php
+    layout_footer($S);
+    exit;
+}
+
 if ($page === 'zamowienie') {
     $o = wsm_order_by_code($pdo, (string) ($seg[1] ?? ''), (string) ($_GET['t'] ?? ''));
+    // LE RETOUR DE STRIPE : on relit la session CHEZ STRIPE (clé secrète) et
+    // on applique ce qu'elle dit — le navigateur n'a fourni qu'un identifiant.
+    // Le webhook reste la voie principale ; ceci évite d'afficher « en
+    // attente » à quelqu'un qui vient de payer.
+    if ($o && isset($_GET['session_id']) && $o['payment_status'] !== 'oplacone') {
+        wsm_stripe_session_sync($pdo, $o, (string) $_GET['session_id']);
+        $o = wsm_order_by_code($pdo, (string) $o['code'], (string) $o['access_token']);
+    }
     layout_head($S, $lang, $langs, $S['order.title'] ?? '', '', 'zamowienie');
     layout_header($S, $lang, $langs, $cartCount);
     if (!$o) {
@@ -1848,7 +1948,10 @@ if ($page === 'zamowienie') {
         layout_footer($S);
         exit;
     }
-    $payUrl = $o['payment']['redirect_url'] ?? '';
+    // Le bouton « Zapłać teraz » mène à la page de paiement intégrée — pour
+    // une commande pas encore payée, tant que Stripe est prêt.
+    $payUrl = (wsm_stripe_ready() && in_array($o['payment_status'], ['oczekuje', 'nieudane'], true) && $o['status'] !== 'anulowane')
+        ? u('zaplac/' . rawurlencode($o['code']), ['t' => $o['access_token']]) : '';
     ?>
 <main class="wrap block">
   <?php layout_crumbs([
@@ -1888,7 +1991,7 @@ if ($page === 'zamowienie') {
           <?php if (($o['shipment']['tracking_number'] ?? '') !== ''): ?><br><span class="mono"><?= e($o['shipment']['tracking_number']) ?></span><?php endif; ?>
         </dd>
       </dl>
-      <?php if ($o['payment_status'] === 'oczekuje' && $payUrl !== ''): ?>
+      <?php if ($payUrl !== ''): ?>
         <a class="btn btn--accent btn--lg btn--block" href="<?= e($payUrl) ?>"><?= e($S['order.pay_now'] ?? '') ?></a>
       <?php elseif ($o['payment_status'] === 'niedostepne' || ($o['payment']['status'] ?? '') === 'niedostepne'): ?>
         <?php notice('warn', $S['order.pay_unavailable'] ?? ''); ?>

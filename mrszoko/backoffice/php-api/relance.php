@@ -16,7 +16,7 @@
 //      plus l'adresse qui part en indésirable. Le silence est une décision,
 //      pas un oubli.
 //
-//   2. ON NE RELANCE QUE CE QU'ON PEUT ENCAISSER. Sans tpay configuré,
+//   2. ON NE RELANCE QUE CE QU'ON PEUT ENCAISSER. Sans Stripe prêt,
 //      aucun lien de paiement ne fonctionne : envoyer « payez ici » vers une
 //      page morte est pire que ne rien envoyer. Fail-closed.
 //
@@ -66,22 +66,22 @@ const WSM_RELANCE_CLE = 'relance';
 /**
  * Peut-on relancer ? Il faut pouvoir ENCAISSER.
  *
- * Règle 2 : sans tpay, le lien de paiement ne mène nulle part. Envoyer
+ * Règle 2 : sans Stripe prêt, le lien de paiement ne mène nulle part. Envoyer
  * « payez ici » vers une page morte fait passer la boutique pour cassée et
  * brûle la seule chance de rattraper la vente.
  */
 function wsm_relance_possible(): bool {
-    $f = __DIR__ . '/tpay.php';
+    $f = __DIR__ . '/stripe.php';
     if (!is_file($f)) return false;
     require_once $f;
-    return function_exists('wsm_tpay_enabled') && wsm_tpay_enabled();
+    return function_exists('wsm_stripe_ready') && wsm_stripe_ready();
 }
 
 /** Ce qui empêche de relancer, dit en clair. */
 function wsm_relance_blocage(): string {
     if (wsm_relance_possible()) return '';
-    return 'tpay nie jest skonfigurowany — link do zapłaty prowadziłby donikąd. '
-         . 'Uzupełnij w Ustawieniach; do tego czasu nie wysyłamy przypomnień.';
+    return 'Stripe nie przyjmuje jeszcze płatności — link do zapłaty prowadziłby donikąd. '
+         . 'Dokończ konfigurację na ekranie Płatności; do tego czasu nie wysyłamy przypomnień.';
 }
 
 /**

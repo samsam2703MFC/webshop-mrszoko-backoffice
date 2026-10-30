@@ -177,36 +177,36 @@ ok('un identifiant contenant des x ne l\'est pas', !wsm_setting_blank('tpay-xx-9
 
 // Table et surcouche remises à zéro : ce test écrit de vrais réglages, il ne
 // doit pas hériter de son exécution précédente.
-$pdo->exec("DELETE FROM wsm_settings WHERE cle LIKE 'tpay.%'");
-wsm_config_overlay(['tpay' => ['client_id' => '', 'client_secret' => '']]);
+$pdo->exec("DELETE FROM wsm_settings WHERE cle LIKE 'stripe.%'");
+wsm_config_overlay(['stripe' => ['publishable_key' => '', 'secret_key' => '']]);
 
 $view = wsm_settings_view($pdo);
-ok('les champs tpay, InPost et poczta sont proposés',
-    isset($view['tpay.client_id'], $view['inpost.token'], $view['mail.from']));
-ok('un champ vide s\'affiche en xxxx', $view['tpay.client_id']['show'] === 'xxxx', $view['tpay.client_id']['show']);
-ok('un secret est marqué comme tel', $view['tpay.client_secret']['type'] === 'secret');
+ok('les champs Stripe, InPost et poczta sont proposés',
+    isset($view['stripe.publishable_key'], $view['inpost.token'], $view['mail.from']));
+ok('un champ vide s\'affiche en xxxx', $view['stripe.publishable_key']['show'] === 'xxxx', $view['stripe.publishable_key']['show']);
+ok('un secret est marqué comme tel', $view['stripe.secret_key']['type'] === 'secret');
 
 // Enregistrement d'un secret : il ne doit plus jamais ressortir.
-wsm_settings_save($pdo, ['tpay__client_secret' => 'super-secret-123', 'tpay__client_id' => 'ID-999'], 'test');
-$row = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'tpay.client_secret'")->fetchColumn();
+wsm_settings_save($pdo, ['stripe__secret_key' => 'super-secret-123', 'stripe__publishable_key' => 'ID-999'], 'test');
+$row = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'stripe.secret_key'")->fetchColumn();
 ok('le secret est bien enregistré', $row === 'super-secret-123');
-wsm_config_overlay(['tpay' => ['client_secret' => 'super-secret-123', 'client_id' => 'ID-999']]);
+wsm_config_overlay(['stripe' => ['secret_key' => 'super-secret-123', 'publishable_key' => 'ID-999']]);
 $view = wsm_settings_view($pdo);
 ok('mais il n\'est jamais réaffiché', !str_contains(json_encode($view), 'super-secret-123'));
-ok('l\'écran dit seulement qu\'il est posé', $view['tpay.client_secret']['set'] === true);
-ok('un champ non secret reste lisible', $view['tpay.client_id']['show'] === 'ID-999', $view['tpay.client_id']['show']);
+ok('l\'écran dit seulement qu\'il est posé', $view['stripe.secret_key']['set'] === true);
+ok('un champ non secret reste lisible', $view['stripe.publishable_key']['show'] === 'ID-999', $view['stripe.publishable_key']['show']);
 
 // Un champ secret laissé sur son masque ne l'efface pas.
-wsm_settings_save($pdo, ['tpay__client_secret' => '••••••••••••'], 'test');
-$row = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'tpay.client_secret'")->fetchColumn();
+wsm_settings_save($pdo, ['stripe__secret_key' => '••••••••••••'], 'test');
+$row = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'stripe.secret_key'")->fetchColumn();
 ok('laisser le masque ne détruit pas le secret', $row === 'super-secret-123');
-wsm_settings_save($pdo, ['tpay__client_secret' => ''], 'test');
-$row = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'tpay.client_secret'")->fetchColumn();
+wsm_settings_save($pdo, ['stripe__secret_key' => ''], 'test');
+$row = $pdo->query("SELECT val FROM wsm_settings WHERE cle = 'stripe.secret_key'")->fetchColumn();
 ok('un champ vide non plus', $row === 'super-secret-123');
 
 // Le journal d'audit ne reçoit que des clés.
-$changed = wsm_settings_save($pdo, ['tpay__client_secret' => 'autre-secret'], 'test');
-ok('l\'enregistrement ne renvoie que des clés', $changed === ['tpay.client_secret'], $changed);
+$changed = wsm_settings_save($pdo, ['stripe__secret_key' => 'autre-secret'], 'test');
+ok('l\'enregistrement ne renvoie que des clés', $changed === ['stripe.secret_key'], $changed);
 
 // ---- 6. Poczta fail-closed --------------------------------------------------
 echo "\n-- poczta bez konfiguracji --\n";
@@ -288,7 +288,8 @@ ok('une ligne sans variable n\'est jamais touchée',
 
 // ---- Nettoyage --------------------------------------------------------------
 $pdo->prepare("DELETE FROM wsm_products WHERE id = ?")->execute([$pid]);
-$pdo->exec("DELETE FROM wsm_settings WHERE cle LIKE 'tpay.%'");
+$pdo->exec("DELETE FROM wsm_settings WHERE cle LIKE 'stripe.%'");
+wsm_config_overlay(['stripe' => ['publishable_key' => '', 'secret_key' => '']]);
 
 echo "\n" . ($fail === 0 ? "OK — $pass assertions\n" : "ÉCHEC — $fail sur " . ($pass + $fail) . "\n");
 exit($fail === 0 ? 0 : 1);

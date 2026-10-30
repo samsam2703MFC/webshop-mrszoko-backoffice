@@ -43,10 +43,10 @@ function znak_mastercard(): string {
 }
 
 /** Le bâtiment de banque des deux virements ; « online » porte un éclair. */
-function znak_bank(bool $online): string {
+function znak_bank(): string {
     return '<svg class="znak-svg znak-svg--ikona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
          . '<path d="M3 9.5 12 4l9 5.5M4.5 10.5v7M9 10.5v7M15 10.5v7M19.5 10.5v7M3 19.5h18M3 10h18"/>'
-         . ($online ? '<path d="M13.2 1.5 11.4 5h2.4l-1.8 3.5" stroke-width="1.4"/>' : '')
+         . '<path d="M13.2 1.5 11.4 5h2.4l-1.8 3.5" stroke-width="1.4"/>'
          . '</svg>';
 }
 
@@ -75,9 +75,7 @@ function znak_tile(string $code): string {
         case 'googlepay':
             return '<span class="znak-tile">' . znak_marka('googlepay', 'znak-svg znak-svg--gpay') . '</span>';
         case 'przelew_online':
-            return '<span class="znak-tile znak-tile--bank">' . znak_bank(true) . '</span>';
-        case 'przelew':
-            return '<span class="znak-tile znak-tile--bank">' . znak_bank(false) . '</span>';
+            return '<span class="znak-tile znak-tile--bank">' . znak_bank() . '</span>';
     }
     return '';
 }
@@ -287,6 +285,7 @@ function ikona_ui(string $co): string {
         'pauza'  => '<path d="M9 6v12M15 6v12"/>',
         'graj'   => '<path d="M8 5.5v13l10.5-6.5Z"/>',
         'ok'     => '<path d="M6.5 12.5l3.6 3.6 7.4-8"/>',
+        'klodka' => '<path d="M7 10.5V8a5 5 0 0 1 10 0v2.5M5.8 10.5h12.4a.8.8 0 0 1 .8.8v8.4a.8.8 0 0 1-.8.8H5.8a.8.8 0 0 1-.8-.8v-8.4a.8.8 0 0 1 .8-.8ZM12 14.5v2.5"/>',
         default  => '',
     };
     if ($d === '') return '';

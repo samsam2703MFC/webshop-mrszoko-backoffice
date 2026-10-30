@@ -76,7 +76,7 @@ function seo_path(): string {
  * autres n'ont aucun sens hors session — et une caisse indexée envoie des
  * visiteurs sur un panier vide, ce qui se paie en taux de rebond.
  */
-const SEO_PRIVE = ['koszyk', 'kasa', 'zamowienie'];
+const SEO_PRIVE = ['koszyk', 'kasa', 'zamowienie', 'zaplac'];
 
 function seo_indexable(string $page): bool {
     return !in_array($page, SEO_PRIVE, true);

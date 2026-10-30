@@ -431,7 +431,7 @@ CREATE TABLE IF NOT EXISTS `wsm_landing_products` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
---  BOUTIQUE EN LIGNE — commandes, paiements (tpay), expéditions (InPost)
+--  BOUTIQUE EN LIGNE — commandes, paiements (Stripe), expéditions (InPost)
 -- ----------------------------------------------------------------------------
 --  Tous les montants sont en GROSZE (entiers). Jamais de flottant sur de
 --  l'argent : 0.1 + 0.2 != 0.3 en binaire, et une facture doit tomber juste.
@@ -540,17 +540,18 @@ CREATE TABLE IF NOT EXISTS `wsm_order_items` (
     FOREIGN KEY (`order_id`) REFERENCES `wsm_orders` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- --- Paiements tpay ---------------------------------------------------------
+-- --- Paiements (Stripe Connect) --------------------------------------------
 CREATE TABLE IF NOT EXISTS `wsm_payments` (
   `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `order_id`     INT UNSIGNED NOT NULL,
-  `provider`     VARCHAR(24)  NOT NULL DEFAULT 'tpay',
+  `provider`     VARCHAR(24)  NOT NULL DEFAULT 'stripe',
   `tr_id`        VARCHAR(64)  NOT NULL DEFAULT '',
   `tr_title`     VARCHAR(64)  NOT NULL DEFAULT '',
   `amount`       INT NOT NULL DEFAULT 0,
   `currency`     CHAR(3)      NOT NULL DEFAULT 'PLN',
   `status`       VARCHAR(24)  NOT NULL DEFAULT 'oczekuje',
   `redirect_url` VARCHAR(500) NOT NULL DEFAULT '',
+  `app_fee`      INT NOT NULL DEFAULT 0,
   `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -560,12 +561,12 @@ CREATE TABLE IF NOT EXISTS `wsm_payments` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --- Notifications de paiement : event_key UNIQUE = idempotence -------------
--- tpay réémet sa notification jusqu'à recevoir « TRUE ». Sans cette clé unique
+-- Stripe réémet son webhook tant qu'il ne reçoit pas 2xx. Sans cette clé unique
 -- une commande serait encaissée deux fois.
 CREATE TABLE IF NOT EXISTS `wsm_payment_events` (
   `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `order_id`     INT UNSIGNED NULL DEFAULT NULL,
-  `provider`     VARCHAR(24)  NOT NULL DEFAULT 'tpay',
+  `provider`     VARCHAR(24)  NOT NULL DEFAULT 'stripe',
   `event_key`    VARCHAR(160) NOT NULL,
   `status`       VARCHAR(24)  NOT NULL DEFAULT '',
   `amount`       INT NOT NULL DEFAULT 0,

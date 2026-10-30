@@ -15,7 +15,7 @@ require_once __DIR__ . '/console.php';
 [$pdo, $me, $isAdmin] = console_boot();
 $API = console_api_dir();
 require_once $API . '/shop.php';
-require_once $API . '/tpay.php';
+require_once $API . '/stripe.php';
 require_once $API . '/inpost.php';
 require_once $API . '/mail.php';
 require_once $API . '/stock.php';
@@ -107,7 +107,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             // L'ENCAISSEMENT À LA MAIN, pour les virements. Il ne passe PAS
             // par le chemin du colis : marquer payée une commande déjà en
             // préparation ne doit pas la ramener en arrière. wsm_order_mark_paid()
-            // écrit les deux champs et la date, comme le fait tpay.
+            // écrit les deux champs et la date, comme le fait le paiement Stripe.
             if ((string) $order['payment_status'] === 'oplacone') {
                 $flash = $order['code'] . ' była już opłacona.';
             } else {
@@ -374,7 +374,7 @@ $lien = function (array $zmiana = []) use ($kolejka, $widok): string {
 };
 
 $kpis   = wsm_shop_kpis($pdo);
-$cfg    = ['tpay' => wsm_tpay_enabled(), 'inpost' => wsm_inpost_enabled()];
+$cfg    = ['stripe' => wsm_stripe_ready(), 'inpost' => wsm_inpost_enabled()];
 
 
 console_head('Zamówienia', $me, '', $kpis['orders_pending'] ? $kpis['orders_pending'] . ' czeka na płatność' : '');
@@ -383,10 +383,10 @@ console_crumbs($detail
     ? ['Pulpit' => 'pulpit.php', 'Zamówienia' => 'zamowienia.php', $detail['code'] => null]
     : ['Pulpit' => 'pulpit.php', 'Zamówienia' => null]);
 ?>
-  <?php if (!$cfg['tpay'] || !$cfg['inpost']): ?>
+  <?php if (!$cfg['stripe'] || !$cfg['inpost']): ?>
   <p class="warnbox">
-    <?php if (!$cfg['tpay']): ?>tpay nie jest skonfigurowany — zamówienia powstają, ale nie da się ich opłacić online.<?php endif; ?>
-    <?php if (!$cfg['tpay'] && !$cfg['inpost']): ?><br><?php endif; ?>
+    <?php if (!$cfg['stripe']): ?>Stripe nie przyjmuje jeszcze płatności — zamówienia powstają, ale nie da się ich opłacić online (ekran <a href="platnosci.php">Płatności</a>).<?php endif; ?>
+    <?php if (!$cfg['stripe'] && !$cfg['inpost']): ?><br><?php endif; ?>
     <?php if (!$cfg['inpost']): ?>InPost ShipX nie jest skonfigurowany — etykiet nie można utworzyć automatycznie.<?php endif; ?>
   </p>
   <?php endif; ?>

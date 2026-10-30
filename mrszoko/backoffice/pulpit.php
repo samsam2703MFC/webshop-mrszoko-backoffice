@@ -18,7 +18,7 @@ require_once __DIR__ . '/console.php';
 $API = console_api_dir();
 require_once $API . '/shop.php';
 require_once $API . '/mail.php';
-require_once $API . '/tpay.php';
+require_once $API . '/stripe.php';
 require_once $API . '/inpost.php';
 
 $kpis   = wsm_shop_kpis($pdo);
@@ -41,7 +41,7 @@ $noPhoto  = (int) $pdo->query("SELECT COUNT(*) FROM wsm_products WHERE shop_visi
 $visible  = (int) $pdo->query("SELECT COUNT(*) FROM wsm_products WHERE shop_visible = 1")->fetchColumn();
 
 $missing = [];
-if (!wsm_tpay_enabled())   $missing[] = 'tpay (płatności online)';
+if (!wsm_stripe_ready())  $missing[] = 'Stripe (płatności online)';
 if (!wsm_inpost_enabled()) $missing[] = 'InPost ShipX (etykiety)';
 if (!wsm_mail_enabled())   $missing[] = 'poczta (wiadomości do klientów)';
 

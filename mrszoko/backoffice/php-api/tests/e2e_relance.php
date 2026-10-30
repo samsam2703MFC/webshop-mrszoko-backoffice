@@ -77,19 +77,19 @@ $mk = function (string $qui, int $heuresAge) use ($pdo, $pid, $sfx): array {
     return [$o, $e];
 };
 
-// ---- 1. Sans tpay, on n'envoie RIEN ------------------------------------------------------
-echo "-- bez tpay nie wysyłamy nic --\n";
-ok('tpay est bien fermé dans ce bac à sable', wsm_relance_possible() === false);
+// ---- 1. Sans Stripe prêt, on n'envoie RIEN ------------------------------------------------
+echo "-- bez Stripe nie wysyłamy nic --\n";
+wsm_config_overlay(['stripe' => ['secret_key' => '', 'publishable_key' => '', 'account' => '']]);
+ok('Stripe est bien fermé dans ce bac à sable', wsm_relance_possible() === false);
 $r0 = wsm_relance_run($pdo, 'test');
 ok('aucune relance n\'est mise en file', $r0['wyslane'] === 0, $r0);
-ok('et le message dit pourquoi', str_contains($r0['message'], 'tpay'), $r0['message']);
-ok('il dit aussi où le corriger', str_contains($r0['message'], 'Ustawieni'), $r0['message']);
+ok('et le message dit pourquoi', str_contains($r0['message'], 'Stripe'), $r0['message']);
+ok('il dit aussi où le corriger', str_contains($r0['message'], 'Płatności'), $r0['message']);
 ok('un « payez ici » vers une page morte n\'est jamais envoyé', $envois === 0, $envois);
 
-// On ouvre tpay pour la suite du test.
-wsm_config_overlay(['tpay' => ['client_id' => '123', 'client_secret' => 'sekret',
-                               'merchant_id' => '123', 'security_code' => 'kod']]);
-ok('tpay ouvert, les relances redeviennent possibles', wsm_relance_possible() === true);
+// On ouvre Stripe pour la suite du test (clés factices : le dépôt est public).
+wsm_config_overlay(['stripe' => ['secret_key' => 'sk_test_e2e', 'publishable_key' => 'pk_test_e2e', 'account' => 'acct_e2eRelance']]);
+ok('Stripe prêt, les relances redeviennent possibles', wsm_relance_possible() === true);
 
 // ---- 2. Le calendrier : ni trop tôt, ni éternellement -------------------------------------
 echo "\n-- kalendarz: nie za wcześnie, nie w nieskończoność --\n";

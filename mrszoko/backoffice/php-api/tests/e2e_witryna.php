@@ -24,7 +24,7 @@
 //      depuis Dostawa, jamais recopié dans un texte ; sans seuil, la phrase
 //      disparaît au lieu d'annoncer « od 0 zł ».
 //   3. UN LOGO DE PAIEMENT EST UNE PROMESSE : par défaut, la vitrine montre
-//      les modes de livraison ACTIFS et, pour payer, tpay s'il est configuré,
+//      les modes de livraison ACTIFS et, pour payer, Stripe s'il est prêt,
 //      sinon le virement. Le choix de la console fait foi, « rien » compris.
 //   4. LES DESSINS NE CHARGENT RIEN : aucune adresse externe, aucun script,
 //      les libellés échappés.
@@ -233,12 +233,15 @@ $actifs = array_column($pdo->query("SELECT id FROM wsm_shipping_methods WHERE ac
 $attendu = array_values(array_unique(array_filter(array_map(fn($i) => WSM_METODY_Z_DOSTAWY[$i] ?? null, $actifs))));
 ok('par défaut, les modes de livraison ACTIFS', wsm_metody_auto($pdo, 'wysylka') === $attendu, [wsm_metody_auto($pdo, 'wysylka'), $actifs]);
 ok('… et DPD Pickup n\'y est pas tant que la caisse ne l\'offre pas', !in_array('dpd_pickup', wsm_metody_auto($pdo, 'wysylka'), true));
-$tpayAvant = wsm_config()['tpay'] ?? [];
-wsm_config_overlay(['tpay' => ['client_id' => '', 'client_secret' => '']]);
-ok('sans tpay, le virement seulement — le seul moyen qui marche alors', wsm_metody_auto($pdo, 'platnosc') === ['przelew']);
-wsm_config_overlay(['tpay' => ['client_id' => 'abc', 'client_secret' => 'def']]);
-ok('avec tpay, BLIK, cartes, portefeuilles, virement rapide', wsm_metody_auto($pdo, 'platnosc') === ['blik', 'visa', 'mastercard', 'googlepay', 'applepay', 'przelew_online']);
-wsm_config_overlay(['tpay' => $tpayAvant]);
+$stripeAvant = wsm_config()['stripe'] ?? [];
+wsm_config_overlay(['stripe' => ['secret_key' => '', 'publishable_key' => '', 'account' => '']]);
+ok('sans Stripe prêt, aucun moyen de paiement promis — plus de virement', wsm_metody_auto($pdo, 'platnosc') === []);
+wsm_config_overlay(['stripe' => ['secret_key' => 'sk_test_x', 'publishable_key' => 'pk_test_x', 'account' => '']]);
+ok('… même avec les clés, tant que la boutique n\'a pas de compte', wsm_metody_auto($pdo, 'platnosc') === []);
+wsm_config_overlay(['stripe' => ['account' => 'acct_test1']]);
+ok('Stripe prêt : BLIK, cartes, portefeuilles, Przelewy24', wsm_metody_auto($pdo, 'platnosc') === ['blik', 'visa', 'mastercard', 'googlepay', 'applepay', 'przelew_online']);
+ok('le virement traditionnel a quitté la liste', !isset(WSM_METODY_PLATNOSCI['przelew']));
+wsm_config_overlay(['stripe' => array_replace(['secret_key' => '', 'publishable_key' => '', 'account' => ''], $stripeAvant)]);
 $shopAvant = wsm_config()['shop'] ?? [];
 wsm_config_overlay(['shop' => ['metody_platnosci' => 'visa,blik,zly']]);
 ok('le choix de la console fait foi, dans l\'ordre du dictionnaire, sans code inconnu', wsm_metody($pdo, 'platnosc') === ['blik', 'visa']);

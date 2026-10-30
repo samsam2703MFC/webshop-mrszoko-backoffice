@@ -481,7 +481,7 @@ ok('encaisser une commande en préparation ne la fait pas reculer',
 $oS = $mk(['invoice' => 0]);
 $pdo->prepare('UPDATE wsm_orders SET status = ?, payment_status = ?, paid_at = NULL WHERE id = ?')
     ->execute(['nowe', 'oczekuje', (int) $oS['id']]);
-wsm_order_mark_paid($pdo, (int) $oS['id'], 'tpay');
+wsm_order_mark_paid($pdo, (int) $oS['id'], 'stripe');
 $rS = $pdo->query('SELECT status, payment_status FROM wsm_orders WHERE id = ' . (int) $oS['id'])->fetch();
 ok('… mais une commande neuve payée passe bien à « opłacone »',
    $rS['status'] === 'oplacone' && $rS['payment_status'] === 'oplacone', $rS);

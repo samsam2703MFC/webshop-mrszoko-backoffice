@@ -383,6 +383,62 @@
     ustaw();
   }
 
+  // ---- Zapłać : le formulaire Stripe, intégré dans la page ------------------
+  // Stripe.js (chargé par la page, version épinglée « endive ») monte son
+  // formulaire dans un iframe ICI : BLIK, Przelewy24, carte, portefeuilles.
+  // La boutique ne voit jamais une donnée de carte. Le secret de session est
+  // demandé au serveur au moment du montage, avec le jeton du formulaire ;
+  // la commande et son montant sont fixés là-bas, jamais ici.
+  var stripeBox = document.querySelector('[data-stripe-checkout]');
+  if (stripeBox) {
+    var montuj = function () {
+      if (!window.Stripe) return false;
+      var stripe = window.Stripe(stripeBox.getAttribute('data-pk'),
+        { stripeAccount: stripeBox.getAttribute('data-konto') || undefined });
+      var blad = function () {
+        while (stripeBox.firstChild) stripeBox.removeChild(stripeBox.firstChild);
+        var p = document.createElement('p');
+        p.className = 'notice notice--warn';
+        p.textContent = stripeBox.getAttribute('data-blad') || 'Error';
+        stripeBox.appendChild(p);
+      };
+      var fetchClientSecret = function () {
+        var fd = new FormData();
+        fd.append('_t', stripeBox.getAttribute('data-t') || '');
+        return fetch(stripeBox.getAttribute('data-sesja'), {
+          method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function (d) {
+          if (!d || !d.clientSecret) throw new Error('no secret');
+          return d.clientSecret;
+        });
+      };
+      // La méthode a changé de nom avec la version « dahlia » de Stripe.js ;
+      // on prend celle qui existe, la nouvelle d'abord.
+      var cree = stripe.createEmbeddedCheckoutPage || stripe.initEmbeddedCheckout;
+      if (!cree) { blad(); return true; }
+      cree.call(stripe, { fetchClientSecret: fetchClientSecret }).then(function (checkout) {
+        while (stripeBox.firstChild) stripeBox.removeChild(stripeBox.firstChild);
+        checkout.mount(stripeBox);
+      }).catch(blad);
+      return true;
+    };
+    // Le script de Stripe est chargé en « defer » : il peut arriver après nous.
+    if (!montuj()) {
+      var essais = 0;
+      var attente = setInterval(function () {
+        if (montuj() || ++essais > 100) {
+          clearInterval(attente);
+          if (!window.Stripe) {
+            stripeBox.textContent = stripeBox.getAttribute('data-blad') || '';
+          }
+        }
+      }, 100);
+    }
+  }
+
   // ---- Le menu sur téléphone -------------------------------------------------
   var menuBtn = document.querySelector('.head-menu');
   var head = document.querySelector('.site-head');

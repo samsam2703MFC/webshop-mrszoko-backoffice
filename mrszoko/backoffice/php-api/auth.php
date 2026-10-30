@@ -93,7 +93,7 @@ function wsm_roles_base(): array {
                'etykieta_druk.php' => 'w', 'etykieta_inpost.php' => 'w', 'etykieta_dpd.php' => 'w',
                'produkty.php' => 'w',
                'zamowienia.php' => 'r', 'zamowienie_druk.php' => 'r', 'pulpit.php' => 'r'];
-    $compta = ['faktury.php' => 'w', 'faktura_druk.php' => 'w', 'ksef.php' => 'w',
+    $compta = ['faktury.php' => 'w', 'faktura_druk.php' => 'w', 'ksef.php' => 'w', 'platnosci.php' => 'w',
                'kontrahenci.php' => 'w', 'zamowienia.php' => 'r', 'klienci.php' => 'r',
                'zgloszenia.php' => 'r', 'pulpit.php' => 'r'];
 
@@ -121,7 +121,9 @@ function wsm_roles_base(): array {
         // Lecture seule PARTOUT sauf les écrans qui donnent les clés : les
         // comptes et les réglages (jetons, mots de passe) ne se regardent pas
         // « juste pour voir ».
-        'Podgląd' => ['ecrans' => '*', 'ecrit' => false, 'sauf' => ['uzytkownicy.php', 'ustawienia.php'],
+        // Płatności aussi : ses composants Stripe remboursent et contestent —
+        // ce ne sont pas des écrans « à regarder ».
+        'Podgląd' => ['ecrans' => '*', 'ecrit' => false, 'sauf' => ['uzytkownicy.php', 'ustawienia.php', 'platnosci.php'],
             'aide' => 'Podgląd — wszystko do czytania, nic do zmiany'],
     ];
 }
