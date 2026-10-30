@@ -698,6 +698,20 @@ function wsm_content_jednorazowe(): array {
     }
     $ops['migracja.2026_10_stripe'] = $s;
 
+    // LA MÊME, APRÈS LA VIRGULE. wsm_content_remplacements() change à chaque
+    // déploiement « — » en « , » : en base, la ligne de la politique se lit
+    // « **operator płatności**, Krajowy Integrator… » — la migration ci-dessus
+    // cherchait le tiret, et le déploiement l'a dit (« 1 tekst wspomina
+    // tpay »). Les deux graphies, cette fois.
+    $s2 = [];
+    foreach ([', ', ' — '] as $sep) {
+        $s2[] = ['UPDATE wsm_shop_i18n SET v = REPLACE(v, ?, ?) WHERE lang = ? AND k = ?',
+                 ['- **operator płatności**' . $sep . 'Krajowy Integrator Płatności S.A. (Tpay), w zakresie niezbędnym do rozliczenia transakcji,',
+                  '- **operator płatności**' . $sep . 'Stripe Payments Europe, Limited (Irlandia), w zakresie niezbędnym do rozliczenia transakcji,',
+                  'pl', 'privacy.s4.b']];
+    }
+    $ops['migracja.2026_10_stripe_przecinek'] = $s2;
+
     return $ops;
 }
 
