@@ -84,6 +84,7 @@ function wsm_roles_base(): array {
     $vente  = ['zamowienia.php' => 'w', 'zamowienie_druk.php' => 'w',
                'klienci.php' => 'w', 'kontrahenci.php' => 'w', 'poczta.php' => 'w',
                'przypomnienia.php' => 'w', 'kampanie.php' => 'w', 'zgloszenia.php' => 'w',
+               'newsletter.php' => 'w', 'sms.php' => 'w', 'subskrybenci.php' => 'w',
                'rabaty.php' => 'w', 'produkty.php' => 'r', 'faktury.php' => 'r', 'pulpit.php' => 'r'];
     // etykieta_dpd.php manquait ici, et personne ne l'a vu : le magasin
     // imprimait l'étiquette InPost et se heurtait à un 403 sur celle de DPD,

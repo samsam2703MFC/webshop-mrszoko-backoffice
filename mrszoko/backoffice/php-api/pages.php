@@ -59,6 +59,7 @@ const WSM_PAGE_RESERVED = [
     'moje-zamowienie', 'catalog', 'robots.txt', 'sitemap.xml', 'assets', 'media',
     'fonts', 'img', 'api', 'backoffice', 'shop', 'landing', 'index.php', 'strona',
     'strony', 'blok', 'bloki', 'admin', 'login', 'logout', 'tpay', 'stripe', 'zaplac', 'inpost',
+    'newsletter', 's',
 ];
 
 function wsm_pages_ensure(PDO $pdo): void {

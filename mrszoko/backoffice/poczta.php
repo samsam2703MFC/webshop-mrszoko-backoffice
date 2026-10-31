@@ -193,8 +193,8 @@ elseif ($detail && ($detail['email'] ?? '')) $langClient = wsm_tr_lang_client($p
 $traduction = $detail ? wsm_tr_cached($pdo, (int) $detail['id'], WSM_LANG_BASE) : null;
 $iaPrete = wsm_tr_enabled();
 
-$statusTag = ['wyslana' => 'ok', 'kolejka' => 'wait', 'blad' => 'bad'];
-$statusLbl = ['wyslana' => 'Wysłana', 'kolejka' => 'W kolejce', 'blad' => 'Błąd'];
+$statusTag = ['wyslana' => 'ok', 'kolejka' => 'wait', 'wysylanie' => 'wait', 'pominieta' => '', 'blad' => 'bad'];
+$statusLbl = ['wyslana' => 'Wysłana', 'kolejka' => 'W kolejce', 'wysylanie' => 'Wysyłanie', 'pominieta' => 'Pominięta (wypisany)', 'blad' => 'Błąd'];
 
 console_head('Poczta', $me, <<<'CSS'
   /* La traduction se lit comme une note en marge, pas comme le message :

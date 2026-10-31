@@ -552,6 +552,8 @@ CREATE TABLE IF NOT EXISTS wsm_messages (
   direction     TEXT NOT NULL DEFAULT 'wyjscie',
   subject       TEXT NOT NULL DEFAULT '',
   body          TEXT NOT NULL DEFAULT '',
+  html          TEXT NULL,
+  unsub_url     TEXT NOT NULL DEFAULT '',
   template_code TEXT NOT NULL DEFAULT '',
   event_key     TEXT NULL UNIQUE,
   status        TEXT NOT NULL DEFAULT 'kolejka',
@@ -1053,3 +1055,97 @@ CREATE TABLE IF NOT EXISTS wsm_slide_i18n (
   cta_label TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (slide_id, lang)
 );
+
+-- MARKETING (marketing.php, newsletter.php, smsapi.php) — voir le schéma MySQL.
+CREATE TABLE IF NOT EXISTS wsm_subscribers (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  email             TEXT NOT NULL DEFAULT '' UNIQUE,
+  phone             TEXT NOT NULL DEFAULT '',
+  name              TEXT NOT NULL DEFAULT '',
+  lang              TEXT NOT NULL DEFAULT 'pl',
+  source            TEXT NOT NULL DEFAULT '',
+  email_status      TEXT NOT NULL DEFAULT '',
+  email_zgoda_at    TEXT DEFAULT NULL,
+  email_potw_at     TEXT DEFAULT NULL,
+  email_wypis_at    TEXT DEFAULT NULL,
+  email_zgoda_tekst TEXT NOT NULL DEFAULT '',
+  sms_status        TEXT NOT NULL DEFAULT '',
+  sms_zgoda_at      TEXT DEFAULT NULL,
+  sms_wypis_at      TEXT DEFAULT NULL,
+  sms_zgoda_tekst   TEXT NOT NULL DEFAULT '',
+  token             TEXT NOT NULL DEFAULT '',
+  token_at          TEXT DEFAULT NULL,
+  sms_token         TEXT NOT NULL DEFAULT '',
+  ip                TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TEXT DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_subscribers_phone ON wsm_subscribers (phone);
+CREATE INDEX IF NOT EXISTS idx_wsm_subscribers_token ON wsm_subscribers (token);
+CREATE INDEX IF NOT EXISTS idx_wsm_subscribers_sms_token ON wsm_subscribers (sms_token);
+
+CREATE TABLE IF NOT EXISTS wsm_mkt_events (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  typ        TEXT NOT NULL DEFAULT '',
+  ref        TEXT NOT NULL DEFAULT '',
+  kto        TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_mkt_events_ref ON wsm_mkt_events (ref, typ);
+
+CREATE TABLE IF NOT EXISTS wsm_newsletters (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa       TEXT NOT NULL DEFAULT '',
+  temat       TEXT NOT NULL DEFAULT '',
+  preheader   TEXT NOT NULL DEFAULT '',
+  bloki       TEXT,
+  tlumaczenia TEXT,
+  segment     TEXT NOT NULL DEFAULT 'wszyscy',
+  kod         TEXT NOT NULL DEFAULT '',
+  link_code   TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'szkic',
+  odbiorcow   INTEGER NOT NULL DEFAULT 0,
+  created_by  TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TEXT DEFAULT NULL,
+  sent_at     TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wsm_sms_campaigns (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa       TEXT NOT NULL DEFAULT '',
+  tresc       TEXT,
+  tlumaczenia TEXT,
+  segment     TEXT NOT NULL DEFAULT 'wszyscy',
+  ascii       INTEGER NOT NULL DEFAULT 1,
+  kod         TEXT NOT NULL DEFAULT '',
+  link_code   TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'szkic',
+  odbiorcow   INTEGER NOT NULL DEFAULT 0,
+  czesci      INTEGER NOT NULL DEFAULT 0,
+  created_by  TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TEXT DEFAULT NULL,
+  sent_at     TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wsm_sms (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER NULL,
+  phone       TEXT NOT NULL DEFAULT '',
+  tresc       TEXT,
+  czesci      INTEGER NOT NULL DEFAULT 1,
+  status      TEXT NOT NULL DEFAULT 'kolejka',
+  raport      TEXT NOT NULL DEFAULT '',
+  sms_id      TEXT NOT NULL DEFAULT '',
+  error       TEXT NOT NULL DEFAULT '',
+  event_key   TEXT NULL UNIQUE,
+  test        INTEGER NOT NULL DEFAULT 0,
+  actor       TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sent_at     TEXT DEFAULT NULL,
+  raport_at   TEXT DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wsm_sms_status ON wsm_sms (status, id);
+CREATE INDEX IF NOT EXISTS idx_wsm_sms_smsid ON wsm_sms (sms_id);
+CREATE INDEX IF NOT EXISTS idx_wsm_sms_campaign ON wsm_sms (campaign_id);

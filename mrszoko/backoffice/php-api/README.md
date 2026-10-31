@@ -202,6 +202,64 @@ it in the console *before* the integration is switched on, so missing data is
 visible immediately. Without a ShipX token nothing is sent — the parcel is
 prepared by hand and the shipment row stays `oczekuje_na_konfiguracje`.
 
+## Marketing — newsletter and SMS
+
+Four console screens under *Marketing*: **Newsletter**, **SMS**,
+**Subskrybenci** (the consent register) and **Kampanie** (the existing
+win-back mails).
+
+**Who receives what.** A newsletter goes to people who confirmed a signup
+(double opt-in: the footer form or the checkout box sends a link, nothing is
+sent before the click). Since 10 November 2024 commercial e-mail needs
+**prior consent** (*Prawo komunikacji elektronicznej*, art. 398), and the
+"existing customers" exception is uncertain in Polish law, so buyers who did
+not tick the box are **left out by default**: the buyer segments (regulars,
+dormant, companies…) only narrow the confirmed list. Including them is a
+switch, `WSM_MKT_KLIENCI_BEZ_ZGODY=1` or *Integracje → Marketing*, to turn on
+only on a lawyer's advice. An SMS goes **only** to numbers whose owner ticked
+the separate SMS box. At checkout that number is the delivery phone and the
+consent is active at once; from the footer form anyone could type anyone's
+number, so the consent waits until the **phone** opens the link received by
+SMS (one confirmation SMS per number per day, the footer offers SMS only once
+SMSAPI works). E-mail confirmation and SMS confirmation both take a button
+press: mail scanners open links on their own.
+
+Sending a campaign, erasing a record and exporting the register are reserved
+to administrators; *Sprzedaż* prepares, tests and unsubscribes on request.
+Campaigns wait for **Publiczny adres sklepu** (`WSM_SHOP_URL`): links, opt-outs
+and delivery reports are built from it, and without it a forged `Host` header
+could put a foreign address in a confirmation mail.
+
+An e-mail refusal (unsubscribe link, one-click `List-Unsubscribe-Post`,
+*Usuń dane*) lands in the same `wsm_camp_stop` list the win-back mails already
+honour, so a later purchase never brings the address back. An SMS refusal
+(link, `STOP` reported by the operator) ends the SMS consent, which every send
+checks again just before it goes. The register keeps, per address, the date,
+the source, the exact consent text and the IP: that is the answer to "where
+did you get my address?" (CSV export).
+
+**Sending.** Nothing leaves at the click: a campaign queues one line per
+recipient (`nl-{id}-{email}` in `wsm_messages`, `wsm_sms` for SMS) and the
+**pump** drains it in small batches (`wsm_mkt_pump`). Each line is claimed
+(`kolejka` → `wysylanie`) before it goes, so two pumps never send it twice.
+SMS leave only between 8:00 and 21:00 Warsaw time and skip a number that
+unsubscribed after queueing. The pump runs when the *Newsletter* or *SMS*
+screen opens and from its *Wyślij teraz partię* button; for unattended
+sending, the server can run `php api/kolejka.php 30 30` every minute (CLI
+only, file-locked, answers 403/404 from the web). The deploy does **not**
+install that schedule.
+
+**SMSAPI** is the same client as the CRM: OAuth token, approved sender name,
+platform `pl` or `com`. The cost is shown before sending (GSM-7 160/153,
+Unicode 70/67 per part, the unsubscribe line included). Delivery reports come
+back on `api/shop/sms/raport?k=…` (HMAC key, HTTPS only); nothing has to be
+pasted in the SMSAPI panel.
+
+**AI drafting** (Claude, the same key as translations) proposes a newsletter
+from a brief, SMS variants under the length limit, and the uk/en versions.
+It never invents a discount, a code or a product: products come from the
+catalogue, the code from *Rabaty*, and every draft is edited by a person.
+
 ## Product photos
 
 Uploaded from the console (`/mrszoko/backoffice/produkty.php`, role `Centrala`),
@@ -306,7 +364,8 @@ list, written out.
 | **KSeF** | `WSM_KSEF_TOKEN`, `WSM_KSEF_PUBLIC_KEY`, `WSM_KSEF_ENV` | Invoices are not filed automatically. The *KSeF* screen still builds the FA(2) XML for manual filing. `WSM_KSEF_PUBLIC_KEY` is a **path on the server** to the Ministry of Finance public key — without it the token cannot be encrypted, so no session opens. |
 | **Allegro** | `WSM_ALLEGRO_CLIENT_ID`, `WSM_ALLEGRO_CLIENT_SECRET`, `WSM_ALLEGRO_REFRESH_TOKEN`, `WSM_ALLEGRO_SELLER_ID` | The second sales channel stays shut. The *Allegro* screen still shows which listings would go out and which are blocked. |
 | **Superadmin** | `WSM_SUPERADMIN_EMAILS` | The platform-owner module is invisible and its page answers 404. Deliberately not a database role: an account that could grant itself the role could rewrite its own invoice. |
-| **Claude** | `WSM_ANTHROPIC_API_KEY` | The "translate the missing strings" button does not appear. |
+| **SMSAPI** | `WSM_SMSAPI_TOKEN`, `WSM_SMSAPI_NADAWCA`, `WSM_SMSAPI_REGION`, `WSM_SMSAPI_CENA` | SMS campaigns can be written and costed but not sent. Newsletters need **outgoing mail** above instead. |
+| **Claude** | `WSM_ANTHROPIC_API_KEY` | The "translate the missing strings" button and the AI drafting in *Newsletter* / *SMS* do not appear. |
 
 Every one of these integrations is **fail-closed**, and `xxxx` counts as
 unconfigured — it is what a demo field holds, and taking it for a credential

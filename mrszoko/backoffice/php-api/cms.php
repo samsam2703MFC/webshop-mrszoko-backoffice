@@ -101,6 +101,7 @@ const WSM_CMS_SECTIONS = [
     'upsell' => 'Propozycje produktów',
     'claim' => 'Reklamacje i zwroty',
     'stop' => 'Wypisanie z wiadomości',
+    'nl' => 'Newsletter i SMS: zapis, potwierdzenie, wypisanie, stopka wiadomości',
     'seller' => 'Dane sprzedawcy w stopce',
     'footer' => 'Stopka',
     // Page d'accueil

@@ -347,6 +347,15 @@ function console_sections(?array $me = null): array {
             'kontrahenci.php' => 'Kontrahenci',
             'poczta.php'      => 'Poczta',
             'przypomnienia.php' => 'Przypomnienia',
+        ],
+
+        // CE QU'ON ENVOIE À BEAUCOUP DE MONDE D'UN COUP, et à qui on a le
+        // droit de l'envoyer. Séparé de « Kontakty » : un message à une
+        // personne et une campagne à mille ne se préparent pas de la même façon.
+        'Marketing' => [
+            'newsletter.php'  => 'Newsletter',
+            'sms.php'         => 'SMS',
+            'subskrybenci.php' => 'Subskrybenci',
             'kampanie.php'    => 'Kampanie',
         ],
 

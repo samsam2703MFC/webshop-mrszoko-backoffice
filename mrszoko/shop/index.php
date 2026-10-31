@@ -115,6 +115,17 @@ if (isset($_GET[WSM_LINK_PARAM_PUB]) && $method === 'GET') {
                 $pr = wsm_shop_product($pdo, (string) $lien['produkt'], $lang);
                 if ($pr) redirect(u('p/' . $pr['slug']));
             }
+            // UN LIEN « SKLEP » POSÉ SUR UNE AUTRE PAGE Y RESTE. La newsletter
+            // met ?l=nl12 sur la fiche d'un produit : renvoyer à l'accueil
+            // ferait perdre au client le produit sur lequel il a cliqué. On
+            // garde le chemin demandé (le nôtre, jamais une adresse tierce) et
+            // on retire seulement le paramètre.
+            $ici = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '');
+            if ($ici !== '' && str_starts_with($ici, '/') && !str_starts_with($ici, '//') && rtrim($ici, '/') !== rtrim((string) parse_url(u(), PHP_URL_PATH), '/')) {
+                $reste = $_GET;
+                unset($reste[WSM_LINK_PARAM_PUB]);
+                redirect($ici . ($reste ? '?' . http_build_query($reste) : ''));
+            }
             redirect(u());
         }
         // Un code inconnu ne casse rien : on sert la boutique, sans source.
@@ -421,6 +432,22 @@ if ($method === 'POST') {
             // on retombe sur l'affichage de la caisse, plus bas
         } else {
             cart_write([]);
+            // Les cases marketing de la caisse : inscription avec la preuve
+            // (texte exact affiché). Ne fait jamais échouer la commande.
+            if (!empty($_POST['zgoda_nl']) || !empty($_POST['zgoda_sms'])) {
+                try {
+                    require_once $WSM_API_DIR . '/marketing.php';
+                    require_once $WSM_API_DIR . '/contact.php';
+                    wsm_mkt_subscribe($pdo, [
+                        'email' => (string) ($order['email'] ?? ($_POST['email'] ?? '')), 'phone' => (string) ($_POST['phone'] ?? ''),
+                        'name' => trim((string) ($_POST['first_name'] ?? '')), 'lang' => $lang, 'source' => 'kasa',
+                        'newsletter' => !empty($_POST['zgoda_nl']),
+                        'sms' => !empty($_POST['zgoda_sms']) && wsm_mkt_phone((string) ($_POST['phone'] ?? '')) !== '',
+                        'ip' => wsm_contact_ip(),
+                        'tekst_email' => (string) ($S['checkout.nl_optin'] ?? ''), 'tekst_sms' => (string) ($S['checkout.sms_optin'] ?? ''),
+                    ]);
+                } catch (Throwable $e) { /* la commande d'abord ; l'inscription se refait */ }
+            }
             // Le code part avec le panier : il vient d'être consommé, et le
             // laisser traîner le ferait re-tenter — puis refuser — sur la
             // commande suivante, ce qui ressemblerait à une panne.
@@ -1003,6 +1030,137 @@ layout_head($S, $lang, $langs, $p['name'], $p['desc'], 'p', $ogImg);
 //  Le message entre dans la MESSAGERIE, pas dans un e-mail : même écran, même
 //  recherche, même statuts que le courrier reçu — et rien n'est perdu si le
 //  SMTP est muet. Voir php-api/contact.php pour les trois filtres anti-robot.
+// ==================== NEWSLETTER I SMS (marketing.php) ======================
+//  Quatre gestes, une seule page : s'inscrire (formulaire du pied ou de cette
+//  page), confirmer son adresse (lien du mail), se désinscrire de l'e-mail
+//  (lien signé), se désinscrire des SMS (lien court /s/…). Se désinscrire
+//  demande UN clic de confirmation : les antivirus de messagerie ouvrent les
+//  liens tout seuls, et ne doivent pas désinscrire à la place du client.
+if ($page === 'newsletter' || $page === 's') {
+    require_once $WSM_API_DIR . '/marketing.php';
+    require_once $WSM_API_DIR . '/contact.php';      // le piège et l'horodatage, comme le contact
+    $titre = $S['nl.title'] ?? 'Newsletter';
+    $msg = ''; $msgKind = 'ok'; $bouton = null; $v = []; $nlErr = []; $formulaire = false;
+    $etape = (string) ($seg[1] ?? '');
+
+    if ($page === 's') {
+        $tok = preg_replace('/[^a-z0-9]/', '', strtolower($etape)) ?? '';
+        $titre = $S['nl.sms_unsub_title'] ?? '';
+        $q = $pdo->prepare("SELECT sms_status FROM wsm_subscribers WHERE sms_token = ? AND sms_token <> ''");
+        $q->execute([$tok]);
+        $etat = $q->fetchColumn();
+        $marque = (string) ($S['brand'] ?? '');
+        if ($etat === false) { $msg = $S['nl.bad_link'] ?? ''; $msgKind = 'warn'; }
+        elseif ($etat === 'oczekuje') {
+            // Le lien du SMS de confirmation : le TÉLÉPHONE l'ouvre, un bouton
+            // confirme (un aperçu de lien qui « ouvre » tout seul ne le presse pas).
+            $titre = $S['nl.sms_confirm_title'] ?? $titre;
+            if ($method === 'POST' && ($_POST['a'] ?? '') === 'potwierdz') {
+                $okSms = wsm_mkt_sms_confirm($pdo, $tok);
+                $msg = $okSms ? ($S['nl.sms_ok'] ?? '') : ($S['nl.bad_link'] ?? ''); $msgKind = $okSms ? 'ok' : 'warn';
+            } elseif ($method === 'POST') {
+                wsm_mkt_unsub_sms($pdo, $tok);
+                $msg = $S['nl.sms_unsub_done'] ?? '';
+            } else {
+                $msg = str_replace('{sklep}', $marque, (string) ($S['nl.sms_confirm_ask'] ?? '')); $msgKind = 'info';
+                $bouton = ['action' => u('s/' . $tok), 'label' => $S['nl.sms_confirm_btn'] ?? '', 'champs' => ['a' => 'potwierdz']];
+            }
+        }
+        elseif ($method === 'POST' || $etat === 'wypisany') {
+            if ($method === 'POST') wsm_mkt_unsub_sms($pdo, $tok);
+            $msg = $S['nl.sms_unsub_done'] ?? '';
+        } else {
+            $msg = $S['nl.sms_unsub_ask'] ?? ''; $msgKind = 'info';
+            $bouton = ['action' => u('s/' . $tok), 'label' => $S['nl.unsub_btn'] ?? '', 'champs' => []];
+        }
+    } elseif ($etape === 'potwierdz') {
+        // Un bouton, pas le simple clic : les antivirus de messagerie ouvrent
+        // les liens tout seuls, et une confirmation automatique effacerait un
+        // refus donné plus tôt par la personne.
+        $tk = preg_replace('/[^a-f0-9]/', '', (string) ($method === 'POST' ? ($_POST['t'] ?? '') : ($_GET['t'] ?? ''))) ?? '';
+        if ($method === 'POST') {
+            [$ok] = wsm_mkt_confirm($pdo, $tk);
+            $titre = $S['nl.confirmed_title'] ?? '';
+            $msg = $ok ? ($S['nl.confirmed'] ?? '') : ($S['nl.bad_link'] ?? '');
+            $msgKind = $ok ? 'ok' : 'warn';
+        } else {
+            $msg = $S['nl.confirm_ask'] ?? ''; $msgKind = 'info';
+            $bouton = ['action' => u('newsletter/potwierdz'), 'label' => $S['nl.confirm_btn'] ?? '', 'champs' => ['t' => $tk]];
+        }
+    } elseif ($etape === 'wypisz') {
+        $titre = $S['nl.unsub_title'] ?? '';
+        $src = $method === 'POST' ? $_POST : $_GET;
+        $em = (string) ($src['e'] ?? ''); $tk = (string) ($src['t'] ?? '');
+        $rf = preg_replace('/[^a-z0-9:]/', '', (string) ($src['r'] ?? '')) ?? '';
+        if (!wsm_mkt_token_email_ok($em, $tk)) { $msg = $S['nl.bad_link'] ?? ''; $msgKind = 'warn'; }
+        elseif ($method === 'POST') { wsm_mkt_unsub_email($pdo, $em, $rf); $msg = $S['nl.unsub_done'] ?? ''; }
+        else {
+            $msg = str_replace('{email}', $em, $S['nl.unsub_ask'] ?? ''); $msgKind = 'info';
+            $bouton = ['action' => u('newsletter/wypisz'), 'label' => $S['nl.unsub_btn'] ?? '',
+                       'champs' => ['e' => $em, 't' => $tk, 'r' => $rf]];
+        }
+    } else {
+        $formulaire = true;
+        if ($method === 'POST') {
+            $v = $_POST;
+            $ip = wsm_contact_ip();
+            [$tsOk] = wsm_contact_stamp_ok((string) ($_POST['_ts'] ?? ''));
+            $robot = trim((string) ($_POST['firma_www'] ?? '')) !== '' || !$tsOk;
+            if (!$robot && $ip !== '') {
+                // Cinq inscriptions par heure et par adresse IP : au-delà, c'est un robot.
+                $q = $pdo->prepare("SELECT COUNT(*) FROM wsm_subscribers WHERE ip = ? AND updated_at >= ?");
+                $q->execute([$ip, date('Y-m-d H:i:s', time() - 3600)]);
+                $robot = (int) $q->fetchColumn() >= 5;
+            }
+            $chceNl = !empty($_POST['zgoda_nl']); $chceSms = !empty($_POST['zgoda_sms']);
+            if (wsm_mkt_email_norm((string) ($_POST['email'] ?? '')) === '') $nlErr['email'] = $S['nl.err_email'] ?? '';
+            if (!$chceNl && !$chceSms) $nlErr['zgoda'] = $S['nl.err_consent'] ?? '';
+            if ($chceSms && wsm_mkt_phone((string) ($_POST['phone'] ?? '')) === '') $nlErr['phone'] = $S['nl.err_phone'] ?? '';
+            if (!$nlErr) {
+                // Un robot reçoit la même réponse qu'un humain : lui dire non lui
+                // apprendrait à contourner.
+                if (!$robot) {
+                    // La preuve : le texte des cases tel que le SERVEUR l'affiche,
+                    // jamais ce qu'un formulaire renverrait.
+                    [$zNl, $zSms] = nl_textes_zgody($S);
+                    wsm_mkt_subscribe($pdo, [
+                        'email' => (string) $_POST['email'], 'phone' => (string) ($_POST['phone'] ?? ''), 'lang' => $lang,
+                        'source' => 'strona', 'newsletter' => $chceNl, 'sms' => $chceSms, 'ip' => $ip,
+                        'tekst_email' => $chceNl ? $zNl : '', 'tekst_sms' => $chceSms ? $zSms : '',
+                    ]);
+                }
+                $msg = trim(($chceNl ? str_replace('{email}', strtolower(trim((string) $_POST['email'])), $S['nl.check_mail'] ?? '') : '')
+                          . ' ' . ($chceSms ? ($S['nl.sms_check'] ?? '') : ''));
+                $formulaire = false; $v = [];
+            }
+        }
+    }
+
+    $GLOBALS['WSM_PAS_DE_NL'] = true;        // pas deux formulaires sur la même page
+    layout_head($S, $lang, $langs, $titre, $S['nl.lead'] ?? '', 'newsletter');
+    layout_header($S, $lang, $langs, $cartCount);
+    ?>
+<main class="wrap block nl-page">
+  <h1><?= e($titre) ?></h1>
+  <?php if ($msg !== '') notice($msgKind, $msg); ?>
+  <?php if ($bouton): ?>
+  <form method="post" action="<?= e($bouton['action']) ?>">
+    <?= csrf_field() ?>
+    <?php foreach ($bouton['champs'] as $k => $x): ?><input type="hidden" name="<?= e($k) ?>" value="<?= e($x) ?>"><?php endforeach; ?>
+    <button class="btn btn--brand" type="submit"><?= e($bouton['label']) ?></button>
+  </form>
+  <?php endif; ?>
+  <?php if ($formulaire): ?>
+  <p class="lead"><?= e($S['nl.lead'] ?? '') ?></p>
+  <?php nl_form($S, $v, $nlErr); ?>
+  <?php endif; ?>
+  <p><a class="btn btn--ghost" href="<?= e(u()) ?>"><?= e($S['cart.empty_cta'] ?? '') ?></a></p>
+</main>
+<?php
+    layout_footer($S);
+    exit;
+}
+
 if ($page === 'kontakt') {
     // $WSM_API_DIR, PAS un chemin en dur : le déploiement renomme php-api en
     // api. Écrit en dur, ce require passait en local et TUAIT la page sur le
@@ -1645,6 +1803,18 @@ if ($page === 'kasa') {
           </label>
           <?php if (isset($errors['consent_terms'])) echo '<small class="err">' . e($errors['consent_terms']) . '</small>'; ?>
         </p>
+        <?php // LE MARKETING SE DEMANDE, IL NE SE PRÉSUME PAS : deux cases, vides,
+              // séparées de celle du règlement. La newsletter passera encore par
+              // la confirmation du mail ; le SMS part au numéro de la commande. ?>
+        <?php $zNl = (string) ($S['checkout.nl_optin'] ?? ''); $zSms = (string) ($S['checkout.sms_optin'] ?? ''); ?>
+        <?php if ($zNl !== ''): ?>
+        <label class="check"><input type="checkbox" name="zgoda_nl" value="1"<?= !empty($v['zgoda_nl']) ? ' checked' : '' ?>>
+          <span><?= e($zNl) ?></span></label>
+        <?php endif; ?>
+        <?php if ($zSms !== ''): ?>
+        <label class="check"><input type="checkbox" name="zgoda_sms" value="1"<?= !empty($v['zgoda_sms']) ? ' checked' : '' ?>>
+          <span><?= e($zSms) ?></span></label>
+        <?php endif; ?>
       </fieldset>
 
       <button class="btn btn--accent btn--lg btn--block" type="submit"><?= e($S['checkout.submit'] ?? '') ?></button>

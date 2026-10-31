@@ -3081,6 +3081,71 @@ jobs:
           REMOTE
 
 
+      # ── MARKETING : newsletter, SMS (SMSAPI), rédaction IA ──────────────────
+      # Les modules, les tables, les routes publiques (désinscription « un
+      # clic », accusés SMS, pages de la boutique) et la pompe de la file
+      # (kolejka.php), essayée à vide : elle n'envoie rien ici. Sans tâche
+      # planifiée sur le serveur, la file part à l'ouverture des écrans
+      # Newsletter et SMS, et par leur bouton « Wyślij teraz partię ».
+      - name: Verify marketing (newsletter, SMS)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -e ssh -p ${{ vars.SSH_PORT || '22' }} \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "DB_USER='${{ secrets.WSM_DB_USER }}' DB_PASS='${{ secrets.WSM_DB_PASS }}' DIR_API='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice/api' DIR_BO='${{ vars.DEPLOY_DIR || '/var/www/html/mrszoko' }}/backoffice' bash -s" << 'REMOTE'
+          fail=0
+          echo "== marketing: moduly i ekrany =="
+          for f in marketing.php newsletter.php smsapi.php marketing_ai.php kolejka.php; do
+            [ -f "$DIR_API/$f" ] || { echo "  ^ BRAK: api/$f"; fail=1; }
+          done
+          for f in newsletter.php sms.php subskrybenci.php; do
+            [ -f "$DIR_BO/$f" ] || { echo "  ^ BRAK: $f"; fail=1; }
+          done
+          [ "$fail" = "0" ] && echo "  moduly i ekrany: obecne"
+          q() { mysql -u"$DB_USER" -p"$DB_PASS" -N -B mrszoko -e "$1" 2>/dev/null; }
+          echo "== tabele i stan =="
+          SM=$(php -r '
+            require_once "'"$DIR_API"'/db.php"; require_once "'"$DIR_API"'/smsapi.php";
+            $pdo = wsm_bootstrap(); $k = wsm_mkt_kpis($pdo);
+            echo "subskrybenci ", $k["email_aktywni"], " (czeka ", $k["email_oczekuja"], "), zgody SMS ", $k["sms_aktywni"],
+                 ", kolejka e-mail ", $k["kolejka_mail"], ", SMS ", $k["kolejka_sms"],
+                 ", poczta ", wsm_mail_enabled() ? "tak" : "nie", ", SMSAPI ", wsm_sms_enabled() ? "tak" : "nie",
+                 ", newsletter do klientow bez zgody ", wsm_mkt_klienci_bez_zgody() ? "TAK (PKE art. 398!)" : "nie";
+          ' 2>&1 | head -c 300)
+          echo "  $SM"
+          case "$SM" in *"PHP Fatal"*|*Uncaught*|*"Parse error"*) echo "  ^ ZLE : moduly marketingu nie laduja sie"; fail=1;; esac
+          MT=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mrszoko'
+                  AND table_name IN ('wsm_subscribers','wsm_mkt_events','wsm_newsletters','wsm_sms_campaigns','wsm_sms')")
+          MC=$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='mrszoko'
+                  AND table_name='wsm_messages' AND column_name IN ('html','unsub_url')")
+          [ "${MT:-0}" = "5" ] && [ "${MC:-0}" = "2" ] && echo "  5 tabel + kolumny html/unsub_url: obecne" \
+            || { echo "  ^ ZLE : tabele ${MT:-0}/5, kolumny ${MC:-0}/2"; fail=1; }
+          echo "== trasy publiczne =="
+          SH="http://localhost/mrszoko/shop"; API="http://localhost/mrszoko/backoffice/api"
+          c1=$(curl -skL -o /dev/null -w '%{http_code}' -X POST "$API/shop/newsletter/wypisz?e=x%40example.com&t=zly")
+          c2=$(curl -skL -o /dev/null -w '%{http_code}' "$API/shop/sms/raport?k=zly&MsgId=1&status=404")
+          c3=$(curl -skL -o /dev/null -w '%{http_code}' "$SH/newsletter")
+          c4=$(curl -skL -o /dev/null -w '%{http_code}' "$SH/s/zzzzzzzz")
+          c5=$(curl -skL -o /dev/null -w '%{http_code}' "$API/kolejka.php")
+          echo "  wypisz z falszywym tokenem -> $c1 (400), raport SMS z falszywym kluczem -> $c2 (403)"
+          echo "  /newsletter -> $c3, /s/... -> $c4, kolejka.php z sieci -> $c5 (403 lub 404)"
+          case "$c5" in 403|404) w=ok;; *) w=zle;; esac
+          [ "$c1" = "400" ] && [ "$c2" = "403" ] && [ "$c3" = "200" ] && [ "$c4" = "200" ] && [ "$w" = "ok" ] \
+            || { echo "  ^ NOT OK : trasy marketingu"; fail=1; }
+          F=$(curl -skL "$SH/" | grep -c 'name="zgoda_nl"')
+          [ "${F:-0}" -ge 1 ] && echo "  formularz newslettera w stopce: obecny" || { echo "  ^ NOT OK : brak formularza w stopce"; fail=1; }
+          echo "== pompa kolejki (proba na sucho, nic nie wysyla) =="
+          PR=$(php "$DIR_API/kolejka.php" 0 0 2>&1 | tail -1)
+          echo "  $PR"
+          case "$PR" in kolejka:*) ;; *) echo "  ^ NOT OK : kolejka.php nie dziala"; fail=1;; esac
+          if [ -f /etc/cron.d/wsm-kolejka ]; then echo "  zadanie cyklicznie: /etc/cron.d/wsm-kolejka obecne"
+          else echo "  (bez zadania cyklicznego: kolejka wychodzi przy otwarciu ekranow Newsletter/SMS)"; fi
+          if [ "$fail" = "0" ]; then echo "ALL MARKETING CHECKS OK"; else echo "MARKETING CHECKS FAILED"; exit 1; fi
+          REMOTE
+
+
       # Nettoyage transitoire : avant cette version, le back-office était servi À
       # PLAT sous /mrszoko/ (index.html, support.js, api/…). rsync tourne sans
       # --delete, donc ces fichiers resteraient servis à côté du nouveau layout

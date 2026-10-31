@@ -212,6 +212,30 @@ $cfg = [
         'env'        => getenv('WSM_KSEF_ENV') ?: '',
     ],
 
+    // ---- SMS marketing : SMSAPI (smsapi.php) -------------------------------
+    //  FERMÉ TANT QUE LE JETON ET L'EXPÉDITEUR SONT VIDES. `token` = jeton
+    //  OAuth du panneau SMSAPI (permission « sms ») ; `nadawca` = le nom
+    //  d'expéditeur validé chez SMSAPI ; `region` = pl (smsapi.pl, défaut) ou
+    //  com ; `cena` = prix d'un SMS en złotys, pour l'estimation du coût.
+    // ---- Marketing : à qui la newsletter a le droit d'écrire --------------
+    //  FERMÉ PAR DÉFAUT. Depuis le 10 novembre 2024, un e-mail commercial
+    //  demande un consentement PRÉALABLE (Prawo komunikacji elektronicznej,
+    //  art. 398), et la Pologne n'a pas repris clairement l'exception
+    //  « clients existants » (soft opt-in) de la directive. Fermé : la
+    //  newsletter ne part qu'aux personnes qui ont coché la case et confirmé
+    //  par e-mail. Ouvert (1) : aussi aux acheteurs sans case cochée, à ne
+    //  décider qu'avec l'avis d'un juriste.
+    'marketing' => [
+        'klienci_bez_zgody' => (getenv('WSM_MKT_KLIENCI_BEZ_ZGODY') ?: '0') === '1',
+    ],
+
+    'smsapi' => [
+        'token'   => getenv('WSM_SMSAPI_TOKEN') ?: '',
+        'nadawca' => getenv('WSM_SMSAPI_NADAWCA') ?: '',
+        'region'  => getenv('WSM_SMSAPI_REGION') ?: '',
+        'cena'    => getenv('WSM_SMSAPI_CENA') ?: '',
+    ],
+
     // ---- Caisse fiscale : Fakturownia + Paragony.pl (fiskal.php) -----------
     //  FERMÉ TANT QUE LE DOMAINE ET LE JETON SONT VIDES. `domena` = le compte
     //  (szoko.fakturownia.pl), `api_token` = Ustawienia → Integracja → Kod
