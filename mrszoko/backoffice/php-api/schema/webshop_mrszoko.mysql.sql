@@ -715,6 +715,8 @@ CREATE TABLE IF NOT EXISTS `wsm_messages` (
   `direction`     VARCHAR(10)  NOT NULL DEFAULT 'wyjscie',
   `subject`       VARCHAR(250) NOT NULL DEFAULT '',
   `body`          MEDIUMTEXT   NOT NULL,
+  `html`          MEDIUMTEXT   NULL,
+  `unsub_url`     VARCHAR(500) NOT NULL DEFAULT '',
   `template_code` VARCHAR(60)  NOT NULL DEFAULT '',
   `event_key`     VARCHAR(100) NULL DEFAULT NULL,
   `status`        VARCHAR(12)  NOT NULL DEFAULT 'kolejka',
@@ -1345,4 +1347,109 @@ CREATE TABLE IF NOT EXISTS `wsm_slide_i18n` (
   `tekst`     VARCHAR(400) NOT NULL DEFAULT '',
   `cta_label` VARCHAR(80) NOT NULL DEFAULT '',
   PRIMARY KEY (`slide_id`, `lang`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  MARKETING (marketing.php, newsletter.php, smsapi.php). Le consentement est
+--  une PREUVE : quand, d'où, et le texte exact qu'on a fait cocher. Un refus
+--  ne s'efface pas — il survit à toutes les campagnes suivantes.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `wsm_subscribers` (
+  `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `email`             VARCHAR(200) NOT NULL DEFAULT '',
+  `phone`             VARCHAR(20)  NOT NULL DEFAULT '',
+  `name`              VARCHAR(120) NOT NULL DEFAULT '',
+  `lang`              VARCHAR(5)   NOT NULL DEFAULT 'pl',
+  `source`            VARCHAR(20)  NOT NULL DEFAULT '',
+  `email_status`      VARCHAR(12)  NOT NULL DEFAULT '',
+  `email_zgoda_at`    DATETIME NULL DEFAULT NULL,
+  `email_potw_at`     DATETIME NULL DEFAULT NULL,
+  `email_wypis_at`    DATETIME NULL DEFAULT NULL,
+  `email_zgoda_tekst` VARCHAR(500) NOT NULL DEFAULT '',
+  `sms_status`        VARCHAR(12)  NOT NULL DEFAULT '',
+  `sms_zgoda_at`      DATETIME NULL DEFAULT NULL,
+  `sms_wypis_at`      DATETIME NULL DEFAULT NULL,
+  `sms_zgoda_tekst`   VARCHAR(500) NOT NULL DEFAULT '',
+  `token`             VARCHAR(40)  NOT NULL DEFAULT '',
+  `token_at`          DATETIME NULL DEFAULT NULL,
+  `sms_token`         VARCHAR(16)  NOT NULL DEFAULT '',
+  `ip`                VARCHAR(45)  NOT NULL DEFAULT '',
+  `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`        DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_subscribers_email` (`email`),
+  KEY `idx_wsm_subscribers_phone` (`phone`),
+  KEY `idx_wsm_subscribers_token` (`token`),
+  KEY `idx_wsm_subscribers_sms_token` (`sms_token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_mkt_events` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `typ`        VARCHAR(20)  NOT NULL DEFAULT '',
+  `ref`        VARCHAR(40)  NOT NULL DEFAULT '',
+  `kto`        VARCHAR(200) NOT NULL DEFAULT '',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wsm_mkt_events_ref` (`ref`, `typ`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_newsletters` (
+  `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `nazwa`       VARCHAR(190) NOT NULL DEFAULT '',
+  `temat`       VARCHAR(250) NOT NULL DEFAULT '',
+  `preheader`   VARCHAR(250) NOT NULL DEFAULT '',
+  `bloki`       MEDIUMTEXT,
+  `tlumaczenia` MEDIUMTEXT,
+  `segment`     VARCHAR(24)  NOT NULL DEFAULT 'wszyscy',
+  `kod`         VARCHAR(40)  NOT NULL DEFAULT '',
+  `link_code`   VARCHAR(40)  NOT NULL DEFAULT '',
+  `status`      VARCHAR(12)  NOT NULL DEFAULT 'szkic',
+  `odbiorcow`   INT NOT NULL DEFAULT 0,
+  `created_by`  VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  DATETIME NULL DEFAULT NULL,
+  `sent_at`     DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_sms_campaigns` (
+  `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `nazwa`       VARCHAR(190) NOT NULL DEFAULT '',
+  `tresc`       TEXT,
+  `tlumaczenia` TEXT,
+  `segment`     VARCHAR(24)  NOT NULL DEFAULT 'wszyscy',
+  `ascii`       TINYINT(1)   NOT NULL DEFAULT 1,
+  `kod`         VARCHAR(40)  NOT NULL DEFAULT '',
+  `link_code`   VARCHAR(40)  NOT NULL DEFAULT '',
+  `status`      VARCHAR(12)  NOT NULL DEFAULT 'szkic',
+  `odbiorcow`   INT NOT NULL DEFAULT 0,
+  `czesci`      INT NOT NULL DEFAULT 0,
+  `created_by`  VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  DATETIME NULL DEFAULT NULL,
+  `sent_at`     DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wsm_sms` (
+  `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `campaign_id` INT UNSIGNED NULL DEFAULT NULL,
+  `phone`       VARCHAR(20)  NOT NULL DEFAULT '',
+  `tresc`       TEXT,
+  `czesci`      INT NOT NULL DEFAULT 1,
+  `status`      VARCHAR(12)  NOT NULL DEFAULT 'kolejka',
+  `raport`      VARCHAR(20)  NOT NULL DEFAULT '',
+  `sms_id`      VARCHAR(40)  NOT NULL DEFAULT '',
+  `error`       VARCHAR(250) NOT NULL DEFAULT '',
+  `event_key`   VARCHAR(120) NULL DEFAULT NULL,
+  `test`        TINYINT(1)   NOT NULL DEFAULT 0,
+  `actor`       VARCHAR(120) NOT NULL DEFAULT '',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `sent_at`     DATETIME NULL DEFAULT NULL,
+  `raport_at`   DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wsm_sms_event` (`event_key`),
+  KEY `idx_wsm_sms_status` (`status`, `id`),
+  KEY `idx_wsm_sms_smsid` (`sms_id`),
+  KEY `idx_wsm_sms_campaign` (`campaign_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

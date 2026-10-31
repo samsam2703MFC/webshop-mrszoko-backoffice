@@ -417,7 +417,8 @@ function wsm_ensure_nouvelles_tables(PDO $pdo): void {
               'wsm_page_views', 'wsm_page_paths', 'wsm_order_lookups',
               'wsm_role_profiles', 'wsm_role_screens',
               'wsm_pages', 'wsm_page_i18n', 'wsm_sections', 'wsm_section_i18n', 'wsm_media',
-              'wsm_slides', 'wsm_slide_i18n'] as $t) {
+              'wsm_slides', 'wsm_slide_i18n',
+              'wsm_subscribers', 'wsm_mkt_events', 'wsm_newsletters', 'wsm_sms_campaigns', 'wsm_sms'] as $t) {
         if (!wsm_table_exists($pdo, $t)) { wsm_apply_schema($pdo); break; }
     }
     $links = __DIR__ . '/links.php';
@@ -623,6 +624,13 @@ function wsm_ensure_mail(PDO $pdo): void {
         || !wsm_table_exists($pdo, 'wsm_mail_templates')) {
         wsm_apply_schema($pdo);
     }
+    // La newsletter part en HTML (avec sa version texte) et porte son lien de
+    // désinscription dans l'en-tête List-Unsubscribe : deux colonnes de plus
+    // sur la file, vides pour tous les messages d'avant.
+    wsm_ensure_columns($pdo, 'wsm_messages', [
+        'html'      => ['MEDIUMTEXT NULL', 'TEXT NULL'],
+        'unsub_url' => ["VARCHAR(500) NOT NULL DEFAULT ''", "TEXT NOT NULL DEFAULT ''"],
+    ]);
     try {
         require_once __DIR__ . '/seed.php';
         if (!(int) $pdo->query("SELECT COUNT(*) FROM wsm_mail_templates")->fetchColumn()) {

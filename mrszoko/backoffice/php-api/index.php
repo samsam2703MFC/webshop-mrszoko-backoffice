@@ -241,6 +241,37 @@ if ($sroute !== '') {
         exit;
     }
 
+    // Désinscription « un clic » (RFC 8058) : l'adresse de l'en-tête
+    // List-Unsubscribe. La messagerie POSTe sans formulaire ni cookie — le
+    // jeton signé suffit. Un GET (quelqu'un a collé l'adresse) mène à la page
+    // de la boutique, qui demande confirmation : les antivirus de messagerie
+    // ouvrent les liens tout seuls, et ne doivent pas désinscrire à la place
+    // du client.
+    if ($sroute === 'newsletter/wypisz') {
+        require_once __DIR__ . '/marketing.php';
+        $e = (string) ($_GET['e'] ?? ''); $t = (string) ($_GET['t'] ?? ''); $r = (string) ($_GET['r'] ?? '');
+        if ($method === 'POST') {
+            $ok = wsm_mkt_token_email_ok($e, $t) && wsm_mkt_unsub_email($pdo, $e, preg_replace('/[^a-z0-9:]/', '', $r) ?? '');
+            wsm_send(['ok' => $ok], $ok ? 200 : 400);
+        }
+        // Le jeton REÇU, tel quel : en recalculer un ici ouvrirait la porte
+        // à quiconque connaît une adresse.
+        header('Location: ' . wsm_shop_base_url() . '/newsletter/wypisz?e=' . rawurlencode($e) . '&t=' . rawurlencode($t)
+               . ($r !== '' ? '&r=' . rawurlencode($r) : ''), true, 302);
+        exit;
+    }
+
+    // Accusés de l'opérateur (SMSAPI, notify_url) : GET ou POST selon le
+    // panneau ; la clé de l'adresse fait foi. SMSAPI attend « OK ».
+    if ($sroute === 'sms/raport') {
+        require_once __DIR__ . '/smsapi.php';
+        $n = wsm_sms_raport($pdo, $_POST + $_GET, (string) ($_GET['k'] ?? ''));
+        http_response_code($n < 0 ? 403 : 200);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo $n < 0 ? 'NO' : 'OK';
+        exit;
+    }
+
     // Webhook Fakturownia (`invoice:update`) : il DÉSIGNE un reçu, que
     // fiskal.php relit chez Fakturownia avec notre propre jeton — le corps
     // n'est jamais cru. 200 aussi pour ce qui ne nous concerne pas : 25

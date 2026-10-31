@@ -133,6 +133,17 @@ function layout_footer(array $S, string $lang = ''): void {
     if ($lang === '') $lang = (string) ($GLOBALS['lang'] ?? WSM_SHOP_DEFAULT_LANG);
     ?>
 <footer class="site-foot">
+  <?php // LA NEWSLETTER, en haut du pied, sur toutes les pages : c'est là qu'on
+        // la cherche. Le formulaire est celui de la page /newsletter (nl_form). ?>
+  <?php if (empty($GLOBALS['WSM_PAS_DE_NL'])): ?>
+  <section class="foot-nl" aria-labelledby="foot-nl-t"><div class="wrap foot-nl-in">
+    <div class="foot-nl-txt">
+      <h2 id="foot-nl-t"><?= e($S['nl.title'] ?? 'Newsletter') ?></h2>
+      <p><?= e($S['nl.lead'] ?? '') ?></p>
+    </div>
+    <?php nl_form($S); ?>
+  </div></section>
+  <?php endif; ?>
   <?php // COMMENT PAYER, COMMENT RECEVOIR — sur toutes les pages, avant de
         // commander. Ce que la caisse offre vraiment (metody.php). ?>
   <?php $metody = metody_html(wsm_pdo(), $S, 'metody--stopka'); if ($metody !== ''): ?>
@@ -186,6 +197,49 @@ function layout_footer(array $S, string $lang = ''): void {
 </body>
 </html>
 <?php
+}
+
+/**
+ * LE FORMULAIRE D'INSCRIPTION (newsletter, et SMS en option).
+ *
+ * Deux cases, jamais cochées d'avance : l'accord se donne (RODO pour l'e-mail,
+ * art. 398 Prawo komunikacji elektronicznej pour le SMS). Le texte exact des
+ * cases part avec le formulaire et devient la PREUVE de l'accord (marketing.php).
+ * Même piège et même horodatage signé que le formulaire de contact.
+ */
+function nl_form(array $S, array $v = [], array $err = []): void {
+    global $WSM_API_DIR;
+    if (!function_exists('wsm_contact_stamp')) require_once $WSM_API_DIR . '/contact.php';
+    $marque = (string) ($S['brand'] ?? '');
+    $zNl  = str_replace('{sklep}', $marque, (string) ($S['nl.consent_email'] ?? ''));
+    $zSms = str_replace('{sklep}', $marque, (string) ($S['nl.consent_sms'] ?? ''));
+    $id = 'nl' . substr(md5((string) mt_rand()), 0, 4);
+    ?>
+    <form class="nl-form" method="post" action="<?= e(u('newsletter')) ?>" novalidate>
+      <?= csrf_field() ?>
+      <input type="hidden" name="_ts" value="<?= e(wsm_contact_stamp()) ?>">
+      <div class="hp" aria-hidden="true"><label for="<?= $id ?>-w">Nie wypełniaj tego pola</label>
+        <input type="text" id="<?= $id ?>-w" name="firma_www" tabindex="-1" autocomplete="off" value=""></div>
+      <div class="nl-row">
+        <label class="sr-only" for="<?= $id ?>-e"><?= e($S['nl.email'] ?? '') ?></label>
+        <input id="<?= $id ?>-e" name="email" type="email" required maxlength="200" autocomplete="email"
+               placeholder="<?= e($S['nl.email'] ?? '') ?>" value="<?= e((string) ($v['email'] ?? '')) ?>"<?= isset($err['email']) ? ' aria-invalid="true"' : '' ?>>
+        <button class="btn btn--brand" type="submit"><?= e($S['nl.submit'] ?? '') ?></button>
+      </div>
+      <label class="nl-check"><input type="checkbox" name="zgoda_nl" value="1"<?= !empty($v['zgoda_nl']) ? ' checked' : '' ?>>
+        <span><?= e($zNl) ?></span></label>
+      <input type="hidden" name="tekst_nl" value="<?= e($zNl) ?>">
+      <label class="nl-check"><input type="checkbox" name="zgoda_sms" value="1"<?= !empty($v['zgoda_sms']) ? ' checked' : '' ?>>
+        <span><?= e($zSms) ?></span></label>
+      <input type="hidden" name="tekst_sms" value="<?= e($zSms) ?>">
+      <div class="nl-tel">
+        <label for="<?= $id ?>-t"><?= e($S['nl.phone'] ?? '') ?></label>
+        <input id="<?= $id ?>-t" name="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel"
+               placeholder="600 100 200" value="<?= e((string) ($v['phone'] ?? '')) ?>"<?= isset($err['phone']) ? ' aria-invalid="true"' : '' ?>>
+      </div>
+      <?php foreach ($err as $m): ?><small class="err"><?= e($m) ?></small><?php endforeach; ?>
+    </form>
+    <?php
 }
 
 /** Bandeau d'erreur ou de succès, réutilisé par toutes les pages. */

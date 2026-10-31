@@ -84,6 +84,20 @@ function wsm_settings_fields(): array {
         'ksef.env'        => ['ksef', 'Środowisko', ['ksef', 'env'], 'WSM_KSEF_ENV', 'select:test|demo|prod',
                               'test = piaskownica, demo = przedprodukcyjne, prod = prawdziwy rejestr.'],
 
+        // Newsletter : qui peut la recevoir (marketing.php, config « marketing »).
+        'marketing.klienci_bez_zgody' => ['sms', 'Newsletter do klientów bez zgody', ['marketing', 'klienci_bez_zgody'], 'WSM_MKT_KLIENCI_BEZ_ZGODY', 'select:1|0',
+                             '0 = tylko osoby, które zaznaczyły zgodę i potwierdziły ją mailem (domyślnie). 1 = także kupujący bez zgody: od 10.11.2024 '
+                             . 'Prawo komunikacji elektronicznej (art. 398) wymaga uprzedniej zgody, a wyjątek dla dotychczasowych klientów jest w Polsce niepewny. Włącz tylko po opinii prawnika.'],
+        // SMS marketing : SMSAPI (smsapi.php), comme le CRM.
+        'smsapi.token'   => ['sms', 'Token OAuth SMSAPI', ['smsapi', 'token'], 'WSM_SMSAPI_TOKEN', 'secret',
+                             'Panel SMSAPI → Ustawienia API → Tokeny OAuth, z uprawnieniem „sms”. Nigdy nie opuszcza serwera.'],
+        'smsapi.nadawca' => ['sms', 'Nazwa nadawcy', ['smsapi', 'nadawca'], 'WSM_SMSAPI_NADAWCA', 'text',
+                             'Do 11 znaków, zatwierdzona w panelu SMSAPI (np. SzokoShop). To ją widzi klient.'],
+        'smsapi.region'  => ['sms', 'Platforma', ['smsapi', 'region'], 'WSM_SMSAPI_REGION', 'select:pl|com',
+                             'pl = smsapi.pl (konto polskie), com = smsapi.com. Token działa tylko na swojej platformie.'],
+        'smsapi.cena'    => ['sms', 'Cena jednego SMS-a (zł)', ['smsapi', 'cena'], 'WSM_SMSAPI_CENA', 'text',
+                             'Do szacowania kosztu kampanii przed wysyłką. Puste = 0,16 zł.'],
+
         // La caisse fiscale : Fakturownia + module Paragony.pl + imprimante
         // fiscale online chez la société (fiskal.php).
         'fakturownia.domena'        => ['paragon', 'Adres konta Fakturowni', ['fakturownia', 'domena'], 'WSM_FAKTUROWNIA_DOMENA', 'text',

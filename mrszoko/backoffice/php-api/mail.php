@@ -353,6 +353,10 @@ function wsm_mail_queue(PDO $pdo, array $m): int {
         'status'        => ($m['direction'] ?? 'wyjscie') === 'wyjscie' ? 'kolejka' : 'wyslana',
         'actor'         => mb_substr((string) ($m['actor'] ?? 'system'), 0, 120),
     ];
+    // La version HTML et le lien de désinscription (newsletter) : écrits
+    // seulement s'ils existent — un message texte reste exactement ce qu'il était.
+    if (trim((string) ($m['html'] ?? '')) !== '')      $cols['html'] = (string) $m['html'];
+    if (trim((string) ($m['unsub_url'] ?? '')) !== '') $cols['unsub_url'] = mb_substr((string) $m['unsub_url'], 0, 500);
     $names = array_keys($cols);
     $sql = 'INSERT INTO wsm_messages (' . implode(',', $names) . ') VALUES (' .
            implode(',', array_fill(0, count($names), '?')) . ')';
@@ -390,10 +394,42 @@ function wsm_mail_headers(array $mail): array {
     $h['From'] = $name !== '' ? wsm_mail_encode($name) . ' <' . $from . '>' : $from;
     if (filter_var((string) $c['reply_to'], FILTER_VALIDATE_EMAIL)) $h['Reply-To'] = (string) $c['reply_to'];
     if (filter_var((string) $c['bcc'], FILTER_VALIDATE_EMAIL)) $h['Bcc'] = (string) $c['bcc'];
+    // LA DÉSINSCRIPTION EN UN CLIC (RFC 8058). Gmail et Yahoo l'exigent des
+    // envois groupés : sans elle, la newsletter part en indésirables — et la
+    // réputation du domaine avec elle, donc les confirmations de commande.
+    $unsub = trim((string) ($mail['unsub_url'] ?? ''));
+    if (preg_match('#^https?://#', $unsub)) {
+        $h['List-Unsubscribe'] = '<' . $unsub . '>';
+        $h['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+    }
     $h['MIME-Version'] = '1.0';
-    $h['Content-Type'] = 'text/plain; charset=UTF-8';
-    $h['Content-Transfer-Encoding'] = '8bit';
+    if (trim((string) ($mail['html'] ?? '')) !== '') {
+        $h['Content-Type'] = 'multipart/alternative; boundary="' . wsm_mail_boundary($mail) . '"';
+    } else {
+        $h['Content-Type'] = 'text/plain; charset=UTF-8';
+        $h['Content-Transfer-Encoding'] = '8bit';
+    }
     return $h;
+}
+
+/** La frontière des parties : stable pour un même message (en-tête et corps la partagent). */
+function wsm_mail_boundary(array $mail): string {
+    return '=_wsm_' . substr(hash('sha256', (string) ($mail['to'] ?? '') . '|' . (string) ($mail['subject'] ?? '')
+                                    . '|' . (string) ($mail['html'] ?? '')), 0, 28);
+}
+
+/**
+ * Le corps tel qu'il part. Texte seul : inchangé. Avec HTML : deux parties
+ * (texte, puis HTML), en base64 — une ligne HTML de plus de 998 caractères
+ * serait coupée par le serveur SMTP au milieu d'une balise.
+ */
+function wsm_mail_body(array $mail): string {
+    $html = (string) ($mail['html'] ?? '');
+    if (trim($html) === '') return (string) $mail['body'];
+    $b = wsm_mail_boundary($mail);
+    $part = fn(string $type, string $txt): string => "--$b\r\nContent-Type: $type; charset=UTF-8\r\n"
+        . "Content-Transfer-Encoding: base64\r\n\r\n" . rtrim(chunk_split(base64_encode($txt), 76, "\r\n")) . "\r\n";
+    return $part('text/plain', (string) $mail['body']) . $part('text/html', $html) . "--$b--\r\n";
 }
 
 /** Sujet non-ASCII : encodé, sinon il arrive en mojibake. */
@@ -407,7 +443,7 @@ function wsm_mail_php(array $mail): array {
     $lines = [];
     foreach ($h as $k => $v) if ($k !== 'Subject') $lines[] = "$k: $v";
     $ok = @mail((string) $mail['to'], wsm_mail_encode((string) $mail['subject']),
-                (string) $mail['body'], implode("\r\n", $lines));
+                wsm_mail_body($mail), implode("\r\n", $lines));
     return $ok ? [true, ''] : [false, 'mail() odrzucił wiadomość'];
 }
 
@@ -477,7 +513,7 @@ function wsm_mail_smtp(array $mail): array {
         $head = ['To: ' . $mail['to'], 'Subject: ' . wsm_mail_encode((string) $mail['subject'])];
         foreach ($h as $k => $v) if ($k !== 'Bcc') $head[] = "$k: $v";
         // Un point seul en début de ligne terminerait le message : on le double.
-        $body = preg_replace('/^\./m', '..', (string) $mail['body']);
+        $body = preg_replace('/^\./m', '..', wsm_mail_body($mail));
         [$code, $msg] = $say(implode("\r\n", $head) . "\r\n\r\n" . $body . "\r\n.");
         if ($code !== 250) return [false, 'SMTP: wiadomość odrzucona — ' . $msg];
         $say('QUIT');
@@ -501,6 +537,7 @@ function wsm_mail_send(PDO $pdo, int $id): array {
 
     [$ok, $err] = (wsm_mail_transport())([
         'to' => (string) $m['email'], 'subject' => (string) $m['subject'], 'body' => (string) $m['body'],
+        'html' => (string) ($m['html'] ?? ''), 'unsub_url' => (string) ($m['unsub_url'] ?? ''),
     ]);
     wsm_mail_mark($pdo, $id, $ok ? 'wyslana' : 'blad', $ok ? '' : $err);
     return [$ok, $err];

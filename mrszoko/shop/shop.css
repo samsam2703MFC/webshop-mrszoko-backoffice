@@ -1303,3 +1303,27 @@ h3 { font-weight: var(--weight-bold); }
   .prog-pasek i, .card, .kup-pasek { transition: none; }
   .card:hover { transform: none; }
 }
+
+/* ---- Newsletter : le bandeau du pied et la page /newsletter -----------------
+   Un champ, un bouton, deux cases vides. Les champs restent à 16 px : en
+   dessous, l'iPhone zoome sur le formulaire et le client perd la page. */
+.foot-nl { background: var(--choco-900); border-bottom: 1px solid var(--choco-800); }
+.foot-nl-in { display: grid; gap: var(--space-5); padding-top: var(--space-8); padding-bottom: var(--space-8); }
+@media (min-width: 900px) { .foot-nl-in { grid-template-columns: 1fr 1.25fr; align-items: start; } }
+.foot-nl h2 { margin: 0 0 6px; font-size: var(--text-xl); color: var(--cream-50); }
+.foot-nl p { margin: 0; color: var(--choco-300); line-height: 1.6; }
+.nl-form { display: grid; gap: 10px; }
+.nl-row { display: flex; gap: 8px; }
+.nl-row input { flex: 1; min-width: 0; height: 48px; padding: 0 18px; border-radius: 999px;
+                border: 1px solid var(--border-default); background: var(--white); font: inherit; font-size: 16px; }
+.nl-row .btn { flex: none; }
+.nl-check { display: flex; gap: 10px; align-items: flex-start; font-size: var(--text-xs); line-height: 1.5; cursor: pointer; }
+.nl-check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brand); flex: none; }
+.nl-tel { display: grid; gap: 4px; font-size: var(--text-xs); }
+.nl-tel input { height: 44px; max-width: 280px; padding: 0 14px; border-radius: 10px;
+                border: 1px solid var(--border-default); background: var(--white); font: inherit; font-size: 16px; }
+.nl-form .err { font-size: var(--text-xs); color: var(--danger); }
+.site-foot .nl-check span, .site-foot .nl-tel label { color: var(--choco-200, var(--cream-200)); }
+.site-foot .nl-form .err { color: #f1b9ad; }
+.nl-page .nl-form { max-width: 560px; margin: var(--space-5) 0; }
+.nl-page form .btn { margin-bottom: var(--space-4); }
