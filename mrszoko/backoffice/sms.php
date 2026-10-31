@@ -63,7 +63,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 [$ok, $m] = wsm_sms_camp_test($pdo, $id, (string) ($_POST['numer'] ?? ''), $acteur);
                 $flash = $m; $kind = $ok ? 'ok' : 'err';
             } elseif (isset($_POST['wyslij']) && $szkic) {
-                if (empty($_POST['potwierdzam'])) { $flash = 'Zaznacz, że próbka została sprawdzona i koszt jest zaakceptowany.'; $kind = 'err'; }
+                if (!wsm_mkt_decide($me)) { $flash = 'Wysyłkę do wszystkich zatwierdza administrator: przygotuj kampanię i próbkę, a administrator kliknie „Wyślij”.'; $kind = 'err'; }
+                elseif (!wsm_mkt_adres_ok()) { $flash = 'Najpierw ustaw „Publiczny adres sklepu” (Integracje → Sklep): od niego zależą linki w wiadomościach, wypisania i raporty doręczeń.'; $kind = 'err'; }
+                elseif (empty($_POST['potwierdzam'])) { $flash = 'Zaznacz, że próbka została sprawdzona i koszt jest zaakceptowany.'; $kind = 'err'; }
                 else { [$n, $m] = wsm_sms_camp_send($pdo, $id, $acteur); $flash = $m; $kind = $n > 0 ? 'ok' : 'err'; }
             }
         }
@@ -108,6 +110,9 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Marketing' => null, 'SMS' => $c ? 'sm
 </div>
 <?php if (!wsm_sms_enabled()): ?>
 <p class="warnbox">SMSAPI nie jest jeszcze podłączone (Integracje → SMS: token OAuth i nazwa nadawcy). Kampanie można przygotować — wyjdą po podłączeniu.</p>
+<?php endif; ?>
+<?php if (!wsm_mkt_adres_ok()): ?>
+<p class="warnbox">Brak „Publicznego adresu sklepu” (Integracje → Sklep). Kampanie można przygotować i przetestować, ale wysyłka czeka na ten adres: od niego zależą linki, wypisania i raporty doręczeń.</p>
 <?php endif; ?>
 <?php if ($pompe['sms'] > 0): ?><p class="hint">Przy otwarciu ekranu wyszło <?= (int) $pompe['sms'] ?> SMS-ów z kolejki.</p><?php endif; ?>
 
@@ -191,8 +196,10 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Marketing' => null, 'SMS' => $c ? 'sm
       <p class="hint">Do wysłania: <b><?= (int) $pv['odbiorcow'] ?></b> SMS-ów · <?= (int) $pv['czesci'] ?> części do zapłaty ·
         koszt około <b><?= h($zl((int) $pv['koszt'])) ?></b><?php foreach ($pv['jezyki'] as $l => $n): ?> · <?= h($l) ?>: <?= (int) $n ?><?php endforeach; ?>.
         <?= wsm_sms_godziny_ok() ? '' : ' Teraz jest noc — kolejka ruszy o 8:00.' ?></p>
+      <?php if (wsm_mkt_decide($me)): ?>
       <label class="chk" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" name="potwierdzam" value="1"> Próbka sprawdzona, koszt zaakceptowany.</label>
       <p class="actions"><button class="btn btn--brand" type="submit" name="wyslij" value="1">Wyślij do <?= (int) $pv['odbiorcow'] ?> osób</button></p>
+      <?php else: ?><p class="hint">Wysyłkę do wszystkich zatwierdza administrator: przygotuj kampanię i próbkę, a administrator kliknie „Wyślij”.</p><?php endif; ?>
       <?php else: ?>
       <p class="hint">Wysłana <?= h((string) $c['sent_at']) ?>: <?= (int) $c['odbiorcow'] ?> SMS-ów, <?= (int) $c['czesci'] ?> części.</p>
       <?php endif; ?>

@@ -22,7 +22,12 @@ wsm_mkt_ensure($pdo);
 $flash = ''; $kind = 'ok';
 $acteur = (string) ($me['nom'] ?? '');
 
-if (isset($_GET['csv']) && $isAdmin) {
+$decide = wsm_mkt_decide($me);
+// Une cellule qui commence par = + - @ serait une FORMULE dans Excel : le texte
+// de la case vient de la boutique, on ne laisse pas une saisie devenir un calcul.
+$cellule = fn($v): string => preg_match('/^[=+\-@\t\r]/', (string) $v) ? "'" . (string) $v : (string) $v;
+
+if (isset($_GET['csv']) && $decide) {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="zgody-' . date('Y-m-d') . '.csv"');
     $o = fopen('php://output', 'w');
@@ -30,9 +35,9 @@ if (isset($_GET['csv']) && $isAdmin) {
     fputcsv($o, ['email', 'telefon', 'jezyk', 'zrodlo', 'email_status', 'email_zgoda', 'email_potwierdzenie', 'email_wypis',
                  'email_tekst_zgody', 'sms_status', 'sms_zgoda', 'sms_wypis', 'sms_tekst_zgody', 'ip', 'utworzono'], ';');
     foreach ($pdo->query("SELECT * FROM wsm_subscribers ORDER BY id") as $r) {
-        fputcsv($o, [$r['email'], $r['phone'], $r['lang'], $r['source'], $r['email_status'], $r['email_zgoda_at'], $r['email_potw_at'],
+        fputcsv($o, array_map($cellule, [$r['email'], $r['phone'], $r['lang'], $r['source'], $r['email_status'], $r['email_zgoda_at'], $r['email_potw_at'],
                      $r['email_wypis_at'], $r['email_zgoda_tekst'], $r['sms_status'], $r['sms_zgoda_at'], $r['sms_wypis_at'],
-                     $r['sms_zgoda_tekst'], $r['ip'], $r['created_at']], ';');
+                     $r['sms_zgoda_tekst'], $r['ip'], $r['created_at']]), ';');
     }
     if (function_exists('wsm_audit')) wsm_audit($pdo, $acteur, 'Eksport zgód marketingowych', 'wsm_subscribers', 'Sieć');
     exit;
@@ -48,6 +53,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     elseif (!$r) { $flash = 'Nie znaleziono.'; $kind = 'err'; }
     elseif (isset($_POST['wypisz_email'])) { wsm_mkt_unsub_email($pdo, (string) $r['email'], 'konsola'); $flash = 'Wypisano ' . $r['email'] . ' z e-maili.'; }
     elseif (isset($_POST['wypisz_sms'])) { wsm_mkt_unsub_sms($pdo, (string) $r['phone'], 'konsola'); $flash = 'Wypisano ' . $r['phone'] . ' z SMS-ów.'; }
+    elseif (isset($_POST['usun']) && !$decide) { $flash = 'Usunięcie danych zatwierdza administrator.'; $kind = 'err'; }
     elseif (isset($_POST['usun'])) {
         wsm_camp_stop($pdo, (string) $r['email'], $acteur);            // le refus survit à l'effacement
         $pdo->prepare("DELETE FROM wsm_subscribers WHERE id = ?")->execute([$sid]);
@@ -99,7 +105,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Marketing' => null, 'Subskrybenci' =>
   <?php endforeach; ?>
   <input type="search" name="q" value="<?= h($q) ?>" placeholder="e-mail lub telefon"><input type="hidden" name="f" value="<?= h($f) ?>">
   <button type="submit">Szukaj</button>
-  <?php if ($isAdmin): ?><a href="subskrybenci.php?csv=1">Eksport zgód (CSV)</a><?php endif; ?>
+  <?php if ($decide): ?><a href="subskrybenci.php?csv=1">Eksport zgód (CSV)</a><?php endif; ?>
 </form>
 <div class="panel"><div class="tablewrap"><table class="rwd">
   <thead><tr><th>Adres</th><th>Źródło</th><th>Newsletter</th><th>SMS</th><th>Zgoda</th><th></th></tr></thead>
@@ -119,7 +125,7 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Marketing' => null, 'Subskrybenci' =>
       <form method="post"><?= console_csrf_field() ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
         <?php if ($r['email_status'] !== 'wypisany'): ?><button type="submit" name="wypisz_email" value="1">Wypisz e-mail</button><?php endif; ?>
         <?php if ($r['sms_status'] === 'aktywny'): ?><button type="submit" name="wypisz_sms" value="1">Wypisz SMS</button><?php endif; ?>
-        <button type="submit" name="usun" value="1">Usuń dane</button></form>
+        <?php if ($decide): ?><button type="submit" name="usun" value="1">Usuń dane</button><?php endif; ?></form>
     <?php endif; ?></td>
   </tr>
   <?php endforeach; ?>

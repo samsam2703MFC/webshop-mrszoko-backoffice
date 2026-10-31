@@ -1049,7 +1049,23 @@ if ($page === 'newsletter' || $page === 's') {
         $q = $pdo->prepare("SELECT sms_status FROM wsm_subscribers WHERE sms_token = ? AND sms_token <> ''");
         $q->execute([$tok]);
         $etat = $q->fetchColumn();
+        $marque = (string) ($S['brand'] ?? '');
         if ($etat === false) { $msg = $S['nl.bad_link'] ?? ''; $msgKind = 'warn'; }
+        elseif ($etat === 'oczekuje') {
+            // Le lien du SMS de confirmation : le TÉLÉPHONE l'ouvre, un bouton
+            // confirme (un aperçu de lien qui « ouvre » tout seul ne le presse pas).
+            $titre = $S['nl.sms_confirm_title'] ?? $titre;
+            if ($method === 'POST' && ($_POST['a'] ?? '') === 'potwierdz') {
+                $okSms = wsm_mkt_sms_confirm($pdo, $tok);
+                $msg = $okSms ? ($S['nl.sms_ok'] ?? '') : ($S['nl.bad_link'] ?? ''); $msgKind = $okSms ? 'ok' : 'warn';
+            } elseif ($method === 'POST') {
+                wsm_mkt_unsub_sms($pdo, $tok);
+                $msg = $S['nl.sms_unsub_done'] ?? '';
+            } else {
+                $msg = str_replace('{sklep}', $marque, (string) ($S['nl.sms_confirm_ask'] ?? '')); $msgKind = 'info';
+                $bouton = ['action' => u('s/' . $tok), 'label' => $S['nl.sms_confirm_btn'] ?? '', 'champs' => ['a' => 'potwierdz']];
+            }
+        }
         elseif ($method === 'POST' || $etat === 'wypisany') {
             if ($method === 'POST') wsm_mkt_unsub_sms($pdo, $tok);
             $msg = $S['nl.sms_unsub_done'] ?? '';
@@ -1058,10 +1074,19 @@ if ($page === 'newsletter' || $page === 's') {
             $bouton = ['action' => u('s/' . $tok), 'label' => $S['nl.unsub_btn'] ?? '', 'champs' => []];
         }
     } elseif ($etape === 'potwierdz') {
-        [$ok] = wsm_mkt_confirm($pdo, (string) ($_GET['t'] ?? ''));
-        $titre = $S['nl.confirmed_title'] ?? '';
-        $msg = $ok ? ($S['nl.confirmed'] ?? '') : ($S['nl.bad_link'] ?? '');
-        $msgKind = $ok ? 'ok' : 'warn';
+        // Un bouton, pas le simple clic : les antivirus de messagerie ouvrent
+        // les liens tout seuls, et une confirmation automatique effacerait un
+        // refus donné plus tôt par la personne.
+        $tk = preg_replace('/[^a-f0-9]/', '', (string) ($method === 'POST' ? ($_POST['t'] ?? '') : ($_GET['t'] ?? ''))) ?? '';
+        if ($method === 'POST') {
+            [$ok] = wsm_mkt_confirm($pdo, $tk);
+            $titre = $S['nl.confirmed_title'] ?? '';
+            $msg = $ok ? ($S['nl.confirmed'] ?? '') : ($S['nl.bad_link'] ?? '');
+            $msgKind = $ok ? 'ok' : 'warn';
+        } else {
+            $msg = $S['nl.confirm_ask'] ?? ''; $msgKind = 'info';
+            $bouton = ['action' => u('newsletter/potwierdz'), 'label' => $S['nl.confirm_btn'] ?? '', 'champs' => ['t' => $tk]];
+        }
     } elseif ($etape === 'wypisz') {
         $titre = $S['nl.unsub_title'] ?? '';
         $src = $method === 'POST' ? $_POST : $_GET;
@@ -1095,14 +1120,17 @@ if ($page === 'newsletter' || $page === 's') {
                 // Un robot reçoit la même réponse qu'un humain : lui dire non lui
                 // apprendrait à contourner.
                 if (!$robot) {
+                    // La preuve : le texte des cases tel que le SERVEUR l'affiche,
+                    // jamais ce qu'un formulaire renverrait.
+                    [$zNl, $zSms] = nl_textes_zgody($S);
                     wsm_mkt_subscribe($pdo, [
                         'email' => (string) $_POST['email'], 'phone' => (string) ($_POST['phone'] ?? ''), 'lang' => $lang,
                         'source' => 'strona', 'newsletter' => $chceNl, 'sms' => $chceSms, 'ip' => $ip,
-                        'tekst_email' => (string) ($_POST['tekst_nl'] ?? ''), 'tekst_sms' => (string) ($_POST['tekst_sms'] ?? ''),
+                        'tekst_email' => $chceNl ? $zNl : '', 'tekst_sms' => $chceSms ? $zSms : '',
                     ]);
                 }
-                $msg = $chceNl ? str_replace('{email}', strtolower(trim((string) $_POST['email'])), $S['nl.check_mail'] ?? '')
-                               : ($S['nl.sms_ok'] ?? '');
+                $msg = trim(($chceNl ? str_replace('{email}', strtolower(trim((string) $_POST['email'])), $S['nl.check_mail'] ?? '') : '')
+                          . ' ' . ($chceSms ? ($S['nl.sms_check'] ?? '') : ''));
                 $formulaire = false; $v = [];
             }
         }

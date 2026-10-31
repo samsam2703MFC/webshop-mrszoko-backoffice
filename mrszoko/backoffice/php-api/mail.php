@@ -346,7 +346,8 @@ function wsm_mail_queue(PDO $pdo, array $m): int {
         // « wyjscie ». Trouvé en branchant l'envoi des documents.
         'direction'     => in_array($m['direction'] ?? 'wyjscie', ['wyjscie', 'wejscie', 'notatka'], true)
                            ? ($m['direction'] ?? 'wyjscie') : 'wyjscie',
-        'subject'       => mb_substr((string) ($m['subject'] ?? ''), 0, 250),
+        // Un saut de ligne dans un sujet deviendrait un EN-TÊTE de plus en SMTP.
+        'subject'       => mb_substr(trim((string) preg_replace('/[\r\n\t]+/', ' ', (string) ($m['subject'] ?? ''))), 0, 250),
         'body'          => (string) ($m['body'] ?? ''),
         'template_code' => mb_substr((string) ($m['template_code'] ?? ''), 0, 60),
         'event_key'     => ($m['event_key'] ?? '') !== '' ? (string) $m['event_key'] : null,

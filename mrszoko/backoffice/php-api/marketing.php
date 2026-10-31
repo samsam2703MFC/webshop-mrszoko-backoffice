@@ -82,7 +82,9 @@ function wsm_mkt_secret(): string {
 
 function wsm_mkt_email_norm(string $e): string {
     $e = strtolower(trim($e));
-    return filter_var($e, FILTER_VALIDATE_EMAIL) ? $e : '';
+    // 200 : la largeur de wsm_subscribers.email. MySQL strict refuserait plus
+    // long par une erreur 500 ; on refuse ici, poliment.
+    return strlen($e) <= 200 && filter_var($e, FILTER_VALIDATE_EMAIL) ? $e : '';
 }
 
 function wsm_mkt_lang(string $l): string {
@@ -183,10 +185,11 @@ function wsm_mkt_sms_stop_url(string $smsToken): string {
  *
  * @param array $in email, phone, name, lang, source, newsletter (bool), sms (bool),
  *                  ip, tekst_email, tekst_sms (le texte exact des cases)
- * @return array{ok:bool, blad:string, potwierdzenie:bool, sms:bool}
+ * @return array{ok:bool, blad:string, potwierdzenie:bool, sms:bool, sms_potwierdzenie:bool}
+ *         sms = consentement SMS actif ; sms_potwierdzenie = SMS de confirmation parti
  */
 function wsm_mkt_subscribe(PDO $pdo, array $in): array {
-    $out = ['ok' => false, 'blad' => '', 'potwierdzenie' => false, 'sms' => false];
+    $out = ['ok' => false, 'blad' => '', 'potwierdzenie' => false, 'sms' => false, 'sms_potwierdzenie' => false];
     $email = wsm_mkt_email_norm((string) ($in['email'] ?? ''));
     if ($email === '') { $out['blad'] = 'email'; return $out; }
     $chceNl  = !empty($in['newsletter']);
@@ -209,7 +212,9 @@ function wsm_mkt_subscribe(PDO $pdo, array $in): array {
     $set = ['lang' => $lang, 'updated_at' => $now];
     $nom = trim((string) ($in['name'] ?? ''));
     if ($nom !== '' && trim((string) $cur['name']) === '') $set['name'] = mb_substr($nom, 0, 120);
-    if ($tel !== '') $set['phone'] = $tel;
+    // Le numéro ne change QU'AVEC la case SMS : sinon n'importe qui, en tapant
+    // l'adresse d'un autre, déplacerait son consentement SMS vers un numéro.
+    if ($chceSms) $set['phone'] = $tel;
 
     // --- E-mail : double opt-in ---------------------------------------------
     $envoyer = false;
@@ -224,20 +229,94 @@ function wsm_mkt_subscribe(PDO $pdo, array $in): array {
             $envoyer = true;
         }
     }
-    // --- SMS : la case suffit, avec le numéro --------------------------------
+    // --- SMS ------------------------------------------------------------------
+    //  À la caisse, le numéro est celui de la livraison : la case suffit. Au
+    //  pied de page, n'importe qui peut taper n'importe quel numéro : le
+    //  consentement attend que le TÉLÉPHONE ouvre le lien reçu par SMS.
+    $smsPotw = false;
     if ($chceSms) {
-        $set += ['sms_status' => 'aktywny', 'sms_zgoda_at' => $now, 'sms_wypis_at' => null,
+        $deja = (string) $cur['sms_status'] === 'aktywny' && (string) $cur['phone'] === $tel;
+        $direct = $src === 'kasa' || $deja;
+        $set += ['sms_status' => $direct ? 'aktywny' : 'oczekuje', 'sms_zgoda_at' => $now, 'sms_wypis_at' => null,
                  'sms_zgoda_tekst' => mb_substr((string) ($in['tekst_sms'] ?? ''), 0, 500)];
         if ((string) $cur['sms_token'] === '') $set['sms_token'] = wsm_mkt_sms_token($pdo);
-        $out['sms'] = true;
+        $out['sms'] = $direct;
+        $smsPotw = !$direct;
     }
     $cols = implode(', ', array_map(fn($k) => "$k = ?", array_keys($set)));
     $pdo->prepare("UPDATE wsm_subscribers SET $cols WHERE id = ?")->execute([...array_values($set), $id]);
     wsm_mkt_event($pdo, 'zapis', $src, $email);
 
     if ($envoyer) $out['potwierdzenie'] = wsm_mkt_send_confirmation($pdo, $email, $lang, (string) $set['token']);
+    if ($smsPotw) $out['sms_potwierdzenie'] = wsm_mkt_send_sms_confirmation($pdo, $tel,
+        (string) ($set['sms_token'] ?? $cur['sms_token']), $lang);
     $out['ok'] = true;
     return $out;
+}
+
+/**
+ * Le SMS « confirmez » du pied de page : un lien court, ouvert sur le
+ * téléphone, prouve que le numéro est bien à la personne. Un seul par numéro
+ * et par jour (un SMS se paie, et personne ne doit pouvoir en faire pleuvoir
+ * sur un tiers). Il part tout de suite : la personne l'attend.
+ */
+function wsm_mkt_send_sms_confirmation(PDO $pdo, string $tel, string $smsToken, string $lang): bool {
+    $f = __DIR__ . '/smsapi.php';
+    if (!is_file($f)) return false;
+    require_once $f;
+    if (!wsm_sms_enabled() || $smsToken === '' || !wsm_mkt_hote_ok()) return false;
+    $q = $pdo->prepare("SELECT COUNT(*) FROM wsm_sms WHERE phone = ? AND event_key LIKE 'smspotw-%' AND created_at >= ?");
+    $q->execute([$tel, date('Y-m-d H:i:s', time() - 86400)]);
+    if ((int) $q->fetchColumn() > 0) return false;
+    $texte = wsm_sms_ascii(str_replace(['{sklep}', '{link}'], [wsm_brand_name(), wsm_mkt_sms_stop_url($smsToken)],
+        wsm_mkt_t($pdo, $lang, 'nl.sms_confirm_sms', '{sklep}: potwierdz zgode na SMS-y z ofertami: {link}')));
+    // test = 1 : un message de service, hors campagnes et hors pompe (la pompe
+    // l'écarterait : le numéro n'a pas encore de consentement actif).
+    $pdo->prepare("INSERT INTO wsm_sms (campaign_id, phone, tresc, czesci, status, test, actor, event_key, created_at)
+                   VALUES (NULL,?,?,?,'kolejka',1,'zapis',?,?)")
+        ->execute([$tel, $texte, wsm_sms_parts($texte)['czesci'], 'smspotw-' . bin2hex(random_bytes(8)), date('Y-m-d H:i:s')]);
+    return wsm_sms_envoyer_ligne($pdo, (int) $pdo->lastInsertId())['ok'];
+}
+
+/**
+ * Le lien du SMS de confirmation a été ouvert, et le bouton pressé.
+ * @return bool le numéro a maintenant un consentement actif
+ */
+function wsm_mkt_sms_confirm(PDO $pdo, string $smsToken): bool {
+    $st = $pdo->prepare("SELECT * FROM wsm_subscribers WHERE sms_token = ? AND sms_token <> ''");
+    $st->execute([$smsToken]);
+    $r = $st->fetch();
+    if (!$r || (string) $r['sms_status'] !== 'oczekuje' || (string) $r['phone'] === '') return false;
+    if (strtotime((string) $r['sms_zgoda_at']) < time() - WSM_MKT_POTW_J * 86400) return false;
+    $now = date('Y-m-d H:i:s');
+    $pdo->prepare("UPDATE wsm_subscribers SET sms_status = 'aktywny', sms_zgoda_at = ?, updated_at = ? WHERE id = ?")
+        ->execute([$now, $now, (int) $r['id']]);
+    wsm_mkt_event($pdo, 'potwierdzenie_sms', (string) $r['source'], (string) $r['phone']);
+    return true;
+}
+
+/**
+ * L'adresse du lien envoyé est-elle sûre ? Sans « Publiczny adres sklepu », les
+ * liens prennent l'hôte de la requête ; un en-tête Host forgé ferait alors
+ * partir de NOTRE domaine un message pointant ailleurs. On n'accepte que
+ * l'adresse configurée, l'adresse IP du serveur ou la machine locale.
+ */
+function wsm_mkt_hote_ok(): bool {
+    if ((string) (wsm_config()['shop_url'] ?? '') !== '') return true;
+    $hote = strtolower((string) preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+    $hote = trim($hote, '[]');
+    return $hote !== '' && in_array($hote, array_filter(['localhost', '127.0.0.1', '::1',
+        strtolower((string) ($_SERVER['SERVER_ADDR'] ?? ''))]), true);
+}
+
+/** « Publiczny adres sklepu » est-il réglé ? Sans lui, pas de campagne : ses liens et ses accusés en dépendent. */
+function wsm_mkt_adres_ok(): bool {
+    return (string) (wsm_config()['shop_url'] ?? '') !== '';
+}
+
+/** Envoyer une campagne, supprimer une fiche, exporter le registre : l'administration seulement. */
+function wsm_mkt_decide(?array $me): bool {
+    return function_exists('wsm_role_de') && in_array(wsm_role_de($me), [WSM_ROLE_SUPERADMIN, WSM_ROLE_ADMIN], true);
 }
 
 /** Un jeton court et unique pour le lien SMS (8 caractères sans ambiguïté). */
@@ -255,6 +334,7 @@ function wsm_mkt_sms_token(PDO $pdo): string {
 
 /** L'e-mail « confirmez votre inscription » — en file, et tenté tout de suite. */
 function wsm_mkt_send_confirmation(PDO $pdo, string $email, string $lang, string $token): bool {
+    if (!wsm_mkt_hote_ok()) return false;
     $lien = wsm_shop_base_url() . '/newsletter/potwierdz?t=' . $token;
     $sujet = wsm_mkt_t($pdo, $lang, 'nl.confirm_subject', 'Potwierdź zapis do newslettera');
     $corps = str_replace(['{link}', '{sklep}'], [$lien, wsm_brand_name()],
@@ -323,10 +403,17 @@ function wsm_mkt_unsub_email(PDO $pdo, string $email, string $ref = ''): bool {
 /** Ne plus envoyer de SMS à ce jeton (lien court) ou à ce numéro. */
 function wsm_mkt_unsub_sms(PDO $pdo, string $tokenOuNumero, string $ref = ''): bool {
     $tel = wsm_mkt_phone($tokenOuNumero);
-    $st = $tel !== ''
-        ? $pdo->prepare("SELECT * FROM wsm_subscribers WHERE phone = ?")
-        : $pdo->prepare("SELECT * FROM wsm_subscribers WHERE sms_token = ? AND sms_token <> ''");
-    $st->execute([$tel !== '' ? $tel : $tokenOuNumero]);
+    if ($tel === '') {
+        // Un jeton : on retrouve SON numéro, puis toutes les fiches qui le
+        // portent — le public dédoublonne par numéro, une seule fiche oubliée
+        // suffirait à faire repartir le SMS.
+        $q = $pdo->prepare("SELECT phone FROM wsm_subscribers WHERE sms_token = ? AND sms_token <> ''");
+        $q->execute([$tokenOuNumero]);
+        $tel = (string) $q->fetchColumn();
+        if ($tel === '') return false;
+    }
+    $st = $pdo->prepare("SELECT * FROM wsm_subscribers WHERE phone = ?");
+    $st->execute([$tel]);
     $lignes = $st->fetchAll();
     if (!$lignes) return false;
     $now = date('Y-m-d H:i:s');
@@ -494,24 +581,50 @@ function wsm_mkt_pump(PDO $pdo, int $maxMail = 20, int $maxSms = 20, float $budg
             $out['uwagi'][] = 'poczta nieskonfigurowana — wiadomości czekają w kolejce';
         } else {
             $ou = implode(' OR ', array_map(fn($p) => 'event_key LIKE ' . $pdo->quote($p . '%'), WSM_MKT_POMPE_CLES));
-            $st = $pdo->prepare("SELECT id FROM wsm_messages WHERE direction = 'wyjscie' AND status = 'kolejka'
+            $st = $pdo->prepare("SELECT id, email, event_key FROM wsm_messages WHERE direction = 'wyjscie' AND status = 'kolejka'
                                     AND ($ou) AND created_at >= ? ORDER BY id LIMIT " . max(1, min(200, $maxMail)));
             $st->execute([date('Y-m-d H:i:s', time() - WSM_MKT_POMPE_AGE_J * 86400)]);
-            $suite = 0;
+            // Le refus se relit AU DÉPART : une newsletter peut attendre des
+            // jours en file, et qui s'est désinscrit (ou a fait effacer ses
+            // données) entre-temps ne doit plus la recevoir. Seule la
+            // confirmation d'inscription passe : elle répond à une demande.
+            $refus = wsm_mkt_refus($pdo);
+            $saute = $pdo->prepare("UPDATE wsm_messages SET status = 'pominieta', error = 'wypisany przed wysyłką'
+                                     WHERE id = ? AND status = 'kolejka'");
             // Chaque ligne est PRISE avant l'envoi : deux pompes en même temps
             // (deux écrans ouverts, l'écran et la tâche planifiée) ne
             // l'enverront jamais deux fois. Une ligne restée « wysylanie »
             // après une panne n'est pas renvoyée : un doublon vaut moins
             // qu'un oubli visible dans Poczta.
             $prise = $pdo->prepare("UPDATE wsm_messages SET status = 'wysylanie' WHERE id = ? AND status = 'kolejka'");
-            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            $serie = [];
+            foreach ($st->fetchAll() as $m) {
                 if (microtime(true) - $debut > $budget) break;
-                $prise->execute([(int) $id]);
+                $id = (int) $m['id'];
+                if (!str_starts_with((string) $m['event_key'], 'nlpotw-') && isset($refus[strtolower((string) $m['email'])])) {
+                    $saute->execute([$id]);
+                    continue;
+                }
+                $prise->execute([$id]);
                 if ($prise->rowCount() !== 1) continue;
-                try { [$ok] = wsm_mail_send($pdo, (int) $id); }
-                catch (Throwable $e) { wsm_mail_mark($pdo, (int) $id, 'blad', $e->getMessage()); $ok = false; }
-                if ($ok) { $out['mail']++; $suite = 0; }
-                else { $out['mail_bledy']++; if (++$suite >= 3) { $out['uwagi'][] = 'serwer poczty nie odpowiada — wstrzymano'; break; } }
+                try { [$ok, $err] = wsm_mail_send($pdo, $id); }
+                catch (Throwable $e) { $err = $e->getMessage(); wsm_mail_mark($pdo, $id, 'blad', $err); $ok = false; }
+                if ($ok) { $out['mail']++; $serie = []; continue; }
+                $out['mail_bledy']++;
+                // Une adresse refusée est l'affaire de CE message : elle reste
+                // en erreur et ne compte pas comme une panne du serveur.
+                if (preg_match('/odbiorca odrzucony|adres odbiorcy|wiadomość odrzucona/u', (string) $err)) continue;
+                $serie[] = $id;
+                if (count($serie) >= 3) {
+                    // Trois échecs de suite : c'est le serveur, pas les
+                    // adresses. Ces trois-là retournent en file (sinon une
+                    // panne marquerait toute la campagne en erreur, trois
+                    // lignes par minute) et la pompe s'arrête.
+                    $ph = implode(',', array_fill(0, count($serie), '?'));
+                    $pdo->prepare("UPDATE wsm_messages SET status = 'kolejka' WHERE status = 'blad' AND id IN ($ph)")->execute($serie);
+                    $out['uwagi'][] = 'serwer poczty nie odpowiada — wstrzymano, wiadomości czekają w kolejce';
+                    break;
+                }
             }
         }
     }

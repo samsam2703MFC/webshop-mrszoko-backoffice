@@ -345,6 +345,30 @@ function wsm_nl_send(PDO $pdo, int $id, string $actor): array {
     if (!$nl) return [0, 'Nie znaleziono newslettera.'];
     if ((string) $nl['status'] !== 'szkic') return [0, 'Ten newsletter już wyszedł.'];
     if (!$nl['bloki'] || trim((string) $nl['temat']) === '') return [0, 'Uzupełnij temat i dodaj przynajmniej jeden blok.'];
+    // PRISE de l'édition : un double clic ne la met pas en file deux fois.
+    $prise = $pdo->prepare("UPDATE wsm_newsletters SET status = 'wysylanie' WHERE id = ? AND status = 'szkic'");
+    $prise->execute([$id]);
+    if ($prise->rowCount() !== 1) return [0, 'Ten newsletter właśnie wychodzi.'];
+    try {
+        return wsm_nl_enfiler($pdo, $nl, $id, $actor);
+    } catch (Throwable $e) {
+        $pdo->prepare("UPDATE wsm_newsletters SET status = 'szkic' WHERE id = ? AND status = 'wysylanie'")->execute([$id]);
+        return [0, 'Wysyłka przerwana: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * La clé d'un message de newsletter. wsm_messages.event_key fait 100
+ * caractères : une adresse longue y entre par son empreinte (MySQL strict
+ * aurait refusé la ligne, et la personne n'aurait rien reçu).
+ */
+function wsm_nl_event_key(int $id, string $email): string {
+    $k = 'nl-' . $id . '-' . $email;
+    return strlen($k) <= 100 ? $k : 'nl-' . $id . '-h' . sha1($email);
+}
+
+/** La mise en file elle-même, une fois l'édition prise. */
+function wsm_nl_enfiler(PDO $pdo, array $nl, int $id, string $actor): array {
     [$code, $uwaga] = wsm_mkt_link($pdo, 'nl' . $id, 'Newsletter: ' . (string) $nl['nazwa'], (string) $nl['kod']);
     $pdo->prepare("UPDATE wsm_newsletters SET link_code = ? WHERE id = ?")->execute([$code, $id]);
     $n = 0;
@@ -353,7 +377,7 @@ function wsm_nl_send(PDO $pdo, int $id, string $actor): array {
         $mid = wsm_mail_queue($pdo, [
             'email' => $d['email'], 'direction' => 'wyjscie', 'subject' => $r['temat'], 'body' => $r['tekst'],
             'html' => $r['html'], 'unsub_url' => wsm_mkt_unsub_oneclick($d['email'], 'nl:' . $id),
-            'template_code' => 'newsletter', 'event_key' => 'nl-' . $id . '-' . $d['email'], 'actor' => $actor ?: 'newsletter',
+            'template_code' => 'newsletter', 'event_key' => wsm_nl_event_key($id, $d['email']), 'actor' => $actor ?: 'newsletter',
         ]);
         if ($mid > 0) $n++;
     }

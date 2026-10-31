@@ -199,20 +199,29 @@ function layout_footer(array $S, string $lang = ''): void {
 <?php
 }
 
+/** Le texte exact des deux cases, tel qu'affiché : la preuve de l'accord. */
+function nl_textes_zgody(array $S): array {
+    $marque = (string) ($S['brand'] ?? '');
+    return [str_replace('{sklep}', $marque, (string) ($S['nl.consent_email'] ?? '')),
+            str_replace('{sklep}', $marque, (string) ($S['nl.consent_sms'] ?? ''))];
+}
+
 /**
  * LE FORMULAIRE D'INSCRIPTION (newsletter, et SMS en option).
  *
- * Deux cases, jamais cochées d'avance : l'accord se donne (RODO pour l'e-mail,
- * art. 398 Prawo komunikacji elektronicznej pour le SMS). Le texte exact des
- * cases part avec le formulaire et devient la PREUVE de l'accord (marketing.php).
- * Même piège et même horodatage signé que le formulaire de contact.
+ * Deux cases, jamais cochées d'avance : l'accord se donne (art. 398 Prawo
+ * komunikacji elektronicznej). Le texte exact des cases est la PREUVE de
+ * l'accord : le serveur le recompose (nl_textes_zgody), il ne vient pas du
+ * navigateur. La case SMS n'apparaît que si SMSAPI marche : le numéro se
+ * confirme par un lien reçu par SMS. Même piège et même horodatage signé que
+ * le formulaire de contact.
  */
 function nl_form(array $S, array $v = [], array $err = []): void {
     global $WSM_API_DIR;
     if (!function_exists('wsm_contact_stamp')) require_once $WSM_API_DIR . '/contact.php';
-    $marque = (string) ($S['brand'] ?? '');
-    $zNl  = str_replace('{sklep}', $marque, (string) ($S['nl.consent_email'] ?? ''));
-    $zSms = str_replace('{sklep}', $marque, (string) ($S['nl.consent_sms'] ?? ''));
+    [$zNl, $zSms] = nl_textes_zgody($S);
+    if (!function_exists('wsm_sms_enabled')) { require_once $WSM_API_DIR . '/marketing.php'; require_once $WSM_API_DIR . '/smsapi.php'; }
+    $sms = wsm_sms_enabled();
     $id = 'nl' . substr(md5((string) mt_rand()), 0, 4);
     ?>
     <form class="nl-form" method="post" action="<?= e(u('newsletter')) ?>" novalidate>
@@ -228,15 +237,15 @@ function nl_form(array $S, array $v = [], array $err = []): void {
       </div>
       <label class="nl-check"><input type="checkbox" name="zgoda_nl" value="1"<?= !empty($v['zgoda_nl']) ? ' checked' : '' ?>>
         <span><?= e($zNl) ?></span></label>
-      <input type="hidden" name="tekst_nl" value="<?= e($zNl) ?>">
+      <?php if ($sms): ?>
       <label class="nl-check"><input type="checkbox" name="zgoda_sms" value="1"<?= !empty($v['zgoda_sms']) ? ' checked' : '' ?>>
         <span><?= e($zSms) ?></span></label>
-      <input type="hidden" name="tekst_sms" value="<?= e($zSms) ?>">
       <div class="nl-tel">
         <label for="<?= $id ?>-t"><?= e($S['nl.phone'] ?? '') ?></label>
         <input id="<?= $id ?>-t" name="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel"
                placeholder="600 100 200" value="<?= e((string) ($v['phone'] ?? '')) ?>"<?= isset($err['phone']) ? ' aria-invalid="true"' : '' ?>>
       </div>
+      <?php endif; ?>
       <?php foreach ($err as $m): ?><small class="err"><?= e($m) ?></small><?php endforeach; ?>
     </form>
     <?php

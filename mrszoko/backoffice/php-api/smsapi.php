@@ -86,13 +86,19 @@ function wsm_sms_http(string $method, string $path, array $params = []): array {
             CURLOPT_CUSTOMREQUEST  => $method,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $c['token']],
+            CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_POSTFIELDS     => $method === 'GET' ? null : http_build_query($params),
         ]);
         $res = curl_exec($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $joint = (float) curl_getinfo($ch, CURLINFO_CONNECT_TIME) > 0;
         curl_close($ch);
-        if (!($res === false || $code >= 500) || $i === count($hosts) - 1) break;
+        // Le repli ne rejoue QUE ce qui n'a pas pu arriver : serveur injoignable,
+        // ou passerelle qui dit ne pas avoir transmis (502/503/504). Une réponse
+        // perdue APRÈS la connexion peut cacher un SMS déjà parti (et payé).
+        $rejouable = ($res === false && !$joint) || in_array($code, [502, 503, 504], true) || ($method === 'GET' && $res === false);
+        if (!$rejouable || $i === count($hosts) - 1) break;
     }
     return [$res === false ? 0 : $code, json_decode((string) $res, true), $hote];
 }
@@ -195,13 +201,20 @@ function wsm_sms_raport_url(): string {
 
 /**
  * Envoie UN SMS. Aucune exception ne remonte.
- * @return array{ok:bool, sid:string, error:string}
+ *
+ * $idx : l'identifiant de NOTRE ligne. Avec check_idx, SMSAPI refuse un second
+ * SMS portant le même dans les 24 h : un renvoi après une réponse perdue ne
+ * se paie pas deux fois.
+ *
+ * @return array{ok:bool, sid:string, error:string, panne:bool}
+ *         panne = le compte ou le réseau, pas ce SMS (crédit, jeton, nadawca,
+ *         pas de réponse) : la ligne doit attendre, pas échouer.
  */
-function wsm_sms_send_raw(string $to, string $text, bool $raport = true): array {
-    if (!wsm_sms_enabled()) return ['ok' => false, 'sid' => '', 'error' => 'SMSAPI nieskonfigurowane'];
+function wsm_sms_send_raw(string $to, string $text, bool $raport = true, string $idx = ''): array {
+    if (!wsm_sms_enabled()) return ['ok' => false, 'sid' => '', 'error' => 'SMSAPI nieskonfigurowane', 'panne' => true];
     $num = wsm_mkt_phone($to);
-    if ($num === '') return ['ok' => false, 'sid' => '', 'error' => 'nieprawidłowy numer'];
-    if (trim($text) === '') return ['ok' => false, 'sid' => '', 'error' => 'pusta treść'];
+    if ($num === '') return ['ok' => false, 'sid' => '', 'error' => 'nieprawidłowy numer', 'panne' => false];
+    if (trim($text) === '') return ['ok' => false, 'sid' => '', 'error' => 'pusta treść', 'panne' => false];
     $p = [
         'to'       => ltrim($num, '+'),            // SMSAPI : sans le « + »
         'from'     => wsm_sms_cfg()['nadawca'],
@@ -211,16 +224,20 @@ function wsm_sms_send_raw(string $to, string $text, bool $raport = true): array 
         'encoding' => 'utf-8',
     ];
     if ($raport && preg_match('#^https://#', wsm_sms_raport_url())) $p['notify_url'] = wsm_sms_raport_url();
+    if ($idx !== '') { $p['idx'] = $idx; $p['check_idx'] = 1; }
     try {
         [$code, $res, $hote] = wsm_sms_call('POST', '/sms.do', $p);
     } catch (Throwable $e) {
-        return ['ok' => false, 'sid' => '', 'error' => 'błąd: ' . $e->getMessage()];
+        return ['ok' => false, 'sid' => '', 'error' => 'błąd: ' . $e->getMessage(), 'panne' => true];
     }
     // SMSAPI répond 200 même pour un refus : c'est « error » qui fait foi.
     if (!is_array($res) || isset($res['error']) || $code < 200 || $code >= 300) {
-        return ['ok' => false, 'sid' => '', 'error' => wsm_sms_err($res, $code, $hote)];
+        $kod = is_array($res) ? (int) ($res['error'] ?? 0) : 0;
+        // 101/102 jeton, 103 crédit, 14 expéditeur non validé : tout le compte est arrêté.
+        $panne = $code === 0 || $code >= 500 || in_array($kod, [101, 102, 103, 14], true);
+        return ['ok' => false, 'sid' => '', 'error' => wsm_sms_err($res, $code, $hote), 'panne' => $panne];
     }
-    return ['ok' => true, 'sid' => (string) ($res['list'][0]['id'] ?? ''), 'error' => ''];
+    return ['ok' => true, 'sid' => (string) ($res['list'][0]['id'] ?? ''), 'error' => '', 'panne' => false];
 }
 
 /**
@@ -351,6 +368,23 @@ function wsm_sms_camp_send(PDO $pdo, int $id, string $actor): array {
     $c = wsm_sms_camp_get($pdo, $id);
     if (!$c) return [0, 'Nie znaleziono kampanii.'];
     if ((string) $c['status'] !== 'szkic') return [0, 'Ta kampania już wyszła.'];
+    // PRISE de la campagne : un double clic ou deux onglets ne la mettent
+    // pas en file deux fois, et le second n'écrase pas les chiffres du premier.
+    $prise = $pdo->prepare("UPDATE wsm_sms_campaigns SET status = 'wysylanie' WHERE id = ? AND status = 'szkic'");
+    $prise->execute([$id]);
+    if ($prise->rowCount() !== 1) return [0, 'Ta kampania właśnie wychodzi.'];
+    try {
+        return wsm_sms_camp_enfiler($pdo, $c, $id, $actor);
+    } catch (Throwable $e) {
+        // Rien n'est perdu : les lignes déjà en file ont une clé unique, un
+        // nouvel envoi mettra seulement les autres.
+        $pdo->prepare("UPDATE wsm_sms_campaigns SET status = 'szkic' WHERE id = ? AND status = 'wysylanie'")->execute([$id]);
+        return [0, 'Wysyłka przerwana: ' . $e->getMessage()];
+    }
+}
+
+/** La mise en file elle-même, une fois la campagne prise. */
+function wsm_sms_camp_enfiler(PDO $pdo, array $c, int $id, string $actor): array {
     [$code, $uwaga] = wsm_mkt_link($pdo, 's' . $id, 'SMS: ' . (string) $c['nazwa'], (string) $c['kod']);
     $pdo->prepare("UPDATE wsm_sms_campaigns SET link_code = ? WHERE id = ?")->execute([$code, $id]);
     $c['link_code'] = $code;
@@ -385,11 +419,14 @@ function wsm_sms_envoyer_ligne(PDO $pdo, int $rid): array {
     $prise = $pdo->prepare("UPDATE wsm_sms SET status = 'wysylanie' WHERE id = ? AND status = 'kolejka'");
     $prise->execute([$rid]);
     if ($prise->rowCount() !== 1) return ['ok' => false, 'error' => 'nie ma w kolejce'];
-    try { $res = wsm_sms_send_raw((string) $r['phone'], (string) $r['tresc'], !(int) $r['test']); }
-    catch (Throwable $e) { $res = ['ok' => false, 'sid' => '', 'error' => $e->getMessage()]; }
+    try { $res = wsm_sms_send_raw((string) $r['phone'], (string) $r['tresc'], !(int) $r['test'], 'wsm' . $rid); }
+    catch (Throwable $e) { $res = ['ok' => false, 'sid' => '', 'error' => $e->getMessage(), 'panne' => true]; }
+    // Une panne du compte ou du réseau n'est pas la faute de CE SMS : il
+    // retourne en file (campagne) au lieu d'échouer pour toujours.
+    $statut = $res['ok'] ? 'wyslany' : (!empty($res['panne']) && !(int) $r['test'] ? 'kolejka' : 'blad');
     $pdo->prepare("UPDATE wsm_sms SET status = ?, sms_id = ?, error = ?, sent_at = ?, raport = ? WHERE id = ?")
-        ->execute([$res['ok'] ? 'wyslany' : 'blad', mb_substr($res['sid'], 0, 40), mb_substr($res['error'], 0, 250),
-                   date('Y-m-d H:i:s'), $res['ok'] && $res['sid'] !== '' ? 'QUEUE' : '', $rid]);
+        ->execute([$statut, mb_substr($res['sid'], 0, 40), mb_substr($res['error'], 0, 250),
+                   $res['ok'] ? date('Y-m-d H:i:s') : null, $res['ok'] && $res['sid'] !== '' ? 'QUEUE' : '', $rid]);
     return $res;
 }
 
@@ -419,6 +456,7 @@ function wsm_sms_pump(PDO $pdo, int $max = 20, float $budget = 8.0): array {
         }
         $res = wsm_sms_envoyer_ligne($pdo, (int) $r['id']);
         if ($res['ok']) { $ok++; $suite = 0; }
+        elseif (!empty($res['panne'])) return ['wyslane' => $ok, 'uwaga' => 'SMSAPI nie przyjmuje (SMS-y czekają w kolejce): ' . $res['error']];
         elseif (++$suite >= 3) return ['wyslane' => $ok, 'uwaga' => 'SMSAPI nie przyjmuje: ' . $res['error']];
     }
     return ['wyslane' => $ok, 'uwaga' => ''];
@@ -471,7 +509,10 @@ function wsm_sms_camp_list(PDO $pdo): array {
             if ((string) $r['raport'] === 'DELIVERED') $s['dostarczone'] += (int) $r['n'];
             elseif (in_array((string) $r['raport'], WSM_SMS_FINAUX, true)) $s['niedostarczone'] += (int) $r['n'];
         }
-        $out[] = $c + ['stat' => $s, 'koszt' => (int) $c['czesci'] * wsm_sms_cfg()['cena'],
+        // Le coût, c'est ce qui est PARTI (pas les ignorés, les échecs, la file).
+        $q = $pdo->prepare("SELECT COALESCE(SUM(czesci), 0) FROM wsm_sms WHERE campaign_id = ? AND test = 0 AND status = 'wyslany'");
+        $q->execute([(int) $c['id']]);
+        $out[] = $c + ['stat' => $s, 'koszt' => (int) $q->fetchColumn() * wsm_sms_cfg()['cena'],
                        'link' => wsm_mkt_link_stats($pdo, (string) $c['link_code']),
                        'wypisy' => wsm_mkt_wypisy($pdo, 'sms:' . (int) $c['id'])];
     }

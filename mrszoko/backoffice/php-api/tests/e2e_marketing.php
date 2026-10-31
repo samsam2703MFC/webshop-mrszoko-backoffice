@@ -42,7 +42,9 @@ echo "webshop_mrszoko — end-to-end marketing (newsletter, SMS, AI)\n\n";
 $sfx = substr(bin2hex(random_bytes(4)), 0, 8);
 $avant = ['smsapi' => wsm_config()['smsapi'] ?? [], 'mail' => wsm_config()['mail'] ?? [],
           'anthropic_api_key' => wsm_config()['anthropic_api_key'] ?? '',
-          'bez_zgody' => !empty(wsm_config()['marketing']['klienci_bez_zgody'])];
+          'bez_zgody' => !empty(wsm_config()['marketing']['klienci_bez_zgody']),
+          'shop_url' => (string) (wsm_config()['shop_url'] ?? '')];
+wsm_config_overlay(['shop_url' => 'https://sklep.example/mrszoko/shop']);
 $_SERVER['HTTP_HOST'] = 'sklep.example';
 $_SERVER['REQUEST_URI'] = '/mrszoko/backoffice/newsletter.php';
 $mail = fn(string $t) => "$t.$sfx@example.com";
@@ -72,7 +74,7 @@ register_shutdown_function(function () use ($pdo, $sfx, $avant) {
     wsm_config_overlay(['smsapi' => array_replace(['token' => '', 'nadawca' => '', 'region' => '', 'cena' => ''], $avant['smsapi']),
                         'mail' => array_replace(['from' => '', 'transport' => ''], $avant['mail']),
                         'anthropic_api_key' => $avant['anthropic_api_key'],
-                        'marketing' => ['klienci_bez_zgody' => $avant['bez_zgody']]]);
+                        'marketing' => ['klienci_bez_zgody' => $avant['bez_zgody']], 'shop_url' => $avant['shop_url']]);
     wsm_sms_teraz(-1);
 });
 
@@ -115,8 +117,29 @@ ok('SMS sans numéro : refusé', wsm_mkt_subscribe($pdo, ['email' => $e3, 'sms' 
 ok('SMS avec un fixe : refusé', wsm_mkt_subscribe($pdo, ['email' => $e3, 'sms' => true, 'phone' => '22 123 45 67'])['blad'] === 'telefon');
 $r = wsm_mkt_subscribe($pdo, ['email' => $e3, 'sms' => true, 'phone' => '690 000 001', 'tekst_sms' => 'SMS tak', 'name' => 'Ola']);
 $s3 = wsm_mkt_sub_by_email($pdo, $e3);
-ok('case SMS + mobile : SMS actif tout de suite, jeton court', $r['sms'] && $s3['sms_status'] === 'aktywny' && strlen($s3['sms_token']) === 8 && $s3['sms_zgoda_tekst'] === 'SMS tak');
+ok('pied de page, case SMS : en ATTENTE tant que le téléphone n\'a pas confirmé', !$r['sms'] && $s3['sms_status'] === 'oczekuje' && strlen($s3['sms_token']) === 8 && $s3['sms_zgoda_tekst'] === 'SMS tak');
 ok('… mais l\'e-mail n\'est pas inscrit pour autant', $s3['email_status'] === '');
+ok('un jeton SMS inventé ne confirme rien', !wsm_mkt_sms_confirm($pdo, 'zzzzzzzz'));
+ok('le lien du SMS ouvert et le bouton pressé : consentement actif', wsm_mkt_sms_confirm($pdo, (string) $s3['sms_token'])
+   && wsm_mkt_sub_by_email($pdo, $e3)['sms_status'] === 'aktywny');
+ok('… et une seule fois', !wsm_mkt_sms_confirm($pdo, (string) $s3['sms_token']));
+wsm_mkt_subscribe($pdo, ['email' => $e3, 'newsletter' => true, 'phone' => '690 000 009']);
+ok('cocher la newsletter seule ne DÉPLACE PAS le consentement SMS vers un autre numéro',
+   wsm_mkt_sub_by_email($pdo, $e3)['phone'] === '+48690000001' && wsm_mkt_sub_by_email($pdo, $e3)['sms_status'] === 'aktywny');
+$rk = wsm_mkt_subscribe($pdo, ['email' => $mail('kasa'), 'sms' => true, 'phone' => '690 000 005', 'source' => 'kasa']);
+ok('à la caisse (numéro de livraison) : SMS actif tout de suite', $rk['sms'] && wsm_mkt_sub_by_email($pdo, $mail('kasa'))['sms_status'] === 'aktywny');
+// L'adresse des liens : sans « Publiczny adres sklepu », un en-tête Host forgé
+// ne doit pas faire partir de chez nous un lien vers ailleurs.
+wsm_config_overlay(['shop_url' => '']);
+$_SERVER['HTTP_HOST'] = 'evil.example'; $_SERVER['SERVER_ADDR'] = '192.0.2.10';
+$rx = wsm_mkt_subscribe($pdo, ['email' => $mail('host'), 'newsletter' => true]);
+ok('Host forgé, pas d\'adresse configurée : aucune confirmation ne part', !wsm_mkt_hote_ok() && $rx['ok'] && !$rx['potwierdzenie']);
+$_SERVER['HTTP_HOST'] = '192.0.2.10:443';
+ok('… l\'adresse IP du serveur, elle, est acceptée', wsm_mkt_hote_ok());
+$_SERVER['HTTP_HOST'] = 'sklep.example'; unset($_SERVER['SERVER_ADDR']);
+wsm_config_overlay(['shop_url' => 'https://sklep.example/mrszoko/shop']);
+ok('une adresse de plus de 200 caractères est refusée (la colonne MySQL en fait 200)',
+   wsm_mkt_email_norm(str_repeat('a', 64) . '@' . str_repeat('b', 63) . '.' . str_repeat('c', 63) . '.' . str_repeat('d', 10) . '.pl') === '');
 ok('sans aucune case : refusé', wsm_mkt_subscribe($pdo, ['email' => $mail('rien')])['blad'] === 'zgoda');
 
 // ---- 2. Les publics ----------------------------------------------------------------------------
@@ -143,7 +166,7 @@ ok('« klienci » : les acheteurs seuls', isset($adr('klienci')[$eB]) && !isset(
 $sms = array_column(wsm_mkt_audience_sms($pdo, 'wszyscy'), null, 'phone');
 ok('SMS : seulement la case SMS', isset($sms['+48690000001']) && !in_array($e1, array_column($sms, 'email'), true));
 ok('SMS « klienci » : l\'inscrit SMS qui n\'a jamais acheté n\'y est pas', !isset(array_column(wsm_mkt_audience_sms($pdo, 'klienci'), null, 'phone')['+48690000001']));
-wsm_mkt_subscribe($pdo, ['email' => $mail('sms2'), 'sms' => true, 'phone' => '+48690000001']);
+wsm_mkt_subscribe($pdo, ['email' => $mail('sms2'), 'sms' => true, 'phone' => '+48690000001', 'source' => 'kasa']);
 ok('un numéro partagé par deux fiches : un seul SMS', count(array_filter(wsm_mkt_audience_sms($pdo, 'wszyscy'), fn($d) => $d['phone'] === '+48690000001')) === 1);
 
 // ---- 3. La sortie ------------------------------------------------------------------------------
@@ -188,11 +211,18 @@ ok('sans jeton : canal fermé, diag « zle » sans appel', !wsm_sms_enabled() &&
 ok('sans jeton : un envoi est refusé sans appel', !wsm_sms_send_raw('+48690000001', 'x')['ok'] && $appels === []);
 wsm_config_overlay(['smsapi' => ['token' => 'test-oauth-token', 'nadawca' => 'SzokoShop', 'region' => '', 'cena' => '0,20']]);
 ok('plateforme .pl par défaut (compte polonais)', wsm_sms_hosts()[0] === 'https://api.smsapi.pl' && wsm_sms_cfg()['cena'] === 20);
+wsm_config_overlay(['shop_url' => 'http://sklep.example/mrszoko/shop']);
 $r = wsm_sms_send_raw('600 100 200', 'Test ż');
+wsm_config_overlay(['shop_url' => 'https://sklep.example/mrszoko/shop']);
 $pp = $appels[0]['params'] ?? [];
 ok('ce qui part : numéro sans « + », expéditeur, UTF-8, JSON', $r['ok'] && $r['sid'] === 'MSG1' && ($pp['to'] ?? '') === '48600100200'
    && ($pp['from'] ?? '') === 'SzokoShop' && ($pp['encoding'] ?? '') === 'utf-8' && ($pp['format'] ?? '') === 'json' && $appels[0]['p'] === '/sms.do');
 ok('pas d\'adresse d\'accusé en http (SMSAPI exige https)', !isset($pp['notify_url']));
+wsm_sms_send_raw('600 100 200', 'Test', true, 'wsm42');
+$pp2 = $appels[1]['params'] ?? [];
+ok('en https : l\'adresse d\'accusé part ; et l\'identifiant de NOTRE ligne, que SMSAPI refuse deux fois (check_idx)',
+   str_starts_with((string) ($pp2['notify_url'] ?? ''), 'https://') && ($pp2['idx'] ?? '') === 'wsm42' && ($pp2['check_idx'] ?? 0) === 1);
+array_pop($appels);
 wsm_sms_transport(fn() => [200, ['error' => 101, 'message' => 'Authorization failed'], 'https://api.smsapi.pl']);
 $r = wsm_sms_send_raw('600 100 200', 'x');
 ok('SMSAPI répond 200 avec « error » : c\'est un refus, et il est expliqué', !$r['ok'] && str_contains($r['error'], 'kod 101') && str_contains($r['error'], 'OAuth'), $r['error']);
@@ -216,7 +246,7 @@ $pv = wsm_sms_camp_preview($pdo, $c);
 ok('l\'aperçu chiffre AVANT : destinataires, SMS, coût', $pv['odbiorcow'] >= 1 && $pv['czesci'] >= $pv['odbiorcow'] && $pv['koszt'] === $pv['czesci'] * 20);
 [$okT] = wsm_sms_camp_test($pdo, $cid, '690 000 009', 'test');
 ok('próbka : un SMS, tout de suite, marqué test', $okT && count($appels) === 1 && ($appels[0]['params']['to'] ?? '') === '48690000009');
-wsm_mkt_subscribe($pdo, ['email' => $mail('sms3'), 'sms' => true, 'phone' => '+48690000002']);
+wsm_mkt_subscribe($pdo, ['email' => $mail('sms3'), 'sms' => true, 'phone' => '+48690000002', 'source' => 'kasa']);
 [$n, $m] = wsm_sms_camp_send($pdo, $cid, 'test');
 ok('envoi : en file (rien n\'est parti encore), lien suivi créé', $n >= 2 && count($appels) === 1 && wsm_mkt_link_stats($pdo, 's' . $cid) !== null
    && (string) wsm_sms_camp_get($pdo, $cid)['link_code'] === 's' . $cid, [$n, $m]);
@@ -244,6 +274,48 @@ $pdo->prepare("UPDATE wsm_sms SET sms_id = ? WHERE phone = ? AND campaign_id = ?
 wsm_sms_raport($pdo, ['MsgId' => 'MSGSTOP', 'status' => '412', 'status_name' => 'STOP'], wsm_sms_raport_key());
 ok('« STOP » chez l\'opérateur : le numéro est désinscrit', (string) wsm_mkt_sub_by_email($pdo, $e3)['sms_status'] === 'wypisany');
 ok('… et la campagne qui l\'a provoqué est comptée', wsm_mkt_wypisy($pdo, 'sms:' . $cid) >= 1);
+
+// Le lien STOP d'une fiche vaut pour le NUMÉRO : deux fiches le partagent, le
+// public dédoublonne par numéro, une fiche oubliée suffirait à faire repartir le SMS.
+wsm_mkt_subscribe($pdo, ['email' => $mail('dzieli1'), 'sms' => true, 'phone' => '+48690000006', 'source' => 'kasa']);
+wsm_mkt_subscribe($pdo, ['email' => $mail('dzieli2'), 'sms' => true, 'phone' => '+48690000006', 'source' => 'kasa']);
+wsm_mkt_unsub_sms($pdo, (string) wsm_mkt_sub_by_email($pdo, $mail('dzieli1'))['sms_token']);
+ok('le lien STOP d\'une fiche désinscrit le numéro sur TOUTES ses fiches',
+   wsm_mkt_sub_by_email($pdo, $mail('dzieli2'))['sms_status'] === 'wypisany'
+   && !in_array('+48690000006', array_column(wsm_mkt_audience_sms($pdo, 'wszyscy'), 'phone'), true));
+
+// Le SMS de confirmation du pied de page : il part, il porte le lien, une fois par jour et par numéro.
+$appels = [];
+wsm_sms_transport(function ($m, $p, $params) use (&$appels) {
+    $appels[] = $params;
+    return [200, ['count' => 1, 'list' => [['id' => 'POTW' . count($appels)]]], 'https://api.smsapi.pl'];
+});
+$rp = wsm_mkt_subscribe($pdo, ['email' => $mail('potw'), 'sms' => true, 'phone' => '+48690000007', 'lang' => 'pl']);
+$tokP = (string) wsm_mkt_sub_by_email($pdo, $mail('potw'))['sms_token'];
+ok('pied de page : le SMS de confirmation part, avec le lien court vers ce numéro',
+   $rp['sms_potwierdzenie'] && count($appels) === 1 && str_contains((string) $appels[0]['message'], '/s/' . $tokP)
+   && wsm_mkt_sub_by_email($pdo, $mail('potw'))['sms_status'] === 'oczekuje', $appels[0]['message'] ?? null);
+wsm_mkt_subscribe($pdo, ['email' => $mail('potw2'), 'sms' => true, 'phone' => '+48690000007']);
+ok('… pas un second dans la journée pour ce numéro (personne ne fait pleuvoir des SMS sur un tiers)', count($appels) === 1);
+ok('… et tant qu\'il n\'est pas confirmé, le numéro n\'est dans aucun public',
+   !in_array('+48690000007', array_column(wsm_mkt_audience_sms($pdo, 'wszyscy'), 'phone'), true));
+
+// Une panne du compte (crédit épuisé) : le SMS attend, il n'échoue pas pour toujours.
+[$cid2] = wsm_sms_camp_save($pdo, ['nazwa' => 'Panne ' . $sfx, 'segment' => 'wszyscy', 'ascii' => 1,
+    'tresc' => 'Szoko Shop: nowa czekolada juz jest. {link}'], 'test');
+$GLOBALS['mkt_sms'][] = $cid2;
+$pdo->prepare("UPDATE wsm_sms_campaigns SET status = 'wysylanie' WHERE id = ?")->execute([$cid2]);
+ok('une campagne déjà PRISE (double clic, deuxième onglet) ne repart pas', wsm_sms_camp_send($pdo, $cid2, 'test')[0] === 0);
+$pdo->prepare("UPDATE wsm_sms_campaigns SET status = 'szkic' WHERE id = ?")->execute([$cid2]);
+wsm_mkt_subscribe($pdo, ['email' => $mail('panne'), 'sms' => true, 'phone' => '+48690000008', 'source' => 'kasa']);
+[$n2] = wsm_sms_camp_send($pdo, $cid2, 'test');
+wsm_sms_transport(fn() => [200, ['error' => 103, 'message' => 'Insufficient credits'], 'https://api.smsapi.pl']);
+$r2 = wsm_sms_pump($pdo, 50);
+$st = $pdo->prepare("SELECT status FROM wsm_sms WHERE campaign_id = ? AND phone = ?");
+$st->execute([$cid2, '+48690000008']);
+ok('crédit épuisé : la pompe s\'arrête, le SMS reste en file (pas en erreur)',
+   $n2 >= 1 && $r2['wyslane'] === 0 && str_contains($r2['uwaga'], 'czekają') && (string) $st->fetchColumn() === 'kolejka', $r2);
+$pdo->prepare("DELETE FROM wsm_sms WHERE campaign_id = ?")->execute([$cid2]);
 
 // ---- 6. La newsletter --------------------------------------------------------------------------
 echo "\n-- newsletter: render, tłumaczenia, linki, wysyłka --\n";
@@ -349,6 +421,23 @@ wsm_mail_queue($pdo, ['email' => $mail('p4'), 'subject' => 'a', 'body' => 'x', '
 wsm_mail_transport(fn() => [false, 'SMTP: serwer nie przywitał']);
 $r = wsm_mkt_pump($pdo, 50, 0);
 ok('trois échecs de suite : la pompe s\'arrête (le 4e attend)', $r['mail_bledy'] === 3 && str_contains(implode(' ', $r['uwagi']), 'wstrzymano'));
+$st = $pdo->prepare("SELECT COUNT(*) FROM wsm_messages WHERE event_key IN (?,?,?) AND status = 'kolejka'");
+$st->execute(['nl-0-' . $mail('p1'), 'nl-0-' . $mail('p2'), 'nl-0-' . $mail('p3')]);
+ok('… et ces trois-là retournent en file : une panne ne marque pas la campagne en erreur, trois lignes par minute', (int) $st->fetchColumn() === 3);
+wsm_mail_transport(fn() => [false, 'SMTP: odbiorca odrzucony — 550 no such user']);
+$r = wsm_mkt_pump($pdo, 3, 0);
+ok('une ADRESSE refusée n\'est pas une panne : la pompe continue, la ligne reste en erreur',
+   $r['mail_bledy'] === 3 && !str_contains(implode(' ', $r['uwagi']), 'wstrzymano'));
+// Le refus se relit au départ : désinscrit après la mise en file, rien ne part.
+$pz = $mail('pozno');
+wsm_mail_queue($pdo, ['email' => $pz, 'subject' => 'a', 'body' => 'x', 'event_key' => 'nl-0-' . $pz]);
+wsm_mkt_unsub_email($pdo, $pz, 'test');
+$envoyes = [];
+wsm_mail_transport(function (array $m) use (&$envoyes) { $envoyes[] = $m['to']; return [true, '']; });
+wsm_mkt_pump($pdo, 200, 0, 60.0);
+$st = $pdo->prepare("SELECT status FROM wsm_messages WHERE event_key = ?");
+$st->execute(['nl-0-' . $pz]);
+ok('désinscrit APRÈS la mise en file : la newsletter ne part pas (pominięta)', !in_array($pz, $envoyes, true) && (string) $st->fetchColumn() === 'pominieta');
 // Deux pompes à la fois (deux écrans ouverts, l'écran et la tâche planifiée) :
 // celle-ci a listé A et B ; pendant qu'elle envoie A, l'autre prend B.
 $pa = $mail('pa'); $pb = $mail('pb');
@@ -365,6 +454,16 @@ $st = $pdo->prepare("SELECT status FROM wsm_messages WHERE event_key = ?");
 $st->execute(['nl-0-' . $pb]);
 ok('deux pompes en même temps : un message pris par l\'autre ne part pas deux fois',
    in_array($pa, $envoyes, true) && !in_array($pb, $envoyes, true) && (string) $st->fetchColumn() === 'wysylanie', $envoyes);
+
+$pdo->prepare("UPDATE wsm_newsletters SET status = 'wysylanie' WHERE id = ?")->execute([$nid]);
+ok('une newsletter déjà PRISE ne repart pas (double clic)', wsm_nl_send($pdo, $nid, 'test')[0] === 0);
+$pdo->prepare("UPDATE wsm_newsletters SET status = 'wyslana' WHERE id = ?")->execute([$nid]);
+$long = str_repeat('a', 90) . '@example.com';
+$kl = wsm_nl_event_key(7, $long);
+ok('une adresse longue entre dans la clé (100 caractères) par son empreinte', strlen($kl) <= 100 && str_starts_with($kl, 'nl-7-h') && wsm_nl_event_key(7, 'a@b.pl') === 'nl-7-a@b.pl');
+$mid = wsm_mail_queue($pdo, ['email' => $mail('crlf'), 'subject' => "Promo\r\nBcc: ktos@example.com", 'body' => 'x']);
+$st = $pdo->prepare("SELECT subject FROM wsm_messages WHERE id = ?"); $st->execute([$mid]);
+ok('un saut de ligne dans un sujet ne devient pas un en-tête', !preg_match('/[\r\n]/', (string) $st->fetchColumn()));
 
 // ---- 9. L'IA -----------------------------------------------------------------------------------
 echo "\n-- AI: proponuje, nie wymyśla --\n";
@@ -399,7 +498,20 @@ echo "\n-- konsola, sklep, trasy --\n";
 $sec = console_sections_marketing($racine);
 ok('menu : section Marketing (Newsletter, SMS, Subskrybenci, Kampanie)', $sec);
 $auth = $lire('mrszoko/backoffice/php-api/auth.php');
-ok('le rôle Sprzedaż écrit sur les trois écrans', str_contains($auth, "'newsletter.php' => 'w', 'sms.php' => 'w', 'subskrybenci.php' => 'w'"));
+ok('le rôle Sprzedaż prépare sur les trois écrans', str_contains($auth, "'newsletter.php' => 'w', 'sms.php' => 'w', 'subskrybenci.php' => 'w'"));
+ok('… mais envoyer, effacer, exporter : l\'administration seulement',
+   !wsm_mkt_decide(['role' => 'Sprzedaż']) && !wsm_mkt_decide(['role' => 'Podgląd']) && wsm_mkt_decide(['role' => WSM_ROLE_ADMIN]));
+$nlEcran = $lire('mrszoko/backoffice/newsletter.php'); $smsEcran = $lire('mrszoko/backoffice/sms.php'); $subEcran = $lire('mrszoko/backoffice/subskrybenci.php');
+ok('… vérifié au moment d\'envoyer, pas seulement caché dans la page',
+   substr_count($nlEcran, '!wsm_mkt_decide($me)') >= 2 && substr_count($smsEcran, 'wsm_mkt_decide($me)') >= 2
+   && str_contains($subEcran, "isset(\$_POST['usun']) && !\$decide") && str_contains($subEcran, "isset(\$_GET['csv']) && \$decide"));
+ok('sans « Publiczny adres sklepu », pas d\'envoi de campagne', str_contains($nlEcran, '!wsm_mkt_adres_ok()') && str_contains($smsEcran, '!wsm_mkt_adres_ok()'));
+ok('l\'export CSV neutralise les formules (= + - @)', str_contains($subEcran, 'array_map($cellule'));
+$boutique = $lire('mrszoko/shop/index.php');
+ok('la preuve du consentement est composée par le serveur, jamais lue dans le formulaire',
+   !str_contains($boutique, "\$_POST['tekst_nl']") && !str_contains($lire('mrszoko/shop/layout.php'), 'name="tekst_nl"') && str_contains($boutique, 'nl_textes_zgody($S)'));
+ok('la confirmation de l\'e-mail se fait par un bouton (POST), pas à l\'ouverture du lien',
+   (bool) preg_match('/if \(\$method === \'POST\'\) \{\s*\[\$ok\] = wsm_mkt_confirm/', $boutique));
 $f = wsm_settings_fields();
 ok('Integracje : le jeton SMSAPI est un secret, la plateforme un choix pl|com',
    ($f['smsapi.token'][4] ?? '') === 'secret' && ($f['smsapi.region'][4] ?? '') === 'select:pl|com');

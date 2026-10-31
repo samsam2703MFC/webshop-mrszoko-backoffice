@@ -100,7 +100,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 [$ok, $m] = wsm_nl_test($pdo, $id, (string) ($_POST['adres'] ?? ''), (string) ($_POST['probka_jezyk'] ?? 'pl'), $acteur);
                 $flash = $m; $kind = $ok ? 'ok' : 'err';
             } elseif (isset($_POST['wyslij'])) {
-                if (empty($_POST['potwierdzam'])) { $flash = 'Zaznacz, że próbka została sprawdzona.'; $kind = 'err'; }
+                if (!wsm_mkt_decide($me)) { $flash = 'Wysyłkę do wszystkich zatwierdza administrator: przygotuj kampanię i próbkę, a administrator kliknie „Wyślij”.'; $kind = 'err'; }
+                elseif (!wsm_mkt_adres_ok()) { $flash = 'Najpierw ustaw „Publiczny adres sklepu” (Integracje → Sklep): od niego zależą linki w wiadomościach, wypisania i raporty doręczeń.'; $kind = 'err'; }
+                elseif (empty($_POST['potwierdzam'])) { $flash = 'Zaznacz, że próbka została sprawdzona.'; $kind = 'err'; }
                 else { [$n, $m] = wsm_nl_send($pdo, $id, $acteur); $flash = $m; $kind = $n > 0 ? 'ok' : 'err'; }
             }
         }
@@ -151,6 +153,9 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Marketing' => null, 'Newsletter' => $
 </div>
 <?php if (!wsm_mail_enabled()): ?>
 <p class="warnbox">Poczta wychodząca nie jest jeszcze skonfigurowana (Integracje → Poczta). Newslettery można przygotować i zaplanować — wyjdą, gdy poczta zacznie działać.</p>
+<?php endif; ?>
+<?php if (!wsm_mkt_adres_ok()): ?>
+<p class="warnbox">Brak „Publicznego adresu sklepu” (Integracje → Sklep). Kampanie można przygotować i przetestować, ale wysyłka czeka na ten adres: od niego zależą linki, wypisania i raporty doręczeń.</p>
 <?php endif; ?>
 <?php if ($pompe['mail'] > 0): ?><p class="hint">Przy otwarciu ekranu wyszło <?= (int) $pompe['mail'] ?> wiadomości z kolejki.</p><?php endif; ?>
 
@@ -304,7 +309,9 @@ console_crumbs(['Pulpit' => 'pulpit.php', 'Marketing' => null, 'Newsletter' => $
         <label class="field"><span>Język próbki</span><select name="probka_jezyk"><?php foreach (WSM_MKT_LANGS as $l): ?><option<?= $l === $jezyk ? ' selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?></select></label>
       </div>
       <p class="actions"><button type="submit" name="probka" value="1">Wyślij próbkę</button></p>
-      <?php if ($szkic): ?>
+      <?php if ($szkic && !wsm_mkt_decide($me)): ?>
+      <p class="hint">Wysyłkę do wszystkich zatwierdza administrator: przygotuj kampanię i próbkę, a administrator kliknie „Wyślij”.</p>
+      <?php elseif ($szkic): ?>
       <label class="chk" style="display:flex;gap:8px;align-items:center;margin:12px 0"><input type="checkbox" name="potwierdzam" value="1"> Próbka sprawdzona: temat, linki, ceny i kod są poprawne.</label>
       <p class="actions"><button class="btn btn--brand" type="submit" name="wyslij" value="1">Wyślij do <?= (int) $prev['odbiorcow'] ?> odbiorców</button></p>
       <?php else: ?>

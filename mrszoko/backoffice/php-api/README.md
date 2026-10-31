@@ -217,7 +217,18 @@ not tick the box are **left out by default**: the buyer segments (regulars,
 dormant, companies…) only narrow the confirmed list. Including them is a
 switch, `WSM_MKT_KLIENCI_BEZ_ZGODY=1` or *Integracje → Marketing*, to turn on
 only on a lawyer's advice. An SMS goes **only** to numbers whose owner ticked
-the separate SMS box.
+the separate SMS box. At checkout that number is the delivery phone and the
+consent is active at once; from the footer form anyone could type anyone's
+number, so the consent waits until the **phone** opens the link received by
+SMS (one confirmation SMS per number per day, the footer offers SMS only once
+SMSAPI works). E-mail confirmation and SMS confirmation both take a button
+press: mail scanners open links on their own.
+
+Sending a campaign, erasing a record and exporting the register are reserved
+to administrators; *Sprzedaż* prepares, tests and unsubscribes on request.
+Campaigns wait for **Publiczny adres sklepu** (`WSM_SHOP_URL`): links, opt-outs
+and delivery reports are built from it, and without it a forged `Host` header
+could put a foreign address in a confirmation mail.
 
 An e-mail refusal (unsubscribe link, one-click `List-Unsubscribe-Post`,
 *Usuń dane*) lands in the same `wsm_camp_stop` list the win-back mails already
